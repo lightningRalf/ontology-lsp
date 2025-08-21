@@ -1,12 +1,17 @@
 module.exports = {
-  preset: 'ts-jest',
+  preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
   testMatch: ['**/*.test.ts'],
+  extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
-    '^(\\.{1,2}/.*)\\.js$': '$1',
-    '^leven$': '<rootDir>/__mocks__/leven.js'
+    '^(\\.{1,2}/.*)\\.js$': '$1'
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(uuid|js-yaml)/)'
-  ]
+    'node_modules/(?!(leven|uuid|js-yaml)/)'
+  ],
+  globals: {
+    'ts-jest': {
+      useESM: true
+    }
+  }
 };
