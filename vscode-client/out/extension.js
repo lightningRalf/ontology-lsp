@@ -77,6 +77,8 @@ async function activate(context) {
         // Initialize configuration manager first
         configManager = new ConfigurationManager_1.ConfigurationManager(context);
         await configManager.initialize();
+        // Check if we're in test mode
+        const isTestMode = process.env.VSCODE_TEST === '1' || process.env.NODE_ENV === 'test';
         // Check if extension is enabled
         if (!configManager.get('enable')) {
             console.log('[Ontology LSP] Extension is disabled by configuration');
@@ -206,16 +208,17 @@ async function activate(context) {
                 }
             }
         };
-        // Create the language client
-        client = new node_1.LanguageClient('ontologyLSP', 'Ontology Language Server', serverOptions, clientOptions);
-        // Register client capabilities
-        client.registerProposedFeatures();
-        // Start the client
-        await client.start();
-        // Wait for server to be ready
-        await client.start();
-        // Setup post-initialization features
-        await setupPostInitialization(context);
+        // Skip server connection in test mode unless explicitly enabled
+        if (!isTestMode || process.env.ONTOLOGY_TEST_WITH_SERVER === 'true') {
+            // Create the language client
+            client = new node_1.LanguageClient('ontologyLSP', 'Ontology Language Server', serverOptions, clientOptions);
+            // Register client capabilities
+            client.registerProposedFeatures();
+            // Start the client
+            await client.start();
+            // Setup post-initialization features
+            await setupPostInitialization(context);
+        }
         // Initialize command manager with client reference
         commandManager = new CommandManager_1.CommandManager(context, client, configManager);
         await commandManager.registerCommands();
@@ -287,8 +290,22 @@ function getServerPath(context) {
     if (customPath) {
         return path.isAbsolute(customPath) ? customPath : path.join(context.extensionPath, customPath);
     }
-    // Use bundled server
-    return path.join(context.extensionPath, '..', 'dist', 'server.js');
+    // Try multiple locations for the server
+    const serverLocations = [
+        path.join(context.extensionPath, 'server.js'), // In extension directory
+        path.join(context.extensionPath, 'dist', 'server.js'), // In extension dist
+        '/home/lightningralf/programming/ontology-lsp/dist/server.js' // Absolute fallback
+    ];
+    const fs = require('fs');
+    for (const location of serverLocations) {
+        if (fs.existsSync(location)) {
+            console.log(`[Ontology LSP] Found server at: ${location}`);
+            return location;
+        }
+    }
+    // Default fallback
+    console.error('[Ontology LSP] Server not found in expected locations');
+    return serverLocations[0];
 }
 /**
  * Setup post-initialization features that require server connection

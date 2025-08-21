@@ -25,14 +25,10 @@
         "ai"
     ],
     "activationEvents": [
+        "onStartupFinished",
         "onLanguage:typescript",
         "onLanguage:javascript",
-        "onLanguage:python",
-        "onCommand:ontology.showGraph",
-        "onCommand:ontology.analyzeCodebase",
-        "workspaceContains:**/*.ts",
-        "workspaceContains:**/*.js",
-        "workspaceContains:**/*.py"
+        "onLanguage:python"
     ],
     "main": "./out/extension.js",
     "contributes": {
@@ -47,7 +43,7 @@
                 },
                 "ontologyLSP.server.path": {
                     "type": "string",
-                    "default": "",
+                    "default": "/home/lightningralf/programming/ontology-lsp/dist/server.js",
                     "description": "Path to the Ontology LSP server executable (leave empty for bundled)"
                 },
                 "ontologyLSP.trace.server": {
@@ -96,19 +92,19 @@
                 },
                 "ontologyLSP.propagation.maxDepth": {
                     "type": "number",
-                    "default": 3,
+                    "default": 2,
                     "minimum": 1,
                     "maximum": 10,
                     "description": "Maximum depth for propagation search"
                 },
                 "ontologyLSP.performance.cacheSize": {
                     "type": "number",
-                    "default": 500,
+                    "default": 250,
                     "description": "Maximum cache size in MB"
                 },
                 "ontologyLSP.performance.parallelWorkers": {
                     "type": "number",
-                    "default": 4,
+                    "default": 2,
                     "minimum": 1,
                     "maximum": 16,
                     "description": "Number of parallel workers for analysis"

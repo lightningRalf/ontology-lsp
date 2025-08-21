@@ -43,6 +43,9 @@ async function main() {
         // The path to test runner
         // Passed to --extensionTestsPath
         const extensionTestsPath = path.resolve(__dirname, './suite/index');
+        // Set test environment variables
+        process.env.VSCODE_TEST = '1';
+        process.env.NODE_ENV = 'test';
         // Download VS Code, unzip it and run the integration test
         await (0, test_electron_1.runTests)({
             extensionDevelopmentPath,
@@ -53,7 +56,13 @@ async function main() {
                 '--disable-web-security',
                 // Add a workspace folder for testing
                 path.resolve(__dirname, '../../../test-workspace')
-            ]
+            ],
+            // Pass environment variables to the test process
+            extensionTestsEnv: {
+                ...process.env,
+                VSCODE_TEST: '1',
+                NODE_ENV: 'test'
+            }
         });
     }
     catch (err) {
