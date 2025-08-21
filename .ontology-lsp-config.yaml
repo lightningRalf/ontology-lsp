@@ -1,0 +1,85 @@
+version: 1.0.0
+
+# Layer configuration
+layers:
+  claude_tools:
+    enabled: true
+    timeout: 100
+    maxResults: 100
+    fileTypes: [ts, tsx, js, jsx, py, java, go, rust]
+    
+  tree_sitter:
+    enabled: true
+    timeout: 500
+    languages: [typescript, javascript, python]
+    maxFileSize: 1MB
+    
+  ontology:
+    enabled: true
+    dbPath: .ontology/concepts.db
+    cacheSize: 1000
+    
+  patterns:
+    enabled: true
+    learningThreshold: 3
+    confidenceThreshold: 0.7
+    maxPatterns: 1000
+    
+  propagation:
+    enabled: true
+    maxDepth: 3
+    autoApplyThreshold: 0.9
+
+# Performance tuning
+performance:
+  caching:
+    memory:
+      maxSize: 500MB
+      ttl: 3600
+    disk:
+      enabled: true
+      path: .ontology/cache
+      maxSize: 2GB
+      
+  parallelism:
+    workers: 4
+    batchSize: 100
+    
+  indexing:
+    incremental: true
+    watchDebounce: 500
+    
+# Search configuration
+search:
+  fuzzy:
+    editDistanceThreshold: 3
+    tokenOverlapThreshold: 0.5
+    semanticSimilarityThreshold: 0.7
+  
+  context:
+    windowSize: 3
+    includeComments: true
+    includeStrings: false
+
+# Pattern learning
+patterns:
+  synonyms:
+    get: [fetch, retrieve, load, obtain]
+    set: [update, modify, change, assign]
+    create: [make, build, generate, produce]
+    delete: [remove, destroy, eliminate]
+  
+  transformations:
+    camelCase: true
+    snake_case: true
+    PascalCase: true
+    kebab-case: true
+
+# Monitoring
+monitoring:
+  metrics:
+    enabled: true
+    
+  logging:
+    level: info
+    format: json
