@@ -1,5 +1,5 @@
 // Pattern Storage - Manages persistence of learned patterns
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
 import { Pattern, Example, TokenPattern, PatternCategory } from '../types/core';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -50,7 +50,7 @@ interface TopPerformingPatternRow {
 }
 
 export class PatternStorage {
-    private db: Database.Database;
+    private db: Database;
     
     constructor(private dbPath: string) {
         // Ensure directory exists
@@ -60,7 +60,7 @@ export class PatternStorage {
         }
         
         this.db = new Database(dbPath);
-        this.db.pragma('journal_mode = WAL');
+        this.db.exec('PRAGMA journal_mode = WAL');
     }
     
     async initialize(): Promise<void> {

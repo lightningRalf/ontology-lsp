@@ -1,5 +1,5 @@
 // Ontology Storage - SQLite-based persistence for concepts and relations
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
 import { Concept, Relation } from '../types/core';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -64,7 +64,7 @@ interface StatsRow {
 }
 
 export class OntologyStorage {
-    private db: Database.Database;
+    private db: Database;
     
     constructor(private dbPath: string) {
         // Ensure directory exists
@@ -74,7 +74,7 @@ export class OntologyStorage {
         }
         
         this.db = new Database(dbPath);
-        this.db.pragma('journal_mode = WAL');
+        this.db.exec('PRAGMA journal_mode = WAL');
     }
     
     async initialize(): Promise<void> {

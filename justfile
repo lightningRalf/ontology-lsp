@@ -2,7 +2,7 @@
 
 # Build the LSP server
 build:
-    npm run build
+    ~/.bun/bin/bun build ./src/server.ts --target=bun --outdir=dist --format=esm
 
 # Build the VS Code extension
 build-extension:
@@ -21,7 +21,7 @@ install-extension: build-all package-extension
 
 # Start the LSP server
 start:
-    node dist/server.js --stdio
+    ~/.bun/bin/bun run dist/server.js --stdio
 
 # Check server status
 status:
@@ -62,7 +62,7 @@ test-coverage:
 
 # Run linter
 lint:
-    npm run lint
+    ~/.bun/bin/bun run lint
     cd vscode-client && npm run lint
 
 # Clean and rebuild
@@ -73,7 +73,7 @@ clean:
 
 # Development mode (auto-restart)
 dev:
-    npm run dev
+    ~/.bun/bin/bun run src/server.ts --stdio
 
 # Open VS Code with extension in development mode
 dev-extension:

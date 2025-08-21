@@ -110,9 +110,12 @@ async function activate(context) {
         const serverModule = getServerPath(context);
         const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
         // Server options with automatic restart on crash
+        // Use Bun to run the server for native SQLite support
+        const bunPath = '/home/lightningralf/.bun/bin/bun';
         const serverOptions = {
             run: {
-                module: serverModule,
+                command: bunPath,
+                args: ['run', serverModule, '--stdio'],
                 transport: node_1.TransportKind.stdio,
                 options: {
                     cwd: context.extensionPath,
@@ -124,10 +127,10 @@ async function activate(context) {
                 }
             },
             debug: {
-                module: serverModule,
+                command: bunPath,
+                args: ['run', serverModule, '--stdio'],
                 transport: node_1.TransportKind.stdio,
                 options: {
-                    ...debugOptions,
                     cwd: context.extensionPath,
                     env: {
                         ...process.env,

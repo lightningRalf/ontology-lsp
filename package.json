@@ -4,11 +4,13 @@
   "description": "Ontology-enhanced LSP proxy with fuzzy matching and pattern learning",
   "main": "dist/server.js",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/server.js",
-    "dev": "ts-node src/server.ts",
+    "build": "bun build ./src/server.ts --target=node --outdir=dist --format=cjs",
+    "build:tsc": "tsc",
+    "start": "bun run dist/server.js --stdio",
+    "dev": "bun run src/server.ts",
     "test": "jest",
-    "lint": "eslint src/**/*.ts",
+    "lint": "bunx @biomejs/biome check --write .",
+    "format": "bunx @biomejs/biome format --write .",
     "clean": "rimraf dist"
   },
   "keywords": [
@@ -21,7 +23,6 @@
   "author": "Claude Code Enhanced",
   "license": "MIT",
   "dependencies": {
-    "better-sqlite3": "^12.2.0",
     "bloom-filters": "^3.0.4",
     "chokidar": "^4.0.3",
     "graphlib": "^2.1.8",
@@ -36,6 +37,7 @@
     "vscode-languageserver-textdocument": "^1.0.12"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.2.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/graphlib": "^2.1.12",
     "@types/jest": "^30.0.0",
@@ -53,5 +55,11 @@
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "trustedDependencies": [
+    "tree-sitter",
+    "tree-sitter-javascript",
+    "tree-sitter-python",
+    "tree-sitter-typescript"
+  ]
 }

@@ -99,9 +99,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
         const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
         
         // Server options with automatic restart on crash
+        // Use Bun to run the server for native SQLite support
+        const bunPath = '/home/lightningralf/.bun/bin/bun';
         const serverOptions: ServerOptions = {
             run: {
-                module: serverModule,
+                command: bunPath,
+                args: ['run', serverModule, '--stdio'],
                 transport: TransportKind.stdio,
                 options: {
                     cwd: context.extensionPath,
@@ -113,10 +116,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
                 }
             },
             debug: {
-                module: serverModule,
+                command: bunPath,
+                args: ['run', serverModule, '--stdio'],
                 transport: TransportKind.stdio,
                 options: {
-                    ...debugOptions,
                     cwd: context.extensionPath,
                     env: {
                         ...process.env,
