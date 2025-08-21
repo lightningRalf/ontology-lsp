@@ -57,21 +57,34 @@ An intelligent Language Server Protocol (LSP) proxy that uses semantic understan
 ## Installation
 
 ### Prerequisites
-- Node.js 18+ 
-- Claude Code environment
-- TypeScript project
+- Bun runtime (recommended) or Node.js 18+
+- Claude Code environment (optional)
+- TypeScript/JavaScript/Python project
 
-### Quick Start
+### Quick Start with bunx (No Install Required!)
 
 ```bash
-# Install the package
+# Run directly without installing using bunx
+bunx ontology-lsp-proxy init
+bunx ontology-lsp-proxy start --stdio
+bunx ontology-lsp-proxy analyze
+bunx ontology-lsp-proxy stats
+
+# Or use the shorter alias after first run
+bunx ontology-lsp init
+```
+
+### Global Installation
+
+```bash
+# Install globally with npm
 npm install -g ontology-lsp-proxy
 
-# Initialize in your project
-cd your-project
-ontology-lsp init
+# Or with Bun
+bun install -g ontology-lsp-proxy
 
-# Start the server
+# Then use directly
+ontology-lsp init
 ontology-lsp start
 ```
 

@@ -3,8 +3,21 @@
   "version": "1.0.0",
   "description": "Ontology-enhanced LSP proxy with fuzzy matching and pattern learning",
   "main": "dist/server.js",
+  "bin": {
+    "ontology-lsp": "./dist/cli/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/ontology-lsp"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "build": "bun build ./src/server.ts --target=bun --outdir=dist --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python",
+    "build": "bun build ./src/server.ts --target=bun --outdir=dist --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python && bun build ./src/cli/index.ts --target=bun --outdir=dist/cli --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python",
+    "build:cli": "bun build ./src/cli/index.ts --target=bun --outdir=dist/cli --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python",
     "build:tsc": "tsc",
     "start": "bun run dist/server.js --stdio",
     "dev": "bun run src/server.ts",
@@ -26,6 +39,7 @@
     "@types/glob": "^9.0.0",
     "bloom-filters": "^3.0.4",
     "chokidar": "^4.0.3",
+    "commander": "^14.0.0",
     "glob": "^11.0.3",
     "graphlib": "^2.1.8",
     "js-yaml": "^4.1.0",

@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec /home/lightningralf/.bun/bin/bun run /home/lightningralf/programming/ontology-lsp/dist/cli/index.js "$@"
