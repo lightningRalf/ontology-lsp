@@ -9,9 +9,9 @@ module.exports = {
   transformIgnorePatterns: [
     'node_modules/(?!(leven|uuid|js-yaml)/)'
   ],
-  globals: {
-    'ts-jest': {
+  transform: {
+    '^.+\\.ts$': ['ts-jest', {
       useESM: true
-    }
+    }]
   }
 };
