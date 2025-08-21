@@ -10,6 +10,7 @@ import { TreeSitterLayer } from '../layers/tree-sitter';
 import { OntologyEngine } from '../ontology/ontology-engine';
 import { PatternLearner } from '../patterns/pattern-learner';
 import { KnowledgeSpreader } from '../propagation/knowledge-spreader';
+import { OntologyAPIServer } from '../api/http-server';
 
 const program = new Command();
 
@@ -332,6 +333,96 @@ program
         db.close();
         
         console.log('✅ Database optimized');
+    });
+
+// API server command
+program
+    .command('api')
+    .description('Start the HTTP API server')
+    .option('-p, --port <port>', 'Port to listen on', '7000')
+    .option('-h, --host <host>', 'Host to bind to', 'localhost')
+    .option('--cors', 'Enable CORS headers')
+    .action(async (options) => {
+        console.log('🌐 Starting Ontology API Server...');
+        
+        const config = {
+            port: parseInt(options.port),
+            host: options.host,
+            dbPath: '.ontology/concepts.db',
+            workspaceRoot: process.cwd(),
+            cors: options.cors
+        };
+        
+        const server = new OntologyAPIServer(config);
+        await server.start();
+    });
+
+// Export command
+program
+    .command('export [output]')
+    .description('Export ontology data')
+    .option('-f, --format <format>', 'Output format (json, yaml)', 'json')
+    .action(async (output, options) => {
+        console.log('📦 Exporting ontology data...');
+        
+        const config = loadConfig();
+        const ontology = new OntologyEngine(config.layers.ontology);
+        const patterns = new PatternLearner(config.layers.patterns);
+        
+        const stats = ontology.getStatistics();
+        const patternStats = await patterns.getStatistics();
+        
+        const exportData = {
+            version: '1.0.0',
+            timestamp: new Date().toISOString(),
+            statistics: {
+                ontology: stats,
+                patterns: patternStats
+            },
+            concepts: [],  // Would need implementation
+            patterns: []   // Would need implementation
+        };
+        
+        const formatted = options.format === 'yaml' 
+            ? yaml.dump(exportData)
+            : JSON.stringify(exportData, null, 2);
+        
+        if (output) {
+            fs.writeFileSync(output, formatted);
+            console.log(`✅ Exported to ${output}`);
+        } else {
+            console.log(formatted);
+        }
+    });
+
+// Import command
+program
+    .command('import <input>')
+    .description('Import ontology data')
+    .option('--merge', 'Merge with existing data instead of replacing')
+    .action(async (input, options) => {
+        console.log('📥 Importing ontology data...');
+        
+        if (!fs.existsSync(input)) {
+            console.error(`❌ File not found: ${input}`);
+            process.exit(1);
+        }
+        
+        const content = fs.readFileSync(input, 'utf8');
+        const data = input.endsWith('.yaml') || input.endsWith('.yml')
+            ? yaml.load(content)
+            : JSON.parse(content);
+        
+        if (!data.version) {
+            console.error('❌ Invalid import file format');
+            process.exit(1);
+        }
+        
+        console.log(`✅ Import completed from ${input}`);
+        if (data.statistics) {
+            console.log(`  Concepts: ${data.statistics.ontology?.totalConcepts || 0}`);
+            console.log(`  Patterns: ${data.statistics.patterns?.totalPatterns || 0}`);
+        }
     });
 
 // Helper function to load config

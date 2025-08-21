@@ -583,4 +583,38 @@ export class OntologyEngine extends EventEmitter {
         await this.storage.close();
         this.removeAllListeners();
     }
+
+    async importConcept(conceptData: any): Promise<void> {
+        const concept: Concept = {
+            id: conceptData.id || uuidv4(),
+            canonicalName: conceptData.canonicalName,
+            representations: new Map(conceptData.representations || []),
+            relations: new Map(conceptData.relations || []),
+            confidence: conceptData.confidence || 0.5,
+            signature: conceptData.signature,
+            metadata: conceptData.metadata || {},
+            evolution: conceptData.evolution || []
+        };
+        
+        await this.addConcept(concept);
+    }
+
+    async exportConcepts(): Promise<any[]> {
+        const concepts: any[] = [];
+        
+        for (const [id, concept] of this.concepts) {
+            concepts.push({
+                id: concept.id,
+                canonicalName: concept.canonicalName,
+                representations: Array.from(concept.representations.entries()),
+                relations: Array.from(concept.relations.entries()),
+                confidence: concept.confidence,
+                signature: concept.signature,
+                metadata: concept.metadata,
+                evolution: concept.evolution
+            });
+        }
+        
+        return concepts;
+    }
 }

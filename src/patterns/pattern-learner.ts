@@ -661,4 +661,43 @@ export class PatternLearner extends EventEmitter {
         await this.storage.close();
         this.removeAllListeners();
     }
+
+    async importPattern(patternData: any): Promise<void> {
+        const pattern: Pattern = {
+            id: patternData.id || uuidv4(),
+            from: patternData.from,
+            to: patternData.to,
+            category: patternData.category || PatternCategory.General,
+            confidence: patternData.confidence || 0.5,
+            examples: patternData.examples || [],
+            metadata: patternData.metadata || {},
+            createdAt: patternData.createdAt ? new Date(patternData.createdAt) : new Date(),
+            lastApplied: patternData.lastApplied ? new Date(patternData.lastApplied) : new Date(),
+            occurrences: patternData.occurrences || 0
+        };
+        
+        this.patterns.set(pattern.id, pattern);
+        await this.storage.savePattern(pattern);
+    }
+
+    async exportPatterns(): Promise<any[]> {
+        const patterns: any[] = [];
+        
+        for (const [id, pattern] of this.patterns) {
+            patterns.push({
+                id: pattern.id,
+                from: pattern.from,
+                to: pattern.to,
+                category: pattern.category,
+                confidence: pattern.confidence,
+                examples: pattern.examples,
+                metadata: pattern.metadata,
+                createdAt: pattern.createdAt,
+                lastApplied: pattern.lastApplied,
+                occurrences: pattern.occurrences
+            });
+        }
+        
+        return patterns;
+    }
 }
