@@ -10,10 +10,54 @@ import {
 } from '../types/claude-tools';
 import * as path from 'path';
 
-// Claude Code tools (correct capitalization)
-declare const Grep: (params: ClaudeGrepParams) => Promise<ClaudeGrepResult[] | string[]>;
-declare const Glob: (params: ClaudeGlobParams) => Promise<ClaudeGlobResult>;
-declare const LS: (params: ClaudeLSParams) => Promise<ClaudeLSResult>;
+// Import actual implementations instead of declaring them
+import { execSync } from 'child_process';
+import * as fs from 'fs';
+import { glob as globLib } from 'glob';
+
+// Implement Claude Code tool replacements
+const Grep = async (params: ClaudeGrepParams): Promise<ClaudeGrepResult[] | string[]> => {
+    try {
+        const cmd = `rg "${params.pattern}" ${params.path || '.'} --json ${params['-i'] ? '-i' : ''} ${params['-n'] ? '-n' : ''} ${params.type ? `--type ${params.type}` : ''}`;
+        const result = execSync(cmd, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }).trim();
+        return result.split('\n').filter(Boolean).map(line => {
+            try {
+                return JSON.parse(line);
+            } catch {
+                return line;
+            }
+        });
+    } catch {
+        return [];
+    }
+};
+
+const Glob = async (params: ClaudeGlobParams): Promise<ClaudeGlobResult> => {
+    try {
+        const files = await globLib(params.pattern, { 
+            cwd: params.path || process.cwd(),
+            ignore: ['node_modules/**', '.git/**']
+        });
+        return { files };
+    } catch {
+        return { files: [] };
+    }
+};
+
+const LS = async (params: ClaudeLSParams): Promise<ClaudeLSResult> => {
+    try {
+        const entries = fs.readdirSync(params.path, { withFileTypes: true });
+        return {
+            entries: entries.map(e => ({
+                name: e.name,
+                type: e.isDirectory() ? 'directory' : 'file',
+                path: path.join(params.path, e.name)
+            }))
+        };
+    } catch {
+        return { entries: [] };
+    }
+};
 
 export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
     name = 'ClaudeToolsLayer';

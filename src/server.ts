@@ -92,6 +92,12 @@ export class OntologyLSPServer {
         this.connection.onRequest('ontology/suggestRefactor', this.onSuggestRefactor.bind(this));
         this.connection.onRequest('ontology/getStatistics', this.onGetStatistics.bind(this));
         this.connection.onRequest('ontology/learnPattern', this.onLearnPattern.bind(this));
+        this.connection.onRequest('ontology/getConceptGraph', this.onGetConceptGraph.bind(this));
+        this.connection.onRequest('ontology/getPatterns', this.onGetPatterns.bind(this));
+        this.connection.onRequest('ontology/analyzeCodebase', this.onAnalyzeCodebase.bind(this));
+        this.connection.onRequest('ontology/clearCache', this.onClearCache.bind(this));
+        this.connection.onRequest('ontology/exportOntology', this.onExportOntology.bind(this));
+        this.connection.onRequest('ontology/importOntology', this.onImportOntology.bind(this));
         
         // Document change handlers
         this.documents.onDidChangeContent(this.onDocumentChange.bind(this));
@@ -627,6 +633,93 @@ export class OntologyLSPServer {
             strengthened: result.strengthened,
             newCandidate: result.newCandidate,
             patternId: result.pattern?.id
+        };
+    }
+    
+    private async onGetConceptGraph(): Promise<any> {
+        // Get all concepts and their relationships
+        const stats = this.ontology.getStatistics();
+        const concepts: any[] = [];
+        const links: any[] = [];
+        
+        // Build a simple graph structure for visualization
+        // Since we don't have a getAllConcepts method, we'll return basic stats
+        return {
+            nodes: [
+                { id: 'root', label: 'Ontology', type: 'root', size: stats.totalConcepts }
+            ],
+            edges: [],
+            stats: {
+                totalConcepts: stats.totalConcepts,
+                totalRelations: stats.totalRelations,
+                averageConfidence: stats.averageConfidence
+            }
+        };
+    }
+    
+    private async onGetPatterns(): Promise<any> {
+        const stats = await this.patternLearner.getStatistics();
+        // Return pattern statistics for now
+        return {
+            totalPatterns: stats.totalPatterns,
+            strongPatterns: stats.strongPatterns,
+            recentLearning: stats.recentLearning,
+            patterns: [] // Would need to implement getPatterns() in PatternLearner
+        };
+    }
+    
+    private async onAnalyzeCodebase(): Promise<any> {
+        const workspaceFolder = this.getWorkspaceFolder();
+        this.connection.window.showInformationMessage('Starting codebase analysis...');
+        
+        // Analyze TypeScript/JavaScript files
+        const tsFiles = await this.claudeTools.process({
+            identifier: '',
+            searchPath: workspaceFolder,
+            globPattern: '**/*.{ts,tsx,js,jsx}'
+        });
+        
+        // Analyze Python files
+        const pyFiles = await this.claudeTools.process({
+            identifier: '',
+            searchPath: workspaceFolder,
+            globPattern: '**/*.py'
+        });
+        
+        return {
+            filesAnalyzed: tsFiles.files.length + pyFiles.files.length,
+            languages: ['typescript', 'javascript', 'python'],
+            timestamp: new Date().toISOString()
+        };
+    }
+    
+    private async onClearCache(): Promise<any> {
+        // Clear caches
+        this.claudeTools = new ClaudeToolsLayer(this.globalSettings.layers.claude_tools);
+        
+        return {
+            success: true,
+            message: 'Cache cleared successfully'
+        };
+    }
+    
+    private async onExportOntology(): Promise<any> {
+        const stats = this.ontology.getStatistics();
+        
+        return {
+            version: '1.0.0',
+            timestamp: new Date().toISOString(),
+            statistics: stats,
+            concepts: [], // Would need to implement export functionality
+            patterns: []
+        };
+    }
+    
+    private async onImportOntology(params: { data: any }): Promise<any> {
+        // Would implement import functionality
+        return {
+            success: false,
+            message: 'Import functionality not yet implemented'
         };
     }
     

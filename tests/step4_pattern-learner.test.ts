@@ -23,11 +23,11 @@ describe('Step 4: PatternLearner', () => {
   });
 
   test('strengthens existing pattern on further examples', async () => {
-    const patterns = (learner as any).patterns;
-    const existing = patterns.values().next().value;
+    const things = (learner as any).patterns;
+    const existing = things.values().next().value;
     const prevOccurrences = existing.occurrences;
     await learner.learnFromRename('getItem', 'fetchItem', context);
-    const updated = patterns.get(existing.id);
+    const updated = things.get(existing.id);
     expect(updated.occurrences).toBeGreaterThanOrEqual(prevOccurrences);
     expect(updated.confidence).toBeGreaterThanOrEqual(existing.confidence);
   });
