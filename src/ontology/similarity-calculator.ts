@@ -1,5 +1,5 @@
 // Similarity Calculator - Computes semantic and syntactic similarity between identifiers
-import * as leven from 'leven';
+import leven from 'leven';
 
 export class SimilarityCalculator {
     private synonyms = new Map<string, string[]>();

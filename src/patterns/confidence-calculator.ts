@@ -98,7 +98,7 @@ export class ConfidenceCalculator {
     
     private categoryScore(category: string): number {
         // Different categories have different reliability
-        const categoryScores = {
+        const categoryScores: Record<string, number> = {
             'rename': 0.05,      // Basic renaming
             'refactor': 0.1,     // Structural refactoring
             'convention': 0.15,  // Naming convention changes (most reliable)

@@ -310,7 +310,7 @@ export class KnowledgeSpreader extends EventEmitter {
         path: PropagationPath,
         targetConcept: Concept
     ): string {
-        const explanations = {
+        const explanations: Record<string, string> = {
             'direct_relation': `Directly related to ${change.identifier}`,
             'historical_co_change': `Historically changes with ${change.identifier}`,
             'same_module': `In same module as ${change.identifier}`,

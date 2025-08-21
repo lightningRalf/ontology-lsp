@@ -49,15 +49,22 @@ export class OntologyLSPServer {
     private hasDiagnosticRelatedInformationCapability = false;
     
     // Our enhanced layers
-    private claudeTools: ClaudeToolsLayer;
-    private treeSitter: TreeSitterLayer;
-    private ontology: OntologyEngine;
-    private patternLearner: PatternLearner;
-    private knowledgeSpreader: KnowledgeSpreader;
+    private claudeTools!: ClaudeToolsLayer;
+    private treeSitter!: TreeSitterLayer;
+    private ontology!: OntologyEngine;
+    private patternLearner!: PatternLearner;
+    private knowledgeSpreader!: KnowledgeSpreader;
     
     // Configuration
     private globalSettings: Config = this.getDefaultSettings();
     private documentSettings = new Map<string, Thenable<Config>>();
+    
+    private getErrorMessage(error: unknown): string {
+        if (error instanceof Error) {
+            return error.message;
+        }
+        return String(error);
+    }
     
     constructor() {
         this.setupServer();
@@ -96,8 +103,40 @@ export class OntologyLSPServer {
         const dbPath = path.join(workspaceFolder, '.ontology', 'ontology.db');
         
         // Initialize layers
-        this.claudeTools = new ClaudeToolsLayer(this.globalSettings.layers.claude_tools);
-        this.treeSitter = new TreeSitterLayer();
+        const claudeToolsConfig = {
+            grep: {
+                defaultTimeout: this.globalSettings.layers.claude_tools.timeout,
+                maxResults: this.globalSettings.layers.claude_tools.maxResults,
+                caseSensitive: false,
+                includeContext: true,
+                contextLines: 3
+            },
+            glob: {
+                defaultTimeout: this.globalSettings.layers.claude_tools.timeout,
+                maxFiles: 1000,
+                ignorePatterns: ['node_modules/**', '.git/**']
+            },
+            ls: {
+                defaultTimeout: this.globalSettings.layers.claude_tools.timeout,
+                maxDepth: 10,
+                followSymlinks: false,
+                includeDotfiles: false
+            },
+            optimization: {
+                bloomFilter: true,
+                frequencyCache: true,
+                recentSearches: true,
+                negativeLookup: true
+            },
+            caching: {
+                enabled: true,
+                ttl: 3600,
+                maxEntries: 1000
+            }
+        };
+        
+        this.claudeTools = new ClaudeToolsLayer(claudeToolsConfig);
+        this.treeSitter = new TreeSitterLayer(this.globalSettings.layers.tree_sitter);
         this.ontology = new OntologyEngine(dbPath);
         this.patternLearner = new PatternLearner(dbPath, {
             learningThreshold: this.globalSettings.layers.patterns.learningThreshold,
@@ -284,7 +323,7 @@ export class OntologyLSPServer {
             return locations.length > 0 ? locations : null;
             
         } catch (error) {
-            this.connection.console.error(`Definition failed: ${error.message}`);
+            this.connection.console.error(`Definition failed: ${this.getErrorMessage(error)}`);
             return null;
         }
     }
@@ -339,7 +378,7 @@ export class OntologyLSPServer {
             return locations;
             
         } catch (error) {
-            this.connection.console.error(`References failed: ${error.message}`);
+            this.connection.console.error(`References failed: ${this.getErrorMessage(error)}`);
             return null;
         }
     }
@@ -497,7 +536,7 @@ export class OntologyLSPServer {
             return edit;
             
         } catch (error) {
-            this.connection.console.error(`Rename failed: ${error.message}`);
+            this.connection.console.error(`Rename failed: ${this.getErrorMessage(error)}`);
             return null;
         }
     }

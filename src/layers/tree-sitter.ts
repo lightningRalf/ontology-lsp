@@ -5,6 +5,9 @@ import { TreeSitterConfig } from '../types/core.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
+// Re-export ASTNode for other modules
+export { ASTNode } from '../types/core.js';
+
 // Language imports (in real implementation, these would be proper imports)
 declare const TypeScript: any;
 declare const JavaScript: any;
@@ -687,7 +690,7 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
         const value = parseFloat(match[1]);
         const unit = (match[2] || 'B').toUpperCase();
         
-        const multipliers = {
+        const multipliers: Record<string, number> = {
             'B': 1,
             'KB': 1024,
             'MB': 1024 * 1024,
@@ -744,7 +747,7 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
     }
     
     private extractImplementsClause(node: SyntaxNode): string[] {
-        const implements: string[] = [];
+        const implementsList: string[] = [];
         const heritageNode = this.findChildByType(node, 'class_heritage');
         
         if (heritageNode) {
@@ -752,13 +755,13 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
             if (implementsNode) {
                 for (const child of implementsNode.children) {
                     if (child.type === 'type_identifier') {
-                        implements.push(child.text);
+                        implementsList.push(child.text);
                     }
                 }
             }
         }
         
-        return implements;
+        return implementsList;
     }
     
     private extractImportInfo(node: SyntaxNode): { source: string; specifiers: string[] } | null {
