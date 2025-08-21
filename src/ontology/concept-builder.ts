@@ -1,7 +1,6 @@
 // Concept Builder - Creates concepts from various sources of information
-import { Concept, ConceptSignature, ConceptMetadata, SymbolRepresentation } from '../types/core';
-import { ASTNode, TreeSitterResult } from '../layers/tree-sitter';
-import { EnhancedMatches } from '../types/core';
+import { Concept, ConceptSignature, ConceptMetadata, SymbolRepresentation, ASTNode, EnhancedMatches } from '../types/core';
+import { TreeSitterResult } from '../layers/tree-sitter';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface BuildContext {

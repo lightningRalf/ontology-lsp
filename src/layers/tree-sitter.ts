@@ -5,9 +5,6 @@ import { TreeSitterConfig } from '../types/core';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
-// Re-export ASTNode for other modules
-export { ASTNode } from '../types/core';
-
 // Language imports - only load what we need
 let TypeScript: any = null;
 let JavaScript: any = null; 

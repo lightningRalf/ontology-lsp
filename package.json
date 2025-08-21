@@ -16,7 +16,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "bun build ./src/server.ts --target=bun --outdir=dist --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python && bun build ./src/cli/index.ts --target=bun --outdir=dist/cli --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python && bun build ./src/api/http-server.ts --target=bun --outdir=dist/api --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python",
+    "build": "~/.bun/bin/bun build ./src/server.ts --target=bun --outdir=dist --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python && ~/.bun/bin/bun build ./src/cli/index.ts --target=bun --outdir=dist/cli --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python && ~/.bun/bin/bun build ./src/api/http-server.ts --target=bun --outdir=dist/api --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python",
     "build:cli": "bun build ./src/cli/index.ts --target=bun --outdir=dist/cli --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python",
     "build:api": "bun build ./src/api/http-server.ts --target=bun --outdir=dist/api --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python",
     "build:tsc": "tsc",

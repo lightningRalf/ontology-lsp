@@ -1,5 +1,4 @@
 import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
-import { OntologyLSPServer } from '../src/server';
 import { ClaudeToolsLayer } from '../src/layers/claude-tools';
 import { TreeSitterLayer } from '../src/layers/tree-sitter';
 import { OntologyEngine } from '../src/ontology/ontology-engine';
@@ -9,7 +8,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 describe('Integration Tests', () => {
-  let server: OntologyLSPServer;
   let testDir: string;
 
   beforeAll(async () => {
@@ -30,9 +28,6 @@ describe('Integration Tests', () => {
         console.log('Setting user data:', id, data);
       }`
     );
-
-    // Initialize server
-    server = new OntologyLSPServer();
   });
 
   afterAll(async () => {

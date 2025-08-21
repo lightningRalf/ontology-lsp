@@ -38,7 +38,7 @@ test-all: test test-extension
 
 # Run server tests with Bun
 test:
-    bun test
+    ~/.bun/bin/bun test tests/step*.test.ts tests/integration.test.ts
 
 # Run extension tests
 test-extension:
@@ -46,23 +46,23 @@ test-extension:
 
 # Run unit tests only
 test-unit:
-    bun test tests/step*.test.ts
+    ~/.bun/bin/bun test tests/step*.test.ts
 
 # Run integration tests only
 test-integration:
-    bun test tests/integration.test.ts
+    ~/.bun/bin/bun test tests/integration.test.ts
 
 # Run performance tests only
 test-perf:
-    bun test tests/integration.test.ts --grep "Performance"
+    ~/.bun/bin/bun test tests/integration.test.ts --grep "Performance"
 
 # Run tests with coverage
 test-coverage:
-    bun test --coverage
+    ~/.bun/bin/bun test --coverage
 
 # Run tests in watch mode
 test-watch:
-    bun test --watch
+    ~/.bun/bin/bun test --watch
 
 # Run linter
 lint:

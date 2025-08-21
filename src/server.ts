@@ -927,6 +927,8 @@ export class OntologyLSPServer {
     }
 }
 
-// Create and start server
-const server = new OntologyLSPServer();
-server.start();
+// Create and start server only when run as main module
+if (import.meta.main || require.main === module) {
+    const server = new OntologyLSPServer();
+    server.start();
+}
