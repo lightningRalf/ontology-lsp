@@ -1,3 +1,4 @@
+import { describe, test, expect } from 'bun:test';
 import { KnowledgeSpreader } from '../src/propagation/knowledge-spreader';
 import { Concept } from '../src/types/core';
 

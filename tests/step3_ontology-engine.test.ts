@@ -1,3 +1,4 @@
+import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
 import { OntologyEngine } from '../src/ontology/ontology-engine';
 import { RelationType, Concept, SymbolRepresentation } from '../src/types/core';
 

@@ -1,3 +1,4 @@
+import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
 import { PatternLearner } from '../src/patterns/pattern-learner';
 import { RenameContext } from '../src/types/core';
 

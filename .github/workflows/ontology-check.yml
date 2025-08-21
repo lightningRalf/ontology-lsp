@@ -31,8 +31,8 @@ jobs:
       - name: Build project
         run: bun run build
       
-      - name: Run tests
-        run: bun test
+      - name: Run tests with coverage
+        run: bun test --coverage
       
       - name: Check ontology consistency
         run: |

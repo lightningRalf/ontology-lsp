@@ -36,9 +36,9 @@ status:
 # Run all tests
 test-all: test test-extension
 
-# Run server tests
+# Run server tests with Bun
 test:
-    npm test
+    bun test
 
 # Run extension tests
 test-extension:
@@ -46,19 +46,23 @@ test-extension:
 
 # Run unit tests only
 test-unit:
-    cd vscode-client && npm run test:unit
+    bun test tests/step*.test.ts
 
 # Run integration tests only
 test-integration:
-    cd vscode-client && npm run test:integration
+    bun test tests/integration.test.ts
 
-# Run end-to-end tests only
-test-e2e:
-    cd vscode-client && npm run test:e2e
+# Run performance tests only
+test-perf:
+    bun test tests/integration.test.ts --grep "Performance"
 
 # Run tests with coverage
 test-coverage:
-    cd vscode-client && npm run test:coverage
+    bun test --coverage
+
+# Run tests in watch mode
+test-watch:
+    bun test --watch
 
 # Run linter
 lint:

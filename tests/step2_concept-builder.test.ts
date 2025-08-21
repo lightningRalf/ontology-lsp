@@ -1,3 +1,4 @@
+import { describe, test, expect } from 'bun:test';
 import { ConceptBuilder, BuildContext, UsageExample } from '../src/ontology/concept-builder';
 import type { ASTNode } from '../src/types/core';
 

@@ -1,10 +1,12 @@
+import { describe, test, expect } from 'bun:test';
 import { SimilarityCalculator } from '../src/ontology/similarity-calculator';
 
 describe('Step 1: SimilarityCalculator', () => {
   const calc = new SimilarityCalculator();
 
   test('identical identifiers have similarity 1', async () => {
-    await expect(calc.calculate('getUser', 'getUser')).resolves.toBe(1);
+    const result = await calc.calculate('getUser', 'getUser');
+    expect(result).toBe(1);
   });
 
   test('synonym based identifiers show reasonable similarity', async () => {
