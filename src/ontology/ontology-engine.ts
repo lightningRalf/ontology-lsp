@@ -4,10 +4,10 @@ import { Graph } from 'graphlib';
 import { 
     Concept, Relation, RelationType, ConceptSignature, EvolutionHistory,
     ConceptMetadata, SymbolRepresentation, SearchQuery, Match, ASTNode
-} from '../types/core.js';
-import { OntologyStorage } from './storage.js';
-import { ConceptBuilder } from './concept-builder.js';
-import { SimilarityCalculator } from './similarity-calculator.js';
+} from '../types/core';
+import { OntologyStorage } from './storage';
+import { ConceptBuilder } from './concept-builder';
+import { SimilarityCalculator } from './similarity-calculator';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface RelatedConcept {

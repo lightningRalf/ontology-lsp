@@ -1,6 +1,6 @@
 // Confidence Calculator - Calculates confidence scores for patterns
-import { Pattern, Example } from '../types/core.js';
-import { PatternCandidate } from './pattern-learner.js';
+import { Pattern, Example } from '../types/core';
+import { PatternCandidate } from './pattern-learner';
 
 export class ConfidenceCalculator {
     

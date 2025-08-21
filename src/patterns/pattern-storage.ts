@@ -1,8 +1,53 @@
 // Pattern Storage - Manages persistence of learned patterns
 import Database from 'better-sqlite3';
-import { Pattern, Example, TokenPattern, PatternCategory } from '../types/core.js';
+import { Pattern, Example, TokenPattern, PatternCategory } from '../types/core';
 import * as path from 'path';
 import * as fs from 'fs';
+
+// Database row type interfaces
+interface PatternRow {
+    id: string;
+    from_pattern: string;
+    to_pattern: string;
+    confidence: number;
+    occurrences: number;
+    category: string;
+    last_applied: string;
+    created_at: string;
+    updated_at: string;
+}
+
+interface PatternExampleRow {
+    id: number;
+    pattern_id: string;
+    old_name: string;
+    new_name: string;
+    confidence: number;
+    context_data: string | null;
+    created_at: string;
+}
+
+interface PatternMetricsRow {
+    pattern_id: string;
+    total_applications: number;
+    successful_applications: number;
+    average_confidence: number;
+    last_success: string | null;
+    last_failure: string | null;
+}
+
+interface GlobalStatsRow {
+    total_patterns: number;
+    total_applications: number;
+    avg_success_rate: number;
+}
+
+interface TopPerformingPatternRow {
+    pattern_id: string;
+    category: string;
+    success_rate: number;
+    total_applications: number;
+}
 
 export class PatternStorage {
     private db: Database.Database;
@@ -168,7 +213,7 @@ export class PatternStorage {
             return null;
         }
         
-        return this.deserializePattern(patternRow);
+        return this.deserializePattern(patternRow as PatternRow);
     }
     
     async loadAllPatterns(): Promise<Pattern[]> {
@@ -181,12 +226,12 @@ export class PatternStorage {
         
         for (const row of patternRows) {
             try {
-                const pattern = await this.deserializePattern(row);
+                const pattern = await this.deserializePattern(row as PatternRow);
                 if (pattern) {
                     patterns.push(pattern);
                 }
             } catch (error) {
-                console.warn(`Failed to deserialize pattern ${row.id}:`, error);
+                console.warn(`Failed to deserialize pattern ${(row as PatternRow).id}:`, error);
             }
         }
         
@@ -204,12 +249,12 @@ export class PatternStorage {
         
         for (const row of patternRows) {
             try {
-                const pattern = await this.deserializePattern(row);
+                const pattern = await this.deserializePattern(row as PatternRow);
                 if (pattern) {
                     patterns.push(pattern);
                 }
             } catch (error) {
-                console.warn(`Failed to deserialize pattern ${row.id}:`, error);
+                console.warn(`Failed to deserialize pattern ${(row as PatternRow).id}:`, error);
             }
         }
         
@@ -266,7 +311,7 @@ export class PatternStorage {
     } | null> {
         const metricsRow = this.db.prepare(`
             SELECT * FROM pattern_metrics WHERE pattern_id = ?
-        `).get(patternId);
+        `).get(patternId) as PatternMetricsRow | undefined;
         
         if (!metricsRow) {
             return null;
@@ -300,7 +345,7 @@ export class PatternStorage {
                 AVG(CAST(successful_applications AS REAL) / NULLIF(total_applications, 0)) as avg_success_rate,
                 SUM(total_applications) as total_applications
             FROM pattern_metrics
-        `).get();
+        `).get() as GlobalStatsRow;
         
         const topPerformingRows = this.db.prepare(`
             SELECT 
@@ -320,10 +365,10 @@ export class PatternStorage {
             totalApplications: statsRow.total_applications || 0,
             averageSuccessRate: statsRow.avg_success_rate || 0,
             topPerformingPatterns: topPerformingRows.map(row => ({
-                patternId: row.pattern_id,
-                category: row.category,
-                successRate: row.success_rate || 0,
-                totalApplications: row.total_applications
+                patternId: (row as TopPerformingPatternRow).pattern_id,
+                category: (row as TopPerformingPatternRow).category,
+                successRate: (row as TopPerformingPatternRow).success_rate || 0,
+                totalApplications: (row as TopPerformingPatternRow).total_applications
             }))
         };
     }
@@ -360,7 +405,7 @@ export class PatternStorage {
         avgStmt.run(patternId, patternId);
     }
     
-    private async deserializePattern(row: any): Promise<Pattern | null> {
+    private async deserializePattern(row: PatternRow): Promise<Pattern | null> {
         try {
             // Load examples
             const exampleRows = this.db.prepare(`
@@ -369,17 +414,18 @@ export class PatternStorage {
             `).all(row.id);
             
             const examples: Example[] = exampleRows.map(exRow => {
-                const contextData = JSON.parse(exRow.context_data || '{}');
+                const typedExRow = exRow as PatternExampleRow;
+                const contextData = JSON.parse(typedExRow.context_data || '{}');
                 
                 return {
-                    oldName: exRow.old_name,
-                    newName: exRow.new_name,
-                    confidence: exRow.confidence,
+                    oldName: typedExRow.old_name,
+                    newName: typedExRow.new_name,
+                    confidence: typedExRow.confidence,
                     context: {
                         file: contextData.file || '',
                         concept: contextData.concept ? { id: contextData.concept } : undefined,
                         surroundingSymbols: contextData.surroundingSymbols || [],
-                        timestamp: new Date(contextData.timestamp || exRow.created_at)
+                        timestamp: new Date(contextData.timestamp || typedExRow.created_at)
                     }
                 } as Example;
             });

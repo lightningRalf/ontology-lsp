@@ -1,12 +1,12 @@
 // Tree-sitter AST Analysis Layer
 import Parser, { SyntaxNode, Tree, Query } from 'tree-sitter';
-import { Layer, EnhancedMatches, ASTNode, NodeMetadata } from '../types/core.js';
-import { TreeSitterConfig } from '../types/core.js';
+import { Layer, EnhancedMatches, ASTNode, NodeMetadata } from '../types/core';
+import { TreeSitterConfig } from '../types/core';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
 // Re-export ASTNode for other modules
-export { ASTNode } from '../types/core.js';
+export { ASTNode } from '../types/core';
 
 // Language imports (in real implementation, these would be proper imports)
 declare const TypeScript: any;
@@ -655,7 +655,7 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
             
             // Prefer certain file types
             if (file.endsWith('.ts') || file.endsWith('.tsx')) score += 2;
-            if (file.endsWith('.js') || file.endsWith('.jsx')) score += 1;
+            if (file.endsWith('') || file.endsWith('.jsx')) score += 1;
             
             // Prefer non-test files
             if (!file.includes('test') && !file.includes('spec')) score += 1;
@@ -673,7 +673,7 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
             case '.ts':
             case '.tsx':
                 return 'typescript';
-            case '.js':
+            case '':
             case '.jsx':
                 return 'javascript';
             case '.py':

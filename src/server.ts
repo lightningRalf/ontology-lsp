@@ -25,11 +25,11 @@ import {
 import { TextDocument } from 'vscode-languageserver-textdocument';
 
 // Import our layers and systems
-import { ClaudeToolsLayer } from './layers/claude-tools.js';
-import { TreeSitterLayer } from './layers/tree-sitter.js';
-import { OntologyEngine } from './ontology/ontology-engine.js';
-import { PatternLearner } from './patterns/pattern-learner.js';
-import { KnowledgeSpreader } from './propagation/knowledge-spreader.js';
+import { ClaudeToolsLayer } from './layers/claude-tools';
+import { TreeSitterLayer } from './layers/tree-sitter';
+import { OntologyEngine } from './ontology/ontology-engine';
+import { PatternLearner } from './patterns/pattern-learner';
+import { KnowledgeSpreader } from './propagation/knowledge-spreader';
 
 // Import types
 import { 
@@ -278,7 +278,7 @@ export class OntologyLSPServer {
             
             // Layer 3: Ontology concept lookup
             const concept = await this.ontology.findConcept(symbol);
-            context.concept = concept;
+            context.concept = concept || undefined;
             
             // Build enhanced definition results
             const locations: Location[] = [];
@@ -446,7 +446,7 @@ export class OntologyLSPServer {
             // Learn from this rename
             const renameContext = {
                 file: params.textDocument.uri,
-                concept,
+                concept: concept || undefined,
                 surroundingSymbols: await this.getSurroundingSymbols(document, params.position),
                 timestamp: new Date()
             };

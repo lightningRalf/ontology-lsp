@@ -1,7 +1,7 @@
 // Concept Builder - Creates concepts from various sources of information
-import { Concept, ConceptSignature, ConceptMetadata, SymbolRepresentation } from '../types/core.js';
-import { ASTNode, TreeSitterResult } from '../layers/tree-sitter.js';
-import { EnhancedMatches } from '../types/core.js';
+import { Concept, ConceptSignature, ConceptMetadata, SymbolRepresentation } from '../types/core';
+import { ASTNode, TreeSitterResult } from '../layers/tree-sitter';
+import { EnhancedMatches } from '../types/core';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface BuildContext {

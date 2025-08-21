@@ -4,10 +4,10 @@ import { Graph } from 'graphlib';
 import { 
     Change, Suggestion, PropagationPath, Concept, Pattern,
     RelatedConcept, Relation
-} from '../types/core.js';
-import { OntologyEngine } from '../ontology/ontology-engine.js';
-import { PatternLearner } from '../patterns/pattern-learner.js';
-import { PropagationRule, createDefaultRules } from './propagation-rules.js';
+} from '../types/core';
+import { OntologyEngine } from '../ontology/ontology-engine';
+import { PatternLearner } from '../patterns/pattern-learner';
+import { PropagationRule, createDefaultRules } from './propagation-rules';
 
 export interface PropagationContext {
     change: Change;
@@ -133,8 +133,20 @@ export class KnowledgeSpreader extends EventEmitter {
         
         return {
             change,
-            concept,
-            relatedConcepts,
+            concept: concept || undefined,
+            relatedConcepts: relatedConcepts.map(rc => ({
+                concept: rc.concept,
+                relationship: {
+                    id: '',
+                    targetConceptId: rc.concept.id,
+                    type: rc.relation as any,
+                    confidence: rc.confidence,
+                    evidence: [],
+                    createdAt: new Date()
+                } as Relation,
+                distance: rc.distance,
+                path: []
+            })),
             recentChanges,
             activePatterns,
             fileContext: await this.getFileContext(change.location),
@@ -156,8 +168,8 @@ export class KnowledgeSpreader extends EventEmitter {
                     affected.push({
                         concept: related.concept,
                         reason: 'direct_relation',
-                        confidence: related.confidence,
-                        evidence: [`Related via ${related.relation}`]
+                        confidence: related.relationship.confidence,
+                        evidence: [`Related via ${related.relationship.type}`]
                     });
                     processed.add(related.concept.id);
                 }

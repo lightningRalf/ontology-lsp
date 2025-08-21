@@ -1,6 +1,6 @@
 // Propagation Rules - Define how changes propagate between concepts
-import { Change, Concept, Suggestion } from '../types/core.js';
-import { PropagationContext } from './knowledge-spreader.js';
+import { Change, Concept, Suggestion } from '../types/core';
+import { PropagationContext } from './knowledge-spreader';
 
 export abstract class PropagationRule {
     constructor(
