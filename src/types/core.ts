@@ -103,6 +103,13 @@ export interface Relation {
     createdAt: Date;
 }
 
+export interface RelatedConcept {
+    concept: Concept;
+    relationship: Relation;
+    distance: number;
+    path?: string[];
+}
+
 export enum RelationType {
     Extends = 'extends',
     Implements = 'implements',
@@ -123,7 +130,7 @@ export interface ConceptSignature {
 
 export interface EvolutionHistory {
     timestamp: Date;
-    type: 'rename' | 'signature' | 'relation' | 'canonical_rename';
+    type: 'rename' | 'signature' | 'relation' | 'canonical_rename' | 'move';
     from: string;
     to: string;
     reason: string;
@@ -187,7 +194,6 @@ export interface Layer<T, R> {
     process(input: T): Promise<R>;
     fallback?: () => R;
     timeout: number;
-    cache?: CacheStrategy;
 }
 
 export interface CacheStrategy {
@@ -233,6 +239,8 @@ export interface NodeMetadata {
     exports?: Export[];
     calls?: string[];
     references?: string[];
+    extends?: string;
+    implements?: string[];
 }
 
 export interface Import {

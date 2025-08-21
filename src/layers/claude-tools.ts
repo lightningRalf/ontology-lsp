@@ -10,7 +10,7 @@ import {
 } from '../types/claude-tools.js';
 import * as path from 'path';
 
-// Mock interfaces for Claude Code tools (in real implementation, these would be imported)
+// Claude Code tools (correct capitalization)
 declare const Grep: (params: ClaudeGrepParams) => Promise<ClaudeGrepResult[] | string[]>;
 declare const Glob: (params: ClaudeGlobParams) => Promise<ClaudeGlobResult>;
 declare const LS: (params: ClaudeLSParams) => Promise<ClaudeLSResult>;
@@ -22,6 +22,13 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
     private cache = new Map<string, { result: EnhancedMatches; timestamp: number }>();
     private bloomFilter = new Set<string>();
     private frequencyMap = new Map<string, number>();
+    
+    private getErrorMessage(error: unknown): string {
+        if (error instanceof Error) {
+            return error.message;
+        }
+        return String(error);
+    }
     
     constructor(private config: ClaudeToolsLayerConfig) {}
     
@@ -72,7 +79,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             
         } catch (error) {
             throw new ClaudeToolError(
-                `Claude tools search failed: ${error.message}`,
+                `Claude tools search failed: ${this.getErrorMessage(error)}`,
                 'grep',
                 query,
                 error as Error
@@ -249,7 +256,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 matches: [],
                 searchTime: Date.now(),
                 success: false,
-                error: error.message
+                error: this.getErrorMessage(error)
             };
         }
     }
@@ -549,7 +556,9 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
         if (this.cache.size >= this.config.caching.maxEntries) {
             // Remove oldest entry
             const firstKey = this.cache.keys().next().value;
-            this.cache.delete(firstKey);
+            if (firstKey !== undefined) {
+                this.cache.delete(firstKey);
+            }
         }
         
         this.cache.set(key, {

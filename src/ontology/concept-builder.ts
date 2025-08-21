@@ -5,7 +5,7 @@ import { EnhancedMatches } from '../types/core.js';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface BuildContext {
-    identifier: string;
+    identifier?: string;
     location?: {
         uri: string;
         range: any;
@@ -88,7 +88,7 @@ export class ConceptBuilder {
     }
     
     async buildFromASTNode(node: ASTNode, context: BuildContext = {}): Promise<Concept | null> {
-        const identifier = this.extractIdentifierFromNode(node);
+        const identifier = context.identifier || this.extractIdentifierFromNode(node);
         if (!identifier) return null;
         
         const buildContext: BuildContext = {
