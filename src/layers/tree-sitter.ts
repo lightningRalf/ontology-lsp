@@ -8,10 +8,23 @@ import * as path from 'path';
 // Re-export ASTNode for other modules
 export { ASTNode } from '../types/core';
 
-// Language imports (in real implementation, these would be proper imports)
-declare const TypeScript: any;
-declare const JavaScript: any;
-declare const Python: any;
+// Language imports - only load what we need
+let TypeScript: any = null;
+let JavaScript: any = null; 
+let Python: any = null;
+
+try {
+    TypeScript = require('tree-sitter-typescript').typescript;
+    JavaScript = require('tree-sitter-typescript').javascript;
+} catch (e) {
+    console.warn('Failed to load TypeScript/JavaScript parsers:', e);
+}
+
+try {
+    Python = require('tree-sitter-python');
+} catch (e) {
+    console.warn('Failed to load Python parser:', e);
+}
 
 export interface TreeSitterResult {
     nodes: ASTNode[];
@@ -51,17 +64,29 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
     }
     
     private setupParsers(): void {
-        const languages = {
-            'typescript': TypeScript,
-            'javascript': JavaScript,
-            'python': Python
-        };
+        const languages: { [key: string]: any } = {};
+        
+        // Only add languages that are available and loaded
+        if (this.config.languages.includes('typescript') && TypeScript) {
+            languages['typescript'] = TypeScript;
+        }
+        
+        if (this.config.languages.includes('javascript') && JavaScript) {
+            languages['javascript'] = JavaScript;
+        }
+        
+        if (this.config.languages.includes('python') && Python) {
+            languages['python'] = Python;
+        }
         
         for (const [name, language] of Object.entries(languages)) {
-            if (this.config.languages.includes(name)) {
+            try {
                 const parser = new Parser();
                 parser.setLanguage(language);
                 this.parsers.set(name, parser);
+                console.log(`Initialized ${name} parser`);
+            } catch (e) {
+                console.warn(`Failed to initialize ${name} parser:`, e);
             }
         }
     }
