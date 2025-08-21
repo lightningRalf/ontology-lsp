@@ -1,8 +1,67 @@
 // Ontology Storage - SQLite-based persistence for concepts and relations
 import Database from 'better-sqlite3';
-import { Concept, Relation } from '../types/core.js';
+import { Concept, Relation } from '../types/core';
 import * as path from 'path';
 import * as fs from 'fs';
+
+// Database row type interfaces
+interface ConceptRow {
+    id: string;
+    canonical_name: string;
+    confidence: number;
+    data: string;
+    created_at: string;
+    updated_at: string;
+}
+
+interface RepresentationRow {
+    id: number;
+    concept_id: string;
+    name: string;
+    location_uri: string;
+    location_range: string;
+    first_seen: string;
+    last_seen: string;
+    occurrences: number;
+    context: string | null;
+}
+
+interface RelationRow {
+    id: string;
+    from_concept_id: string;
+    to_concept_id: string;
+    relation_type: string;
+    confidence: number;
+    evidence: string | null;
+    created_at: string;
+}
+
+interface EvolutionRow {
+    id: number;
+    concept_id: string;
+    timestamp: string;
+    change_type: string;
+    from_state: string;
+    to_state: string;
+    reason: string | null;
+    confidence: number;
+}
+
+interface MetadataRow {
+    concept_id: string;
+    category: string | null;
+    tags: string | null;
+    is_interface: boolean;
+    is_abstract: boolean;
+    is_deprecated: boolean;
+    documentation: string | null;
+}
+
+interface StatsRow {
+    total_concepts: number;
+    total_representations: number;
+    total_relations: number;
+}
 
 export class OntologyStorage {
     private db: Database.Database;
@@ -225,7 +284,7 @@ export class OntologyStorage {
     async loadConcept(conceptId: string): Promise<Concept | null> {
         const conceptRow = this.db.prepare(`
             SELECT * FROM concepts WHERE id = ?
-        `).get(conceptId);
+        `).get(conceptId) as ConceptRow | undefined;
         
         if (!conceptRow) return null;
         
@@ -241,12 +300,12 @@ export class OntologyStorage {
         
         for (const row of conceptRows) {
             try {
-                const concept = await this.deserializeConcept(row);
+                const concept = await this.deserializeConcept(row as ConceptRow);
                 if (concept) {
                     concepts.push(concept);
                 }
             } catch (error) {
-                console.warn(`Failed to deserialize concept ${row.id}:`, error);
+                console.warn(`Failed to deserialize concept ${(row as ConceptRow).id}:`, error);
             }
         }
         
@@ -265,7 +324,7 @@ export class OntologyStorage {
     async findConceptsByName(name: string): Promise<Concept[]> {
         const conceptIds = this.db.prepare(`
             SELECT DISTINCT concept_id FROM representations WHERE name LIKE ?
-        `).all(`%${name}%`).map(row => row.concept_id);
+        `).all(`%${name}%`).map(row => (row as { concept_id: string }).concept_id);
         
         const concepts: Concept[] = [];
         
@@ -291,7 +350,7 @@ export class OntologyStorage {
                 (SELECT COUNT(*) FROM representations) as total_representations,
                 (SELECT COUNT(*) FROM relations) as total_relations
             FROM concepts
-        `).get();
+        `).get() as StatsRow;
         
         return {
             totalConcepts: stats.total_concepts,
@@ -302,7 +361,7 @@ export class OntologyStorage {
         };
     }
     
-    private async deserializeConcept(row: any): Promise<Concept | null> {
+    private async deserializeConcept(row: ConceptRow): Promise<Concept | null> {
         try {
             const data = JSON.parse(row.data);
             
@@ -313,16 +372,17 @@ export class OntologyStorage {
             
             const representations = new Map();
             for (const repRow of repRows) {
-                representations.set(repRow.name, {
-                    name: repRow.name,
+                const row = repRow as RepresentationRow;
+                representations.set(row.name, {
+                    name: row.name,
                     location: {
-                        uri: repRow.location_uri,
-                        range: JSON.parse(repRow.location_range)
+                        uri: row.location_uri,
+                        range: JSON.parse(row.location_range)
                     },
-                    firstSeen: new Date(repRow.first_seen),
-                    lastSeen: new Date(repRow.last_seen),
-                    occurrences: repRow.occurrences,
-                    context: repRow.context
+                    firstSeen: new Date(row.first_seen),
+                    lastSeen: new Date(row.last_seen),
+                    occurrences: row.occurrences,
+                    context: row.context
                 });
             }
             
@@ -333,13 +393,14 @@ export class OntologyStorage {
             
             const relations = new Map();
             for (const relRow of relationRows) {
-                relations.set(relRow.to_concept_id, {
-                    id: relRow.id,
-                    targetConceptId: relRow.to_concept_id,
-                    type: relRow.relation_type,
-                    confidence: relRow.confidence,
-                    evidence: JSON.parse(relRow.evidence || '[]'),
-                    createdAt: new Date(relRow.created_at)
+                const row = relRow as RelationRow;
+                relations.set(row.to_concept_id, {
+                    id: row.id,
+                    targetConceptId: row.to_concept_id,
+                    type: row.relation_type,
+                    confidence: row.confidence,
+                    evidence: JSON.parse(row.evidence || '[]'),
+                    createdAt: new Date(row.created_at)
                 });
             }
             
@@ -348,14 +409,17 @@ export class OntologyStorage {
                 SELECT * FROM evolution_history WHERE concept_id = ? ORDER BY timestamp DESC
             `).all(row.id);
             
-            const evolution = evolutionRows.map(evRow => ({
-                timestamp: new Date(evRow.timestamp),
-                type: evRow.change_type,
-                from: evRow.from_state,
-                to: evRow.to_state,
-                reason: evRow.reason,
-                confidence: evRow.confidence
-            }));
+            const evolution = evolutionRows.map(evRow => {
+                const row = evRow as EvolutionRow;
+                return {
+                    timestamp: new Date(row.timestamp),
+                    type: row.change_type as 'rename' | 'signature' | 'relation' | 'canonical_rename' | 'move',
+                    from: row.from_state,
+                    to: row.to_state,
+                    reason: row.reason || '',
+                    confidence: row.confidence
+                };
+            });
             
             // Load metadata
             const metadataRow = this.db.prepare(`
@@ -363,12 +427,12 @@ export class OntologyStorage {
             `).get(row.id);
             
             const metadata = metadataRow ? {
-                category: metadataRow.category,
-                tags: JSON.parse(metadataRow.tags || '[]'),
-                isInterface: metadataRow.is_interface,
-                isAbstract: metadataRow.is_abstract,
-                isDeprecated: metadataRow.is_deprecated,
-                documentation: metadataRow.documentation
+                category: (metadataRow as MetadataRow).category || undefined,
+                tags: JSON.parse((metadataRow as MetadataRow).tags || '[]'),
+                isInterface: (metadataRow as MetadataRow).is_interface,
+                isAbstract: (metadataRow as MetadataRow).is_abstract,
+                isDeprecated: (metadataRow as MetadataRow).is_deprecated,
+                documentation: (metadataRow as MetadataRow).documentation || undefined
             } : {
                 tags: []
             };

@@ -3,9 +3,9 @@ import { EventEmitter } from 'events';
 import { 
     Pattern, TokenPattern, Example, RenameContext, PatternCategory,
     Concept, Change
-} from '../types/core.js';
-import { PatternStorage } from './pattern-storage.js';
-import { ConfidenceCalculator } from './confidence-calculator.js';
+} from '../types/core';
+import { PatternStorage } from './pattern-storage';
+import { ConfidenceCalculator } from './confidence-calculator';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface PatternCandidate {

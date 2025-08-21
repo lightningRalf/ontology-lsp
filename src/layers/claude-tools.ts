@@ -1,13 +1,13 @@
 // Claude Tools Layer - Integration with Claude Code's native Grep, Glob, LS tools
 import { 
     Layer, SearchQuery, EnhancedMatches, Match, SearchContext 
-} from '../types/core.js';
+} from '../types/core';
 import { 
     ClaudeGrepParams, ClaudeGlobParams, ClaudeLSParams,
     ClaudeGrepResult, ClaudeGlobResult, ClaudeLSResult,
     GrepSearchStrategy, SearchVariant, HybridSearchResult,
     ClaudeToolError, ClaudeToolsLayerConfig
-} from '../types/claude-tools.js';
+} from '../types/claude-tools';
 import * as path from 'path';
 
 // Claude Code tools (correct capitalization)
