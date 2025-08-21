@@ -1,0 +1,1 @@
+{"version":3,"file":"ConflictResolver.d.ts","sourceRoot":"","sources":["../../src/integration/ConflictResolver.ts"],"names":[],"mappings":"AAAA;;;GAGG;AAEH,OAAO,KAAK,MAAM,MAAM,QAAQ,CAAC;AAEjC,qBAAa,gBAAgB;IACb,OAAO,CAAC,OAAO;gBAAP,OAAO,EAAE,MAAM,CAAC,gBAAgB;IAE9C,gBAAgB,IAAI,OAAO,CAAC,IAAI,CAAC;IA2BvC,OAAO,CAAC,6BAA6B;CAcxC"}
