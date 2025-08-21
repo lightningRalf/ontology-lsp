@@ -267,9 +267,9 @@ export class OntologyStorage {
                 concept.id,
                 concept.metadata.category || null,
                 JSON.stringify(concept.metadata.tags || []),
-                concept.metadata.isInterface || false,
-                concept.metadata.isAbstract || false,
-                concept.metadata.isDeprecated || false,
+                concept.metadata.isInterface ? 1 : 0,
+                concept.metadata.isAbstract ? 1 : 0,
+                concept.metadata.isDeprecated ? 1 : 0,
                 concept.metadata.documentation || null
             );
         });
