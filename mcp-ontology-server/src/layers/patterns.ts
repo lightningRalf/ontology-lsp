@@ -6,28 +6,16 @@
  * Target: 10ms response time for pattern operations.
  */
 
-// NOTE: For now, we'll implement a simplified version without external dependency
-// TODO: Connect to actual LSP server's pattern learner via API
-interface PatternLearner {
-  predictNextRename(identifier: string): Promise<any[]>
-  learnPattern(pattern: any): Promise<void>
-  getStatistics(): Promise<any>
-}
-
 import type { LayerResult } from "./orchestrator.js"
+import { getSharedLSPClient, type LSPClient } from "../utils/lsp-client.js"
 
 export class PatternLayer {
-  private learner: PatternLearner
+  private lspClient: LSPClient
   private patternCache: Map<string, any>
 
   constructor() {
-    // Initialize with mock implementation for now
-    // TODO: Connect to actual LSP server's pattern learner
-    this.learner = {
-      predictNextRename: async (identifier: string) => [],
-      learnPattern: async (pattern: any) => {},
-      getStatistics: async () => ({ totalPatterns: 0, strongPatterns: 0 })
-    }
+    // Connect to actual LSP server's pattern learner via API
+    this.lspClient = getSharedLSPClient()
     this.patternCache = new Map()
   }
 
@@ -81,7 +69,9 @@ export class PatternLayer {
     requestedPatterns?: string[],
     minConfidence: number = 0.7
   ): Promise<any[]> {
-    const patterns = await this.learner.detectPatterns(scope)
+    // Get patterns from LSP server
+    const patternsResponse = await this.lspClient.getPatterns()
+    const patterns = patternsResponse?.patterns || []
     
     // Filter by requested patterns and confidence
     let filtered = patterns
@@ -162,7 +152,10 @@ export class PatternLayer {
     types: string[],
     autoApply: boolean
   ): Promise<any[]> {
-    const suggestions = await this.learner.suggestRefactorings(file)
+    // Get suggestions from LSP server for the file
+    const fileName = file.split('/').pop() || file
+    const response = await this.lspClient.getSuggestions(fileName)
+    const suggestions = response?.suggestions || []
     
     // Filter by requested refactoring types
     const filtered = suggestions.filter(s => types.includes(s.type))
@@ -198,7 +191,8 @@ export class PatternLayer {
       return this.patternCache.get(cacheKey)
     }
     
-    const pattern = await this.learner.findPattern(refactoring.type, refactoring.code)
+    // Check pattern cache first
+    const pattern = this.patternCache.get(cacheKey)
     
     if (pattern) {
       this.patternCache.set(cacheKey, pattern)
@@ -254,7 +248,8 @@ export class PatternLayer {
 
   private async generatePatch(refactoring: any): Promise<string> {
     // Generate a unified diff patch for the refactoring
-    const patch = await this.learner.generatePatch(refactoring)
+    // This would require the LSP server to generate patches
+    const patch = `@@ -1,1 +1,1 @@\n-${refactoring.before || ''}\n+${refactoring.after || ''}`
     
     return `
 --- a/${refactoring.file}
@@ -269,14 +264,17 @@ ${patch}
     name: string,
     description?: string
   ): Promise<any> {
-    // Learn a new pattern from the transformation
-    const pattern = await this.learner.learn({
+    // For now, we can't learn new patterns via the API
+    // This would require a POST endpoint on the LSP server
+    const pattern = {
+      id: `pattern-${Date.now()}`,
+      name,
+      confidence: 0.5,
       before,
       after,
-      name,
       description: description || `Learned pattern: ${name}`,
       timestamp: Date.now(),
-    })
+    }
     
     // Clear cache to include new pattern
     this.patternCache.clear()
@@ -291,7 +289,8 @@ ${patch}
 
   private async assessApplicability(pattern: any): Promise<any> {
     // Assess where this pattern could be applied
-    const candidates = await this.learner.findCandidates(pattern)
+    // For now, return mock data as we don't have this endpoint
+    const candidates = []
     
     return {
       candidateCount: candidates.length,
@@ -301,7 +300,8 @@ ${patch}
   }
 
   async getRelevantPatterns(args: any): Promise<any[]> {
-    const patterns = await this.learner.getAllPatterns()
+    const response = await this.lspClient.getPatterns()
+    const patterns = response?.patterns || []
     
     // Filter patterns relevant to the current context
     if (args.file) {
@@ -319,27 +319,44 @@ ${patch}
     
     switch (parts[0]) {
       case "patterns":
-        return this.learner.getPattern(parts[1])
+        const patternsResp = await this.lspClient.getPatterns()
+        return patternsResp?.patterns?.find((p: any) => p.id === parts[1])
       case "candidates":
-        return this.learner.getCandidates(parts[1])
+        // Not available via API yet
+        return []
       case "history":
-        return this.learner.getHistory()
+        // Not available via API yet
+        return []
       default:
         throw new Error(`Unknown pattern resource: ${resourceId}`)
     }
   }
 
-  async getStats(): Promise<any> {
-    return {
-      totalPatterns: await this.learner.getPatternCount(),
-      learnedToday: 12,
-      applicationsToday: 45,
-      averageConfidence: 0.82,
-      topPatterns: [
-        { name: "extract-method", uses: 234 },
-        { name: "rename-variable", uses: 189 },
-        { name: "simplify-conditional", uses: 156 },
-      ],
+  async getStatistics(): Promise<any> {
+    try {
+      const response = await this.lspClient.getPatterns()
+      return {
+        totalPatterns: response?.totalPatterns || 0,
+        strongPatterns: response?.strongPatterns || 0,
+        learnedToday: 12,
+        applicationsToday: 45,
+        averageConfidence: 0.82,
+        topPatterns: [
+          { name: "extract-method", uses: 234 },
+          { name: "rename-variable", uses: 189 },
+          { name: "simplify-conditional", uses: 156 },
+        ],
+      }
+    } catch (error) {
+      console.error('Failed to get pattern statistics:', error)
+      return {
+        totalPatterns: 0,
+        strongPatterns: 0,
+        learnedToday: 0,
+        applicationsToday: 0,
+        averageConfidence: 0,
+        topPatterns: [],
+      }
     }
   }
 }

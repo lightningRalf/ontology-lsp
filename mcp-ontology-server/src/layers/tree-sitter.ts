@@ -6,24 +6,15 @@
  * Target: 50ms response time for AST operations.
  */
 
-// NOTE: For now, we'll implement a simplified version without external dependency
-// TODO: Connect to actual LSP server's tree-sitter layer
-interface BaseTreeSitter {
-  parseFile(file: string): Promise<any>
-  query(ast: any, query: string): Promise<any[]>
-}
 import type { LayerResult } from "./orchestrator.js"
+import { getSharedLSPClient, type LSPClient } from "../utils/lsp-client.js"
 
 export class TreeSitterLayer {
-  private baseLayer: BaseTreeSitter
+  private lspClient: LSPClient
 
   constructor() {
-    // Initialize with mock implementation for now
-    // TODO: Connect to actual LSP server's tree-sitter
-    this.baseLayer = {
-      parseFile: async (file: string) => ({ type: "program", children: [] }),
-      query: async (ast: any, query: string) => []
-    }
+    // Connect to actual LSP server via /find endpoint with semantic search
+    this.lspClient = getSharedLSPClient()
   }
 
   async enhance(previousResult: LayerResult, args: any): Promise<LayerResult> {
@@ -218,9 +209,9 @@ export class TreeSitterLayer {
     if (!file) return []
     
     try {
-      const ast = await this.baseLayer.parseFile(file)
+      const ast = await this.parseFile(file)
       const query = `(import_statement) @import`
-      const imports = await this.baseLayer.query(ast, query)
+      const imports = await this.queryAST(ast, query)
       
       return imports.map(i => ({
         source: i.source,

@@ -1,0 +1,71 @@
+{
+  "mcp": {
+    "server": {
+      "name": "ontology-mcp-server",
+      "version": "1.0.0",
+      "description": "MCP server for Ontology-Enhanced LSP",
+      "transport": "stdio"
+    }
+  },
+  "lsp": {
+    "connection": {
+      "host": "localhost",
+      "port": 7000,
+      "timeout": 5000,
+      "maxRetries": 3,
+      "retryDelay": 1000,
+      "circuitBreaker": {
+        "enabled": true,
+        "failureThreshold": 5,
+        "resetTimeout": 60000
+      }
+    },
+    "cache": {
+      "enabled": true,
+      "ttl": 300000,
+      "maxEntries": 1000,
+      "cleanupInterval": 60000
+    }
+  },
+  "layers": {
+    "ontology": {
+      "enabled": true,
+      "timeout": 1000,
+      "cache": {
+        "statsTTL": 60000
+      }
+    },
+    "treeSitter": {
+      "enabled": true,
+      "timeout": 2000,
+      "languages": ["typescript", "javascript", "python"]
+    },
+    "patterns": {
+      "enabled": true,
+      "timeout": 1000,
+      "minConfidence": 0.7
+    },
+    "knowledge": {
+      "enabled": true,
+      "timeout": 2000,
+      "propagationDepth": 5
+    }
+  },
+  "performance": {
+    "targets": {
+      "ontology": "10ms",
+      "treeSitter": "50ms",
+      "patterns": "10ms",
+      "knowledge": "20ms"
+    },
+    "monitoring": {
+      "enabled": true,
+      "metricsInterval": 60000
+    }
+  },
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "destination": "stdout"
+  }
+}
