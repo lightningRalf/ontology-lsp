@@ -13,7 +13,9 @@ export class OntologyLayer {
   private engine: OntologyEngine
 
   constructor() {
-    this.engine = new OntologyEngine()
+    // Use a default database path in temp directory
+    const dbPath = process.env.ONTOLOGY_DB_PATH || '/tmp/mcp-ontology.db'
+    this.engine = new OntologyEngine(dbPath)
   }
 
   async augment(previousResult: LayerResult, args: any): Promise<LayerResult> {

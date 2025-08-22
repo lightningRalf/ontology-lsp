@@ -13,7 +13,12 @@ export class TreeSitterLayer {
   private baseLayer: BaseTreeSitter
 
   constructor() {
-    this.baseLayer = new BaseTreeSitter()
+    // Initialize with default config
+    this.baseLayer = new BaseTreeSitter({
+      languages: ['typescript', 'javascript', 'python'],
+      cacheEnabled: true,
+      maxCacheSize: 100
+    })
   }
 
   async enhance(previousResult: LayerResult, args: any): Promise<LayerResult> {

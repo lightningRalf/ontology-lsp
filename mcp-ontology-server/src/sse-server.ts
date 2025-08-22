@@ -7,7 +7,7 @@
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
-import { BunSSEServerTransport } from "bun-mcp-sse-transport"
+import { BunSSEServerTransport } from "../../bun-mcp-sse-transport/src/index.ts"
 import { OntologyMCPServer } from "./index.js"
 
 const PORT = process.env.MCP_SSE_PORT || 7001

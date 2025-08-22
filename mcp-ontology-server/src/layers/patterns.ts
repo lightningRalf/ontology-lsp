@@ -14,7 +14,9 @@ export class PatternLayer {
   private patternCache: Map<string, any>
 
   constructor() {
-    this.learner = new PatternLearner()
+    // Use a default database path for patterns
+    const dbPath = process.env.PATTERNS_DB_PATH || '/tmp/mcp-patterns.db'
+    this.learner = new PatternLearner(dbPath)
     this.patternCache = new Map()
   }
 
