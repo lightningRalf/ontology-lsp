@@ -35,6 +35,7 @@ export class OntologyEngine extends EventEmitter {
     private similarityCalculator: SimilarityCalculator;
     private conceptBuilder: ConceptBuilder;
     private storage: OntologyStorage;
+    private initPromise: Promise<void> | null = null;
     
     constructor(dbPath: string) {
         super();
@@ -43,7 +44,15 @@ export class OntologyEngine extends EventEmitter {
         this.conceptBuilder = new ConceptBuilder();
         this.storage = new OntologyStorage(dbPath);
         
-        this.initialize();
+        // Store initialization promise for later awaiting
+        this.initPromise = this.initialize();
+    }
+    
+    async ensureInitialized(): Promise<void> {
+        if (this.initPromise) {
+            await this.initPromise;
+            this.initPromise = null;
+        }
     }
     
     private async initialize(): Promise<void> {

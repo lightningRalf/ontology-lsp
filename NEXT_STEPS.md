@@ -2,18 +2,19 @@
 
 > **Purpose**: Forward-looking action items. For completed work, see PROJECT_STATUS.md
 
-## 🚨 CRITICAL: Fix HTTP API Server Startup
+## ✅ FIXED: HTTP API Server Startup
 
-**Problem**: HTTP API server on port 7000 is not starting properly
+**Resolution**: HTTP API server on port 7000 is now working correctly
 - ✅ MCP Server running on port 7001 (confirmed via health check)
-- ❌ HTTP API server fails to respond on port 7000
-- ⚠️ Logs suggest it starts but then immediately shuts down
+- ✅ HTTP API server running on port 7000 (health check confirmed)
+- ✅ Database initialization working properly
+- ✅ All layers (Claude Tools, Tree-sitter, Ontology, Pattern Learner) initialized
 
-### Debug Steps:
-1. Check why HTTP server is not persisting
-2. Verify Bun runtime compatibility with the HTTP server code
-3. Check for any unhandled promise rejections or errors
-4. Ensure database initialization is working
+### Fixed Issues:
+1. ✅ Added proper async initialization handling for OntologyEngine and PatternLearner
+2. ✅ Fixed process lifecycle - server now stays alive with signal handlers
+3. ✅ Added comprehensive error handling and logging
+4. ✅ Ensured database connections are properly awaited
 
 ## 🎯 Phase 3: Integration [NEXT]
 
@@ -46,16 +47,27 @@
 
 - **Phase 1**: ✅ DONE (Unified core, config, ports)
 - **Phase 2**: ✅ DONE (Wire MCP tools - all 16 tools connected!)
-- **Phase 2.5**: 🔴 IN PROGRESS (Fix HTTP API server startup)
-- **Phase 3**: ⏳ TODO (Integration)
+- **Phase 2.5**: ✅ DONE (HTTP API server fixed and running!)
+- **Phase 3**: 🟡 IN PROGRESS (Integration - MCP → LSP Bridge)
 - **Phase 4**: 🔮 FUTURE (Optimization)
 
 ## 🎬 Quick Start Next Session
 
 ```bash
 cd ~/programming/ontology-lsp
-./.claude/hooks/session-start.sh
 
-# Focus: Fix HTTP API server on port 7000
-# Check: src/api/http-server.ts
+# Start all servers:
+just start
+
+# Or for development mode with auto-reload:
+just dev
+
+# Check status:
+just status
+just health
+
+# Watch logs:
+just logs
+
+# Focus: Implement MCP → LSP Bridge
 ```

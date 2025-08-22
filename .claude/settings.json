@@ -6,8 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '⚡ Ontology LSP Server Suite starting in background...' && ($CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh > /tmp/ontology-startup.log 2>&1 &) && ($CLAUDE_PROJECT_DIR/.claude/hooks/startup-status.sh &)",
-            "comment": "Start servers in background and show delayed status",
+            "command": "cd $CLAUDE_PROJECT_DIR && command -v just >/dev/null 2>&1 && (echo '🚀 Starting Ontology LSP...' && just start > /tmp/ontology-startup.log 2>&1 &) || echo '⚠️  Install just: cargo install just'",
+            "comment": "Start servers using justfile",
             "timeout": 1
           }
         ]
@@ -17,19 +17,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '⚡ Checking Ontology LSP Server Suite...' && ($CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh > /tmp/ontology-resume.log 2>&1 &)",
-            "comment": "Check and start servers in background",
-            "timeout": 1
-          }
-        ]
-      },
-      {
-        "matcher": "clear",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo '⚡ Restarting Ontology LSP Server Suite...' && ($CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh > /tmp/ontology-clear.log 2>&1 &)",
-            "comment": "Restart servers in background",
+            "command": "cd $CLAUDE_PROJECT_DIR && command -v just >/dev/null 2>&1 && (just status | grep -q 'Not running' && just start > /tmp/ontology-resume.log 2>&1 &) || true",
+            "comment": "Check and restart servers if needed",
             "timeout": 1
           }
         ]
@@ -40,7 +29,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-stop.sh",
+            "command": "cd $CLAUDE_PROJECT_DIR && command -v just >/dev/null 2>&1 && just stop || (lsof -ti:7000,7001,7002 | xargs -r kill -9 2>/dev/null || true)",
+            "comment": "Stop servers using justfile or fallback",
             "timeout": 5
           }
         ]

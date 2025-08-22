@@ -1,0 +1,108 @@
+#!/bin/bash
+
+# Start all Ontology LSP servers
+
+echo "🚀 Starting Ontology LSP Servers..."
+echo "=================================="
+
+# Kill any existing servers on our ports
+echo "📌 Cleaning up old processes..."
+lsof -ti:7000 | xargs -r kill -9 2>/dev/null
+lsof -ti:7001 | xargs -r kill -9 2>/dev/null
+lsof -ti:7002 | xargs -r kill -9 2>/dev/null
+
+# Set environment
+export ONTOLOGY_WORKSPACE="$(pwd)"
+export BUN_PATH="${HOME}/.bun/bin/bun"
+
+# Check Bun installation
+if [ ! -f "$BUN_PATH" ]; then
+    echo "❌ Bun not found at $BUN_PATH"
+    echo "Please install Bun: curl -fsSL https://bun.sh/install | bash"
+    exit 1
+fi
+
+echo "✅ Using Bun at: $BUN_PATH"
+echo "✅ Bun version: $($BUN_PATH --version)"
+echo ""
+
+# Start HTTP API Server
+echo "🌐 Starting HTTP API Server on port 7000..."
+$BUN_PATH run src/api/http-server.ts &
+HTTP_PID=$!
+echo "   PID: $HTTP_PID"
+
+# Start MCP SSE Server
+echo "🔌 Starting MCP SSE Server on port 7001..."
+$BUN_PATH run mcp-ontology-server/index.ts &
+MCP_PID=$!
+echo "   PID: $MCP_PID"
+
+# Wait for servers to initialize
+echo ""
+echo "⏳ Waiting for servers to initialize..."
+sleep 3
+
+# Test servers
+echo ""
+echo "🧪 Testing server health..."
+
+# Test HTTP API
+HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:7000/health)
+if [ "$HTTP_STATUS" = "200" ]; then
+    echo "✅ HTTP API Server: HEALTHY (port 7000)"
+else
+    echo "❌ HTTP API Server: FAILED (status: $HTTP_STATUS)"
+fi
+
+# Test MCP SSE
+MCP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:7001/health)
+if [ "$MCP_STATUS" = "200" ]; then
+    echo "✅ MCP SSE Server: HEALTHY (port 7001)"
+else
+    echo "❌ MCP SSE Server: FAILED (status: $MCP_STATUS)"
+fi
+
+echo ""
+echo "=================================="
+echo "🎉 Servers are running!"
+echo ""
+echo "📍 HTTP API: http://localhost:7000"
+echo "   - Health: http://localhost:7000/health"
+echo "   - Stats:  http://localhost:7000/stats"
+echo ""
+echo "📍 MCP SSE:  http://localhost:7001"
+echo "   - Health: http://localhost:7001/health"
+echo ""
+echo "📍 Process IDs:"
+echo "   - HTTP API: $HTTP_PID"
+echo "   - MCP SSE:  $MCP_PID"
+echo ""
+echo "Press Ctrl+C to stop all servers..."
+echo "=================================="
+
+# Handle shutdown
+shutdown() {
+    echo ""
+    echo "🛑 Stopping all servers..."
+    kill $HTTP_PID 2>/dev/null
+    kill $MCP_PID 2>/dev/null
+    echo "✅ All servers stopped"
+    exit 0
+}
+
+trap shutdown INT TERM
+
+# Keep running
+while true; do
+    sleep 1
+    # Check if processes are still running
+    if ! kill -0 $HTTP_PID 2>/dev/null; then
+        echo "⚠️ HTTP API Server stopped unexpectedly"
+        shutdown
+    fi
+    if ! kill -0 $MCP_PID 2>/dev/null; then
+        echo "⚠️ MCP SSE Server stopped unexpectedly"
+        shutdown
+    fi
+done

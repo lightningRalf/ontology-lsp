@@ -27,6 +27,7 @@ export class OntologyAPIServer {
     private config: APIConfig;
     private serverConfig: ServerConfig;
     private server: any = null;
+    private initialized: boolean = false;
 
     constructor(config: APIConfig) {
         this.serverConfig = getEnvironmentConfig();
@@ -35,18 +36,26 @@ export class OntologyAPIServer {
             port: config.port ?? this.serverConfig.ports.httpAPI,
             host: config.host ?? this.serverConfig.host
         };
-        this.initializeLayers();
     }
 
-    private initializeLayers(): void {
-        const dbPath = this.config.dbPath || path.join(this.config.workspaceRoot, '.ontology', 'ontology.db');
-        
-        this.ontology = new OntologyEngine(dbPath);
-        this.patternLearner = new PatternLearner(dbPath, {
-            learningThreshold: 3,
-            confidenceThreshold: 0.7
-        });
-        this.knowledgeSpreader = new KnowledgeSpreader(this.ontology, this.patternLearner);
+    private async initializeLayers(): Promise<void> {
+        try {
+            const dbPath = this.config.dbPath || path.join(this.config.workspaceRoot, '.ontology', 'ontology.db');
+            
+            console.log(`[HTTP API] Initializing database at ${dbPath}`);
+            
+            // Create instances
+            this.ontology = new OntologyEngine(dbPath);
+            this.patternLearner = new PatternLearner(dbPath, {
+                learningThreshold: 3,
+                confidenceThreshold: 0.7
+            });
+            
+            // Ensure async initialization completes
+            await this.ontology.ensureInitialized();
+            await this.patternLearner.ensureInitialized();
+            
+            this.knowledgeSpreader = new KnowledgeSpreader(this.ontology, this.patternLearner);
         
         const claudeConfig = {
             grep: {
@@ -80,13 +89,20 @@ export class OntologyAPIServer {
             }
         };
         
-        this.claudeTools = new ClaudeToolsLayer(claudeConfig);
-        this.treeSitter = new TreeSitterLayer({
-            enabled: true,
-            timeout: 500,
-            languages: ['typescript', 'javascript', 'python'],
-            maxFileSize: '1MB'
-        });
+            this.claudeTools = new ClaudeToolsLayer(claudeConfig);
+            this.treeSitter = new TreeSitterLayer({
+                enabled: true,
+                timeout: 500,
+                languages: ['typescript', 'javascript', 'python'],
+                maxFileSize: '1MB'
+            });
+            
+            this.initialized = true;
+            console.log('[HTTP API] All layers initialized successfully');
+        } catch (error) {
+            console.error('[HTTP API] Failed to initialize layers:', error);
+            throw error;
+        }
     }
 
     private loadIgnorePatterns(): string[] {
@@ -117,20 +133,37 @@ export class OntologyAPIServer {
     }
 
     async start(): Promise<void> {
-        this.server = serve({
-            port: this.config.port,
-            hostname: this.config.host,
-            fetch: this.handleRequest.bind(this),
-        });
+        try {
+            // Initialize layers if not already done
+            if (!this.initialized) {
+                console.log('[HTTP API] Initializing layers...');
+                await this.initializeLayers();
+            }
 
-        console.log(`Ontology API Server running at http://${this.config.host}:${this.config.port}`);
+            this.server = serve({
+                port: this.config.port,
+                hostname: this.config.host,
+                fetch: this.handleRequest.bind(this),
+                error: (error) => {
+                    console.error('[HTTP API] Server error:', error);
+                    return new Response('Internal Server Error', { status: 500 });
+                },
+            });
+
+            console.log(`[HTTP API] Server running at http://${this.config.host}:${this.config.port}`);
+            console.log(`[HTTP API] Health check: http://${this.config.host}:${this.config.port}/health`);
+        } catch (error) {
+            console.error('[HTTP API] Failed to start server:', error);
+            throw error;
+        }
     }
 
     async stop(): Promise<void> {
         if (this.server) {
+            console.log('[HTTP API] Stopping server...');
             this.server.stop();
             this.server = null;
-            console.log('Ontology API Server stopped');
+            console.log('[HTTP API] Server stopped');
         }
     }
 
@@ -511,6 +544,37 @@ if (import.meta.main) {
         cors: process.env.ONTOLOGY_API_CORS === 'true'
     };
     
+    console.log('[HTTP API] Starting with config:', {
+        ...config,
+        dbPath: config.dbPath // Show full path for debugging
+    });
+    
     const server = new OntologyAPIServer(config);
-    server.start();
+    
+    // Start server and handle errors
+    server.start().catch((error) => {
+        console.error('[HTTP API] Fatal error:', error);
+        process.exit(1);
+    });
+    
+    // Handle graceful shutdown
+    const shutdown = async () => {
+        console.log('\n[HTTP API] Received shutdown signal');
+        await server.stop();
+        process.exit(0);
+    };
+    
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+    
+    // Keep the process alive
+    process.on('uncaughtException', (error) => {
+        console.error('[HTTP API] Uncaught exception:', error);
+        shutdown();
+    });
+    
+    process.on('unhandledRejection', (reason, promise) => {
+        console.error('[HTTP API] Unhandled rejection at:', promise, 'reason:', reason);
+        shutdown();
+    });
 }

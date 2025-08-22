@@ -39,6 +39,7 @@ export class PatternLearner extends EventEmitter {
     private confidenceCalculator: ConfidenceCalculator;
     private learningThreshold = 3;
     private confidenceThreshold = 0.7;
+    private initPromise: Promise<void> | null = null;
     
     constructor(dbPath: string, config?: { learningThreshold?: number; confidenceThreshold?: number }) {
         super();
@@ -50,7 +51,15 @@ export class PatternLearner extends EventEmitter {
             this.confidenceThreshold = config.confidenceThreshold || 0.7;
         }
         
-        this.initialize();
+        // Store initialization promise for later awaiting
+        this.initPromise = this.initialize();
+    }
+    
+    async ensureInitialized(): Promise<void> {
+        if (this.initPromise) {
+            await this.initPromise;
+            this.initPromise = null;
+        }
     }
     
     private async initialize(): Promise<void> {
