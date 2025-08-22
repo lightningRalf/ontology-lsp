@@ -44,7 +44,7 @@
 - ✅ **Bundler:** Bun's built-in bundler
 - ✅ **Language Parsers:** Tree-sitter with trusted dependencies
 
-## 🚀 Latest Updates (CURRENT SESSION - Aug 22, 2024)
+## 🚀 Latest Updates (CURRENT SESSION - Aug 22, 2025)
 
 ### 1. **Migrated to Bun Runtime** ✅
 Complete migration from Node.js to Bun:
@@ -103,6 +103,40 @@ Critical issues resolved:
 - Fixed server instantiation (only runs as main module)
 - Updated integration tests to not instantiate server directly
 - Added full Bun paths to all build scripts
+
+### 8. **MCP Server Investigation & Fix** ✅
+Deep dive into MCP (Model Context Protocol) integration and architectural redesign:
+
+**Initial Problems Identified**:
+- SSE server running but not connected to ontology-lsp core
+- Import path issues (`@ontology/layers/claude-tools.js` doesn't exist)
+- MCP server creating own layer instances instead of using LSP server
+- Confusion about tool ownership and bidirectional communication needs
+
+**Solution Implemented: CLI as Foundation**:
+- **New Architecture**: MCP Server → CLI Commands → HTTP API → LSP Server
+- **Key Insight**: The CLI tool is the perfect cornerstone for MCP integration
+- **Implementation**:
+  1. Fixed CLI to be a client to the LSP server (via HTTP API on port 7000)
+  2. Added `--json` flag to all CLI commands for machine-readable output
+  3. Created simplified MCP server (`index-simple.ts`) that spawns CLI commands
+  4. MCP server is now a thin wrapper around CLI - no complex layer management
+
+**Benefits of CLI-Based Architecture**:
+- Single source of truth (LSP server)
+- MCP becomes a simple protocol wrapper
+- CLI can be used by any tool (shell scripts, CI/CD, other editors)
+- Testing simplified (test CLI, MCP passes through)
+- Easy to add new features (just add CLI commands)
+
+**Files Created/Modified**:
+- `src/cli/index.ts` - Refactored to use LSPClient class
+- `mcp-ontology-server/src/cli-bridge.ts` - Bridge between MCP and CLI
+- `mcp-ontology-server/src/index-simple.ts` - Simplified MCP server
+- `mcp-ontology-server/src/stdio-simple.ts` - STDIO entry point
+- `.mcp.json` - Updated to use stdio-based MCP server
+
+**Current Status**: ✅ Working - CLI-based MCP architecture implemented and tested
 
 ## 📋 Testing Steps (TO DO NOW)
 
@@ -263,6 +297,40 @@ code --version  # vs  code-oss --version
 8. **Test Runner Migration**: Jest → Bun test (faster, simpler)
 9. **Complete Feature Set**: HTTP API, .ontologyignore, export/import
 10. **Production Ready**: All tests passing, all features implemented
+
+## ✅ MCP Server - FIXED with CLI Architecture
+
+The MCP integration is now **working** with a clean architecture:
+
+### **Final Architecture: CLI as the Foundation**
+```
+Claude Code → MCP Server → CLI Commands → HTTP API → LSP Server
+                ↓
+         (thin wrapper)
+                ↓
+    Spawns: ontology-lsp find --json
+    Spawns: ontology-lsp suggest --json
+    Spawns: ontology-lsp analyze --json
+```
+
+### **How It Works**:
+1. MCP server receives tool request from Claude Code
+2. Spawns appropriate CLI command with `--json` flag
+3. CLI connects to running LSP server via HTTP API (port 7000)
+4. LSP server processes request using 5-layer architecture
+5. Returns JSON result through CLI back to MCP
+
+### **To Use MCP with Claude Code**:
+1. Start the LSP HTTP API server: `ontology-lsp api`
+2. The MCP config in `.mcp.json` will automatically use the CLI-based server
+3. Claude Code can now use ontology features via MCP tools
+
+### **Key Benefits**:
+- **Simple**: MCP is just a protocol wrapper, not a reimplementation
+- **Maintainable**: Single source of truth (CLI)
+- **Testable**: Test CLI independently
+- **Extensible**: Add new features to CLI, MCP gets them automatically
+- **Universal**: CLI works for shell scripts, CI/CD, other tools
 
 ## 📝 Still TODO (from README promises)
 

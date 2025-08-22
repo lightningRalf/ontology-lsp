@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check --write .",
     "mcp:stdio": "bun run src/stdio.ts",
-    "mcp:sse": "bun run src/sse-server.ts"
+    "mcp:sse": "bun run src/sse-server.ts",
+    "mcp:simple": "bun run src/stdio-simple.ts",
+    "mcp:cli-based": "bun run src/stdio-simple.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",

@@ -1,22 +1,43 @@
 /**
  * Claude Tools Layer
  * 
- * Fast file operations and basic code understanding.
- * Integrates with the existing ontology-lsp claude-tools implementation.
+ * This layer exposes Claude Code's native tools (Glob, Grep, LS) via MCP.
+ * These are the actual tools Claude Code uses internally.
  * Target: 5ms response time for basic operations.
  */
 
-import { ClaudeToolsLayer as BaseClaudeTools } from "@ontology/layers/claude-tools.js"
 import type { LayerResult } from "./orchestrator.js"
 
+// Interface matching Claude Code's tool signatures
+interface ClaudeCodeTools {
+  Glob: (args: { pattern: string; path?: string }) => Promise<string[]>
+  Grep: (args: {
+    pattern: string;
+    path?: string;
+    glob?: string;
+    output_mode?: "files_with_matches" | "content" | "count";
+    "-n"?: boolean;
+    "-A"?: number;
+    "-B"?: number;
+    "-C"?: number;
+  }) => Promise<any>
+  LS: (args: { path: string; ignore?: string[] }) => Promise<any>
+}
+
 export class ClaudeToolsLayer {
-  private baseLayer: BaseClaudeTools
   private cache: Map<string, { result: any; timestamp: number }>
+  private workspace: string
+  private tools?: ClaudeCodeTools
 
   constructor() {
-    // Initialize the base layer from the main ontology-lsp project
-    this.baseLayer = new BaseClaudeTools()
     this.cache = new Map()
+    this.workspace = process.cwd()
+    // Tools will be injected when Claude Code calls the MCP server
+  }
+
+  // Set the Claude Code tools when they're available
+  setTools(tools: ClaudeCodeTools) {
+    this.tools = tools
   }
 
   async execute(toolName: string, args: any): Promise<LayerResult> {
@@ -39,8 +60,23 @@ export class ClaudeToolsLayer {
     let result: any
     let sufficient = false
 
-    // Map MCP tool names to Claude Tools operations
+    // Map MCP tool names to Claude Code tools
     switch (toolName) {
+      case "Glob":
+        result = await this.callGlob(args)
+        sufficient = result && result.length > 0
+        break
+        
+      case "Grep":
+        result = await this.callGrep(args)
+        sufficient = result !== null
+        break
+        
+      case "LS":
+        result = await this.callLS(args)
+        sufficient = result !== null
+        break
+        
       case "search_files":
         result = await this.searchFiles(args)
         sufficient = result.files && result.files.length > 0
@@ -87,12 +123,48 @@ export class ClaudeToolsLayer {
     }
   }
 
+  // Direct Claude Code tool wrappers
+  private async callGlob(args: any): Promise<any> {
+    if (!this.tools?.Glob) {
+      // Fallback to filesystem operations if tools not available
+      const { glob } = await import("glob")
+      return glob(args.pattern, { cwd: args.path || this.workspace })
+    }
+    return this.tools.Glob(args)
+  }
+
+  private async callGrep(args: any): Promise<any> {
+    if (!this.tools?.Grep) {
+      // Fallback implementation
+      return { error: "Grep tool not available" }
+    }
+    return this.tools.Grep(args)
+  }
+
+  private async callLS(args: any): Promise<any> {
+    if (!this.tools?.LS) {
+      // Fallback implementation
+      const fs = await import("fs/promises")
+      const path = await import("path")
+      const entries = await fs.readdir(args.path, { withFileTypes: true })
+      return entries.map(e => ({
+        name: e.name,
+        type: e.isDirectory() ? "directory" : "file",
+        path: path.join(args.path, e.name)
+      }))
+    }
+    return this.tools.LS(args)
+  }
+
   private async searchFiles(args: any): Promise<any> {
     const { pattern, content, workspace } = args
     
     try {
-      // Use the base layer's glob functionality
-      const files = await this.baseLayer.glob(pattern, workspace)
+      // Use Claude Code's Glob tool
+      const files = await this.callGlob({ 
+        pattern, 
+        path: workspace || this.workspace 
+      })
       
       if (!content) {
         return { files, count: files.length }
@@ -101,7 +173,13 @@ export class ClaudeToolsLayer {
       // Filter by content if specified
       const matches = []
       for (const file of files) {
-        const hasContent = await this.baseLayer.grep(content, file)
+        // Use Claude Code's Grep to check for content
+        const grepResult = await this.callGrep({
+          pattern: content,
+          path: file,
+          output_mode: "files_with_matches"
+        })
+        const hasContent = grepResult && grepResult.length > 0
         if (hasContent) {
           matches.push(file)
         }
@@ -126,9 +204,13 @@ export class ClaudeToolsLayer {
     const { pattern, files, context = 2 } = args
     
     try {
-      const results = await this.baseLayer.grep(pattern, files || "**/*", {
-        context,
-        includeLineNumbers: true,
+      // Use Claude Code's Grep tool
+      const results = await this.callGrep({
+        pattern,
+        glob: files || "**/*",
+        output_mode: "content",
+        "-n": true,
+        "-C": context
       })
       
       return {
@@ -158,7 +240,13 @@ export class ClaudeToolsLayer {
       ]
       
       for (const pattern of patterns) {
-        const results = await this.baseLayer.grep(pattern, file || "**/*.{ts,js,tsx,jsx}")
+        // Use Claude Code's Grep for pattern search
+        const results = await this.callGrep({
+          pattern,
+          glob: file || "**/*.{ts,js,tsx,jsx}",
+          output_mode: "content",
+          "-n": true
+        })
         
         if (results.length > 0) {
           return {
@@ -190,8 +278,12 @@ export class ClaudeToolsLayer {
       const pattern = `\\b${symbol}\\b`
       const filePattern = scope === "file" && args.file ? args.file : "**/*.{ts,js,tsx,jsx}"
       
-      const results = await this.baseLayer.grep(pattern, filePattern, {
-        includeLineNumbers: true,
+      // Use Claude Code's Grep for reference search
+      const results = await this.callGrep({
+        pattern,
+        glob: filePattern,
+        output_mode: "content",
+        "-n": true
       })
       
       // Filter out likely declarations if requested

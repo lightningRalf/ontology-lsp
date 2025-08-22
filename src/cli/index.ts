@@ -5,12 +5,64 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
 import * as yaml from 'js-yaml';
-import { ClaudeToolsLayer } from '../layers/claude-tools';
-import { TreeSitterLayer } from '../layers/tree-sitter';
-import { OntologyEngine } from '../ontology/ontology-engine';
-import { PatternLearner } from '../patterns/pattern-learner';
-import { KnowledgeSpreader } from '../propagation/knowledge-spreader';
 import { OntologyAPIServer } from '../api/http-server';
+import { Database } from 'bun:sqlite';
+
+// LSP Client for connecting to running server
+class LSPClient {
+    private apiUrl: string;
+    
+    constructor(port: number = 7000) {
+        this.apiUrl = `http://localhost:${port}`;
+    }
+    
+    async request(endpoint: string, method: string = 'GET', body?: any): Promise<any> {
+        const response = await fetch(`${this.apiUrl}${endpoint}`, {
+            method,
+            headers: body ? { 'Content-Type': 'application/json' } : {},
+            body: body ? JSON.stringify(body) : undefined
+        });
+        
+        if (!response.ok) {
+            throw new Error(`LSP Server error: ${response.statusText}`);
+        }
+        
+        return response.json();
+    }
+    
+    async analyze(path: string) {
+        return this.request('/analyze', 'POST', { path });
+    }
+    
+    async find(identifier: string, options: any = {}) {
+        return this.request('/find', 'POST', { identifier, ...options });
+    }
+    
+    async getStats() {
+        return this.request('/stats');
+    }
+    
+    async suggest(identifier: string, confidence: number = 0.7) {
+        return this.request('/suggest', 'POST', { identifier, confidence });
+    }
+    
+    async exportData() {
+        return this.request('/export');
+    }
+    
+    async importData(data: any) {
+        return this.request('/import', 'POST', data);
+    }
+    
+    async isRunning(): Promise<boolean> {
+        try {
+            await this.request('/health');
+            return true;
+        } catch {
+            return false;
+        }
+    }
+}
 
 const program = new Command();
 
@@ -145,52 +197,48 @@ program
 program
     .command('analyze [path]')
     .description('Analyze codebase and build ontology')
-    .option('-o, --output <format>', 'Output format (json, yaml)', 'json')
+    .option('-o, --output <format>', 'Output format (json, yaml, text)', 'text')
+    .option('--json', 'Shorthand for --output json')
+    .option('-p, --port <port>', 'LSP server port', '7000')
     .action(async (searchPath = '.', options) => {
-        console.log(`🔍 Analyzing ${searchPath}...`);
+        const outputFormat = options.json ? 'json' : options.output;
         
-        const config = loadConfig();
-        
-        // Initialize layers
-        const claudeTools = new ClaudeToolsLayer(config.layers.claude_tools);
-        const treeSitter = new TreeSitterLayer(config.layers.tree_sitter);
-        const ontology = new OntologyEngine(config.layers.ontology);
-        
-        // Find all relevant files
-        const query = {
-            identifier: '',
-            searchPath,
-            fileTypes: config.layers.claude_tools.fileTypes
-        };
-        
-        const matches = await claudeTools.process(query);
-        console.log(`Found ${matches.files.size} files to analyze`);
-        
-        // Analyze each file
-        let concepts = 0;
-        for (const file of matches.files) {
-            const ast = await treeSitter.process({
-                identifier: '',
-                searchPath: file,
-                fileTypes: []
-            });
-            
-            // Extract concepts from AST
-            if (ast.exact.length > 0) {
-                concepts += ast.exact.length;
-            }
+        if (outputFormat !== 'json') {
+            console.log(`🔍 Analyzing ${searchPath}...`);
         }
         
-        const stats = {
-            filesAnalyzed: matches.files.size,
-            conceptsFound: concepts,
-            timestamp: new Date().toISOString()
-        };
+        const client = new LSPClient(parseInt(options.port));
         
-        if (options.output === 'yaml') {
-            console.log(yaml.dump(stats));
-        } else {
-            console.log(JSON.stringify(stats, null, 2));
+        // Check if server is running
+        if (!await client.isRunning()) {
+            const error = { error: 'LSP server not running. Start with: ontology-lsp start' };
+            if (outputFormat === 'json') {
+                console.log(JSON.stringify(error));
+            } else {
+                console.error('❌', error.error);
+            }
+            process.exit(1);
+        }
+        
+        try {
+            const stats = await client.analyze(searchPath);
+            
+            if (outputFormat === 'json') {
+                console.log(JSON.stringify(stats, null, 2));
+            } else if (outputFormat === 'yaml') {
+                console.log(yaml.dump(stats));
+            } else {
+                console.log(`✅ Analysis complete`);
+                console.log(`  Files analyzed: ${stats.filesAnalyzed}`);
+                console.log(`  Concepts found: ${stats.conceptsFound}`);
+            }
+        } catch (error) {
+            if (outputFormat === 'json') {
+                console.log(JSON.stringify({ error: error.message }));
+            } else {
+                console.error('❌', error.message);
+            }
+            process.exit(1);
         }
     });
 
@@ -200,26 +248,53 @@ program
     .description('Show ontology statistics')
     .option('--patterns', 'Show pattern statistics')
     .option('--concepts', 'Show concept statistics')
+    .option('--json', 'Output as JSON')
+    .option('-p, --port <port>', 'LSP server port', '7000')
     .action(async (options) => {
-        const config = loadConfig();
+        const client = new LSPClient(parseInt(options.port));
         
-        const ontology = new OntologyEngine(config.layers.ontology);
-        const patterns = new PatternLearner(config.layers.patterns);
-        
-        if (options.patterns) {
-            const stats = await patterns.getStatistics();
-            console.log('\n📊 Pattern Statistics:');
-            console.log(`  Total patterns: ${stats.totalPatterns}`);
-            console.log(`  Strong patterns: ${stats.strongPatterns}`);
-            console.log(`  Recent learning: ${stats.recentLearning}`);
+        if (!await client.isRunning()) {
+            const error = { error: 'LSP server not running. Start with: ontology-lsp start' };
+            if (options.json) {
+                console.log(JSON.stringify(error));
+            } else {
+                console.error('❌', error.error);
+            }
+            process.exit(1);
         }
         
-        if (options.concepts || !options.patterns) {
-            const stats = ontology.getStatistics();
-            console.log('\n🧠 Ontology Statistics:');
-            console.log(`  Total concepts: ${stats.totalConcepts}`);
-            console.log(`  Total relations: ${stats.totalRelations}`);
-            console.log(`  Average confidence: ${stats.averageConfidence}`);
+        try {
+            const stats = await client.getStats();
+            
+            if (options.json) {
+                const filtered = {};
+                if (options.patterns) filtered.patterns = stats.patterns;
+                if (options.concepts) filtered.ontology = stats.ontology;
+                if (!options.patterns && !options.concepts) Object.assign(filtered, stats);
+                
+                console.log(JSON.stringify(filtered, null, 2));
+            } else {
+                if (options.patterns) {
+                    console.log('\n📊 Pattern Statistics:');
+                    console.log(`  Total patterns: ${stats.patterns?.totalPatterns || 0}`);
+                    console.log(`  Strong patterns: ${stats.patterns?.strongPatterns || 0}`);
+                    console.log(`  Recent learning: ${stats.patterns?.recentLearning || 0}`);
+                }
+                
+                if (options.concepts || !options.patterns) {
+                    console.log('\n🧠 Ontology Statistics:');
+                    console.log(`  Total concepts: ${stats.ontology?.totalConcepts || 0}`);
+                    console.log(`  Total relations: ${stats.ontology?.totalRelations || 0}`);
+                    console.log(`  Average confidence: ${stats.ontology?.averageConfidence || 0}`);
+                }
+            }
+        } catch (error) {
+            if (options.json) {
+                console.log(JSON.stringify({ error: error.message }));
+            } else {
+                console.error('❌', error.message);
+            }
+            process.exit(1);
         }
     });
 
@@ -228,29 +303,51 @@ program
     .command('suggest <identifier>')
     .description('Get refactoring suggestions for an identifier')
     .option('-c, --confidence <threshold>', 'Minimum confidence threshold', '0.7')
+    .option('--json', 'Output as JSON')
+    .option('-p, --port <port>', 'LSP server port', '7000')
     .action(async (identifier, options) => {
-        console.log(`💡 Getting suggestions for "${identifier}"...`);
-        
-        const config = loadConfig();
-        const patterns = new PatternLearner(config.layers.patterns);
-        
-        const predictions = await patterns.predictNextRename(identifier);
-        
-        const filtered = predictions.filter(p => 
-            p.confidence >= parseFloat(options.confidence)
-        );
-        
-        if (filtered.length === 0) {
-            console.log('No suggestions found above confidence threshold');
-            return;
+        if (!options.json) {
+            console.log(`💡 Getting suggestions for "${identifier}"...`);
         }
         
-        console.log('\nSuggestions:');
-        filtered.forEach(p => {
-            console.log(`  ${p.original} → ${p.suggested}`);
-            console.log(`    Confidence: ${(p.confidence * 100).toFixed(1)}%`);
-            console.log(`    Reason: ${p.reason}`);
-        });
+        const client = new LSPClient(parseInt(options.port));
+        
+        if (!await client.isRunning()) {
+            const error = { error: 'LSP server not running. Start with: ontology-lsp start' };
+            if (options.json) {
+                console.log(JSON.stringify(error));
+            } else {
+                console.error('❌', error.error);
+            }
+            process.exit(1);
+        }
+        
+        try {
+            const suggestions = await client.suggest(identifier, parseFloat(options.confidence));
+            
+            if (options.json) {
+                console.log(JSON.stringify(suggestions, null, 2));
+            } else {
+                if (suggestions.length === 0) {
+                    console.log('No suggestions found above confidence threshold');
+                    return;
+                }
+                
+                console.log('\nSuggestions:');
+                suggestions.forEach(s => {
+                    console.log(`  ${s.original} → ${s.suggested}`);
+                    console.log(`    Confidence: ${(s.confidence * 100).toFixed(1)}%`);
+                    console.log(`    Reason: ${s.reason}`);
+                });
+            }
+        } catch (error) {
+            if (options.json) {
+                console.log(JSON.stringify({ error: error.message }));
+            } else {
+                console.error('❌', error.message);
+            }
+            process.exit(1);
+        }
     });
 
 // Find command
@@ -259,37 +356,60 @@ program
     .description('Find all occurrences of an identifier')
     .option('-f, --fuzzy', 'Include fuzzy matches')
     .option('-s, --semantic', 'Include semantic matches')
+    .option('--json', 'Output as JSON')
+    .option('-p, --port <port>', 'LSP server port', '7000')
     .action(async (identifier, options) => {
-        console.log(`🔍 Searching for "${identifier}"...`);
-        
-        const config = loadConfig();
-        const claudeTools = new ClaudeToolsLayer(config.layers.claude_tools);
-        
-        const query = {
-            identifier,
-            searchPath: '.',
-            fileTypes: config.layers.claude_tools.fileTypes
-        };
-        
-        const matches = await claudeTools.process(query);
-        
-        console.log(`\nExact matches: ${matches.exact.length}`);
-        matches.exact.forEach(m => {
-            console.log(`  ${m.file}:${m.line}:${m.column}`);
-        });
-        
-        if (options.fuzzy && matches.fuzzy.length > 0) {
-            console.log(`\nFuzzy matches: ${matches.fuzzy.length}`);
-            matches.fuzzy.forEach(m => {
-                console.log(`  ${m.file}:${m.line}:${m.column} (${(m.confidence * 100).toFixed(1)}%)`);
-            });
+        if (!options.json) {
+            console.log(`🔍 Searching for "${identifier}"...`);
         }
         
-        if (options.semantic && matches.conceptual.length > 0) {
-            console.log(`\nSemantic matches: ${matches.conceptual.length}`);
-            matches.conceptual.forEach(m => {
-                console.log(`  ${m.file}:${m.line}:${m.column} (${(m.confidence * 100).toFixed(1)}%)`);
+        const client = new LSPClient(parseInt(options.port));
+        
+        if (!await client.isRunning()) {
+            const error = { error: 'LSP server not running. Start with: ontology-lsp start' };
+            if (options.json) {
+                console.log(JSON.stringify(error));
+            } else {
+                console.error('❌', error.error);
+            }
+            process.exit(1);
+        }
+        
+        try {
+            const matches = await client.find(identifier, {
+                fuzzy: options.fuzzy,
+                semantic: options.semantic
             });
+            
+            if (options.json) {
+                console.log(JSON.stringify(matches, null, 2));
+            } else {
+                console.log(`\nExact matches: ${matches.exact?.length || 0}`);
+                matches.exact?.forEach(m => {
+                    console.log(`  ${m.file}:${m.line}:${m.column}`);
+                });
+                
+                if (options.fuzzy && matches.fuzzy?.length > 0) {
+                    console.log(`\nFuzzy matches: ${matches.fuzzy.length}`);
+                    matches.fuzzy.forEach(m => {
+                        console.log(`  ${m.file}:${m.line}:${m.column} (${(m.confidence * 100).toFixed(1)}%)`);
+                    });
+                }
+                
+                if (options.semantic && matches.conceptual?.length > 0) {
+                    console.log(`\nSemantic matches: ${matches.conceptual.length}`);
+                    matches.conceptual.forEach(m => {
+                        console.log(`  ${m.file}:${m.line}:${m.column} (${(m.confidence * 100).toFixed(1)}%)`);
+                    });
+                }
+            }
+        } catch (error) {
+            if (options.json) {
+                console.log(JSON.stringify({ error: error.message }));
+            } else {
+                console.error('❌', error.message);
+            }
+            process.exit(1);
         }
     });
 
@@ -323,7 +443,6 @@ program
         }
         
         // Run SQLite optimization commands
-        const Database = require('bun:sqlite').Database;
         const db = new Database(dbPath);
         
         db.exec('VACUUM');
@@ -362,36 +481,49 @@ program
     .command('export [output]')
     .description('Export ontology data')
     .option('-f, --format <format>', 'Output format (json, yaml)', 'json')
+    .option('--json', 'Shorthand for --format json')
+    .option('-p, --port <port>', 'LSP server port', '7000')
     .action(async (output, options) => {
-        console.log('📦 Exporting ontology data...');
+        const format = options.json ? 'json' : options.format;
         
-        const config = loadConfig();
-        const ontology = new OntologyEngine(config.layers.ontology);
-        const patterns = new PatternLearner(config.layers.patterns);
+        if (!options.json && !output) {
+            console.log('📦 Exporting ontology data...');
+        }
         
-        const stats = ontology.getStatistics();
-        const patternStats = await patterns.getStatistics();
+        const client = new LSPClient(parseInt(options.port));
         
-        const exportData = {
-            version: '1.0.0',
-            timestamp: new Date().toISOString(),
-            statistics: {
-                ontology: stats,
-                patterns: patternStats
-            },
-            concepts: [],  // Would need implementation
-            patterns: []   // Would need implementation
-        };
+        if (!await client.isRunning()) {
+            const error = { error: 'LSP server not running. Start with: ontology-lsp start' };
+            if (format === 'json' && !output) {
+                console.log(JSON.stringify(error));
+            } else {
+                console.error('❌', error.error);
+            }
+            process.exit(1);
+        }
         
-        const formatted = options.format === 'yaml' 
-            ? yaml.dump(exportData)
-            : JSON.stringify(exportData, null, 2);
-        
-        if (output) {
-            fs.writeFileSync(output, formatted);
-            console.log(`✅ Exported to ${output}`);
-        } else {
-            console.log(formatted);
+        try {
+            const exportData = await client.exportData();
+            
+            const formatted = format === 'yaml' 
+                ? yaml.dump(exportData)
+                : JSON.stringify(exportData, null, 2);
+            
+            if (output) {
+                fs.writeFileSync(output, formatted);
+                if (!options.json) {
+                    console.log(`✅ Exported to ${output}`);
+                }
+            } else {
+                console.log(formatted);
+            }
+        } catch (error) {
+            if (format === 'json' && !output) {
+                console.log(JSON.stringify({ error: error.message }));
+            } else {
+                console.error('❌', error.message);
+            }
+            process.exit(1);
         }
     });
 
@@ -400,11 +532,20 @@ program
     .command('import <input>')
     .description('Import ontology data')
     .option('--merge', 'Merge with existing data instead of replacing')
+    .option('--json', 'Output result as JSON')
+    .option('-p, --port <port>', 'LSP server port', '7000')
     .action(async (input, options) => {
-        console.log('📥 Importing ontology data...');
+        if (!options.json) {
+            console.log('📥 Importing ontology data...');
+        }
         
         if (!fs.existsSync(input)) {
-            console.error(`❌ File not found: ${input}`);
+            const error = { error: `File not found: ${input}` };
+            if (options.json) {
+                console.log(JSON.stringify(error));
+            } else {
+                console.error('❌', error.error);
+            }
             process.exit(1);
         }
         
@@ -414,14 +555,46 @@ program
             : JSON.parse(content);
         
         if (!data.version) {
-            console.error('❌ Invalid import file format');
+            const error = { error: 'Invalid import file format' };
+            if (options.json) {
+                console.log(JSON.stringify(error));
+            } else {
+                console.error('❌', error.error);
+            }
             process.exit(1);
         }
         
-        console.log(`✅ Import completed from ${input}`);
-        if (data.statistics) {
-            console.log(`  Concepts: ${data.statistics.ontology?.totalConcepts || 0}`);
-            console.log(`  Patterns: ${data.statistics.patterns?.totalPatterns || 0}`);
+        const client = new LSPClient(parseInt(options.port));
+        
+        if (!await client.isRunning()) {
+            const error = { error: 'LSP server not running. Start with: ontology-lsp start' };
+            if (options.json) {
+                console.log(JSON.stringify(error));
+            } else {
+                console.error('❌', error.error);
+            }
+            process.exit(1);
+        }
+        
+        try {
+            const result = await client.importData({ ...data, merge: options.merge });
+            
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                console.log(`✅ Import completed from ${input}`);
+                if (result.statistics) {
+                    console.log(`  Concepts: ${result.statistics.ontology?.totalConcepts || 0}`);
+                    console.log(`  Patterns: ${result.statistics.patterns?.totalPatterns || 0}`);
+                }
+            }
+        } catch (error) {
+            if (options.json) {
+                console.log(JSON.stringify({ error: error.message }));
+            } else {
+                console.error('❌', error.message);
+            }
+            process.exit(1);
         }
     });
 
