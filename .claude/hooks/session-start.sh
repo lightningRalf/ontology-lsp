@@ -222,6 +222,9 @@ show_quick_start() {
 
 # Main logic
 main() {
+    # Show immediate feedback that the script is running
+    echo -e "${BRIGHT_CYAN}${LIGHTNING} Initializing Ontology Server Suite...${NC}" >&2
+    
     print_header
     
     # Check if Bun is installed

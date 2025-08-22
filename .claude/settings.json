@@ -6,8 +6,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/start-mcp-server.sh",
-            "timeout": 10
+            "command": "echo '⚡ Ontology LSP Server Suite starting in background...' && ($CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh > /tmp/ontology-startup.log 2>&1 &) && ($CLAUDE_PROJECT_DIR/.claude/hooks/startup-status.sh &)",
+            "comment": "Start servers in background and show delayed status",
+            "timeout": 1
           }
         ]
       },
@@ -16,8 +17,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/start-mcp-server.sh",
-            "timeout": 10
+            "command": "echo '⚡ Checking Ontology LSP Server Suite...' && ($CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh > /tmp/ontology-resume.log 2>&1 &)",
+            "comment": "Check and start servers in background",
+            "timeout": 1
           }
         ]
       },
@@ -26,8 +28,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/start-mcp-server.sh",
-            "timeout": 10
+            "command": "echo '⚡ Restarting Ontology LSP Server Suite...' && ($CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh > /tmp/ontology-clear.log 2>&1 &)",
+            "comment": "Restart servers in background",
+            "timeout": 1
           }
         ]
       }
@@ -37,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/stop-mcp-server.sh",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-stop.sh",
             "timeout": 5
           }
         ]
