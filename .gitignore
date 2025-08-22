@@ -58,3 +58,6 @@ Thumbs.db
 
 # Ontology specific
 .ontology/
+# VS Code test binaries
+vscode-client/.vscode-test/
+

@@ -11,9 +11,15 @@ set -euo pipefail
 MCP_PORT="${MCP_SSE_PORT:-7001}"
 MCP_HOST="${MCP_SSE_HOST:-localhost}"
 MCP_SERVER_DIR="$CLAUDE_PROJECT_DIR/mcp-ontology-server"
+LSP_SERVER_DIR="$CLAUDE_PROJECT_DIR"
+HTTP_API_PORT="${ONTOLOGY_API_PORT:-7000}"
 BUN_PATH="${HOME}/.bun/bin/bun"
-PID_FILE="/tmp/ontology-mcp-server-${MCP_PORT}.pid"
-LOG_FILE="/tmp/ontology-mcp-server-${MCP_PORT}.log"
+MCP_PID_FILE="/tmp/ontology-mcp-server-${MCP_PORT}.pid"
+MCP_LOG_FILE="/tmp/ontology-mcp-server-${MCP_PORT}.log"
+LSP_PID_FILE="/tmp/ontology-lsp-server.pid"
+LSP_LOG_FILE="/tmp/ontology-lsp-server.log"
+API_PID_FILE="/tmp/ontology-api-server-${HTTP_API_PORT}.pid"
+API_LOG_FILE="/tmp/ontology-api-server-${HTTP_API_PORT}.log"
 
 # ANSI color codes for beautiful output
 BOLD='\033[1m'
@@ -100,13 +106,14 @@ print_separator() {
 
 # Function to check if server is running
 is_server_running() {
-    if [ -f "$PID_FILE" ]; then
-        local pid=$(cat "$PID_FILE")
+    local pid_file="$1"
+    if [ -f "$pid_file" ]; then
+        local pid=$(cat "$pid_file")
         if kill -0 "$pid" 2>/dev/null; then
             return 0
         else
             # PID file exists but process is dead
-            rm -f "$PID_FILE"
+            rm -f "$pid_file"
         fi
     fi
     return 1
@@ -114,7 +121,9 @@ is_server_running() {
 
 # Function to check if port is in use
 is_port_in_use() {
-    nc -z "$MCP_HOST" "$MCP_PORT" 2>/dev/null
+    local host="$1"
+    local port="$2"
+    nc -z "$host" "$port" 2>/dev/null
 }
 
 # Function to show startup animation
@@ -131,48 +140,52 @@ show_startup_animation() {
     echo -ne "\r\033[K" >&2  # Clear the line
 }
 
-# Function to start the server with beautiful output
+# Generic function to start a server
 start_server() {
-    echo
-    echo -e "  ${HOURGLASS}  ${BOLD}${BRIGHT_YELLOW}Starting MCP Server...${NC}"
-    echo
+    local server_name="$1"
+    local server_dir="$2"
+    local start_command="$3"
+    local pid_file="$4"
+    local log_file="$5"
+    local check_port="${6:-}"
+    local check_host="${7:-localhost}"
     
-    # Show startup status
-    echo -e "  ${DIM}${BRIGHT_BLACK}┌─ Initialization ─────────────────────────────────────┐${NC}"
-    echo -e "  ${DIM}${BRIGHT_BLACK}│${NC}  ${GEAR} Preparing environment...                      ${DIM}${BRIGHT_BLACK}│${NC}"
-    echo -e "  ${DIM}${BRIGHT_BLACK}│${NC}  ${PACKAGE} Loading Bun runtime...                        ${DIM}${BRIGHT_BLACK}│${NC}"
-    echo -e "  ${DIM}${BRIGHT_BLACK}│${NC}  ${TOOL} Binding to port ${MCP_PORT}...                        ${DIM}${BRIGHT_BLACK}│${NC}"
-    echo -e "  ${DIM}${BRIGHT_BLACK}└──────────────────────────────────────────────────────┘${NC}"
+    echo
+    echo -e "  ${HOURGLASS}  ${BOLD}${BRIGHT_YELLOW}Starting ${server_name}...${NC}"
     
     # Start the server in background
-    cd "$MCP_SERVER_DIR"
-    nohup "$BUN_PATH" run src/sse-server.ts > "$LOG_FILE" 2>&1 &
+    cd "$server_dir"
+    nohup $start_command > "$log_file" 2>&1 &
     local pid=$!
     
     # Save PID
-    echo "$pid" > "$PID_FILE"
+    echo "$pid" > "$pid_file"
     
-    # Wait for server to be ready with progress indication
-    local attempts=0
-    while [ $attempts -lt 10 ]; do
-        if is_port_in_use; then
-            echo
-            echo -e "  ${BRIGHT_GREEN}${CHECK_MARK}${NC}  ${BOLD}${BRIGHT_GREEN}Server started successfully!${NC}"
-            echo
+    # If port provided, wait for server to be ready
+    if [ -n "$check_port" ]; then
+        local attempts=0
+        while [ $attempts -lt 10 ]; do
+            if is_port_in_use "$check_host" "$check_port"; then
+                echo -e "  ${BRIGHT_GREEN}${CHECK_MARK}${NC}  ${BOLD}${BRIGHT_GREEN}${server_name} started successfully!${NC}"
+                return 0
+            fi
+            sleep 0.5
+            attempts=$((attempts + 1))
+        done
+    else
+        # No port to check, just verify process is running
+        sleep 1
+        if kill -0 "$pid" 2>/dev/null; then
+            echo -e "  ${BRIGHT_GREEN}${CHECK_MARK}${NC}  ${BOLD}${BRIGHT_GREEN}${server_name} started successfully!${NC}"
             return 0
         fi
-        # Show progress dots
-        echo -ne "\r  ${DIM}Waiting for server to respond${NC}$(printf '.%.0s' $(seq 1 $((attempts % 4))))"
-        sleep 0.5
-        attempts=$((attempts + 1))
-    done
+    fi
     
     # Server didn't start properly
-    echo
-    echo -e "  ${BRIGHT_RED}${CROSS_MARK}${NC}  ${BOLD}${BRIGHT_RED}Failed to start server${NC}"
-    echo -e "  ${DIM}Check logs at: $LOG_FILE${NC}"
+    echo -e "  ${BRIGHT_RED}${CROSS_MARK}${NC}  ${BOLD}${BRIGHT_RED}Failed to start ${server_name}${NC}"
+    echo -e "  ${DIM}Check logs at: $log_file${NC}"
     kill "$pid" 2>/dev/null || true
-    rm -f "$PID_FILE"
+    rm -f "$pid_file"
     return 1
 }
 
@@ -221,81 +234,101 @@ main() {
         exit 1
     fi
     
-    # Check if MCP server directory exists
-    if [ ! -d "$MCP_SERVER_DIR" ]; then
-        print_status "${WARNING}" "MCP Server" "Not Installed" "$BRIGHT_YELLOW"
-        echo
-        echo -e "  ${DIM}The Ontology MCP server is not installed in this project.${NC}"
-        echo -e "  ${DIM}Continuing without MCP server capabilities.${NC}"
-        echo
-        exit 0
-    fi
+    # Status tracking
+    local servers_started=0
+    local servers_failed=0
     
-    # Check current server status
-    echo -e "  ${BOLD}${BRIGHT_WHITE}${INFO} Server Status Check${NC}"
+    echo -e "  ${BOLD}${BRIGHT_WHITE}${INFO} Checking Ontology Server Suite${NC}"
     print_separator
     
-    if is_server_running; then
-        local pid=$(cat "$PID_FILE")
-        
-        # Server is already running - show detailed status
-        print_status "${CHECK_MARK}" "Status" "Running" "$BRIGHT_GREEN"
-        print_status "${GEAR}" "Process ID" "$pid" "$BRIGHT_CYAN"
-        print_status "${TOOL}" "Endpoint" "http://$MCP_HOST:$MCP_PORT/mcp/sse" "$BRIGHT_CYAN"
-        print_status "${PACKAGE}" "Log File" "$LOG_FILE" "$DIM"
-        
+    # 1. Start MCP Server (if directory exists)
+    if [ -d "$MCP_SERVER_DIR" ]; then
+        if is_server_running "$MCP_PID_FILE"; then
+            local pid=$(cat "$MCP_PID_FILE")
+            print_status "${CHECK_MARK}" "MCP Server" "Running (PID: $pid)" "$BRIGHT_GREEN"
+        elif is_port_in_use "$MCP_HOST" "$MCP_PORT"; then
+            print_status "${WARNING}" "MCP Port $MCP_PORT" "In use by another process" "$BRIGHT_YELLOW"
+        else
+            if start_server "MCP Server" "$MCP_SERVER_DIR" "$BUN_PATH run src/sse-server.ts" "$MCP_PID_FILE" "$MCP_LOG_FILE" "$MCP_PORT" "$MCP_HOST"; then
+                servers_started=$((servers_started + 1))
+            else
+                servers_failed=$((servers_failed + 1))
+            fi
+        fi
+    fi
+    
+    # 2. Start HTTP API Server
+    if [ -d "$LSP_SERVER_DIR/src/api" ]; then
+        if is_server_running "$API_PID_FILE"; then
+            local pid=$(cat "$API_PID_FILE")
+            print_status "${CHECK_MARK}" "HTTP API Server" "Running (PID: $pid)" "$BRIGHT_GREEN"
+        elif is_port_in_use "localhost" "$HTTP_API_PORT"; then
+            print_status "${WARNING}" "API Port $HTTP_API_PORT" "In use by another process" "$BRIGHT_YELLOW"
+        else
+            if start_server "HTTP API Server" "$LSP_SERVER_DIR" "$BUN_PATH run src/api/http-server.ts" "$API_PID_FILE" "$API_LOG_FILE" "$HTTP_API_PORT" "localhost"; then
+                servers_started=$((servers_started + 1))
+            else
+                servers_failed=$((servers_failed + 1))
+            fi
+        fi
+    fi
+    
+    # 3. Start LSP Server (runs on stdio, no port)
+    if [ -f "$LSP_SERVER_DIR/src/server.ts" ]; then
+        if is_server_running "$LSP_PID_FILE"; then
+            local pid=$(cat "$LSP_PID_FILE")
+            print_status "${CHECK_MARK}" "LSP Server" "Running (PID: $pid)" "$BRIGHT_GREEN"
+        else
+            # LSP server doesn't bind to a port, it uses stdio
+            if start_server "LSP Server" "$LSP_SERVER_DIR" "$BUN_PATH run src/server.ts --stdio" "$LSP_PID_FILE" "$LSP_LOG_FILE"; then
+                servers_started=$((servers_started + 1))
+            else
+                servers_failed=$((servers_failed + 1))
+            fi
+        fi
+    fi
+    
+    # Show summary
+    echo
+    if [ $servers_started -gt 0 ] || [ $servers_failed -eq 0 ]; then
         show_capabilities
         show_quick_start
         
         echo
         echo -e "  ${BRIGHT_GREEN}════════════════════════════════════════════════════════════════${NC}"
-        echo -e "  ${BOLD}${BRIGHT_GREEN}${CHECK_MARK} MCP Server is ready for your commands!${NC}"
+        if [ $servers_started -gt 0 ]; then
+            echo -e "  ${BOLD}${BRIGHT_GREEN}${ROCKET} Started $servers_started server(s) successfully!${NC}"
+        fi
+        if [ $servers_failed -gt 0 ]; then
+            echo -e "  ${BOLD}${BRIGHT_YELLOW}${WARNING} Failed to start $servers_failed server(s)${NC}"
+        fi
+        if [ $servers_started -eq 0 ] && [ $servers_failed -eq 0 ]; then
+            echo -e "  ${BOLD}${BRIGHT_GREEN}${CHECK_MARK} All servers already running!${NC}"
+        fi
         echo -e "  ${BRIGHT_GREEN}════════════════════════════════════════════════════════════════${NC}"
-        echo
         
-        exit 0
-    fi
-    
-    # Check if port is already in use by another process
-    if is_port_in_use; then
-        print_status "${WARNING}" "Port $MCP_PORT" "Already in use" "$BRIGHT_YELLOW"
+        # Show endpoints
         echo
-        echo -e "  ${DIM}Another process is using port $MCP_PORT.${NC}"
-        echo -e "  ${DIM}Cannot start Ontology MCP Server.${NC}"
-        echo
-        exit 0
-    fi
-    
-    # Server is not running - start it
-    print_status "${INFO}" "Status" "Not Running" "$BRIGHT_YELLOW"
-    
-    if start_server; then
-        local pid=$(cat "$PID_FILE")
-        
-        # Show success status with details
-        echo -e "  ${BOLD}${BRIGHT_WHITE}${CHECK_MARK} Server Started Successfully${NC}"
+        echo -e "  ${BOLD}${BRIGHT_WHITE}${TOOL} Available Endpoints${NC}"
         print_separator
-        print_status "${GEAR}" "Process ID" "$pid" "$BRIGHT_CYAN"
-        print_status "${TOOL}" "Endpoint" "http://$MCP_HOST:$MCP_PORT/mcp/sse" "$BRIGHT_CYAN"
-        print_status "${PACKAGE}" "Log File" "$LOG_FILE" "$DIM"
-        
-        show_capabilities
-        show_quick_start
-        
-        echo
-        echo -e "  ${BRIGHT_GREEN}════════════════════════════════════════════════════════════════${NC}"
-        echo -e "  ${BOLD}${BRIGHT_GREEN}${ROCKET} MCP Server launched and ready!${NC}"
-        echo -e "  ${BRIGHT_GREEN}════════════════════════════════════════════════════════════════${NC}"
-        echo
+        if is_server_running "$MCP_PID_FILE"; then
+            echo -e "  ${BRIGHT_CYAN}${BULLET}${NC} MCP Server: ${UNDERLINE}http://$MCP_HOST:$MCP_PORT/mcp/sse${NC}"
+        fi
+        if is_server_running "$API_PID_FILE"; then
+            echo -e "  ${BRIGHT_CYAN}${BULLET}${NC} HTTP API:   ${UNDERLINE}http://localhost:$HTTP_API_PORT${NC}"
+        fi
+        if is_server_running "$LSP_PID_FILE"; then
+            echo -e "  ${BRIGHT_CYAN}${BULLET}${NC} LSP Server: Running on stdio (for VS Code extension)"
+        fi
     else
         echo
         echo -e "  ${BRIGHT_RED}════════════════════════════════════════════════════════════════${NC}"
-        echo -e "  ${BOLD}${BRIGHT_RED}${CROSS_MARK} Failed to start MCP Server${NC}"
+        echo -e "  ${BOLD}${BRIGHT_RED}${CROSS_MARK} Failed to start servers${NC}"
         echo -e "  ${DIM}Please check the logs for details.${NC}"
         echo -e "  ${BRIGHT_RED}════════════════════════════════════════════════════════════════${NC}"
-        echo
-        exit 0
     fi
+    
+    echo
 }
 
 # Run main function

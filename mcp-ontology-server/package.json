@@ -16,7 +16,6 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
-    "bun-mcp-sse-transport": "../bun-mcp-sse-transport",
     "bun-mcp-sse-transport": "file:../bun-mcp-sse-transport",
     "zod": "^3.24.1"
   },

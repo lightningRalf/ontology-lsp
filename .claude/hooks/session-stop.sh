@@ -9,8 +9,13 @@ set -euo pipefail
 
 # Configuration
 MCP_PORT="${MCP_SSE_PORT:-7001}"
-PID_FILE="/tmp/ontology-mcp-server-${MCP_PORT}.pid"
-LOG_FILE="/tmp/ontology-mcp-server-${MCP_PORT}.log"
+HTTP_API_PORT="${ONTOLOGY_API_PORT:-7000}"
+MCP_PID_FILE="/tmp/ontology-mcp-server-${MCP_PORT}.pid"
+MCP_LOG_FILE="/tmp/ontology-mcp-server-${MCP_PORT}.log"
+LSP_PID_FILE="/tmp/ontology-lsp-server.pid"
+LSP_LOG_FILE="/tmp/ontology-lsp-server.log"
+API_PID_FILE="/tmp/ontology-api-server-${HTTP_API_PORT}.pid"
+API_LOG_FILE="/tmp/ontology-api-server-${HTTP_API_PORT}.log"
 
 # ANSI color codes
 BOLD='\033[1m'
@@ -39,18 +44,22 @@ WAVE="👋"
 print_header() {
     echo
     echo -e "${BRIGHT_CYAN}╔══════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BRIGHT_CYAN}║${NC}  ${BOLD}${BRIGHT_WHITE}${STOP} Stopping Ontology MCP Server${NC}                                  ${BRIGHT_CYAN}║${NC}"
+    echo -e "${BRIGHT_CYAN}║${NC}  ${BOLD}${BRIGHT_WHITE}${STOP} Stopping Ontology Server Suite${NC}                                ${BRIGHT_CYAN}║${NC}"
     echo -e "${BRIGHT_CYAN}╚══════════════════════════════════════════════════════════════════════╝${NC}"
     echo
 }
 
-# Function to stop the server
+# Generic function to stop a server
 stop_server() {
-    if [ -f "$PID_FILE" ]; then
-        local pid=$(cat "$PID_FILE")
+    local server_name="$1"
+    local pid_file="$2"
+    local log_file="$3"
+    
+    if [ -f "$pid_file" ]; then
+        local pid=$(cat "$pid_file")
         
         if kill -0 "$pid" 2>/dev/null; then
-            echo -e "  ${INFO}  ${BOLD}Stopping server${NC} (PID: ${BRIGHT_CYAN}$pid${NC})"
+            echo -e "  ${INFO}  ${BOLD}Stopping ${server_name}${NC} (PID: ${BRIGHT_CYAN}$pid${NC})"
             
             # Send SIGTERM for graceful shutdown
             kill -TERM "$pid" 2>/dev/null || true
@@ -70,23 +79,23 @@ stop_server() {
                 sleep 0.5
             fi
             
-            echo -e "\n  ${BRIGHT_GREEN}${CHECK_MARK}${NC}  ${BOLD}${BRIGHT_GREEN}Server stopped successfully${NC}"
-            rm -f "$PID_FILE"
+            echo -e "\n  ${BRIGHT_GREEN}${CHECK_MARK}${NC}  ${BOLD}${BRIGHT_GREEN}${server_name} stopped successfully${NC}"
+            rm -f "$pid_file"
             
             # Clean up old log files if they're getting large
-            if [ -f "$LOG_FILE" ] && [ $(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo 0) -gt 10485760 ]; then
+            if [ -f "$log_file" ] && [ $(stat -f%z "$log_file" 2>/dev/null || stat -c%s "$log_file" 2>/dev/null || echo 0) -gt 10485760 ]; then
                 echo -e "  ${DIM}Archiving large log file...${NC}"
-                mv "$LOG_FILE" "${LOG_FILE}.$(date +%Y%m%d_%H%M%S)"
+                mv "$log_file" "${log_file}.$(date +%Y%m%d_%H%M%S)"
             fi
             
             return 0
         else
-            echo -e "  ${DIM}Server process not found (stale PID file)${NC}"
-            rm -f "$PID_FILE"
+            echo -e "  ${DIM}${server_name} process not found (stale PID file)${NC}"
+            rm -f "$pid_file"
             return 0
         fi
     else
-        echo -e "  ${DIM}No server running (no PID file found)${NC}"
+        echo -e "  ${DIM}No ${server_name} running (no PID file found)${NC}"
         return 0
     fi
 }
@@ -95,19 +104,46 @@ stop_server() {
 main() {
     print_header
     
-    if stop_server; then
-        echo
-        echo -e "  ${BRIGHT_CYAN}════════════════════════════════════════════════════════════════${NC}"
-        echo -e "  ${BOLD}${BRIGHT_CYAN}${WAVE} Session ended. MCP Server has been stopped.${NC}"
-        echo -e "  ${BRIGHT_CYAN}════════════════════════════════════════════════════════════════${NC}"
-        echo
+    local servers_stopped=0
+    local servers_failed=0
+    
+    # Stop all servers
+    echo -e "  ${BOLD}${BRIGHT_WHITE}Stopping all Ontology servers...${NC}"
+    echo
+    
+    # 1. Stop MCP Server
+    if stop_server "MCP Server" "$MCP_PID_FILE" "$MCP_LOG_FILE"; then
+        servers_stopped=$((servers_stopped + 1))
     else
-        echo
-        echo -e "  ${BRIGHT_RED}════════════════════════════════════════════════════════════════${NC}"
-        echo -e "  ${BOLD}${BRIGHT_RED}${CROSS_MARK} Error stopping server${NC}"
-        echo -e "  ${BRIGHT_RED}════════════════════════════════════════════════════════════════${NC}"
-        echo
+        servers_failed=$((servers_failed + 1))
     fi
+    
+    # 2. Stop HTTP API Server
+    if stop_server "HTTP API Server" "$API_PID_FILE" "$API_LOG_FILE"; then
+        servers_stopped=$((servers_stopped + 1))
+    else
+        servers_failed=$((servers_failed + 1))
+    fi
+    
+    # 3. Stop LSP Server
+    if stop_server "LSP Server" "$LSP_PID_FILE" "$LSP_LOG_FILE"; then
+        servers_stopped=$((servers_stopped + 1))
+    else
+        servers_failed=$((servers_failed + 1))
+    fi
+    
+    # Show summary
+    echo
+    if [ $servers_failed -eq 0 ]; then
+        echo -e "  ${BRIGHT_CYAN}════════════════════════════════════════════════════════════════${NC}"
+        echo -e "  ${BOLD}${BRIGHT_CYAN}${WAVE} Session ended. All servers have been stopped.${NC}"
+        echo -e "  ${BRIGHT_CYAN}════════════════════════════════════════════════════════════════${NC}"
+    else
+        echo -e "  ${BRIGHT_YELLOW}════════════════════════════════════════════════════════════════${NC}"
+        echo -e "  ${BOLD}${BRIGHT_YELLOW}${WAVE} Session ended. Some servers may still be running.${NC}"
+        echo -e "  ${BRIGHT_YELLOW}════════════════════════════════════════════════════════════════${NC}"
+    fi
+    echo
 }
 
 # Run main function
