@@ -1,20 +1,7 @@
 # NEXT_STEPS.md - What to Do Next
 
-> **Purpose**: Forward-looking action items. For completed work, see PROJECT_STATUS.md
-
-## ✅ FIXED: HTTP API Server Startup
-
-**Resolution**: HTTP API server on port 7000 is now working correctly
-- ✅ MCP Server running on port 7001 (confirmed via health check)
-- ✅ HTTP API server running on port 7000 (health check confirmed)
-- ✅ Database initialization working properly
-- ✅ All layers (Claude Tools, Tree-sitter, Ontology, Pattern Learner) initialized
-
-### Fixed Issues:
-1. ✅ Added proper async initialization handling for OntologyEngine and PatternLearner
-2. ✅ Fixed process lifecycle - server now stays alive with signal handlers
-3. ✅ Added comprehensive error handling and logging
-4. ✅ Ensured database connections are properly awaited
+> **Purpose**: Forward-looking action items ONLY. No history, no completed items.
+> For completed work, see PROJECT_STATUS.md
 
 ## 🎯 Phase 3: Integration [NEXT]
 
@@ -43,13 +30,9 @@
 - Incremental parsing (only reparse changed files)
 - Pattern mining from usage data
 
-## ⚠️ Current State
+## 📍 Current Focus
 
-- **Phase 1**: ✅ DONE (Unified core, config, ports)
-- **Phase 2**: ✅ DONE (Wire MCP tools - all 16 tools connected!)
-- **Phase 2.5**: ✅ DONE (HTTP API server fixed and running!)
-- **Phase 3**: 🟡 IN PROGRESS (Integration - MCP → LSP Bridge)
-- **Phase 4**: 🔮 FUTURE (Optimization)
+**Phase 3**: Integration - MCP → LSP Bridge
 
 ## 🎬 Quick Start Next Session
 
