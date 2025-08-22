@@ -18,7 +18,7 @@ start: stop-quiet
     @echo "Starting HTTP API Server (port 7000)..."
     @sh -c '{{bun}} run src/api/http-server.ts > .ontology/logs/http-api.log 2>&1 & echo $$! > .ontology/pids/http-api.pid'
     @echo "Starting MCP SSE Server (port 7001)..."
-    @sh -c '{{bun}} run mcp-ontology-server/index.ts > .ontology/logs/mcp-sse.log 2>&1 & echo $$! > .ontology/pids/mcp-sse.pid'
+    @sh -c '{{bun}} run mcp-ontology-server/src/sse-server.ts > .ontology/logs/mcp-sse.log 2>&1 & echo $$! > .ontology/pids/mcp-sse.pid'
     @sleep 3
     @just health
     @echo ""
@@ -138,7 +138,7 @@ dev: stop-quiet
     @echo "🔧 Starting in development mode..."
     @mkdir -p .ontology/pids .ontology/logs
     @sh -c '{{bun}} run --watch src/api/http-server.ts > .ontology/logs/http-api.log 2>&1 & echo $$! > .ontology/pids/http-api.pid'
-    @sh -c '{{bun}} run --watch mcp-ontology-server/index.ts > .ontology/logs/mcp-sse.log 2>&1 & echo $$! > .ontology/pids/mcp-sse.pid'
+    @sh -c '{{bun}} run --watch mcp-ontology-server/src/sse-server.ts > .ontology/logs/mcp-sse.log 2>&1 & echo $$! > .ontology/pids/mcp-sse.pid'
     @echo "✅ Development servers started with auto-reload"
     @echo "📌 Logs: just logs"
     @echo "📌 Stop: just stop"

@@ -1,10 +1,10 @@
 {
   "mcpServers": {
     "ontology-lsp": {
-      "command": "bun",
-      "args": ["run", "/home/lightningralf/programming/ontology-lsp/mcp-ontology-server/src/stdio-simple.ts"],
+      "command": "/home/lightningralf/.bun/bin/bun",
+      "args": ["run", "/home/lightningralf/programming/ontology-lsp/mcp-ontology-server/src/stdio.ts"],
       "type": "stdio",
-      "description": "Ontology-enhanced LSP via CLI bridge"
+      "description": "Ontology-enhanced LSP with 5-layer architecture"
     },
     "ontology-lsp-sse": {
       "type": "sse",

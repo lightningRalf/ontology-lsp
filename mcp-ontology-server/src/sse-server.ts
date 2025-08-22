@@ -8,8 +8,8 @@
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { BunSSEServerTransport } from "../../bun-mcp-sse-transport/src/index.ts"
-import { OntologyMCPServer } from "./index.js"
-import { getEnvironmentConfig } from "./config/server-config.js"
+import { OntologyMCPServer } from "./index.ts"
+import { getEnvironmentConfig } from "./config/server-config.ts"
 
 const config = getEnvironmentConfig()
 const PORT = process.env.MCP_SSE_PORT || config.ports.mcpSSE

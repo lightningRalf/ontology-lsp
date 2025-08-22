@@ -7,7 +7,7 @@
  */
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
-import { OntologyMCPServer } from "./index.js"
+import { OntologyMCPServer } from "./index.ts"
 
 async function main() {
   console.error("Starting Ontology MCP Server with stdio transport...")

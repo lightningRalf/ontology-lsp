@@ -10,11 +10,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is an Ontology-Enhanced LSP (Language Server Protocol) proxy that provides intelligent code navigation, refactoring, and pattern learning capabilities. It's designed to handle LLM-generated code with fuzzy matching and adaptive learning. The project uses Bun runtime (not Node.js) for better performance and native SQLite support.
 
 
+### Server Management
+Use `just` commands to manage all servers (HTTP API, MCP SSE, LSP):
+
+```bash
+# Start all servers
+just start        # Starts HTTP API (7000) and MCP SSE (7001)
+
+# Stop all servers  
+just stop         # Cleanly stops all running servers
+
+# Other management commands
+just restart      # Stop then start all servers
+just status       # Show which servers are running
+just health       # Check server health endpoints
+just logs         # Tail server logs
+just dev          # Development mode with auto-reload
+```
+
 ### CLI Tool
 ```bash
 # CLI is available at dist/cli/index.js after build
 ontology-lsp init      # Initialize configuration
-ontology-lsp start     # Start LSP server
 ontology-lsp analyze   # Analyze codebase
 ontology-lsp stats     # Show statistics
 ontology-lsp find <identifier>  # Find with fuzzy matching

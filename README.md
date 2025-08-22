@@ -95,18 +95,45 @@ ontology-lsp start
 git clone https://github.com/your-org/ontology-lsp.git
 cd ontology-lsp
 
-# Install dependencies
-npm install
+# Install dependencies (using Bun)
+bun install
 
-# Build the project
-npm run build
+# Initialize the project
+just init
 
-# Link globally
-npm link
+# Start all servers (HTTP API on 7000, MCP SSE on 7001)
+just start
 
-# Initialize in your project
-cd /path/to/your/project
-ontology-lsp init
+# Check server status
+just status
+
+# View logs
+just logs
+
+# Stop servers when done
+just stop
+```
+
+### Using with Claude Code
+
+Add to your `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "ontology-lsp": {
+      "command": "/home/user/.bun/bin/bun",
+      "args": ["run", "/path/to/ontology-lsp/mcp-ontology-server/src/stdio.ts"],
+      "type": "stdio",
+      "description": "Ontology-enhanced LSP with 5-layer architecture"
+    },
+    "ontology-lsp-sse": {
+      "type": "sse",
+      "url": "http://localhost:7001/mcp/sse",
+      "description": "Ontology-enhanced LSP with SSE transport (requires 'just start')"
+    }
+  }
+}
 ```
 
 ## Configuration

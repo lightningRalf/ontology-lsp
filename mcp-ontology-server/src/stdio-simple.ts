@@ -6,7 +6,7 @@
  * Much simpler than the layered approach - just delegates to CLI commands.
  */
 
-import { SimpleMCPServer } from "./index-simple.js"
+import { SimpleMCPServer } from "./index-simple.ts"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 
 async function main() {

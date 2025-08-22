@@ -13,7 +13,7 @@ import {
   ErrorCode,
   McpError,
 } from "@modelcontextprotocol/sdk/types.js"
-import { CLIBridge } from "./cli-bridge.js"
+import { CLIBridge } from "./cli-bridge.ts"
 
 export class SimpleMCPServer {
   private server: Server
