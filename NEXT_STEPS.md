@@ -1,271 +1,20 @@
-# Ontology LSP - Project Status & Next Steps
+# NEXT_STEPS.md - What to Do Next
 
-## ✅ What We've Accomplished
+> **Purpose**: Forward-looking action items. For completed work, see PROJECT_STATUS.md
 
-### 1. **LSP Server (MIGRATED TO BUN & WORKING)**
-- ✅ Built with Bun and running (`dist/server.js`)
-- ✅ Using Bun's native SQLite (no more native module conflicts!)
-- ✅ Multi-layer architecture (Claude Tools → Tree-sitter → Ontology → Patterns → Propagation)
-- ✅ Support for TypeScript, JavaScript, and Python
-- ✅ **All server tests passing (20/20 tests pass with Bun test)**
-- ✅ Server runs with `just start` or `~/.bun/bin/bun run dist/server.js --stdio`
-- ✅ Bundle size: 1MB (fully self-contained)
-- ✅ Fixed all import issues and module instantiation problems
+## 🎯 Priority 1: Production Validation (TODAY)
 
-### 2. **VS Code Extension (BUN-COMPATIBLE & READY)**
-- ✅ **Extension compiles successfully** with no TypeScript errors
-- ✅ **Extension packages successfully** as `ontology-lsp-1.0.0.vsix` (681 KB)
-- ✅ **Extension configured to use Bun runtime** for server execution
-- ✅ **Fixed all native module issues** - Bun's SQLite is built-in
-- ✅ **Fixed activation events** - added `onStartupFinished` for reliable activation
-- ✅ **Optimized performance settings** - lowered CPU usage (workers: 2, cache: 250MB)
-- ✅ Comprehensive extension with all modules:
-  - Core extension with LanguageClient
-  - Configuration management
-  - Status bar UI
-  - Security layer (filters sensitive data)
-  - Performance monitoring
-  - Command system (12 commands)
-  - Team collaboration features
-  - Extension API for third-party integration
-  - Webview for concept graph visualization
-
-### 3. **Build System (POWERED BY BUN)**
-- ✅ Justfile updated for Bun commands with full paths
-- ✅ Build time: ~50ms with Bun bundler
-- ✅ Using Biome instead of ESLint for linting
-- ✅ Tree-sitter packages trusted and working with Bun
-- ✅ `just` commands: build, test, test-unit, test-integration, test-coverage, test-watch, package, install
-
-### 4. **Technology Stack**
-- ✅ **Runtime:** Bun v1.2.20 (replacing Node.js)
-- ✅ **Database:** Bun's native SQLite (replacing better-sqlite3)
-- ✅ **Linter:** Biome (replacing ESLint)
-- ✅ **Bundler:** Bun's built-in bundler
-- ✅ **Language Parsers:** Tree-sitter with trusted dependencies
-
-## 🚀 Latest Updates (CURRENT SESSION - Aug 22, 2025)
-
-### 1. **Centralized Configuration System - CREATED** ✅ NEW!
-Eliminated port conflicts and configuration inconsistencies:
-- ✅ Created `server-config.ts` with all port allocations
-- ✅ Separate test configuration (ports 7002-7003) vs production (7000-7001)
-- ✅ Environment variable overrides supported
-- ✅ Port validation to prevent conflicts
-- ✅ Configuration documentation in `CONFIG.md`
-- ✅ `.env.sample` template for easy setup
-
-### 2. **Test Infrastructure - SIGNIFICANTLY IMPROVED** ✅ 
-Major progress on test reliability:
-- ✅ **22 tests now passing** (was 11), only 4 failures remain
-- ✅ Fixed import paths and module resolution
-- ✅ Fixed KnowledgeLayer propagation methods
-- ✅ Tests automatically use isolated ports
-- ✅ Reduced timeout failures with proper configuration
-
-### 3. **MCP Server Integration - COMPLETED** ✅
-Successfully integrated MCP server with LSP server:
-- ✅ Created robust HTTP client with circuit breaker, retries, and caching
-- ✅ Connected all 4 layers to LSP API endpoints
-- ✅ Integrated with new configuration system
-- ✅ Implemented error handling with exponential backoff
-- ✅ Created integration tests for MCP-LSP communication
-
-### 4. **Session Management - ENHANCED** ✅
-Improved server lifecycle management:
-- ✅ Scripts now use centralized configuration
-- ✅ Proper port conflict detection and handling
-- ✅ Auto-detection of project directory
-- ✅ Clean shutdown procedures
-- ✅ Beautiful terminal output with status indicators
-
-### 5. **Claude Desktop Configuration - READY** ✅
-Created complete setup for Claude Desktop:
-- ✅ Created `claude-desktop-config.json` with proper MCP server configuration
-- ✅ Created `CLAUDE_DESKTOP_SETUP.md` with detailed instructions
-- ✅ Documented all 16 available MCP tools
-- ✅ Added troubleshooting guide and architecture diagram
-
-### 6. **Previous Accomplishments** ✅
-From earlier sessions:
-- ✅ Migrated to Bun Runtime (v1.2.20)
-- ✅ Using Bun's native SQLite (no more native module conflicts)
-- ✅ Multi-layer architecture working
-- ✅ VS Code extension packaged and configured
-- ✅ CLI tool created with full feature set
-- ✅ Test migration from Jest to Bun test
-- ✅ All critical bugs fixed
-
-**Architecture Implemented**:
-```
-Claude → MCP Server → HTTP Client → LSP API Server
-         ↓
-    [4 Layers Connected]
-    - OntologyLayer → /concepts
-    - TreeSitterLayer → /find  
-    - PatternLayer → /patterns, /suggest
-    - KnowledgeLayer → /analyze
-```
-
-**Ready for Testing**:
-- `/find` endpoint confirmed working
-- All layers connected to LSP API
-- Error handling and resilience in place
-- Integration tests created
-
-## ✅ COMPLETED TODAY
-
-### What's Working Now:
-- ✅ **Configuration System**: Centralized port and settings management
-- ✅ **MCP Server**: Running on port 7001 with SSE transport
-- ✅ **HTTP API Server**: Running on port 7000 with all endpoints
-- ✅ **Session Scripts**: `.claude/hooks/session-start.sh` and `session-stop.sh` working
-- ✅ **Test Suite**: 22/26 tests passing (was 11/26) - major improvement!
-- ✅ **Claude Desktop Config**: Ready in `claude-desktop-config.json`
-- ✅ **Documentation**: Complete setup guide in `CLAUDE_DESKTOP_SETUP.md` and `CONFIG.md`
-
-### Quick Start Commands:
+### 1. Run REAL Integration Tests
+The current tests use mocks. Run the real integration tests for production confidence:
 ```bash
-# Start all servers
-./.claude/hooks/session-start.sh
-
-# Run tests
-cd mcp-ontology-server && bun test
-
-# Stop servers
-./.claude/hooks/session-stop.sh
+cd mcp-ontology-server && ~/.bun/bin/bun test test/integration/mcp-lsp-real.test.ts
 ```
+**Why Critical**: Mocks bypass circuit breakers, retries, and real network behavior.
 
-## 🛠️ Debug Commands
-
+### 2. Test VS Code Extension 
 ```bash
-# Check server works with Bun
-~/.bun/bin/bun run dist/server.js --stdio
-
-# Test server with LSP message
-echo -e 'Content-Length: 159\r\n\r\n{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"processId":null,"rootUri":"file:///home/lightningralf/programming/ontology-lsp","capabilities":{}}}' | ~/.bun/bin/bun run dist/server.js --stdio
-
-# Run tests
-just test  # Runs all tests with Bun
-just test-unit  # Run unit tests only
-just test-integration  # Run integration tests
-just test-coverage  # Run with coverage
-
-# Check extension installation
-code --list-extensions | grep ontology
-
-# Find extension directory
-ls ~/.vscode-oss/extensions/ontology-team.ontology-lsp-1.0.0/
-
-# Reinstall with fixed version
+# Install extension
 just install-extension
-
-# Force reload VS Code
-# Press: Ctrl+Shift+P → "Developer: Reload Window"
-
-# Check logs
-# View → Output → Select "Extension Host" or "Ontology Language Server"
-```
-
-## 📁 Project Structure
-```
-ontology-lsp/
-├── dist/               # ✅ Bun-built LSP server (1MB bundle)
-├── src/                # ✅ Server source (using Bun SQLite)
-├── tests/              # ✅ Server tests (11/11 passing)
-├── vscode-client/      # ✅ Extension (Bun-compatible)
-│   ├── src/           # ✅ Extension source (launches with Bun)
-│   ├── out/           # ✅ Compiled extension
-│   ├── package.json   # ✅ Configured for Bun runtime
-│   └── ontology-lsp-1.0.0.vsix  # ✅ Packaged extension
-├── biome.json         # ✅ Biome linter configuration
-├── bun.lock           # ✅ Bun lockfile
-├── justfile           # ✅ Build commands (using Bun)
-└── package.json       # ✅ Server package with trusted deps
-```
-
-## 🔧 Quick Fixes to Try Next Session
-
-### Fix 1: Force Activation (Easiest)
-```json
-// In vscode-client/package.json
-"activationEvents": ["*"]  // Always activate
-```
-
-### Fix 2: Absolute Server Path
-```json
-// In VS Code settings.json
-{
-  "ontologyLSP.server.path": "/home/lightningralf/programming/ontology-lsp/dist/server.js"
-}
-```
-
-### Fix 3: Debug Mode
-```bash
-# Run extension in debug mode
-cd vscode-client
-code .
-# Press F5 to launch Extension Development Host
-```
-
-### Fix 4: Check VS Code Version
-```bash
-# VS Code OSS might be the issue
-# Try regular VS Code if available
-code --version  # vs  code-oss --version
-```
-
-## 💡 Root Cause Analysis
-
-**Why it's not working:**
-1. **VS Code OSS** vs regular VS Code - different extension paths
-2. **Activation events** not triggering - extension never starts
-3. **Server path** resolution - relative path calculation wrong
-4. **Missing error handling** - extension fails silently
-
-**The solution path:**
-1. First get extension to activate (even with `"*"`)
-2. Then fix server path (absolute path works)
-3. Then optimize activation events
-4. Finally add proper error messages
-
----
-
-**Status:** 🚀 **BUN-POWERED LSP SERVER & EXTENSION - READY FOR PRODUCTION**
-
-## 🎉 Summary of Major Improvements
-
-1. **Migrated to Bun Runtime**: No more native module conflicts
-2. **Native SQLite Support**: Using Bun's built-in database
-3. **Faster Build Times**: 50ms with Bun bundler
-4. **Better Linting**: Biome replacing ESLint
-5. **Reliable Extension**: Configured to launch server with Bun
-6. **Tree-sitter Working**: Packages trusted and building correctly
-7. **CLI Tool**: Full command-line interface with bunx support
-8. **Test Runner Migration**: Jest → Bun test (faster, simpler)
-9. **Complete Feature Set**: HTTP API, .ontologyignore, export/import
-10. **Production Ready**: All tests passing, all features implemented
-
-## 🎯 IMMEDIATE NEXT STEPS - Priority Actions
-
-### 1. **Fix Final 4 Test Failures** 🟡 HIGH (Nearly Complete!)
-Currently 22/26 tests passing. Only 4 tests remain:
-- 2 timeout tests in error handling (may need mock approach)
-- 1 propagation test expecting wrong field name
-- 1 LSP server unavailable test with circuit breaker
-```bash
-# Run tests with proper environment
-cd mcp-ontology-server && BUN_ENV=test ~/.bun/bin/bun test
-
-# Or run specific failing test
-~/.bun/bin/bun test test/integration/mcp-lsp.test.ts
-```
-
-### 2. **Test VS Code Extension** 🔴 CRITICAL
-Verify the extension works with current setup:
-```bash
-# Install and test extension
-./install-extension.sh
 # Or: code --install-extension vscode-client/ontology-lsp-1.0.0.vsix
 
 # Test in VS Code:
@@ -274,22 +23,22 @@ Verify the extension works with current setup:
 # 3. Test F12 (Go to Definition), Shift+F12 (Find References)
 # 4. Test F2 (Rename), Ctrl+. (Code Actions)
 ```
+**Known Issue**: Activation events may not trigger in VS Code OSS
 
-### 3. **Verify Claude Desktop Integration** 🔴 CRITICAL
-Test the MCP server with Claude Desktop:
+### 3. Verify Claude Desktop Integration
 ```bash
-# Start servers using session script
+# Start servers
 ./.claude/hooks/session-start.sh
 
-# Copy configuration to Claude Desktop
+# Copy config
 cp claude-desktop-config.json ~/.config/claude/claude_desktop_config.json
 
-# Restart Claude Desktop and test by asking:
-# "What tools do you have available?"
+# Restart Claude Desktop and ask: "What tools do you have available?"
 ```
 
-### 4. **Create Docker Container** 🟡 HIGH
-Package everything for easy deployment:
+## 🚀 Priority 2: Deployment Ready (THIS WEEK)
+
+### 1. Build & Test Docker Container
 ```dockerfile
 FROM oven/bun:1
 WORKDIR /app
@@ -298,121 +47,134 @@ RUN bun install
 EXPOSE 7000 7001
 CMD ["bun", "run", ".claude/hooks/session-start.sh"]
 ```
-
-### 5. **Publish to NPM** 🟢 MEDIUM
-Publish the CLI tool to NPM:
 ```bash
-# Update version
-npm version patch
+docker build -t ontology-lsp .
+docker run -p 7000:7000 -p 7001:7001 ontology-lsp
+```
 
-# Publish
+### 2. Publish to NPM
+```bash
+npm version minor  # We added significant features
 npm publish
-
-# Users can then install:
-npm install -g ontology-lsp
-bunx ontology-lsp start
+# Users can then: bunx ontology-lsp start
 ```
 
-### 6. **Performance Optimization** 🟢 LOW
-Fine-tune for production:
-- Connection pooling for HTTP requests
-- Lazy loading for large concept graphs
-- Request batching for multiple operations
-- Adjust circuit breaker thresholds
-
-### 7. **Add Authentication** 🟢 LOW
-For secure production deployment:
-```typescript
-// Add to server-config.ts
-apiKey: process.env.LSP_API_KEY
-
-// Add to lsp-client.ts
-headers: {
-  'Authorization': `Bearer ${config.apiKey}`
-}
-```
-
-## 📝 Still TODO (from README promises)
-
-While the core functionality is complete, these features from the README are not yet implemented:
-
-### 1. **NPM Package Publication** 🔄
-- Package is ready (`ontology-lsp-proxy`)
-- Configured for bunx usage
-- Just needs: `npm publish`
-
-### 2. **HTTP API Endpoints** ✅ COMPLETED
-Port 7000 REST API implemented:
-- `GET /stats` - Get statistics
-- `GET /concepts` - Get concept graph
-- `GET /patterns` - Get learned patterns
-- `POST /analyze` - Analyze codebase
-- `POST /suggest` - Get refactoring suggestions
-- `GET /export` - Export ontology data
-- `POST /import` - Import ontology data
-- `GET /health` - Health check
-- Start with: `ontology-lsp api`
-
-### 3. **`.ontologyignore` File Support** ✅ COMPLETED
-File filtering implemented:
-- Parses `.ontologyignore` file
-- Applies patterns to file searches
-- Similar to `.gitignore` functionality
-- Creates default file on first run
-- Supports negation patterns
-
-### 4. **Full Export/Import Functionality** ✅ COMPLETED
-Full implementations added:
-- `exportConcepts()` exports all concepts
-- `importConcept()` imports concept data
-- `exportPatterns()` exports all patterns
-- `importPattern()` imports pattern data
-- CLI commands: `ontology-lsp export` and `ontology-lsp import`
-
-### 5. **CI/CD GitHub Actions** ✅ COMPLETED
-Automated workflows created:
-- `.github/workflows/ontology-check.yml` - Main CI pipeline
-- `.github/workflows/npm-publish.yml` - NPM publishing
-- Test runner configuration
-- Release automation
-- Build and package VS Code extension
-
-### 6. **Documentation Files** ✅ COMPLETED
-Documentation created:
-- `docs/FAQ.md` - Comprehensive FAQ
-- `CONTRIBUTING.md` - Detailed contribution guidelines
-- API documentation in FAQ
-- Architecture documented in README
-
-## 🎉 Project Status Summary
-
-### Ready Now ✅
-- **LSP Server**: Fully functional with Bun runtime
-- **HTTP API**: All endpoints working on port 7000
-- **MCP Server**: SSE transport ready on port 7001
-- **Configuration**: Centralized and conflict-free
-- **Tests**: 85% passing (22/26)
-- **Documentation**: Comprehensive guides available
-
-### Needs Testing 🧪
-- **VS Code Extension**: Built but needs activation testing
-- **Claude Desktop**: Config ready, needs integration test
-- **Docker**: Dockerfile template ready, needs build
-
-### Quick Wins 🚀
-1. Fix last 4 tests → 100% test coverage
-2. Test VS Code extension → Full IDE support
-3. Verify Claude Desktop → MCP tools available
-4. Build Docker image → Easy deployment
-
-**Next Recommended Action:** 
+### 3. Performance Baseline
+Run benchmarks to establish performance metrics:
 ```bash
-# 1. First, get tests to 100%
-cd mcp-ontology-server && ~/.bun/bin/bun test
-
-# 2. Then test VS Code extension
-just install-extension
-
-# 3. Finally, verify Claude Desktop integration
-cp claude-desktop-config.json ~/.config/claude/
+# Create benchmark script
+cd mcp-ontology-server
+bun test test/benchmarks/performance.test.ts
 ```
+Target metrics:
+- Find definition: <200ms for 10K files
+- Circuit breaker: Opens after 5 failures
+- Cache hit rate: >80% in typical usage
+
+## 🔧 Priority 3: Production Hardening (NEXT SPRINT)
+
+### 1. Replace Mocks with Test Fixtures
+Current timeout tests use mocks. Replace with:
+- Test containers for isolated servers
+- Network simulation tools
+- Chaos engineering tests
+
+### 2. Add Observability
+```typescript
+// OpenTelemetry integration
+import { trace } from '@opentelemetry/api'
+const tracer = trace.getTracer('ontology-lsp')
+```
+
+### 3. Security Audit
+- Add rate limiting to HTTP API
+- Implement API key authentication
+- Sanitize file paths in .ontologyignore
+- Add CORS configuration options
+
+### 4. Multi-Language Support
+Currently supports TS/JS/Python. Add:
+- Rust (high demand)
+- Go (growing ecosystem)  
+- Java (enterprise needs)
+
+## 🧪 Priority 4: Advanced Features (FUTURE)
+
+### 1. Distributed Ontology
+- Share concepts across team/organization
+- Federated learning from multiple codebases
+- Conflict resolution strategies
+
+### 2. AI-Enhanced Refactoring
+Leverage the intelligent `inferConcept`:
+- Suggest architectural improvements
+- Detect anti-patterns using learned patterns
+- Auto-generate documentation from inferred relationships
+
+### 3. Real-time Collaboration
+- WebSocket-based live concept sharing
+- Conflict-free replicated data types (CRDTs)
+- Team learning analytics
+
+## ⚠️ Known Issues to Address
+
+### Critical
+1. **Mock Tests**: Integration tests use mocks that bypass real behavior
+2. **VS Code OSS**: Extension may not activate properly
+3. **Circuit Breaker**: Thresholds need tuning for production
+
+### Important
+1. **Memory Usage**: SQLite in-memory DB has no size limits
+2. **Cache Invalidation**: No strategy for stale concept cache
+3. **Error Recovery**: Missing graceful degradation
+
+### Nice to Have
+1. **Telemetry**: No usage analytics
+2. **Migrations**: No DB schema migration strategy
+3. **Backup**: No concept database backup/restore
+
+## 📊 Success Metrics
+
+Track these to validate production readiness:
+
+### Technical
+- [ ] Real integration tests pass (no mocks)
+- [ ] VS Code extension activates reliably
+- [ ] Docker container runs for 24h without issues
+- [ ] Memory usage stays under 1GB with 10K concepts
+
+### User Experience  
+- [ ] Find definition responds in <200ms (p95)
+- [ ] Zero false positives in fuzzy matching
+- [ ] Rename propagation completes in <1s
+- [ ] Circuit breaker prevents cascade failures
+
+### Adoption
+- [ ] NPM package has >10 downloads/week
+- [ ] GitHub repo has >10 stars
+- [ ] At least 1 user reports success
+- [ ] Claude Desktop integration confirmed working
+
+## 🎬 Quick Start for Next Session
+
+```bash
+# 1. Start where we left off
+cd ~/programming/ontology-lsp
+source ~/.bun/bin/bun  # Ensure Bun is in PATH
+
+# 2. Check everything still works
+cd mcp-ontology-server && bun test  # Should show 26/26 passing
+
+# 3. Run REAL integration tests (priority!)
+bun test test/integration/mcp-lsp-real.test.ts
+
+# 4. Start servers
+./.claude/hooks/session-start.sh
+
+# 5. Test with Claude
+# Ask: "What tools do you have available?"
+```
+
+---
+
+**Remember**: The `inferConcept` feature is not a bug—it's the system's intelligence. Preserve it!

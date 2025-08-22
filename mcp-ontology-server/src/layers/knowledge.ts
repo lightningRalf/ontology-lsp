@@ -27,8 +27,8 @@ export class KnowledgeLayer {
         propagated.propagation = await this.propagateRename(
           args.oldName,
           args.newName,
-          args.scope,
-          args.preview
+          args.scope || 'file',
+          args.preview || false
         )
       }
       
@@ -80,8 +80,8 @@ export class KnowledgeLayer {
     // Determine propagation strategy based on scope
     const strategy = this.determineStrategy(scope)
     
-    // Find all affected locations
-    const locations = await this.spreader.findAffectedLocations(oldName, strategy)
+    // Find all affected locations via LSP API
+    const locations = await this.findAffectedLocations(oldName, strategy)
     
     // Group by impact level
     const impacts = this.categorizeImpacts(locations)
@@ -112,6 +112,32 @@ export class KnowledgeLayer {
       results,
       impacts,
       rollbackPlan: this.generateRollbackPlan(changes),
+    }
+  }
+  
+  private async findAffectedLocations(identifier: string, strategy: any): Promise<any[]> {
+    // Use LSP API to find all references
+    try {
+      const response = await this.lspClient.findSymbol(identifier, {
+        fuzzy: strategy.fuzzyMatch,
+        semantic: true
+      })
+      
+      if (!response || !response.matches) {
+        return []
+      }
+      
+      // Convert matches to location format
+      return response.matches.map((match: any) => ({
+        file: match.file,
+        line: match.line,
+        column: match.column,
+        type: match.type,
+        confidence: match.confidence || 1.0
+      }))
+    } catch (error) {
+      console.error(`Failed to find affected locations for ${identifier}:`, error)
+      return []
     }
   }
 

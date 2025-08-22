@@ -246,7 +246,8 @@ export class OntologyAPIServer {
         const identifier = url.searchParams.get('identifier');
         
         if (identifier) {
-            const concept = await this.ontology.findConcept(identifier);
+            // Use strict mode for explicit API lookups - no inference
+            const concept = await this.ontology.findConceptStrict(identifier);
             if (concept) {
                 const response = {
                     id: concept.id,

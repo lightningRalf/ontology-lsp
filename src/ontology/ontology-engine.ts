@@ -72,7 +72,7 @@ export class OntologyEngine extends EventEmitter {
         console.log(`Loaded ${concepts.length} concepts from storage`);
     }
     
-    async findConcept(identifier: string): Promise<Concept | null> {
+    async findConcept(identifier: string, options?: { inferIfMissing?: boolean }): Promise<Concept | null> {
         // 1. Direct lookup by representation
         const directMatch = await this.findByRepresentation(identifier);
         if (directMatch) return directMatch;
@@ -83,8 +83,16 @@ export class OntologyEngine extends EventEmitter {
             return fuzzyMatch[0].concept;
         }
         
-        // 3. Try to infer/create new concept
-        return this.inferConcept(identifier);
+        // 3. Infer if enabled (default: true for backward compatibility)
+        if (options?.inferIfMissing !== false) {
+            return this.inferConcept(identifier);
+        }
+        
+        return null;
+    }
+    
+    async findConceptStrict(identifier: string): Promise<Concept | null> {
+        return this.findConcept(identifier, { inferIfMissing: false });
     }
     
     private async findByRepresentation(name: string): Promise<Concept | null> {
