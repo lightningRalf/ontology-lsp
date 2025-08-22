@@ -2,73 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+@.claude/docs/software-principles.md  
+@.claude/docs/tech-stack-ts.md
+
 ## Project Overview
 
 This is an Ontology-Enhanced LSP (Language Server Protocol) proxy that provides intelligent code navigation, refactoring, and pattern learning capabilities. It's designed to handle LLM-generated code with fuzzy matching and adaptive learning. The project uses Bun runtime (not Node.js) for better performance and native SQLite support.
 
-## Development Commands
-
-### Building & Running
-```bash
-# Build LSP server (uses Bun bundler)
-just build
-# or directly: ~/.bun/bin/bun build ./src/server.ts --target=bun --outdir=dist --format=esm
-
-# Run server in development mode
-just dev
-# or: ~/.bun/bin/bun run src/server.ts --stdio
-
-# Start compiled server
-just start
-# or: ~/.bun/bin/bun run dist/server.js --stdio
-
-# Build everything (server + VS Code extension)
-just build-all
-```
-
-### Testing
-```bash
-# Run all tests with Bun test runner (NOT Jest)
-just test
-# or: ~/.bun/bin/bun test tests/step*.test.ts tests/integration.test.ts
-
-# Run specific test suites
-just test-unit       # Unit tests only
-just test-integration # Integration tests only
-just test-perf       # Performance tests
-just test-coverage   # With coverage report
-just test-watch      # Watch mode
-
-# Test a single file
-~/.bun/bin/bun test tests/step1_similarity.test.ts
-```
-
-### Code Quality
-```bash
-# Lint with Biome (NOT ESLint)
-just lint
-# or: ~/.bun/bin/bun run lint
-# or: bunx @biomejs/biome check --write .
-
-# Format code
-npm run format
-# or: bunx @biomejs/biome format --write .
-```
-
-### VS Code Extension
-```bash
-# Build and install VS Code extension
-just install-extension
-
-# Build extension only
-just build-extension
-
-# Package extension
-just package-extension
-
-# Development mode for extension
-just dev-extension  # Opens VS Code with extension project
-```
 
 ### CLI Tool
 ```bash
