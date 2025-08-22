@@ -12,14 +12,19 @@ import { TreeSitterLayer } from "../../src/layers/tree-sitter.js"
 import { PatternLayer } from "../../src/layers/patterns.js"
 import { KnowledgeLayer } from "../../src/layers/knowledge.js"
 import { OntologyAPIServer } from "../../../src/api/http-server.js"
+import { getTestConfig } from "../../src/config/server-config.js"
 import * as path from "path"
 
 describe("MCP-LSP Integration", () => {
   let lspServer: OntologyAPIServer
   let lspClient: LSPClient
-  let testPort = 7001 // Use different port for testing
+  const testConfig = getTestConfig()
+  const testPort = testConfig.ports.testAPI
 
   beforeAll(async () => {
+    // Set test environment
+    process.env.BUN_ENV = 'test'
+    
     // Start LSP server on test port
     lspServer = new OntologyAPIServer({
       port: testPort,
@@ -386,7 +391,7 @@ describe("MCP-LSP Integration", () => {
 
       const layer = new OntologyLayer()
       // Mock the lspClient property
-      (layer as any).lspClient = offlineClient
+      ;(layer as any).lspClient = offlineClient
 
       const previousResult = {
         data: {},

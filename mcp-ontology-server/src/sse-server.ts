@@ -9,9 +9,11 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { BunSSEServerTransport } from "../../bun-mcp-sse-transport/src/index.ts"
 import { OntologyMCPServer } from "./index.js"
+import { getEnvironmentConfig } from "./config/server-config.js"
 
-const PORT = process.env.MCP_SSE_PORT || 7001
-const HOST = process.env.MCP_SSE_HOST || "localhost"
+const config = getEnvironmentConfig()
+const PORT = process.env.MCP_SSE_PORT || config.ports.mcpSSE
+const HOST = process.env.MCP_SSE_HOST || config.host
 
 async function main() {
   console.log(`Starting Ontology MCP Server with SSE transport on ${HOST}:${PORT}`)

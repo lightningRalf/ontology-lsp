@@ -9,13 +9,16 @@
  * - Timeout handling
  */
 
+import { getEnvironmentConfig, type ServerConfig } from '../config/server-config.js'
+
 interface LSPClientConfig {
-  host: string
-  port: number
+  host?: string
+  port?: number
   timeout?: number
   maxRetries?: number
   cacheEnabled?: boolean
   cacheTTL?: number
+  useConfigDefaults?: boolean
 }
 
 interface CacheEntry {
@@ -43,14 +46,21 @@ export class LSPClient {
   private failureCount: number = 0
   private failureThreshold: number = 5
   private lastFailureTime: number = 0
-  private circuitResetTimeout: number = 60000 // 1 minute
+  private circuitResetTimeout: number
+  private serverConfig: ServerConfig
   
-  constructor(config: LSPClientConfig) {
-    this.baseUrl = `http://${config.host}:${config.port}`
-    this.timeout = config.timeout || 5000
-    this.maxRetries = config.maxRetries || 3
-    this.cacheEnabled = config.cacheEnabled ?? true
-    this.cacheTTL = config.cacheTTL || 300000 // 5 minutes default
+  constructor(config: LSPClientConfig = {}) {
+    this.serverConfig = getEnvironmentConfig()
+    
+    const host = config.host || this.serverConfig.host
+    const port = config.port || this.serverConfig.ports.httpAPI
+    
+    this.baseUrl = `http://${host}:${port}`
+    this.timeout = config.timeout ?? this.serverConfig.timeout
+    this.maxRetries = config.maxRetries ?? this.serverConfig.maxRetries
+    this.cacheEnabled = config.cacheEnabled ?? this.serverConfig.cacheEnabled
+    this.cacheTTL = config.cacheTTL ?? this.serverConfig.cacheTTL
+    this.circuitResetTimeout = this.serverConfig.circuitBreakerResetTimeout
     this.cache = new Map()
     
     // Start cache cleanup interval

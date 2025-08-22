@@ -7,15 +7,18 @@
 
 set -euo pipefail
 
-# Configuration
-MCP_PORT="${MCP_SSE_PORT:-7001}"
-MCP_HOST="${MCP_SSE_HOST:-localhost}"
+# Configuration - Import from central config
 # Get script directory and derive project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MCP_SERVER_DIR="$PROJECT_DIR/mcp-ontology-server"
 LSP_SERVER_DIR="$PROJECT_DIR"
-HTTP_API_PORT="${ONTOLOGY_API_PORT:-7000}"
+
+# Source configuration from the TypeScript config (defaults)
+# These can be overridden by environment variables
+MCP_PORT="${MCP_SSE_PORT:-7001}"
+MCP_HOST="${MCP_SSE_HOST:-localhost}"
+HTTP_API_PORT="${HTTP_API_PORT:-7000}"
 BUN_PATH="${HOME}/.bun/bin/bun"
 MCP_PID_FILE="/tmp/ontology-mcp-server-${MCP_PORT}.pid"
 MCP_LOG_FILE="/tmp/ontology-mcp-server-${MCP_PORT}.log"

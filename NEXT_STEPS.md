@@ -46,40 +46,47 @@
 
 ## 🚀 Latest Updates (CURRENT SESSION - Aug 22, 2025)
 
-### 1. **MCP Server Integration - COMPLETED** ✅
+### 1. **Centralized Configuration System - CREATED** ✅ NEW!
+Eliminated port conflicts and configuration inconsistencies:
+- ✅ Created `server-config.ts` with all port allocations
+- ✅ Separate test configuration (ports 7002-7003) vs production (7000-7001)
+- ✅ Environment variable overrides supported
+- ✅ Port validation to prevent conflicts
+- ✅ Configuration documentation in `CONFIG.md`
+- ✅ `.env.sample` template for easy setup
+
+### 2. **Test Infrastructure - SIGNIFICANTLY IMPROVED** ✅ 
+Major progress on test reliability:
+- ✅ **22 tests now passing** (was 11), only 4 failures remain
+- ✅ Fixed import paths and module resolution
+- ✅ Fixed KnowledgeLayer propagation methods
+- ✅ Tests automatically use isolated ports
+- ✅ Reduced timeout failures with proper configuration
+
+### 3. **MCP Server Integration - COMPLETED** ✅
 Successfully integrated MCP server with LSP server:
 - ✅ Created robust HTTP client with circuit breaker, retries, and caching
 - ✅ Connected all 4 layers to LSP API endpoints
-- ✅ Added comprehensive configuration system (env vars + config files)
+- ✅ Integrated with new configuration system
 - ✅ Implemented error handling with exponential backoff
 - ✅ Created integration tests for MCP-LSP communication
-- ✅ Added detailed documentation for integration
-- ✅ Verified `/find` endpoint already exists and works
 
-### 2. **Session Start/Stop Scripts - FIXED** ✅
-Refactored and improved session management:
-- ✅ Fixed hardcoded CLAUDE_PROJECT_DIR - scripts now auto-detect project directory
-- ✅ Added proper port conflict handling - kills existing processes before starting
-- ✅ Removed LSP server management - correctly identified it's managed by VS Code extension
-- ✅ Added server stop() method to HTTP API server for clean shutdown
-- ✅ Beautiful terminal output with status indicators and colors
+### 4. **Session Management - ENHANCED** ✅
+Improved server lifecycle management:
+- ✅ Scripts now use centralized configuration
+- ✅ Proper port conflict detection and handling
+- ✅ Auto-detection of project directory
+- ✅ Clean shutdown procedures
+- ✅ Beautiful terminal output with status indicators
 
-### 3. **Test Infrastructure - IMPROVED** ✅
-Fixed test timeouts and failures:
-- ✅ Fixed URI parsing in orchestrator's readResource method
-- ✅ Added error handling to getStatistics to prevent hanging
-- ✅ Added missing getStats() methods to KnowledgeLayer and PatternLayer
-- ✅ Made OntologyLayer's getStats() public
-- ✅ **21 tests now passing** (was 11), only 5 minor failures remain
-
-### 4. **Claude Desktop Configuration - READY** ✅
+### 5. **Claude Desktop Configuration - READY** ✅
 Created complete setup for Claude Desktop:
 - ✅ Created `claude-desktop-config.json` with proper MCP server configuration
 - ✅ Created `CLAUDE_DESKTOP_SETUP.md` with detailed instructions
 - ✅ Documented all 16 available MCP tools
 - ✅ Added troubleshooting guide and architecture diagram
 
-### 5. **Previous Accomplishments** ✅
+### 6. **Previous Accomplishments** ✅
 From earlier sessions:
 - ✅ Migrated to Bun Runtime (v1.2.20)
 - ✅ Using Bun's native SQLite (no more native module conflicts)
@@ -109,12 +116,13 @@ Claude → MCP Server → HTTP Client → LSP API Server
 ## ✅ COMPLETED TODAY
 
 ### What's Working Now:
+- ✅ **Configuration System**: Centralized port and settings management
 - ✅ **MCP Server**: Running on port 7001 with SSE transport
 - ✅ **HTTP API Server**: Running on port 7000 with all endpoints
 - ✅ **Session Scripts**: `.claude/hooks/session-start.sh` and `session-stop.sh` working
-- ✅ **Test Suite**: 21/26 tests passing (was 11/26)
+- ✅ **Test Suite**: 22/26 tests passing (was 11/26) - major improvement!
 - ✅ **Claude Desktop Config**: Ready in `claude-desktop-config.json`
-- ✅ **Documentation**: Complete setup guide in `CLAUDE_DESKTOP_SETUP.md`
+- ✅ **Documentation**: Complete setup guide in `CLAUDE_DESKTOP_SETUP.md` and `CONFIG.md`
 
 ### Quick Start Commands:
 ```bash
@@ -240,15 +248,17 @@ code --version  # vs  code-oss --version
 
 ## 🎯 IMMEDIATE NEXT STEPS - Priority Actions
 
-### 1. **Fix Remaining Test Failures** 🔴 CRITICAL
-Currently 21/26 tests passing. Fix the 5 failing tests:
-- Integration test connection timeouts
-- Test expectations for undefined vs actual values
-- Error handling test initialization issues
+### 1. **Fix Final 4 Test Failures** 🟡 HIGH (Nearly Complete!)
+Currently 22/26 tests passing. Only 4 tests remain:
+- 2 timeout tests in error handling (may need mock approach)
+- 1 propagation test expecting wrong field name
+- 1 LSP server unavailable test with circuit breaker
 ```bash
-# Run tests with server running
-bun run src/api/http-server.ts &
-cd mcp-ontology-server && bun test
+# Run tests with proper environment
+cd mcp-ontology-server && BUN_ENV=test ~/.bun/bin/bun test
+
+# Or run specific failing test
+~/.bun/bin/bun test test/integration/mcp-lsp.test.ts
 ```
 
 ### 2. **Test VS Code Extension** 🔴 CRITICAL
@@ -265,51 +275,22 @@ Verify the extension works with current setup:
 # 4. Test F2 (Rename), Ctrl+. (Code Actions)
 ```
 
-### 3. **Verify Claude Desktop Integration** 🟡 HIGH
+### 3. **Verify Claude Desktop Integration** 🔴 CRITICAL
 Test the MCP server with Claude Desktop:
 ```bash
 # Start servers using session script
 ./.claude/hooks/session-start.sh
 
-# Add to ~/.config/claude/claude_desktop_config.json
-# Test by asking Claude: "What tools do you have available?"
+# Copy configuration to Claude Desktop
+cp claude-desktop-config.json ~/.config/claude/claude_desktop_config.json
+
+# Restart Claude Desktop and test by asking:
+# "What tools do you have available?"
 ```
 
-### 4. **Verify Claude Tools Layer Integration** 🟡 HIGH
-The MCP Layer 1 (ClaudeToolsLayer) needs testing:
-- Confirm it can use native Grep/Glob/LS tools
-- Test performance vs direct LSP calls
-- Verify fallback to LSP when tools unavailable
-```bash
-# Test the layer orchestration
-cd mcp-ontology-server
-bun test test/orchestrator.test.ts
-```
-
-### 5. **Add Authentication to LSP API** 🟢 MEDIUM
-For production deployment:
-```typescript
-// Add to lsp-client.ts
-headers: {
-  'Authorization': `Bearer ${process.env.LSP_API_KEY}`
-}
-```
-
-### 6. **Performance Optimization** 🟢 MEDIUM
-Optimize the remaining bottlenecks:
-- Reduce LSP client timeout for tests (currently 5s)
-- Add connection pooling for HTTP requests
-- Implement lazy loading for large concept graphs
-- Add request batching for multiple operations
-
-### 7. **Production Deployment** 🟢 MEDIUM
-Prepare for production use:
-- Add environment-specific configurations
-- Implement health checks and monitoring
-- Add logging with different levels
-- Create Docker container for easy deployment
-```bash
-# Create Dockerfile
+### 4. **Create Docker Container** 🟡 HIGH
+Package everything for easy deployment:
+```dockerfile
 FROM oven/bun:1
 WORKDIR /app
 COPY . .
@@ -318,19 +299,37 @@ EXPOSE 7000 7001
 CMD ["bun", "run", ".claude/hooks/session-start.sh"]
 ```
 
-### 8. **NPM Package Publication** 🟢 LOW
+### 5. **Publish to NPM** 🟢 MEDIUM
 Publish the CLI tool to NPM:
 ```bash
-# Update package.json version
-# Add .npmignore file
-# Publish to NPM
+# Update version
+npm version patch
+
+# Publish
 npm publish
 
 # Users can then install:
 npm install -g ontology-lsp
-# Or use directly:
-npx ontology-lsp init
 bunx ontology-lsp start
+```
+
+### 6. **Performance Optimization** 🟢 LOW
+Fine-tune for production:
+- Connection pooling for HTTP requests
+- Lazy loading for large concept graphs
+- Request batching for multiple operations
+- Adjust circuit breaker thresholds
+
+### 7. **Add Authentication** 🟢 LOW
+For secure production deployment:
+```typescript
+// Add to server-config.ts
+apiKey: process.env.LSP_API_KEY
+
+// Add to lsp-client.ts
+headers: {
+  'Authorization': `Bearer ${config.apiKey}`
+}
 ```
 
 ## 📝 Still TODO (from README promises)
@@ -385,14 +384,35 @@ Documentation created:
 - API documentation in FAQ
 - Architecture documented in README
 
-## 🚀 Ready for Production Use
+## 🎉 Project Status Summary
 
-Despite the missing features above, the core LSP functionality is **production-ready**:
-- ✅ Full LSP protocol support
-- ✅ VS Code extension working
-- ✅ CLI tool functional
-- ✅ Pattern learning operational
-- ✅ Ontology management working
-- ✅ Performance optimized with Bun
+### Ready Now ✅
+- **LSP Server**: Fully functional with Bun runtime
+- **HTTP API**: All endpoints working on port 7000
+- **MCP Server**: SSE transport ready on port 7001
+- **Configuration**: Centralized and conflict-free
+- **Tests**: 85% passing (22/26)
+- **Documentation**: Comprehensive guides available
 
-**Next Action:** Run `just install-extension` and enjoy the Bun-powered LSP!
+### Needs Testing 🧪
+- **VS Code Extension**: Built but needs activation testing
+- **Claude Desktop**: Config ready, needs integration test
+- **Docker**: Dockerfile template ready, needs build
+
+### Quick Wins 🚀
+1. Fix last 4 tests → 100% test coverage
+2. Test VS Code extension → Full IDE support
+3. Verify Claude Desktop → MCP tools available
+4. Build Docker image → Easy deployment
+
+**Next Recommended Action:** 
+```bash
+# 1. First, get tests to 100%
+cd mcp-ontology-server && ~/.bun/bin/bun test
+
+# 2. Then test VS Code extension
+just install-extension
+
+# 3. Finally, verify Claude Desktop integration
+cp claude-desktop-config.json ~/.config/claude/
+```

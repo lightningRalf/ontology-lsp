@@ -5,15 +5,17 @@ import { PatternLearner } from '../patterns/pattern-learner';
 import { KnowledgeSpreader } from '../propagation/knowledge-spreader';
 import { ClaudeToolsLayer } from '../layers/claude-tools';
 import { TreeSitterLayer } from '../layers/tree-sitter';
+import { getEnvironmentConfig, type ServerConfig } from '../../mcp-ontology-server/src/config/server-config';
 import * as path from 'path';
 import * as fs from 'fs';
 
 interface APIConfig {
-    port: number;
-    host: string;
+    port?: number;
+    host?: string;
     dbPath: string;
     workspaceRoot: string;
     cors?: boolean;
+    useConfigDefaults?: boolean;
 }
 
 export class OntologyAPIServer {
@@ -23,10 +25,16 @@ export class OntologyAPIServer {
     private claudeTools!: ClaudeToolsLayer;
     private treeSitter!: TreeSitterLayer;
     private config: APIConfig;
+    private serverConfig: ServerConfig;
     private server: any = null;
 
     constructor(config: APIConfig) {
-        this.config = config;
+        this.serverConfig = getEnvironmentConfig();
+        this.config = {
+            ...config,
+            port: config.port ?? this.serverConfig.ports.httpAPI,
+            host: config.host ?? this.serverConfig.host
+        };
         this.initializeLayers();
     }
 

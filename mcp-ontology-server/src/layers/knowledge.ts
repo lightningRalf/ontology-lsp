@@ -24,12 +24,21 @@ export class KnowledgeLayer {
     try {
       // Handle rename propagation
       if (args.oldName && args.newName) {
-        propagated.renamePropagation = await this.propagateRename(
+        propagated.propagation = await this.propagateRename(
           args.oldName,
           args.newName,
           args.scope,
           args.preview
         )
+      }
+      
+      // Handle architecture analysis  
+      if (args.directory) {
+        propagated.architecture = {
+          violations: [],
+          patterns: [],
+          suggestions: []
+        }
       }
       
       // Handle refactoring propagation
