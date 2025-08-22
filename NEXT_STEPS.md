@@ -104,39 +104,35 @@ Critical issues resolved:
 - Updated integration tests to not instantiate server directly
 - Added full Bun paths to all build scripts
 
-### 8. **MCP Server Investigation & Fix** ✅
-Deep dive into MCP (Model Context Protocol) integration and architectural redesign:
+### 8. **MCP Server - NEEDS FIXING** 🔴
+Started redesigning MCP integration but discovered missing endpoints:
 
-**Initial Problems Identified**:
-- SSE server running but not connected to ontology-lsp core
-- Import path issues (`@ontology/layers/claude-tools.js` doesn't exist)
-- MCP server creating own layer instances instead of using LSP server
-- Confusion about tool ownership and bidirectional communication needs
+**Problems Found**:
+- CLI expects `/find` endpoint but HTTP server doesn't have it
+- CLI expects endpoints that don't exist in the API server
+- MCP server has broken imports (`@ontology/layers/claude-tools.js`)
+- Architecture mismatch between what CLI expects and what API provides
 
-**Solution Implemented: CLI as Foundation**:
-- **New Architecture**: MCP Server → CLI Commands → HTTP API → LSP Server
-- **Key Insight**: The CLI tool is the perfect cornerstone for MCP integration
-- **Implementation**:
-  1. Fixed CLI to be a client to the LSP server (via HTTP API on port 7000)
-  2. Added `--json` flag to all CLI commands for machine-readable output
-  3. Created simplified MCP server (`index-simple.ts`) that spawns CLI commands
-  4. MCP server is now a thin wrapper around CLI - no complex layer management
+**TODO - Fix These Issues**:
+1. **Add missing endpoints to HTTP server** (`src/api/http-server.ts`):
+   - `/find` - for finding identifiers
+   - Verify all CLI commands have matching API endpoints
+   
+2. **Fix the CLI client** (`src/cli/index.ts`):
+   - Map CLI commands to actual existing API endpoints
+   - Or update API to have the endpoints CLI expects
+   
+3. **Complete MCP integration**:
+   - Fix imports in `mcp-ontology-server/src/layers/`
+   - Test the CLI → API flow actually works
+   - Ensure MCP can spawn CLI commands successfully
 
-**Benefits of CLI-Based Architecture**:
-- Single source of truth (LSP server)
-- MCP becomes a simple protocol wrapper
-- CLI can be used by any tool (shell scripts, CI/CD, other editors)
-- Testing simplified (test CLI, MCP passes through)
-- Easy to add new features (just add CLI commands)
+4. **Add start/stop scripts** (mentioned but not implemented):
+   - Create script to start LSP server in background
+   - Create script to stop running LSP server
+   - Add health check to verify server is running
 
-**Files Created/Modified**:
-- `src/cli/index.ts` - Refactored to use LSPClient class
-- `mcp-ontology-server/src/cli-bridge.ts` - Bridge between MCP and CLI
-- `mcp-ontology-server/src/index-simple.ts` - Simplified MCP server
-- `mcp-ontology-server/src/stdio-simple.ts` - STDIO entry point
-- `.mcp.json` - Updated to use stdio-based MCP server
-
-**Current Status**: ✅ Working - CLI-based MCP architecture implemented and tested
+**Current Status**: 🔴 BROKEN - CLI calls endpoints that don't exist
 
 ## 📋 Testing Steps (TO DO NOW)
 
@@ -298,39 +294,68 @@ code --version  # vs  code-oss --version
 9. **Complete Feature Set**: HTTP API, .ontologyignore, export/import
 10. **Production Ready**: All tests passing, all features implemented
 
-## ✅ MCP Server - FIXED with CLI Architecture
+## 🔧 MCP Server - TODO: Complete the Integration
 
-The MCP integration is now **working** with a clean architecture:
+The MCP integration was partially implemented but needs these fixes:
 
-### **Final Architecture: CLI as the Foundation**
+### **Planned Architecture: CLI as the Foundation**
 ```
 Claude Code → MCP Server → CLI Commands → HTTP API → LSP Server
-                ↓
-         (thin wrapper)
-                ↓
-    Spawns: ontology-lsp find --json
-    Spawns: ontology-lsp suggest --json
-    Spawns: ontology-lsp analyze --json
 ```
 
-### **How It Works**:
-1. MCP server receives tool request from Claude Code
-2. Spawns appropriate CLI command with `--json` flag
-3. CLI connects to running LSP server via HTTP API (port 7000)
-4. LSP server processes request using 5-layer architecture
-5. Returns JSON result through CLI back to MCP
+### **Critical Architecture Issue - 5-Layer System Not Connected**:
 
-### **To Use MCP with Claude Code**:
-1. Start the LSP HTTP API server: `ontology-lsp api`
-2. The MCP config in `.mcp.json` will automatically use the CLI-based server
-3. Claude Code can now use ontology features via MCP tools
+The MCP server needs to implement the **5-layer architecture** where each layer progressively enhances results:
 
-### **Key Benefits**:
-- **Simple**: MCP is just a protocol wrapper, not a reimplementation
-- **Maintainable**: Single source of truth (CLI)
-- **Testable**: Test CLI independently
-- **Extensible**: Add new features to CLI, MCP gets them automatically
-- **Universal**: CLI works for shell scripts, CI/CD, other tools
+1. **Layer 1 (Claude Tools)**: Uses Glob/Grep/LS for fast search (~5ms)
+2. **Layer 2 (Tree-sitter)**: AST analysis from LSP server (~50ms)  
+3. **Layer 3 (Ontology)**: Concept relationships from LSP (~10ms)
+4. **Layer 4 (Pattern Learner)**: Learned patterns from LSP (~10ms)
+5. **Layer 5 (Knowledge Spreader)**: Change propagation (~20ms)
+
+**The Problem**: MCP server needs **bidirectional communication**:
+- MCP → Claude Code's Glob/Grep/LS tools (for Layer 1)
+- MCP → LSP server (for Layers 2-5: tree-sitter, ontology, patterns)
+
+**Example Flow for `find_definition`**:
+1. Layer 1: Try with Claude's Grep tool (fast regex search)
+2. If insufficient → Layer 2: Get AST from LSP's tree-sitter
+3. If needed → Layer 3: Query ontology relationships from LSP
+4. Continue through layers as needed
+
+### **What Still Needs to be Done**:
+
+1. **Fix the Bidirectional Communication**:
+   - MCP server needs way to call Claude Code's Glob/Grep/LS tools
+   - MCP server needs to connect to running LSP server (not create own instances)
+   - Options: Tool injection, callback mechanism, or shared process
+
+2. **Fix API Endpoints Mismatch**:
+   - CLI calls `/find` but API doesn't have this endpoint
+   - Need to either add `/find` to API or update CLI to use existing endpoints
+   - Verify all CLI commands map to actual API endpoints
+
+3. **Fix MCP Server Imports**:
+   - Broken: `@ontology/layers/claude-tools.js` doesn't exist
+   - Need to fix all import paths in `mcp-ontology-server/src/layers/`
+   - Connect layers to actual LSP server, not standalone implementations
+
+4. **Test the Full Flow**:
+   - Start API server: `ontology-lsp api` 
+   - Test CLI commands actually work with `--json` flag
+   - Test MCP server can spawn CLI and get results
+   - Test 5-layer progressive enhancement actually works
+
+5. **Create Helper Scripts**:
+   - `start-lsp-server.sh` - Start server in background
+   - `stop-lsp-server.sh` - Stop running server
+   - Add to package.json scripts
+
+6. **Documentation**:
+   - Document which endpoints exist vs which are needed
+   - Create mapping table: CLI command → API endpoint
+   - Document how layers communicate with Claude tools and LSP
+   - Add troubleshooting guide
 
 ## 📝 Still TODO (from README promises)
 
