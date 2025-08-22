@@ -4,6 +4,8 @@ A sophisticated MCP (Model Context Protocol) server that exposes a 5-layer intel
 
 **New to this?** 👉 **[Check out the First Steps Guide](docs/FIRST_STEPS.md)** for a quick start with the 20% of features that provide 80% of the value!
 
+**Want automatic startup?** 🚀 **[Follow the Auto-Start Setup Guide](docs/AUTO_START_SETUP.md)** to have the MCP server start automatically with Claude Code!
+
 ## 🎯 Overview
 
 This MCP server integrates with the ontology-lsp project to provide:
@@ -49,40 +51,86 @@ bun run build
 
 ### Claude Code Integration
 
-First, start the SSE server:
+#### Option A: Automatic Startup (Recommended)
+
+Set up automatic MCP server startup when Claude Code sessions begin:
+
+1. **Create the startup hook script** at `.claude/hooks/start-mcp-server.sh`:
+   ```bash
+   mkdir -p .claude/hooks
+   cp /path/to/mcp-ontology-server/docs/examples/start-mcp-server.sh .claude/hooks/
+   chmod +x .claude/hooks/start-mcp-server.sh
+   ```
+
+2. **Configure Claude Code settings** in `.claude/settings.json`:
+   ```json
+   {
+     "hooks": {
+       "SessionStart": [
+         {
+           "matcher": "startup",
+           "hooks": [
+             {
+               "type": "command",
+               "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/start-mcp-server.sh",
+               "timeout": 10
+             }
+           ]
+         },
+         {
+           "matcher": "resume",
+           "hooks": [
+             {
+               "type": "command",
+               "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/start-mcp-server.sh",
+               "timeout": 10
+             }
+           ]
+         }
+       ]
+     }
+   }
+   ```
+
+3. **Add project MCP configuration** in `.mcp.json`:
+   ```json
+   {
+     "mcpServers": {
+       "ontology-lsp": {
+         "type": "sse",
+         "url": "http://localhost:7001/mcp/sse",
+         "description": "Ontology-enhanced LSP with 5-layer intelligent code understanding"
+       }
+     }
+   }
+   ```
+
+Now the MCP server starts automatically when you open Claude Code in this project!
+
+#### Option B: Manual Setup
+
+If you prefer to manually control the server:
+
+1. **Start the SSE server**:
+   ```bash
+   cd /path/to/mcp-ontology-server
+   ~/.bun/bin/bun run src/sse-server.ts
+   ```
+
+2. **Add to Claude Code**:
+   ```bash
+   # User scope (available across all projects)
+   claude mcp add --transport sse ontology-lsp --scope user http://localhost:7001/mcp/sse
+   
+   # Verify connection
+   claude mcp list
+   ```
+
+#### Option C: Stdio Mode
+
+For simpler setups without SSE features:
 
 ```bash
-# Start the SSE server (runs on port 7001 by default)
-cd /path/to/mcp-ontology-server
-~/.bun/bin/bun run src/sse-server.ts
-
-# Or with custom port
-MCP_SSE_PORT=8080 ~/.bun/bin/bun run src/sse-server.ts
-```
-
-Then add it to Claude Code:
-
-```bash
-# Option 1: Local scope (only for current project)
-claude mcp add --transport sse ontology-lsp http://localhost:7001/mcp/sse
-
-# Option 2: User scope (available across all projects)
-claude mcp add --transport sse ontology-lsp --scope user http://localhost:7001/mcp/sse
-
-# Option 3: Project scope (share with team via .mcp.json)
-claude mcp add --transport sse ontology-lsp --scope project http://localhost:7001/mcp/sse
-
-# Verify the server is connected
-claude mcp list
-
-# In Claude Code, check status with:
-# /mcp
-```
-
-**Alternative: Stdio mode** (if you prefer not running a server):
-
-```bash
-# Add stdio-based server (simpler but no real-time features)
 claude mcp add ontology-lsp -- ~/.bun/bin/bun run /path/to/mcp-ontology-server/src/stdio.ts
 ```
 
