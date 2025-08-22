@@ -61,3 +61,8 @@ Thumbs.db
 # VS Code test binaries
 vscode-client/.vscode-test/
 
+# Temporary/experimental directories
+bun-mcp-sse-transport/
+mcp-language-server/
+.claude-trace/
+

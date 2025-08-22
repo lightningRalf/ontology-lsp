@@ -6,8 +6,10 @@
 export interface ServerPorts {
   httpAPI: number
   mcpSSE: number
+  lspServer: number
   testAPI: number
   testMCP: number
+  testLSP: number
 }
 
 export interface ServerConfig {
@@ -28,8 +30,10 @@ export const DEFAULT_CONFIG: ServerConfig = {
   ports: {
     httpAPI: 7000,      // Main HTTP API server
     mcpSSE: 7001,       // MCP SSE server
-    testAPI: 7002,      // Test HTTP API server
-    testMCP: 7003,      // Test MCP server
+    lspServer: 7002,    // LSP server (can run TCP or stdio)
+    testAPI: 7010,      // Test HTTP API server
+    testMCP: 7011,      // Test MCP server
+    testLSP: 7012,      // Test LSP server
   },
   host: 'localhost',
   timeout: 5000,
@@ -52,6 +56,9 @@ export function getConfig(): ServerConfig {
   }
   if (process.env.MCP_SSE_PORT) {
     config.ports.mcpSSE = parseInt(process.env.MCP_SSE_PORT)
+  }
+  if (process.env.LSP_SERVER_PORT) {
+    config.ports.lspServer = parseInt(process.env.LSP_SERVER_PORT)
   }
   if (process.env.LSP_TIMEOUT) {
     config.timeout = parseInt(process.env.LSP_TIMEOUT)
@@ -76,10 +83,12 @@ export function getTestConfig(): ServerConfig {
   return {
     ...DEFAULT_CONFIG,
     ports: {
-      httpAPI: 7002,
-      mcpSSE: 7003,
-      testAPI: 7002,
-      testMCP: 7003,
+      httpAPI: 7010,      // Test instance of HTTP API
+      mcpSSE: 7011,       // Test instance of MCP SSE
+      lspServer: 7012,    // Test instance of LSP
+      testAPI: 7020,      // Isolated test target API
+      testMCP: 7021,      // Isolated test target MCP
+      testLSP: 7022,      // Isolated test target LSP
     },
     timeout: 1000, // Shorter timeout for tests
     maxRetries: 1, // Fewer retries for tests
@@ -131,7 +140,8 @@ export function logConfig(config: ServerConfig): void {
   console.log('=====================')
   console.log(`HTTP API Server: ${config.host}:${config.ports.httpAPI}`)
   console.log(`MCP SSE Server:  ${config.host}:${config.ports.mcpSSE}`)
-  console.log(`Test Servers:    ${config.host}:${config.ports.testAPI}, ${config.host}:${config.ports.testMCP}`)
+  console.log(`LSP Server:      ${config.host}:${config.ports.lspServer} (or stdio)`)
+  console.log(`Test Servers:    ${config.host}:${config.ports.testAPI} (API), ${config.host}:${config.ports.testMCP} (MCP), ${config.host}:${config.ports.testLSP} (LSP)`)
   console.log(`Timeout:         ${config.timeout}ms`)
   console.log(`Max Retries:     ${config.maxRetries}`)
   console.log(`Cache:           ${config.cacheEnabled ? 'Enabled' : 'Disabled'}`)

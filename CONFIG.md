@@ -12,10 +12,18 @@ The main configuration is defined in `mcp-ontology-server/src/config/server-conf
 
 | Service | Default Port | Environment Variable | Purpose |
 |---------|-------------|---------------------|---------|
+| **Production** | | | |
 | HTTP API Server | 7000 | `HTTP_API_PORT` | Main REST API for ontology operations |
 | MCP SSE Server | 7001 | `MCP_SSE_PORT` | MCP protocol over Server-Sent Events |
-| Test API Server | 7002 | `TEST_API_PORT` | Isolated port for integration tests |
-| Test MCP Server | 7003 | `TEST_MCP_PORT` | Isolated port for MCP tests |
+| LSP Server | 7002 (or stdio) | `LSP_SERVER_PORT` | Language Server Protocol (TCP or stdio mode) |
+| **Test Instances** | | | |
+| Test HTTP API | 7010 | - | Test instance of HTTP API server |
+| Test MCP SSE | 7011 | - | Test instance of MCP server |
+| Test LSP | 7012 | - | Test instance of LSP server |
+| **Test Targets** | | | |
+| Test Target API | 7020 | `TEST_API_PORT` | Isolated server for tests to connect to |
+| Test Target MCP | 7021 | `TEST_MCP_PORT` | Isolated MCP for tests to connect to |
+| Test Target LSP | 7022 | `TEST_LSP_PORT` | Isolated LSP for tests to connect to |
 
 ## Configuration Sources
 
@@ -29,6 +37,7 @@ Settings are loaded in this priority order:
 ### Server Configuration
 - `HTTP_API_PORT` - HTTP API server port (default: 7000)
 - `MCP_SSE_PORT` - MCP SSE server port (default: 7001)
+- `LSP_SERVER_PORT` - LSP server port for TCP mode (default: 7002)
 - `LSP_HOST` - Server host (default: localhost)
 
 ### Performance Settings
@@ -64,7 +73,8 @@ bun run start
 Tests automatically use the test configuration to avoid port conflicts:
 
 ```bash
-# Tests will use ports 7002 and 7003
+# Tests will use ports 7010-7012 for test instances
+# and 7020-7022 for isolated test targets
 bun test
 
 # Or explicitly set test environment
@@ -113,7 +123,7 @@ NODE_ENV=production bun run start
 ```bash
 BUN_ENV=test bun test
 ```
-- Isolated ports (7002, 7003)
+- Isolated ports (7010-7012 for instances, 7020-7022 for targets)
 - In-memory database
 - Disabled caching
 - Shorter timeouts

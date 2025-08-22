@@ -90,8 +90,13 @@ export class OntologyAPIServer {
     }
 
     private loadIgnorePatterns(): string[] {
-        const ignoreFile = path.join(this.config.workspaceRoot, '.ontologyignore');
         const defaultPatterns = ['node_modules/**', '.git/**', 'dist/**', '*.min.js'];
+        
+        if (!this.config.workspaceRoot) {
+            return defaultPatterns;
+        }
+        
+        const ignoreFile = path.join(this.config.workspaceRoot, '.ontologyignore');
         
         if (!fs.existsSync(ignoreFile)) {
             return defaultPatterns;
