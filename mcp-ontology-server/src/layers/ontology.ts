@@ -336,7 +336,7 @@ export class OntologyLayer {
     }
   }
 
-  private async getStats(): Promise<any> {
+  async getStats(): Promise<any> {
     // Cache stats to avoid frequent API calls
     const now = Date.now()
     if (this.statsCache && (now - this.statsCacheTime) < this.statsCacheTTL) {

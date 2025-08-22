@@ -546,4 +546,23 @@ export class KnowledgeLayer {
       }
     }
   }
+  
+  async getStats(): Promise<any> {
+    // Return knowledge layer statistics
+    try {
+      const stats = await this.lspClient.getStats()
+      return {
+        propagations: stats?.knowledge?.propagations || 0,
+        architectureViolations: stats?.knowledge?.violations || 0,
+        analysisRuns: stats?.knowledge?.analyses || 0,
+      }
+    } catch (error) {
+      return {
+        propagations: 0,
+        architectureViolations: 0,
+        analysisRuns: 0,
+        error: 'LSP connection failed'
+      }
+    }
+  }
 }

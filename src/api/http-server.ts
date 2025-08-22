@@ -23,6 +23,7 @@ export class OntologyAPIServer {
     private claudeTools!: ClaudeToolsLayer;
     private treeSitter!: TreeSitterLayer;
     private config: APIConfig;
+    private server: any = null;
 
     constructor(config: APIConfig) {
         this.config = config;
@@ -103,13 +104,21 @@ export class OntologyAPIServer {
     }
 
     async start(): Promise<void> {
-        const server = serve({
+        this.server = serve({
             port: this.config.port,
             hostname: this.config.host,
             fetch: this.handleRequest.bind(this),
         });
 
         console.log(`Ontology API Server running at http://${this.config.host}:${this.config.port}`);
+    }
+
+    async stop(): Promise<void> {
+        if (this.server) {
+            this.server.stop();
+            this.server = null;
+            console.log('Ontology API Server stopped');
+        }
     }
 
     private async handleRequest(request: Request): Promise<Response> {

@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "ontology": {
+      "command": "bun",
+      "args": ["run", "/home/lightningralf/programming/ontology-lsp/mcp-ontology-server/src/sse-server.ts"],
+      "env": {
+        "MCP_SSE_HOST": "localhost",
+        "MCP_SSE_PORT": "7001",
+        "ONTOLOGY_LSP_HOST": "localhost",
+        "ONTOLOGY_LSP_PORT": "7000",
+        "ONTOLOGY_DB_PATH": "/home/lightningralf/programming/ontology-lsp/.ontology/ontology.db",
+        "ONTOLOGY_WORKSPACE": "/home/lightningralf/programming/ontology-lsp"
+      }
+    }
+  }
+}

@@ -10,8 +10,11 @@ set -euo pipefail
 # Configuration
 MCP_PORT="${MCP_SSE_PORT:-7001}"
 MCP_HOST="${MCP_SSE_HOST:-localhost}"
-MCP_SERVER_DIR="$CLAUDE_PROJECT_DIR/mcp-ontology-server"
-LSP_SERVER_DIR="$CLAUDE_PROJECT_DIR"
+# Get script directory and derive project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+MCP_SERVER_DIR="$PROJECT_DIR/mcp-ontology-server"
+LSP_SERVER_DIR="$PROJECT_DIR"
 HTTP_API_PORT="${ONTOLOGY_API_PORT:-7000}"
 BUN_PATH="${HOME}/.bun/bin/bun"
 MCP_PID_FILE="/tmp/ontology-mcp-server-${MCP_PORT}.pid"
@@ -153,7 +156,17 @@ start_server() {
     echo
     echo -e "  ${HOURGLASS}  ${BOLD}${BRIGHT_YELLOW}Starting ${server_name}...${NC}"
     
-    # Start the server in background
+    # Kill any existing process using the port
+    if [ -n "$check_port" ]; then
+        local existing_pid=$(lsof -ti:$check_port 2>/dev/null)
+        if [ -n "$existing_pid" ]; then
+            echo -e "  ${DIM}Killing existing process on port $check_port (PID: $existing_pid)${NC}"
+            kill -9 $existing_pid 2>/dev/null || true
+            sleep 1
+        fi
+    fi
+    
+    # Start the server in background with nohup to detach from terminal
     cd "$server_dir"
     nohup $start_command > "$log_file" 2>&1 &
     local pid=$!
@@ -164,7 +177,7 @@ start_server() {
     # If port provided, wait for server to be ready
     if [ -n "$check_port" ]; then
         local attempts=0
-        while [ $attempts -lt 10 ]; do
+        while [ $attempts -lt 20 ]; do
             if is_port_in_use "$check_host" "$check_port"; then
                 echo -e "  ${BRIGHT_GREEN}${CHECK_MARK}${NC}  ${BOLD}${BRIGHT_GREEN}${server_name} started successfully!${NC}"
                 return 0
@@ -181,9 +194,20 @@ start_server() {
         fi
     fi
     
-    # Server didn't start properly
-    echo -e "  ${BRIGHT_RED}${CROSS_MARK}${NC}  ${BOLD}${BRIGHT_RED}Failed to start ${server_name}${NC}"
-    echo -e "  ${DIM}Check logs at: $log_file${NC}"
+    # Server didn't start properly - check log for errors
+    if [ -f "$log_file" ]; then
+        local error_msg=$(tail -5 "$log_file" | grep -i error | head -1)
+        if [ -n "$error_msg" ]; then
+            echo -e "  ${BRIGHT_RED}${CROSS_MARK}${NC}  ${BOLD}${BRIGHT_RED}Failed to start ${server_name}${NC}"
+            echo -e "  ${DIM}Error: $error_msg${NC}"
+        else
+            echo -e "  ${BRIGHT_RED}${CROSS_MARK}${NC}  ${BOLD}${BRIGHT_RED}Failed to start ${server_name}${NC}"
+            echo -e "  ${DIM}Check logs at: $log_file${NC}"
+        fi
+    else
+        echo -e "  ${BRIGHT_RED}${CROSS_MARK}${NC}  ${BOLD}${BRIGHT_RED}Failed to start ${server_name}${NC}"
+    fi
+    
     kill "$pid" 2>/dev/null || true
     rm -f "$pid_file"
     return 1
@@ -276,20 +300,9 @@ main() {
         fi
     fi
     
-    # 3. Start LSP Server (runs on stdio, no port)
-    if [ -f "$LSP_SERVER_DIR/src/server.ts" ]; then
-        if is_server_running "$LSP_PID_FILE"; then
-            local pid=$(cat "$LSP_PID_FILE")
-            print_status "${CHECK_MARK}" "LSP Server" "Running (PID: $pid)" "$BRIGHT_GREEN"
-        else
-            # LSP server doesn't bind to a port, it uses stdio
-            if start_server "LSP Server" "$LSP_SERVER_DIR" "$BUN_PATH run src/server.ts --stdio" "$LSP_PID_FILE" "$LSP_LOG_FILE"; then
-                servers_started=$((servers_started + 1))
-            else
-                servers_failed=$((servers_failed + 1))
-            fi
-        fi
-    fi
+    # 3. LSP Server runs via VS Code extension, not standalone
+    # We don't start it here - it's launched by the extension when needed
+    print_status "${INFO}" "LSP Server" "Launched by VS Code Extension" "$DIM"
     
     # Show summary
     echo
@@ -320,9 +333,7 @@ main() {
         if is_server_running "$API_PID_FILE"; then
             echo -e "  ${BRIGHT_CYAN}${BULLET}${NC} HTTP API:   ${UNDERLINE}http://localhost:$HTTP_API_PORT${NC}"
         fi
-        if is_server_running "$LSP_PID_FILE"; then
-            echo -e "  ${BRIGHT_CYAN}${BULLET}${NC} LSP Server: Running on stdio (for VS Code extension)"
-        fi
+        echo -e "  ${BRIGHT_CYAN}${BULLET}${NC} LSP Server: Managed by VS Code extension (stdio mode)"
     else
         echo
         echo -e "  ${BRIGHT_RED}════════════════════════════════════════════════════════════════${NC}"

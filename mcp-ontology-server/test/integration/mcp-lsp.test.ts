@@ -46,7 +46,10 @@ describe("MCP-LSP Integration", () => {
   })
 
   afterAll(async () => {
-    // Cleanup would go here if we had server.stop()
+    // Stop the test server
+    if (lspServer) {
+      await lspServer.stop()
+    }
   })
 
   describe("LSP Client", () => {

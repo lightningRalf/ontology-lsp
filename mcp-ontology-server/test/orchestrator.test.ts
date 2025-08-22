@@ -36,6 +36,10 @@ describe("LayerOrchestrator", () => {
   test("should generate prompts", async () => {
     const orchestrator = new LayerOrchestrator()
     
+    // Mock the getContext and getRelevantPatterns to avoid LSP calls
+    orchestrator.ontology.getContext = async () => ({ concepts: [], totalConcepts: 0 })
+    orchestrator.patterns.getRelevantPatterns = async () => []
+    
     const prompt = await orchestrator.generatePrompt("analyze_codebase", {})
     
     expect(prompt).toBeDefined()

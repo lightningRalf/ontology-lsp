@@ -359,4 +359,19 @@ ${patch}
       }
     }
   }
+  
+  async getStats(): Promise<any> {
+    // Return pattern statistics with error handling
+    try {
+      const stats = await this.getStatistics()
+      return stats
+    } catch (error) {
+      return {
+        totalPatterns: 0,
+        strongPatterns: 0,
+        appliedToday: 0,
+        error: 'Failed to retrieve stats'
+      }
+    }
+  }
 }

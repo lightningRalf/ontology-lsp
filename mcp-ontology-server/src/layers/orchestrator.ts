@@ -98,16 +98,20 @@ export class LayerOrchestrator {
 
   async readResource(uri: string): Promise<any> {
     // Parse resource URI to determine which layer to query
-    const [protocol, ...parts] = uri.split(":")
-    const resourceType = parts[0]
+    const match = uri.match(/^([^:]+):\/\/(.*)$/)
+    if (!match) {
+      throw new Error(`Invalid resource URI: ${uri}`)
+    }
+    
+    const [, resourceType, resourcePath] = match
     
     switch (resourceType) {
       case "ontology":
-        return this.ontology.getResource(parts.slice(1).join(":"))
+        return this.ontology.getResource(resourcePath)
       case "patterns":
-        return this.patterns.getResource(parts.slice(1).join(":"))
+        return this.patterns.getResource(resourcePath)
       case "knowledge":
-        return this.knowledge.getResource(parts.slice(1).join(":"))
+        return this.knowledge.getResource(resourcePath)
       case "stats":
         return this.getStatistics()
       default:
@@ -200,13 +204,25 @@ export class LayerOrchestrator {
   }
 
   private async getStatistics(): Promise<any> {
+    // Collect stats from all layers with error handling
+    const getLayerStats = async (layer: any, name: string) => {
+      try {
+        if (typeof layer.getStats === 'function') {
+          return await layer.getStats()
+        }
+        return { status: 'no stats method' }
+      } catch (error) {
+        return { status: 'error', error: error instanceof Error ? error.message : 'unknown' }
+      }
+    }
+    
     return {
       layers: {
-        claudeTools: await this.claudeTools.getStats(),
-        treeSitter: await this.treeSitter.getStats(),
-        ontology: await this.ontology.getStats(),
-        patterns: await this.patterns.getStats(),
-        knowledge: await this.knowledge.getStats(),
+        claudeTools: await getLayerStats(this.claudeTools, 'claudeTools'),
+        treeSitter: await getLayerStats(this.treeSitter, 'treeSitter'),
+        ontology: await getLayerStats(this.ontology, 'ontology'),
+        patterns: await getLayerStats(this.patterns, 'patterns'),
+        knowledge: await getLayerStats(this.knowledge, 'knowledge'),
       },
       performance: {
         averageExecutionTime: "45ms",

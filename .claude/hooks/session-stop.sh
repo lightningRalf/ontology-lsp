@@ -125,12 +125,8 @@ main() {
         servers_failed=$((servers_failed + 1))
     fi
     
-    # 3. Stop LSP Server
-    if stop_server "LSP Server" "$LSP_PID_FILE" "$LSP_LOG_FILE"; then
-        servers_stopped=$((servers_stopped + 1))
-    else
-        servers_failed=$((servers_failed + 1))
-    fi
+    # 3. LSP Server is managed by VS Code extension, not by this script
+    # No need to stop it here
     
     # Show summary
     echo
