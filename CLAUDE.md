@@ -23,6 +23,20 @@ ontology-lsp suggest   # Get refactoring suggestions
 
 ## Architecture
 
+### Port Configuration
+The system uses centralized port configuration to avoid conflicts:
+
+| Service | Default Port | Environment Variable | Description |
+|---------|-------------|---------------------|-------------|
+| HTTP API Server | 7000 | `HTTP_API_PORT` | Main REST API for LSP operations |
+| MCP SSE Server | 7001 | `MCP_SSE_PORT` | Model Context Protocol server |
+| LSP Server | 7002 | `LSP_SERVER_PORT` | Language Server Protocol (TCP/stdio) |
+| Test API | 7010 | - | Test instance of HTTP API |
+| Test MCP | 7011 | - | Test instance of MCP server |
+| Test LSP | 7012 | - | Test instance of LSP server |
+
+Configuration is managed in `mcp-ontology-server/src/config/server-config.ts`.
+
 ### Layered System (Performance-Optimized)
 The system uses a 5-layer architecture, each progressively more sophisticated:
 

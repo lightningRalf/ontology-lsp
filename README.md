@@ -111,10 +111,28 @@ ontology-lsp init
 
 ## Configuration
 
+### Port Configuration
+The system uses the following default ports (all configurable via environment variables):
+
+| Service | Default Port | Environment Variable | Description |
+|---------|-------------|---------------------|-------------|
+| HTTP API | 7000 | `HTTP_API_PORT` | REST API for LSP operations |
+| MCP SSE | 7001 | `MCP_SSE_PORT` | Model Context Protocol server |
+| LSP Server | 7002 | `LSP_SERVER_PORT` | Language Server Protocol |
+
+### Project Configuration
+
 Create `.ontology-lsp-config.yaml` in your project root:
 
 ```yaml
 version: 1.0.0
+
+# Server configuration (optional - defaults shown)
+server:
+  ports:
+    httpAPI: 7000
+    mcpSSE: 7001
+    lspServer: 7002
 
 # Layer configuration
 layers:
@@ -412,8 +430,16 @@ curl http://localhost:7000/patterns
 
 #### Server Won't Start
 ```bash
-# Check if port is available
-lsof -i :7000
+# Check if ports are available (default ports: 7000, 7001, 7002)
+lsof -i :7000  # HTTP API
+lsof -i :7001  # MCP SSE Server
+lsof -i :7002  # LSP Server
+
+# Or set custom ports via environment variables
+export HTTP_API_PORT=8000
+export MCP_SSE_PORT=8001
+export LSP_SERVER_PORT=8002
+ontology-lsp start
 
 # Check logs
 tail -f ~/.ontology-lsp/logs/server.log

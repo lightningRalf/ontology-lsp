@@ -2,40 +2,18 @@
 
 > **Purpose**: Forward-looking action items. For completed work, see PROJECT_STATUS.md
 
-## 🚨 CRITICAL: Wire MCP Tools to LayerOrchestrator
+## 🚨 CRITICAL: Fix HTTP API Server Startup
 
-**Problem**: Tools are defined but NOT connected to the actual implementation!
-- ✅ LayerOrchestrator exists and routes through 5 layers
-- ✅ 16 tools defined in `tools/index.ts`
-- ❌ Tools call orchestrator.executeTool() but implementations missing!
+**Problem**: HTTP API server on port 7000 is not starting properly
+- ✅ MCP Server running on port 7001 (confirmed via health check)
+- ❌ HTTP API server fails to respond on port 7000
+- ⚠️ Logs suggest it starts but then immediately shuts down
 
-## 🎯 Phase 2: MCP Tools Implementation [CURRENT]
-
-### 1. Wire the tools to actual implementations
-```typescript
-// In mcp-ontology-server/src/layers/orchestrator.ts
-// Map tool names to actual layer methods:
-async executeTool(toolName: string, args: any) {
-  switch(toolName) {
-    case 'find_definition':
-      return this.ontology.findDefinition(args)
-    case 'find_references':  
-      return this.ontology.findReferences(args)
-    case 'rename_symbol':
-      return this.knowledge.propagateRename(args)
-    // ... wire all 16 tools
-  }
-}
-```
-
-### 2. Test with Claude Code (CLI)
-```bash
-# Start MCP server
-./.claude/hooks/session-start.sh
-
-# Test with Claude Code CLI (not Desktop!)
-# The MCP server should respond to tool calls
-```
+### Debug Steps:
+1. Check why HTTP server is not persisting
+2. Verify Bun runtime compatibility with the HTTP server code
+3. Check for any unhandled promise rejections or errors
+4. Ensure database initialization is working
 
 ## 🎯 Phase 3: Integration [NEXT]
 
@@ -64,24 +42,11 @@ async executeTool(toolName: string, args: any) {
 - Incremental parsing (only reparse changed files)
 - Pattern mining from usage data
 
-## 📋 Implementation Checklist
-
-### Tools to Wire (Priority Order):
-- [ ] `find_definition` → ontology.findDefinition()
-- [ ] `find_references` → ontology.findReferences()
-- [ ] `rename_symbol` → knowledge.propagateRename()
-- [ ] `suggest_refactoring` → patterns.suggestRefactoring()
-- [ ] `learn_pattern` → patterns.learnPattern()
-- [ ] `detect_patterns` → patterns.detectPatterns()
-- [ ] `analyze_complexity` → treeSitter.analyzeComplexity()
-- [ ] `search_files` → claudeTools.searchFiles()
-- [ ] `grep_content` → claudeTools.grepContent()
-- [ ] ... (7 more tools)
-
 ## ⚠️ Current State
 
 - **Phase 1**: ✅ DONE (Unified core, config, ports)
-- **Phase 2**: 🔴 IN PROGRESS (Wire MCP tools)
+- **Phase 2**: ✅ DONE (Wire MCP tools - all 16 tools connected!)
+- **Phase 2.5**: 🔴 IN PROGRESS (Fix HTTP API server startup)
 - **Phase 3**: ⏳ TODO (Integration)
 - **Phase 4**: 🔮 FUTURE (Optimization)
 
@@ -91,6 +56,6 @@ async executeTool(toolName: string, args: any) {
 cd ~/programming/ontology-lsp
 ./.claude/hooks/session-start.sh
 
-# Focus: Wire the MCP tools to LayerOrchestrator
-# File: mcp-ontology-server/src/layers/orchestrator.ts
+# Focus: Fix HTTP API server on port 7000
+# Check: src/api/http-server.ts
 ```

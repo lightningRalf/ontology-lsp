@@ -140,7 +140,7 @@ export class OntologyLayer {
     }
   }
 
-  private async findRelatedConcepts(
+  private async findRelatedConceptsInternal(
     concept: string,
     depth: number,
     relationTypes?: string[]
@@ -184,7 +184,7 @@ export class OntologyLayer {
     })
   }
 
-  private async analyzeDependencies(
+  private async analyzeDependenciesInternal(
     target: string,
     detectCycles: boolean,
     includeTransitive: boolean
@@ -380,5 +380,223 @@ export class OntologyLayer {
       cacheHitRate: 0.85,
       graphDepth: 5,
     }
+  }
+
+  // Methods called from the orchestrator
+  async findDefinition(args: any): Promise<any> {
+    const { symbol } = args
+    
+    try {
+      // Use LSP API to find definition
+      const response = await this.lspClient.findDefinition(symbol)
+      
+      if (response && !response.error) {
+        return {
+          definitions: response.definitions || [],
+          confidence: response.confidence || 0.8,
+          source: 'ontology'
+        }
+      }
+      
+      // Fallback to concept search
+      const concept = await this.getConcept(symbol)
+      if (concept && concept.location) {
+        return {
+          definitions: [{
+            file: concept.location.file,
+            line: concept.location.line,
+            character: concept.location.character,
+            symbol,
+            type: concept.type || 'unknown'
+          }],
+          confidence: 0.7,
+          source: 'ontology-concept'
+        }
+      }
+      
+      return {
+        definitions: [],
+        confidence: 0,
+        source: 'ontology'
+      }
+    } catch (error) {
+      console.error('OntologyLayer.findDefinition error:', error)
+      return {
+        definitions: [],
+        error: error instanceof Error ? error.message : 'Unknown error',
+        source: 'ontology'
+      }
+    }
+  }
+
+  async findReferences(args: any): Promise<any> {
+    const { symbol } = args
+    
+    try {
+      // Use LSP API to find references
+      const response = await this.lspClient.findReferences(symbol)
+      
+      if (response && !response.error) {
+        return {
+          references: response.references || [],
+          confidence: response.confidence || 0.8,
+          source: 'ontology'
+        }
+      }
+      
+      // Fallback to relationship search
+      const relationships = await this.getRelationships(symbol, ['uses', 'usedBy', 'references'])
+      
+      const references = relationships.map(rel => ({
+        file: rel.location?.file || 'unknown',
+        line: rel.location?.line || 0,
+        character: rel.location?.character || 0,
+        symbol,
+        type: rel.type,
+        target: rel.target
+      }))
+      
+      return {
+        references,
+        confidence: 0.6,
+        source: 'ontology-relationships'
+      }
+    } catch (error) {
+      console.error('OntologyLayer.findReferences error:', error)
+      return {
+        references: [],
+        error: error instanceof Error ? error.message : 'Unknown error',
+        source: 'ontology'
+      }
+    }
+  }
+
+  async findRelatedConcepts(args: any): Promise<any> {
+    const { concept, relationTypes, depth = 2 } = args
+    
+    try {
+      const related = await this.findRelatedConceptsInternal(concept, depth, relationTypes)
+      
+      return {
+        concepts: related,
+        rootConcept: concept,
+        depth,
+        relationTypes: relationTypes || ['all'],
+        confidence: 0.85,
+        source: 'ontology'
+      }
+    } catch (error) {
+      console.error('OntologyLayer.findRelatedConcepts error:', error)
+      return {
+        concepts: [],
+        error: error instanceof Error ? error.message : 'Unknown error',
+        source: 'ontology'
+      }
+    }
+  }
+
+  async analyzeDependencies(args: any): Promise<any> {
+    const { target, detectCycles = true, includeTransitive = false } = args
+    
+    try {
+      const analysis = await this.analyzeDependenciesInternal(target, detectCycles, includeTransitive)
+      
+      return {
+        ...analysis,
+        target,
+        source: 'ontology'
+      }
+    } catch (error) {
+      console.error('OntologyLayer.analyzeDependencies error:', error)
+      return {
+        direct: [],
+        count: 0,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        source: 'ontology'
+      }
+    }
+  }
+
+  async getRefactoringContext(args: any): Promise<any> {
+    const { file } = args
+    
+    try {
+      // Get all concepts in the file
+      const response = await this.lspClient.getConceptsInFile(file)
+      
+      if (response && !response.error) {
+        return {
+          concepts: response.concepts || [],
+          patterns: response.patterns || [],
+          suggestions: response.suggestions || [],
+          confidence: 0.75,
+          source: 'ontology'
+        }
+      }
+      
+      return {
+        concepts: [],
+        patterns: [],
+        suggestions: [],
+        confidence: 0,
+        source: 'ontology'
+      }
+    } catch (error) {
+      console.error('OntologyLayer.getRefactoringContext error:', error)
+      return {
+        concepts: [],
+        error: error instanceof Error ? error.message : 'Unknown error',
+        source: 'ontology'
+      }
+    }
+  }
+
+  async identifyConcepts(ast: any): Promise<any> {
+    // Extract concepts from AST
+    const concepts: any[] = []
+    
+    const traverse = (node: any) => {
+      if (!node) return
+      
+      // Identify various concept types
+      if (node.type === 'ClassDeclaration' || node.type === 'InterfaceDeclaration') {
+        concepts.push({
+          name: node.name,
+          type: 'class',
+          location: node.location,
+          members: node.members || []
+        })
+      } else if (node.type === 'FunctionDeclaration' || node.type === 'MethodDefinition') {
+        concepts.push({
+          name: node.name,
+          type: 'function',
+          location: node.location,
+          parameters: node.parameters || []
+        })
+      } else if (node.type === 'VariableDeclaration') {
+        concepts.push({
+          name: node.name,
+          type: 'variable',
+          location: node.location,
+          kind: node.kind
+        })
+      }
+      
+      // Recursively traverse children
+      if (node.children) {
+        for (const child of node.children) {
+          traverse(child)
+        }
+      }
+    }
+    
+    traverse(ast)
+    
+    return concepts
+  }
+
+  hasData(): boolean {
+    // Check if ontology has been initialized with data
+    return this.statsCache !== null || true // Always return true for now
   }
 }
