@@ -2,6 +2,8 @@
 
 A sophisticated MCP (Model Context Protocol) server that exposes a 5-layer intelligent code understanding system, providing LLMs with deep semantic awareness and adaptive learning capabilities.
 
+**New to this?** 👉 **[Check out the First Steps Guide](docs/FIRST_STEPS.md)** for a quick start with the 20% of features that provide 80% of the value!
+
 ## 🎯 Overview
 
 This MCP server integrates with the ontology-lsp project to provide:
