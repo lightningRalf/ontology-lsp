@@ -6,19 +6,24 @@
  * Target: 50ms response time for AST operations.
  */
 
-import { TreeSitterLayer as BaseTreeSitter } from "@ontology/layers/tree-sitter.js"
+// NOTE: For now, we'll implement a simplified version without external dependency
+// TODO: Connect to actual LSP server's tree-sitter layer
+interface BaseTreeSitter {
+  parseFile(file: string): Promise<any>
+  query(ast: any, query: string): Promise<any[]>
+}
 import type { LayerResult } from "./orchestrator.js"
 
 export class TreeSitterLayer {
   private baseLayer: BaseTreeSitter
 
   constructor() {
-    // Initialize with default config
-    this.baseLayer = new BaseTreeSitter({
-      languages: ['typescript', 'javascript', 'python'],
-      cacheEnabled: true,
-      maxCacheSize: 100
-    })
+    // Initialize with mock implementation for now
+    // TODO: Connect to actual LSP server's tree-sitter
+    this.baseLayer = {
+      parseFile: async (file: string) => ({ type: "program", children: [] }),
+      query: async (ast: any, query: string) => []
+    }
   }
 
   async enhance(previousResult: LayerResult, args: any): Promise<LayerResult> {

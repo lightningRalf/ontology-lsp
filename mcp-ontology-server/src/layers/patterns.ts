@@ -6,7 +6,14 @@
  * Target: 10ms response time for pattern operations.
  */
 
-import { PatternLearner } from "@ontology/patterns/pattern-learner.js"
+// NOTE: For now, we'll implement a simplified version without external dependency
+// TODO: Connect to actual LSP server's pattern learner via API
+interface PatternLearner {
+  predictNextRename(identifier: string): Promise<any[]>
+  learnPattern(pattern: any): Promise<void>
+  getStatistics(): Promise<any>
+}
+
 import type { LayerResult } from "./orchestrator.js"
 
 export class PatternLayer {
@@ -14,9 +21,13 @@ export class PatternLayer {
   private patternCache: Map<string, any>
 
   constructor() {
-    // Use a default database path for patterns
-    const dbPath = process.env.PATTERNS_DB_PATH || '/tmp/mcp-patterns.db'
-    this.learner = new PatternLearner(dbPath)
+    // Initialize with mock implementation for now
+    // TODO: Connect to actual LSP server's pattern learner
+    this.learner = {
+      predictNextRename: async (identifier: string) => [],
+      learnPattern: async (pattern: any) => {},
+      getStatistics: async () => ({ totalPatterns: 0, strongPatterns: 0 })
+    }
     this.patternCache = new Map()
   }
 

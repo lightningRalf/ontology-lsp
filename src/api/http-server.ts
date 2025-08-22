@@ -177,6 +177,13 @@ export class OntologyAPIServer {
                     }
                     break;
                     
+                case '/find':
+                    if (method === 'POST') {
+                        const body = await request.json();
+                        return this.handleFind(body, headers);
+                    }
+                    break;
+                    
                 case '/health':
                     if (method === 'GET') {
                         return new Response(JSON.stringify({ status: 'healthy' }), { headers });
@@ -296,6 +303,74 @@ export class OntologyAPIServer {
         };
         
         return new Response(JSON.stringify(result), { headers });
+    }
+
+    private async handleFind(body: any, headers: any): Promise<Response> {
+        const { identifier, fuzzy = false, semantic = false } = body;
+        
+        if (!identifier) {
+            return new Response(JSON.stringify({ error: 'identifier is required' }), { 
+                status: 400, 
+                headers 
+            });
+        }
+        
+        // Use Claude Tools layer for fast initial search
+        let claudeResults: any;
+        try {
+            claudeResults = await this.claudeTools.process({
+                identifier,
+                searchPath: this.config.workspaceRoot,
+                globPattern: '**/*.{ts,tsx,js,jsx,py}'
+            });
+        } catch (error) {
+            console.error('Claude tools error:', error);
+            claudeResults = { files: [] };
+        }
+        
+        // Ensure claudeResults has the expected structure
+        if (!claudeResults || !Array.isArray(claudeResults.files)) {
+            claudeResults = { files: [] };
+        }
+        
+        // Use Tree-sitter for AST-based search if needed
+        let astResults: any = { files: [] };
+        if (semantic) {
+            try {
+                astResults = await this.treeSitter.process({
+                    identifier,
+                    searchPath: this.config.workspaceRoot,
+                    globPattern: '**/*.{ts,tsx,js,jsx,py}'
+                });
+            } catch (error) {
+                console.error('Tree-sitter error:', error);
+                astResults = { files: [] };
+            }
+        }
+        
+        // Ensure astResults has the expected structure
+        if (!astResults || !Array.isArray(astResults.files)) {
+            astResults = { files: [] };
+        }
+        
+        // Combine results
+        const matches = {
+            exact: claudeResults.files.map((f: any) => ({
+                file: f.filePath || f.path || f,
+                line: f.line || 0,
+                column: f.column || 0,
+                confidence: 1.0
+            })),
+            fuzzy: fuzzy ? [] : undefined,
+            conceptual: semantic ? astResults.files.map((f: any) => ({
+                file: f.filePath || f.path || f,
+                line: f.line || 0,
+                column: f.column || 0,
+                confidence: f.confidence || 0.8
+            })) : undefined
+        };
+        
+        return new Response(JSON.stringify(matches), { headers });
     }
 
     private async handleSuggest(body: any, headers: any): Promise<Response> {

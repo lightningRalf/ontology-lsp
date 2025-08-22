@@ -6,16 +6,29 @@
  * Target: 10ms response time for concept operations.
  */
 
-import { OntologyEngine } from "@ontology/ontology/ontology-engine.js"
+// NOTE: For now, we'll implement a simplified version without external dependency
+// TODO: Connect to actual LSP server's ontology engine via API
+interface OntologyEngine {
+  findConcept(name: string): Promise<any>
+  addConcept(name: string, metadata: any): Promise<any>
+  findRelations(conceptId: string): Promise<any[]>
+  getStatistics(): any
+}
+
 import type { LayerResult } from "./orchestrator.js"
 
 export class OntologyLayer {
   private engine: OntologyEngine
 
   constructor() {
-    // Use a default database path in temp directory
-    const dbPath = process.env.ONTOLOGY_DB_PATH || '/tmp/mcp-ontology.db'
-    this.engine = new OntologyEngine(dbPath)
+    // Initialize with mock implementation for now
+    // TODO: Connect to actual LSP server's ontology engine
+    this.engine = {
+      findConcept: async (name: string) => null,
+      addConcept: async (name: string, metadata: any) => ({ id: "mock-id", name }),
+      findRelations: async (conceptId: string) => [],
+      getStatistics: () => ({ totalConcepts: 0, totalRelations: 0 })
+    }
   }
 
   async augment(previousResult: LayerResult, args: any): Promise<LayerResult> {

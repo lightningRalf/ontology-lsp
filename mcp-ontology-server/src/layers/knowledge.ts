@@ -6,14 +6,25 @@
  * Target: 20ms response time for propagation operations.
  */
 
-import { KnowledgeSpreader } from "@ontology/propagation/knowledge-spreader.js"
+// NOTE: For now, we'll implement a simplified version without external dependency
+// TODO: Connect to actual LSP server's knowledge spreader via API
+interface KnowledgeSpreader {
+  propagateChange(change: any): Promise<any[]>
+  getStatistics(): any
+}
+
 import type { LayerResult } from "./orchestrator.js"
 
 export class KnowledgeLayer {
   private spreader: KnowledgeSpreader
 
   constructor() {
-    this.spreader = new KnowledgeSpreader()
+    // Initialize with mock implementation for now
+    // TODO: Connect to actual LSP server's knowledge spreader
+    this.spreader = {
+      propagateChange: async (change: any) => [],
+      getStatistics: () => ({ propagationDepth: 3, averageTime: "15ms" })
+    }
   }
 
   async propagate(previousResult: LayerResult, args: any): Promise<LayerResult> {
