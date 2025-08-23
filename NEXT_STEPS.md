@@ -3,90 +3,190 @@
 > **Purpose**: Forward-looking action items ONLY. No history, no completed items.
 > For completed work, see PROJECT_STATUS.md
 
-## 🎯 Phase 3: Integration [CURRENT]
+## 🔴 Critical Architectural Issue: Duplicate Implementation
 
-### 1. Fix Layer Implementation Issues [CRITICAL]
-Based on integration tests, the following need immediate fixes:
-- **LSP Client**: `findDefinition` and `findReferences` methods are undefined
-- **Layer Response Format**: Layers returning wrong format (missing `layersUsed` array)
-- **File Path Handling**: Tree-sitter getting undefined file paths
-- **Ontology Layer**: Hanging on `findRelatedConcepts` (5s timeout)
-- **executeWithMetadata**: Not wrapping responses correctly
+### The Problem
+We have **TWO PARALLEL IMPLEMENTATIONS** that don't share code:
+1. **Original System** (`src/`): LSP Server + HTTP API - Works with VS Code
+2. **MCP System** (`mcp-ontology-server/`): Duplicate layers - Broken integration
 
-### 2. MCP → LSP Bridge Enhancement
+This causes:
+- Double maintenance burden
+- Divergent behavior
+- Memory waste (two caches, two databases)
+- Integration failures
+
+## 🎯 Phase 1: Fix Architectural Split [URGENT]
+
+### 1. Unify the Layer Implementations
 ```typescript
-// Current: MCP talks to layers directly
-// Next: Add LSP server integration on port 7002
-// Enable: MCP → LSP → VS Code workflow
+// Move shared layers to common location
+// Both systems should use the SAME code:
+common/
+├── layers/
+│   ├── claude-tools.ts    # Shared by both
+│   ├── tree-sitter.ts     # Shared by both
+│   ├── ontology.ts        # Shared by both
+│   ├── patterns.ts        # Shared by both
+│   └── knowledge.ts       # Shared by both
 ```
 
-### 3. Shared Cache Layer
+### 2. Fix Misnamed Components
 ```typescript
-// Implement unified cache across all layers
-// Share AST parsing results between layers
-// Avoid duplicate Tree-sitter parsing
+// Rename mcp-ontology-server/src/utils/lsp-client.ts
+// It's actually an HTTP client, not LSP!
+class HttpApiClient {  // <- Correct name
+  async findDefinition(symbol: string) {
+    // Add missing method
+    return this.post('/find', { identifier: symbol, semantic: true })
+  }
+  
+  async findReferences(symbol: string) {
+    // Add missing method
+    return this.post('/references', { symbol })  // Need new endpoint!
+  }
+}
 ```
 
-### 4. Session Management
+### 3. Add Missing HTTP Endpoints
 ```typescript
-// Track multiple MCP client sessions
-// Handle concurrent Claude instances
-// Add session-specific context preservation
+// src/api/http-server.ts needs:
+case '/definition':
+  return this.handleFindDefinition(body, headers)
+  
+case '/references':
+  return this.handleFindReferences(body, headers)
 ```
 
-## 🎯 Phase 4: Optimization [FUTURE]
+### 4. Fix Response Format Issues
+```typescript
+// mcp-ontology-server/src/layers/orchestrator.ts
+// executeWithMetadata returns wrong structure
+return {
+  // Tests expect this at top level:
+  layersUsed: layersUsed,
+  executionTime: executionTime,
+  confidence: confidence,
+  data: result  // Actual data nested here
+}
+```
 
-- Connection pooling for HTTP requests
-- Query optimization for large codebases
-- Incremental parsing (only reparse changed files)
-- Pattern mining from usage data
+## 🎯 Phase 2: Create Proper Protocol Adapters [HIGH]
+
+### 1. Protocol-Agnostic Core
+```typescript
+// Create shared business logic that doesn't know about protocols
+interface CodeAnalyzer {
+  findDefinition(symbol: string): Promise<Definition[]>
+  findReferences(symbol: string): Promise<Reference[]>
+  // ... other methods
+}
+```
+
+### 2. Protocol Adapters
+```typescript
+// Thin adapters for each protocol:
+class LSPAdapter {
+  constructor(private analyzer: CodeAnalyzer) {}
+  onDefinition(params) { return this.analyzer.findDefinition(...) }
+}
+
+class MCPAdapter {
+  constructor(private analyzer: CodeAnalyzer) {}
+  handleTool(name, args) { return this.analyzer[name](...) }
+}
+
+class HTTPAdapter {
+  constructor(private analyzer: CodeAnalyzer) {}
+  handleRequest(path, body) { return this.analyzer[path](...) }
+}
+```
+
+## 🎯 Phase 3: Integration Testing [MEDIUM]
+
+### 1. Test All Entry Points
+```bash
+# VS Code Extension → LSP Server
+# Claude Code → MCP Server  
+# CLI Tool → HTTP API
+# All should produce identical results!
+```
+
+### 2. Add Missing Integration Tests
+- Test MCP tools actually work with Claude Code
+- Test VS Code extension with real LSP server
+- Test CLI with HTTP API
+- Cross-protocol consistency tests
+
+## 🎯 Phase 4: Performance & Optimization [LOW]
+
+### 1. Shared Cache Layer
+```typescript
+// Single cache used by all protocols
+class SharedCache {
+  private astCache: Map<string, AST>
+  private conceptCache: Map<string, Concept>
+  // Share expensive computations
+}
+```
+
+### 2. Connection Pooling
+- HTTP client connection reuse
+- Database connection pooling
+- WebSocket management for SSE
 
 ## 📍 Current Focus
 
-**Testing MCP Integration**: Verify the fixed stdio/SSE servers work with Claude Code
+**STOP adding features. FIX the architecture first.**
+
+The duplicate implementation is causing:
+- Integration test failures
+- MCP tools not working
+- Maintenance nightmare
+- Performance degradation
 
 ## 🎬 Quick Start Next Session
 
 ```bash
 cd ~/programming/ontology-lsp
 
-# 1. Start servers (fixed import paths):
-just start
+# 1. Understand the split:
+ls -la src/layers/           # Original implementation
+ls -la mcp-ontology-server/src/layers/  # Duplicate implementation
 
-# 2. Test MCP connection in Claude Code:
-# The stdio server should now work directly
-# SSE server available at http://localhost:7001/mcp/sse
+# 2. See the problem:
+diff src/layers/tree-sitter.ts mcp-ontology-server/src/layers/tree-sitter.ts
 
-# 3. Verify all tools are accessible:
-just mcp-tools
+# 3. Run tests to see failures:
+cd mcp-ontology-server && bun test
 
-# 4. Check health and logs:
-just health
-just logs
-
-# 5. Run tests to ensure nothing broke:
-just test
-
-# Next: Test each of the 16 MCP tools with real queries
+# 4. Start fixing:
+# - Unify layers
+# - Fix misnamed components
+# - Add missing methods
 ```
 
 ## 🔧 Known Issues to Address
 
-### High Priority (Blocking)
-1. **Layer implementations incomplete**: Many methods just stub implementations
-2. **LSP Client methods missing**: `findDefinition`, `findReferences` not implemented
-3. **Response format inconsistent**: Layers not returning expected structure
-4. **File path resolution**: Relative vs absolute path handling broken
+### Critical (Blocking Everything)
+1. **Duplicate layer implementations**: Two separate codebases
+2. **LSPClient is misnamed**: It's an HTTP client, not LSP
+3. **Missing HTTP endpoints**: No `/definition` or `/references`
+4. **Response format mismatch**: `layersUsed` in wrong place
+5. **No shared state**: Two separate caches/databases
+
+### High Priority
+1. **File path resolution**: Undefined paths to tree-sitter
+2. **Ontology layer timeout**: `findRelatedConcepts` hanging
+3. **MCP can't access LSP**: Protocol barrier
+4. **Tests failing**: Integration tests broken
 
 ### Medium Priority
-1. **Remove redundant files**: Delete `stdio-simple.ts` and `index-simple.ts` (unnecessary complexity)
-2. **Build process**: Update package.json build target from `--target=node` to `--target=bun`
-3. **Error handling**: Add better error messages when layers fail to initialize
-4. **Tree-sitter query syntax**: Invalid queries for TypeScript causing parser errors
+1. **Remove redundant files**: Clean up duplicates
+2. **Error handling**: Better error messages
+3. **Build process**: Unify build for both systems
 
-### Low Priority (Future)
-1. **Claude Tools Integration**: Investigate how to properly access Claude Code's native tools
-   - Research MCP server context for tool injection
-   - Understand how Claude Code exposes Glob, Grep, LS tools to MCP servers
-   - Determine if tools should be passed via transport or context
-   - Test with actual Claude Code integration (not standalone)
+### Future
+1. **Claude Tools Integration**: Research proper MCP tool access
+2. **Performance monitoring**: Add metrics
+3. **Documentation**: Update to reflect real architecture
