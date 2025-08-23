@@ -57,13 +57,13 @@ health:
 status:
     @echo "📊 Server Status"
     @echo "=================="
-    @if [ -f .ontology/pids/http-api.pid ] && kill -0 $$(cat .ontology/pids/http-api.pid) 2>/dev/null; then \
-        echo "✅ HTTP API: Running (PID: $$(cat .ontology/pids/http-api.pid))"; \
+    @if [ -f .ontology/pids/http-api.pid ] && kill -0 $(cat .ontology/pids/http-api.pid) 2>/dev/null; then \
+        echo "✅ HTTP API: Running (PID: $(cat .ontology/pids/http-api.pid))"; \
     else \
         echo "❌ HTTP API: Not running"; \
     fi
-    @if [ -f .ontology/pids/mcp-sse.pid ] && kill -0 $$(cat .ontology/pids/mcp-sse.pid) 2>/dev/null; then \
-        echo "✅ MCP SSE: Running (PID: $$(cat .ontology/pids/mcp-sse.pid))"; \
+    @if [ -f .ontology/pids/mcp-sse.pid ] && kill -0 $(cat .ontology/pids/mcp-sse.pid) 2>/dev/null; then \
+        echo "✅ MCP SSE: Running (PID: $(cat .ontology/pids/mcp-sse.pid))"; \
     else \
         echo "❌ MCP SSE: Not running"; \
     fi

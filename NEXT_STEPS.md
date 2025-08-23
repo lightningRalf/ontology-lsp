@@ -5,11 +5,13 @@
 
 ## 🎯 Phase 3: Integration [CURRENT]
 
-### 1. Complete MCP Integration Testing
-- Test stdio server with Claude Code directly
-- Verify SSE server endpoints are responding correctly
-- Ensure all 16 MCP tools are working end-to-end
-- Add integration tests for MCP → Layer communication
+### 1. Fix Layer Implementation Issues [CRITICAL]
+Based on integration tests, the following need immediate fixes:
+- **LSP Client**: `findDefinition` and `findReferences` methods are undefined
+- **Layer Response Format**: Layers returning wrong format (missing `layersUsed` array)
+- **File Path Handling**: Tree-sitter getting undefined file paths
+- **Ontology Layer**: Hanging on `findRelatedConcepts` (5s timeout)
+- **executeWithMetadata**: Not wrapping responses correctly
 
 ### 2. MCP → LSP Bridge Enhancement
 ```typescript
@@ -70,7 +72,21 @@ just test
 
 ## 🔧 Known Issues to Address
 
+### High Priority (Blocking)
+1. **Layer implementations incomplete**: Many methods just stub implementations
+2. **LSP Client methods missing**: `findDefinition`, `findReferences` not implemented
+3. **Response format inconsistent**: Layers not returning expected structure
+4. **File path resolution**: Relative vs absolute path handling broken
+
+### Medium Priority
 1. **Remove redundant files**: Delete `stdio-simple.ts` and `index-simple.ts` (unnecessary complexity)
 2. **Build process**: Update package.json build target from `--target=node` to `--target=bun`
 3. **Error handling**: Add better error messages when layers fail to initialize
-4. **Documentation**: Create MCP tool usage examples for each of the 16 tools
+4. **Tree-sitter query syntax**: Invalid queries for TypeScript causing parser errors
+
+### Low Priority (Future)
+1. **Claude Tools Integration**: Investigate how to properly access Claude Code's native tools
+   - Research MCP server context for tool injection
+   - Understand how Claude Code exposes Glob, Grep, LS tools to MCP servers
+   - Determine if tools should be passed via transport or context
+   - Test with actual Claude Code integration (not standalone)
