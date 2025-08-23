@@ -1,10 +1,12 @@
 {
-  "name": "ontology-lsp-proxy",
-  "version": "1.0.0",
-  "description": "Ontology-enhanced LSP proxy with fuzzy matching and pattern learning",
-  "main": "dist/server.js",
+  "name": "ontology-lsp",
+  "version": "2.0.0",
+  "description": "Unified ontology-enhanced code intelligence system with MCP, LSP, and HTTP adapters",
+  "type": "module",
+  "main": "dist/core/analyzer.js",
   "bin": {
-    "ontology-lsp": "./dist/cli/index.js"
+    "ontology-lsp": "./dist/cli/index.js",
+    "ontology-mcp": "./dist/adapters/mcp/index.js"
   },
   "repository": {
     "type": "git",
@@ -16,13 +18,16 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "~/.bun/bin/bun build ./src/server.ts --target=bun --outdir=dist --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python && ~/.bun/bin/bun build ./src/cli/index.ts --target=bun --outdir=dist/cli --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python && ~/.bun/bin/bun build ./src/api/http-server.ts --target=bun --outdir=dist/api --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python",
+    "build": "~/.bun/bin/bun build ./src/server.ts --target=bun --outdir=dist --format=esm --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python && ~/.bun/bin/bun build ./adapters/mcp/index.ts --target=bun --outdir=dist/adapters/mcp --format=esm",
     "build:cli": "bun build ./src/cli/index.ts --target=bun --outdir=dist/cli --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python",
     "build:api": "bun build ./src/api/http-server.ts --target=bun --outdir=dist/api --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python",
+    "build:mcp": "bun build ./adapters/mcp/index.ts --target=bun --outdir=dist/adapters/mcp --format=esm",
     "build:tsc": "tsc",
     "start": "bun run dist/server.js --stdio",
+    "start:mcp": "bun run adapters/mcp/index.ts",
     "dev": "bun run src/server.ts",
     "test": "bun test",
+    "test:mcp": "bun test test/adapters/mcp.test.ts",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
     "lint": "bunx @biomejs/biome check --write .",
@@ -39,6 +44,7 @@
   "author": "Claude Code Enhanced",
   "license": "MIT",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0",
     "@types/glob": "^9.0.0",
     "bloom-filters": "^3.0.4",
     "chokidar": "^4.0.3",

@@ -10,7 +10,7 @@
  */
 
 import type { LayerResult } from "./orchestrator.js"
-import { getSharedLSPClient, type LSPClient } from "../utils/lsp-client.js"
+import { getSharedLSPClient, type LSPClient } from "../utils/http-api-client.js"
 import { 
   getSharedTreeSitterService, 
   type BaseTreeSitterService,
@@ -24,8 +24,8 @@ export class TreeSitterLayer {
   private performanceMetrics: Map<string, number[]>
 
   constructor() {
-    // Connect to actual LSP server via /find endpoint with semantic search
-    this.lspClient = getSharedLSPClient()
+    // Connect to actual HTTP API server via /find endpoint with semantic search
+    this.lspClient = getSharedLSPClient() // Will be renamed to httpApiClient in future
     
     // Use shared tree-sitter service (fourth-order effect: enables future plugin architecture)
     this.baseLayer = getSharedTreeSitterService()

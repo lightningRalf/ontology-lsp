@@ -299,26 +299,21 @@ export class LayerOrchestrator {
       
       this.logPerformance('executeTool', layersUsed, executionTime)
       
+      // Return flat structure with metadata at top level for compatibility
       return {
-        success: true,
-        data: result,
-        metadata: {
-          layersUsed,
-          executionTime: `${executionTime.toFixed(2)}ms`,
-          confidence: this.calculateConfidence({ data: result }, layersUsed)
-        }
+        ...result,  // Spread the result data at top level
+        layersUsed,
+        executionTime,
+        confidence: this.calculateConfidence({ data: result }, layersUsed)
       }
     } catch (error) {
       const executionTime = performance.now() - startTime
       
       return {
-        success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
-        metadata: {
-          layersUsed,
-          executionTime: `${executionTime.toFixed(2)}ms`,
-          confidence: 0
-        }
+        layersUsed,
+        executionTime,
+        confidence: 0
       }
     }
   }

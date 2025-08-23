@@ -1,7 +1,7 @@
 /**
- * HTTP Client for communicating with the Ontology LSP Server
+ * HTTP Client for communicating with the Ontology HTTP API Server
  * 
- * Provides a resilient connection to the LSP server's HTTP API with:
+ * Provides a resilient connection to the HTTP API server with:
  * - Connection pooling for efficiency
  * - Exponential backoff retry logic
  * - Circuit breaker pattern for fault tolerance
@@ -11,7 +11,7 @@
 
 import { getEnvironmentConfig, type ServerConfig } from '../config/server-config.js'
 
-interface LSPClientConfig {
+interface HttpApiClientConfig {
   host?: string
   port?: number
   timeout?: number
@@ -33,7 +33,7 @@ enum CircuitState {
   HALF_OPEN = "half_open"
 }
 
-export class LSPClient {
+export class HttpApiClient {
   private baseUrl: string
   private timeout: number
   private maxRetries: number
@@ -49,7 +49,7 @@ export class LSPClient {
   private circuitResetTimeout: number
   private serverConfig: ServerConfig
   
-  constructor(config: LSPClientConfig = {}) {
+  constructor(config: HttpApiClientConfig = {}) {
     this.serverConfig = getEnvironmentConfig()
     
     const host = config.host || this.serverConfig.host
@@ -218,7 +218,7 @@ export class LSPClient {
    */
   async get(endpoint: string, params?: any): Promise<any> {
     if (!this.checkCircuitBreaker()) {
-      throw new Error('Circuit breaker is open - LSP server is unavailable')
+      throw new Error('Circuit breaker is open - HTTP API server is unavailable')
     }
     
     const cacheKey = this.getCacheKey(endpoint, params)
@@ -238,7 +238,7 @@ export class LSPClient {
    */
   async post(endpoint: string, body: any): Promise<any> {
     if (!this.checkCircuitBreaker()) {
-      throw new Error('Circuit breaker is open - LSP server is unavailable')
+      throw new Error('Circuit breaker is open - HTTP API server is unavailable')
     }
     
     return this.executeRequest('POST', endpoint, body)
@@ -295,16 +295,52 @@ export class LSPClient {
   async importOntology(data: any): Promise<any> {
     return this.post('/import', { data })
   }
+  
+  /**
+   * Find definition of a symbol (semantic search)
+   */
+  async findDefinition(symbol: string, options?: {
+    fuzzy?: boolean
+    semantic?: boolean
+    file?: string
+  }): Promise<any> {
+    return this.post('/definition', {
+      symbol,
+      ...options
+    })
+  }
+  
+  /**
+   * Find all references to a symbol
+   */
+  async findReferences(symbol: string, options?: {
+    includeDeclaration?: boolean
+    scope?: 'workspace' | 'file' | 'function'
+  }): Promise<any> {
+    return this.post('/references', {
+      symbol,
+      ...options
+    })
+  }
 }
 
 import { getLSPClientConfig } from './config.js'
 
 // Singleton instance for shared use
-let sharedClient: LSPClient | null = null
+let sharedClient: HttpApiClient | null = null
 
-export function getSharedLSPClient(config?: LSPClientConfig): LSPClient {
+export function getSharedHttpApiClient(config?: HttpApiClientConfig): HttpApiClient {
   if (!sharedClient) {
-    sharedClient = new LSPClient(config || getLSPClientConfig())
+    sharedClient = new HttpApiClient(config || getLSPClientConfig())
   }
   return sharedClient
 }
+
+// Deprecated: Maintain backward compatibility temporarily
+export function getSharedLSPClient(config?: HttpApiClientConfig): HttpApiClient {
+  console.warn('getSharedLSPClient is deprecated. Use getSharedHttpApiClient instead.')
+  return getSharedHttpApiClient(config)
+}
+
+// Type alias for backward compatibility
+export type LSPClient = HttpApiClient

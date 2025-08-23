@@ -1,0 +1,190 @@
+{
+  "main": {
+    "id": "1a65e8c28a3cde51",
+    "type": "split",
+    "children": [
+      {
+        "id": "a958ef4c5ae2ec0b",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "b50f4ac68bdf0f49",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "VISION.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "VISION"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "8ce7f85beccd42d8",
+    "type": "split",
+    "children": [
+      {
+        "id": "e5468cd32641884a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "2700b20aa23453b8",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "0fb726652154d879",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "464faa237cc4d451",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "1db9a173a0cb1c56",
+    "type": "split",
+    "children": [
+      {
+        "id": "5a4abb1cf6c413d9",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "75a52de313143c8e",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "VISION.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for VISION"
+            }
+          },
+          {
+            "id": "56dcb81254e2b6f5",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "VISION.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from VISION"
+            }
+          },
+          {
+            "id": "9bbbdf04b3e3390a",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "c9b4c277eb85772a",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "VISION.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of VISION"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "b50f4ac68bdf0f49",
+  "lastOpenFiles": [
+    "MCP_SETUP_GUIDE.md",
+    "MCP_SETUP_GUIDE.md.tmp.701668.1755940738677",
+    "test-mcp-server.ts",
+    "test-mcp-server.ts.tmp.701668.1755940700496",
+    "claude-desktop-config.json.tmp.701668.1755940671278",
+    "package.json.tmp.701668.1755940638020",
+    "package.json.tmp.701668.1755940615107",
+    "package.json.tmp.701668.1755940607755",
+    "test/adapters/mcp.test.ts",
+    "test/adapters/mcp.test.ts.tmp.701668.1755940566433",
+    "test/adapters",
+    "DEPLOYMENT.md",
+    "TESTING_STRATEGY.md",
+    "API_SPECIFICATION.md",
+    "IMPLEMENTATION_PLAN.md"
+  ]
+}

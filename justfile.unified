@@ -1,0 +1,492 @@
+# Ontology-LSP Unified System - Command Center
+# This is the new Justfile for the unified core + adapters architecture
+
+# Default: Show available commands
+default:
+    @just --list
+
+# ═══════════════════════════════════════════════════════════════
+# SETUP & INITIALIZATION
+# ═══════════════════════════════════════════════════════════════
+
+# Initialize the unified system (run this first!)
+init:
+    @echo "🚀 Initializing Ontology-LSP Unified System..."
+    @echo "📁 Creating directory structure..."
+    @mkdir -p core/{analyzer,layers,services,types}
+    @mkdir -p adapters/{mcp,lsp,http,shared}
+    @mkdir -p config
+    @mkdir -p test/{unit,integration,e2e}
+    @mkdir -p scripts
+    @mkdir -p .ontology/{cache,db,logs}
+    @echo "📦 Installing dependencies..."
+    bun install
+    @echo "🗄️ Initializing database..."
+    @just init-db
+    @echo "✅ Initialization complete!"
+
+# Initialize database
+init-db:
+    @echo "🗄️ Setting up database..."
+    @mkdir -p .ontology/db
+    @touch .ontology/db/ontology.db
+    @echo "✅ Database initialized"
+
+# ═══════════════════════════════════════════════════════════════
+# DEVELOPMENT
+# ═══════════════════════════════════════════════════════════════
+
+# Start development mode with hot-reload
+dev:
+    @echo "🚀 Starting unified system in development mode..."
+    @echo "🧠 Core: Starting..."
+    @echo "🔌 Adapters: MCP (7001), HTTP (7000), LSP (7002)"
+    bun run --watch core/server.ts
+
+# Start only the MCP adapter (for Claude Code)
+dev-mcp:
+    @echo "🤖 Starting MCP adapter for Claude Code..."
+    bun run --watch adapters/mcp/index.ts
+
+# Start only the HTTP adapter (for CLI/Web)
+dev-http:
+    @echo "🌐 Starting HTTP adapter..."
+    bun run --watch adapters/http/index.ts
+
+# Start only the LSP adapter (for VS Code)
+dev-lsp:
+    @echo "📝 Starting LSP adapter..."
+    bun run --watch adapters/lsp/index.ts
+
+# Start with verbose logging
+dev-verbose:
+    @echo "🔍 Starting with verbose logging..."
+    LOG_LEVEL=debug just dev
+
+# ═══════════════════════════════════════════════════════════════
+# BUILDING
+# ═══════════════════════════════════════════════════════════════
+
+# Build the unified system
+build:
+    @echo "🔨 Building unified system..."
+    @echo "📦 Building core..."
+    bun build core/analyzer.ts --outdir=dist/core --target=bun
+    @echo "📦 Building MCP adapter..."
+    bun build adapters/mcp/index.ts --outdir=dist/adapters/mcp --target=bun
+    @echo "📦 Building HTTP adapter..."
+    bun build adapters/http/index.ts --outdir=dist/adapters/http --target=bun
+    @echo "📦 Building LSP adapter..."
+    bun build adapters/lsp/index.ts --outdir=dist/adapters/lsp --target=bun
+    @echo "✅ Build complete!"
+
+# Build for production
+build-prod:
+    @echo "🚀 Building for production..."
+    @just build
+    @echo "🗜️ Minifying..."
+    bun build dist/core/analyzer.js --minify --outfile=dist/core/analyzer.min.js
+    @echo "📊 Build stats:"
+    @ls -lh dist/core/*.js dist/adapters/*/*.js
+
+# ═══════════════════════════════════════════════════════════════
+# TESTING
+# ═══════════════════════════════════════════════════════════════
+
+# Run all tests
+test:
+    @echo "🧪 Running all tests..."
+    bun test
+
+# Run unit tests only
+test-unit:
+    @echo "🧪 Running unit tests..."
+    bun test test/unit
+
+# Run integration tests
+test-integration:
+    @echo "🔗 Running integration tests..."
+    bun test test/integration
+
+# Run end-to-end tests
+test-e2e:
+    @echo "🎯 Running end-to-end tests..."
+    @just start-test-servers
+    bun test test/e2e
+    @just stop-test-servers
+
+# Run MCP adapter tests
+test-mcp:
+    @echo "🤖 Testing MCP adapter..."
+    bun test test/adapters/mcp
+
+# Test with coverage
+test-coverage:
+    @echo "📊 Running tests with coverage..."
+    bun test --coverage
+
+# Run benchmarks
+bench:
+    @echo "⚡ Running performance benchmarks..."
+    bun run scripts/benchmark.ts
+
+# ═══════════════════════════════════════════════════════════════
+# MIGRATION FROM OLD SYSTEM
+# ═══════════════════════════════════════════════════════════════
+
+# Migrate from duplicate implementations to unified core
+migrate:
+    @echo "🔄 Starting migration to unified system..."
+    @echo "📦 Backing up existing data..."
+    @just backup
+    @echo "🚚 Moving best implementations to core..."
+    @just extract-core
+    @echo "🔧 Updating imports..."
+    @just update-imports
+    @echo "🧪 Running migration tests..."
+    @just test-migration
+    @echo "✅ Migration complete!"
+
+# Extract best implementations to core
+extract-core:
+    @echo "📤 Extracting best implementations..."
+    # Take working implementations from src/
+    @cp -r src/layers/* core/layers/ 2>/dev/null || true
+    @cp -r src/ontology/* core/services/ 2>/dev/null || true
+    # Remove duplicates from mcp-ontology-server/
+    @echo "🗑️ Removing duplicate implementations..."
+    @rm -rf mcp-ontology-server/src/layers
+    @echo "✅ Core extracted"
+
+# Update imports to use unified core
+update-imports:
+    @echo "🔧 Updating import statements..."
+    bun run scripts/update-imports.ts
+
+# Backup before migration
+backup:
+    @echo "💾 Creating backup..."
+    @mkdir -p .backups/$(date +%Y%m%d_%H%M%S)
+    @cp -r .ontology .backups/$(date +%Y%m%d_%H%M%S)/
+    @cp -r src .backups/$(date +%Y%m%d_%H%M%S)/
+    @cp -r mcp-ontology-server .backups/$(date +%Y%m%d_%H%M%S)/
+    @echo "✅ Backup created"
+
+# Test migration success
+test-migration:
+    @echo "🧪 Testing migration..."
+    @echo "Testing core functionality..."
+    bun test test/migration/core.test.ts
+    @echo "Testing adapter connections..."
+    bun test test/migration/adapters.test.ts
+    @echo "✅ Migration tests passed"
+
+# ═══════════════════════════════════════════════════════════════
+# RUNNING & DEPLOYMENT
+# ═══════════════════════════════════════════════════════════════
+
+# Start production servers
+start:
+    @echo "🚀 Starting production servers..."
+    @just start-core &
+    @just start-mcp &
+    @just start-http &
+    @just start-lsp &
+    @echo "✅ All servers running"
+    @echo "📍 MCP: localhost:7001 (Claude Code)"
+    @echo "📍 HTTP: localhost:7000 (API/CLI)"
+    @echo "📍 LSP: localhost:7002 (VS Code)"
+
+# Start core analyzer
+start-core:
+    @echo "🧠 Starting core analyzer..."
+    bun run dist/core/analyzer.js
+
+# Start MCP adapter
+start-mcp:
+    @echo "🤖 Starting MCP adapter on port 7001..."
+    MCP_PORT=7001 bun run dist/adapters/mcp/index.js
+
+# Start HTTP adapter
+start-http:
+    @echo "🌐 Starting HTTP adapter on port 7000..."
+    HTTP_PORT=7000 bun run dist/adapters/http/index.js
+
+# Start LSP adapter
+start-lsp:
+    @echo "📝 Starting LSP adapter on port 7002..."
+    LSP_PORT=7002 bun run dist/adapters/lsp/index.js
+
+# Stop all servers
+stop:
+    @echo "🛑 Stopping all servers..."
+    @pkill -f "bun.*analyzer" || true
+    @pkill -f "bun.*adapters" || true
+    @echo "✅ All servers stopped"
+
+# Restart all servers
+restart:
+    @just stop
+    @sleep 1
+    @just start
+
+# ═══════════════════════════════════════════════════════════════
+# CLAUDE CODE INTEGRATION
+# ═══════════════════════════════════════════════════════════════
+
+# Configure Claude Desktop for MCP
+configure-claude:
+    @echo "🤖 Configuring Claude Desktop..."
+    @mkdir -p ~/.config/claude
+    @echo "📝 Creating MCP configuration..."
+    @cat > ~/.config/claude/mcp.json << 'EOF'
+    {
+      "mcpServers": {
+        "ontology-lsp": {
+          "command": "bun",
+          "args": ["run", "$(pwd)/dist/adapters/mcp/index.js"],
+          "env": {
+            "MCP_PORT": "7001",
+            "LOG_LEVEL": "info"
+          }
+        }
+      }
+    }
+    EOF
+    @echo "✅ Claude Desktop configured!"
+    @echo "🔄 Please restart Claude Desktop to apply changes"
+
+# Test MCP connection
+test-mcp-connection:
+    @echo "🧪 Testing MCP connection..."
+    @echo "Starting test MCP server..."
+    @just start-mcp &
+    @sleep 2
+    @echo "Sending test request..."
+    @curl -X POST http://localhost:7001/mcp/tools/list || echo "❌ Connection failed"
+    @echo "✅ Test complete"
+    @just stop
+
+# List available MCP tools
+list-mcp-tools:
+    @echo "📋 Available MCP tools:"
+    @curl -s http://localhost:7001/mcp/tools | jq '.tools[].name' || echo "Start server first: just start-mcp"
+
+# ═══════════════════════════════════════════════════════════════
+# MONITORING & DEBUGGING
+# ═══════════════════════════════════════════════════════════════
+
+# Show system status
+status:
+    @echo "📊 System Status"
+    @echo "════════════════"
+    @echo "🧠 Core: $(pgrep -f 'analyzer' > /dev/null && echo '✅ Running' || echo '❌ Stopped')"
+    @echo "🤖 MCP:  $(curl -s http://localhost:7001/health > /dev/null 2>&1 && echo '✅ Running' || echo '❌ Stopped')"
+    @echo "🌐 HTTP: $(curl -s http://localhost:7000/health > /dev/null 2>&1 && echo '✅ Running' || echo '❌ Stopped')"
+    @echo "📝 LSP:  $(pgrep -f 'lsp' > /dev/null && echo '✅ Running' || echo '❌ Stopped')"
+
+# Health check all services
+health:
+    @echo "🏥 Health Check"
+    @echo "═══════════════"
+    @curl -s http://localhost:7000/health | jq '.' || echo "HTTP: Not responding"
+    @curl -s http://localhost:7001/health | jq '.' || echo "MCP: Not responding"
+    @echo "✅ Health check complete"
+
+# View logs
+logs:
+    @echo "📜 Viewing logs..."
+    @tail -f .ontology/logs/*.log
+
+# View MCP logs
+logs-mcp:
+    @tail -f .ontology/logs/mcp.log
+
+# View core logs
+logs-core:
+    @tail -f .ontology/logs/core.log
+
+# Clear logs
+clear-logs:
+    @echo "🗑️ Clearing logs..."
+    @rm -f .ontology/logs/*.log
+    @echo "✅ Logs cleared"
+
+# ═══════════════════════════════════════════════════════════════
+# ANALYSIS & LEARNING
+# ═══════════════════════════════════════════════════════════════
+
+# Analyze codebase for patterns
+analyze:
+    @echo "🧠 Analyzing codebase..."
+    bun run scripts/analyze.ts .
+
+# Learn from recent changes
+learn:
+    @echo "📚 Learning from recent changes..."
+    bun run scripts/learn.ts --from=git
+
+# Export knowledge base
+export-knowledge:
+    @echo "📦 Exporting knowledge..."
+    bun run scripts/export.ts --output=.ontology/export.json
+
+# Import knowledge base
+import-knowledge path:
+    @echo "📥 Importing knowledge from {{path}}..."
+    bun run scripts/import.ts {{path}}
+
+# Show statistics
+stats:
+    @echo "📊 System Statistics"
+    @echo "═══════════════════"
+    @echo "Concepts: $(sqlite3 .ontology/db/ontology.db 'SELECT COUNT(*) FROM concepts' 2>/dev/null || echo '0')"
+    @echo "Patterns: $(sqlite3 .ontology/db/ontology.db 'SELECT COUNT(*) FROM patterns' 2>/dev/null || echo '0')"
+    @echo "Cache entries: $(ls .ontology/cache 2>/dev/null | wc -l || echo '0')"
+
+# ═══════════════════════════════════════════════════════════════
+# MAINTENANCE
+# ═══════════════════════════════════════════════════════════════
+
+# Clean build artifacts
+clean:
+    @echo "🧹 Cleaning build artifacts..."
+    @rm -rf dist/
+    @rm -rf node_modules/
+    @rm -rf .turbo/
+    @echo "✅ Clean complete"
+
+# Clean everything (including cache and logs)
+clean-all:
+    @echo "🧹 Cleaning everything..."
+    @just clean
+    @rm -rf .ontology/cache/*
+    @rm -rf .ontology/logs/*
+    @echo "✅ Full clean complete"
+
+# Reset database (CAUTION!)
+reset-db:
+    @echo "⚠️  This will delete all learned patterns and concepts!"
+    @read -p "Are you sure? (y/N) " -n 1 -r && echo && \
+    if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+        rm -f .ontology/db/ontology.db; \
+        just init-db; \
+        echo "✅ Database reset"; \
+    else \
+        echo "❌ Cancelled"; \
+    fi
+
+# Update dependencies
+update-deps:
+    @echo "📦 Updating dependencies..."
+    bun update
+
+# Format code
+format:
+    @echo "🎨 Formatting code..."
+    bunx biome format --write .
+
+# Lint code
+lint:
+    @echo "🔍 Linting code..."
+    bunx biome check .
+
+# ═══════════════════════════════════════════════════════════════
+# DOCKER & DEPLOYMENT
+# ═══════════════════════════════════════════════════════════════
+
+# Build Docker image
+docker-build:
+    @echo "🐳 Building Docker image..."
+    docker build -t ontology-lsp:latest .
+
+# Run in Docker
+docker-run:
+    @echo "🐳 Running in Docker..."
+    docker run -p 7000:7000 -p 7001:7001 -p 7002:7002 \
+        -v ~/.ontology:/data \
+        ontology-lsp:latest
+
+# Deploy to production
+deploy env="production":
+    @echo "🚀 Deploying to {{env}}..."
+    @just build-prod
+    @just docker-build
+    @echo "📤 Pushing to registry..."
+    docker tag ontology-lsp:latest registry.example.com/ontology-lsp:latest
+    docker push registry.example.com/ontology-lsp:latest
+    @echo "✅ Deployment complete"
+
+# ═══════════════════════════════════════════════════════════════
+# UTILITIES
+# ═══════════════════════════════════════════════════════════════
+
+# Show current version
+version:
+    @echo "Ontology-LSP Unified System"
+    @echo "Version: $(cat package.json | jq -r '.version')"
+    @echo "Core: $(cat core/package.json | jq -r '.version' 2>/dev/null || echo 'dev')"
+    @echo "MCP Adapter: $(cat adapters/mcp/package.json | jq -r '.version' 2>/dev/null || echo 'dev')"
+
+# Open documentation
+docs:
+    @echo "📚 Opening documentation..."
+    @open http://localhost:3000/docs || echo "Run 'just serve-docs' first"
+
+# Serve documentation
+serve-docs:
+    @echo "📚 Serving documentation..."
+    bunx vitepress dev docs
+
+# Run interactive shell
+shell:
+    @echo "🐚 Starting interactive shell..."
+    bun repl
+
+# Quick test of core functionality
+quick-test:
+    @echo "⚡ Quick functionality test..."
+    @echo "Testing find definition..."
+    @curl -X POST http://localhost:7000/api/find-definition \
+        -H "Content-Type: application/json" \
+        -d '{"symbol": "TestClass"}' | jq '.'
+
+# Show help
+help:
+    @echo "Ontology-LSP Unified System - Command Reference"
+    @echo "═══════════════════════════════════════════════"
+    @echo ""
+    @echo "Quick Start:"
+    @echo "  just init         - Initialize the system (run first!)"
+    @echo "  just dev          - Start development mode"
+    @echo "  just dev-mcp      - Start MCP adapter only (for Claude)"
+    @echo "  just test         - Run all tests"
+    @echo ""
+    @echo "Migration:"
+    @echo "  just migrate      - Migrate from old duplicate system"
+    @echo "  just backup       - Backup before migration"
+    @echo ""
+    @echo "Production:"
+    @echo "  just build        - Build for production"
+    @echo "  just start        - Start all servers"
+    @echo "  just stop         - Stop all servers"
+    @echo ""
+    @echo "Claude Integration:"
+    @echo "  just configure-claude - Setup Claude Desktop"
+    @echo "  just test-mcp-connection - Test MCP connection"
+    @echo ""
+    @echo "Monitoring:"
+    @echo "  just status       - Show system status"
+    @echo "  just health       - Health check all services"
+    @echo "  just logs         - View logs"
+    @echo ""
+    @echo "Run 'just --list' for all commands"
+
+# Default environment check
+check-env:
+    @echo "🔍 Checking environment..."
+    @command -v bun >/dev/null 2>&1 || { echo "❌ Bun not installed"; exit 1; }
+    @echo "✅ Bun: $(bun --version)"
+    @command -v sqlite3 >/dev/null 2>&1 || echo "⚠️  SQLite3 not found (optional)"
+    @command -v jq >/dev/null 2>&1 || echo "⚠️  jq not found (optional)"
+    @echo "✅ Environment ready"

@@ -239,6 +239,20 @@ export class OntologyAPIServer {
                     }
                     break;
                     
+                case '/definition':
+                    if (method === 'POST') {
+                        const body = await request.json();
+                        return this.handleFindDefinition(body, headers);
+                    }
+                    break;
+                    
+                case '/references':
+                    if (method === 'POST') {
+                        const body = await request.json();
+                        return this.handleFindReferences(body, headers);
+                    }
+                    break;
+                    
                 case '/health':
                     if (method === 'GET') {
                         return new Response(JSON.stringify({ status: 'healthy' }), { headers });
@@ -427,6 +441,144 @@ export class OntologyAPIServer {
         };
         
         return new Response(JSON.stringify(matches), { headers });
+    }
+
+    private async handleFindDefinition(body: any, headers: any): Promise<Response> {
+        const { symbol, fuzzy = true, semantic = true, file } = body;
+        
+        if (!symbol) {
+            return new Response(JSON.stringify({ error: 'symbol is required' }), { 
+                status: 400, 
+                headers 
+            });
+        }
+        
+        const definitions: any[] = [];
+        
+        // Use Tree-sitter layer for AST-based definition search
+        try {
+            const astResult = await this.treeSitter.process({
+                identifier: symbol,
+                searchPath: file || this.config.workspaceRoot,
+                operation: 'findDefinition'
+            });
+            
+            if (astResult && astResult.definitions) {
+                definitions.push(...astResult.definitions);
+            }
+        } catch (error) {
+            console.error('Tree-sitter definition search error:', error);
+        }
+        
+        // Use ontology for semantic search if enabled
+        if (semantic) {
+            const concept = this.ontology.getConcept(symbol);
+            if (concept && concept.location) {
+                definitions.push({
+                    uri: concept.location.file,
+                    range: {
+                        start: { line: concept.location.line - 1, character: concept.location.column },
+                        end: { line: concept.location.line - 1, character: concept.location.column + symbol.length }
+                    },
+                    confidence: 0.9,
+                    source: 'ontology'
+                });
+            }
+        }
+        
+        // Use fuzzy matching if enabled and no exact matches
+        if (fuzzy && definitions.length === 0) {
+            const fuzzyMatches = this.ontology.findSimilarConcepts(symbol, 0.7);
+            for (const match of fuzzyMatches.slice(0, 5)) {
+                if (match.location) {
+                    definitions.push({
+                        uri: match.location.file,
+                        range: {
+                            start: { line: match.location.line - 1, character: match.location.column },
+                            end: { line: match.location.line - 1, character: match.location.column + match.name.length }
+                        },
+                        confidence: match.similarity,
+                        source: 'fuzzy'
+                    });
+                }
+            }
+        }
+        
+        return new Response(JSON.stringify({ 
+            definitions,
+            layersUsed: ['tree-sitter', 'ontology'],
+            executionTime: Date.now(),
+            confidence: definitions.length > 0 ? Math.max(...definitions.map(d => d.confidence || 0.5)) : 0
+        }), { headers });
+    }
+    
+    private async handleFindReferences(body: any, headers: any): Promise<Response> {
+        const { symbol, includeDeclaration = false, scope = 'workspace' } = body;
+        
+        if (!symbol) {
+            return new Response(JSON.stringify({ error: 'symbol is required' }), { 
+                status: 400, 
+                headers 
+            });
+        }
+        
+        const references: any[] = [];
+        
+        // Use Tree-sitter for AST-based reference search
+        try {
+            const astResult = await this.treeSitter.process({
+                identifier: symbol,
+                searchPath: this.config.workspaceRoot,
+                operation: 'findReferences',
+                includeDeclaration,
+                scope
+            });
+            
+            if (astResult && astResult.references) {
+                references.push(...astResult.references);
+            }
+        } catch (error) {
+            console.error('Tree-sitter reference search error:', error);
+        }
+        
+        // Use ontology to find concept relationships
+        const concept = this.ontology.getConcept(symbol);
+        if (concept) {
+            const relationships = this.ontology.getRelationships(concept.id);
+            
+            for (const rel of relationships) {
+                if (rel.type === 'references' || rel.type === 'uses') {
+                    const targetConcept = this.ontology.getConcept(rel.target);
+                    if (targetConcept && targetConcept.location) {
+                        references.push({
+                            uri: targetConcept.location.file,
+                            range: {
+                                start: { line: targetConcept.location.line - 1, character: targetConcept.location.column },
+                                end: { line: targetConcept.location.line - 1, character: targetConcept.location.column + symbol.length }
+                            },
+                            kind: rel.type,
+                            confidence: 0.85
+                        });
+                    }
+                }
+            }
+        }
+        
+        // Remove duplicates based on uri and line
+        const uniqueRefs = references.reduce((acc, ref) => {
+            const key = `${ref.uri}:${ref.range.start.line}:${ref.range.start.character}`;
+            if (!acc.has(key)) {
+                acc.set(key, ref);
+            }
+            return acc;
+        }, new Map());
+        
+        return new Response(JSON.stringify({ 
+            references: Array.from(uniqueRefs.values()),
+            layersUsed: ['tree-sitter', 'ontology'],
+            executionTime: Date.now(),
+            confidence: references.length > 0 ? 0.9 : 0
+        }), { headers });
     }
 
     private async handleSuggest(body: any, headers: any): Promise<Response> {
