@@ -3,20 +3,52 @@
 > **Purpose**: Forward-looking action items ONLY. No history, no completed items.
 > For completed work, see PROJECT_STATUS.md
 
-## 🎉 System Status: PRODUCTION READY!
+## ⚠️ System Status: DEGRADED - TEST SUITE CRITICAL
 
-The Ontology-LSP system is fully operational and production-ready with:
-- **Unified core architecture** implemented and tested ✅
-- **All critical issues resolved** including cache and test issues ✅
-- **Production documentation** complete with troubleshooting ✅
-- **Web UI Dashboard** for real-time monitoring ✅
-- **Integration tests** at 100% for adapters ✅
-- **Justfile-first architecture** with all commands centralized ✅
+The Ontology-LSP system has significant test failures that must be addressed:
+- **Test Suite Regression**: Only 164/519 tests passing (31.6% success rate) ❌
+- **355 Test Failures**: Critical functionality may be broken ❌
+- **444 Errors**: Preventing proper test execution ❌
+- **Layer 4 Not Registered**: Pattern learner unavailable ❌
+- **Database Issues**: Feedback persistence failing ❌
+- **Performance Regression**: Not meeting <100ms targets ❌
 
-## 🚀 Next Development Priorities
+## 🔴 CRITICAL: Fix Test Suite First
+
+### 1. Fix Layer 4 Registration Issue
+- Investigate why Pattern Learner (Layer 4) is not being registered
+- Check layer-manager.ts initialization
+- Verify pattern-learner.ts exports and imports
+- Ensure all 5 layers are properly registered in unified-analyzer.ts
+
+### 2. Fix Database Persistence
+- Debug feedback storage failures
+- Check SQLite database initialization
+- Verify schema matches expected structure
+- Fix "from_tokens" column reference issues
+
+### 3. Restore Performance Targets
+- Identify performance bottlenecks causing >100ms responses
+- Check if caching is working properly
+- Profile slow operations
+- Optimize database queries
+
+### 4. Run Comprehensive Test Diagnostics
+```bash
+# Check which specific tests are failing
+bun test --reporter=junit --reporter-outfile=test-results.xml
+
+# Run tests by category to isolate issues
+bun test tests/unified-core.test.ts
+bun test tests/learning-system.test.ts
+bun test tests/performance.test.ts
+```
+
+## 🚀 Next Development Priorities (AFTER FIXING TESTS)
 
 ### 1. Deploy to Production Environment
 ```bash
+# DO NOT DEPLOY UNTIL TESTS ARE FIXED!
 # Deploy with Docker
 docker build -t ontology-lsp:latest .
 docker run -d -p 7000-7002:7000-7002 -p 8080:8080 ontology-lsp:latest
