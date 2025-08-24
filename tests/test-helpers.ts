@@ -281,6 +281,7 @@ export function isBunRuntime(): boolean {
 export async function createRealLayers(config: any): Promise<any[]> {
   const { ClaudeToolsLayer } = await import('../src/layers/claude-tools.js');
   const { TreeSitterLayer } = await import('../src/layers/tree-sitter.js');
+  const { PatternLearnerLayer } = await import('../src/layers/pattern-learner-layer.js');
   
   // Create Claude Tools Layer (Layer 1) configuration
   const claudeToolsConfig = {
@@ -323,6 +324,15 @@ export async function createRealLayers(config: any): Promise<any[]> {
     timeout: config.layers.layer2.timeout || 100
   };
 
+  // Create Pattern Learner Layer (Layer 4) configuration
+  const patternLearnerConfig = {
+    dbPath: ':memory:', // Use in-memory database for tests
+    learningThreshold: 2, // Lower threshold for testing
+    confidenceThreshold: 0.5, // Lower threshold for testing
+    timeout: config.layers.layer4.timeout || 50,
+    enabled: config.layers.layer4.enabled
+  };
+
   const layers = [];
 
   // Layer 1: Claude Tools Layer (Fast search)
@@ -339,6 +349,22 @@ export async function createRealLayers(config: any): Promise<any[]> {
     }
     if (!layer1.getDiagnostics) {
       layer1.getDiagnostics = () => ({ name: 'layer1', active: true });
+    }
+    if (!layer1.initialize) {
+      layer1.initialize = async () => {};
+    }
+    if (!layer1.getMetrics) {
+      layer1.getMetrics = () => ({
+        name: 'layer1',
+        requestCount: 0,
+        averageLatency: 0,
+        p95Latency: 0,
+        errorCount: 0,
+        cacheHitRate: 0
+      });
+    }
+    if (!layer1.version) {
+      layer1.version = '1.0.0';
     }
     // Set targetLatency for layer manager
     layer1.targetLatency = 5; // 5ms target for fast search
@@ -361,54 +387,87 @@ export async function createRealLayers(config: any): Promise<any[]> {
     if (!layer2.getDiagnostics) {
       layer2.getDiagnostics = () => ({ name: 'layer2', active: true });
     }
+    if (!layer2.initialize) {
+      layer2.initialize = async () => {};
+    }
+    if (!layer2.getMetrics) {
+      layer2.getMetrics = () => ({
+        name: 'layer2',
+        requestCount: 0,
+        averageLatency: 0,
+        p95Latency: 0,
+        errorCount: 0,
+        cacheHitRate: 0
+      });
+    }
+    if (!layer2.version) {
+      layer2.version = '1.0.0';
+    }
     // Set targetLatency for layer manager
     layer2.targetLatency = 50; // 50ms target for AST analysis
     
     layers.push(layer2);
   }
 
-  // For now, we'll create placeholder layers for 3, 4, 5 until those implementations exist
+  // Layer 3: Placeholder for ontology concepts (stub until implemented)
   if (config.layers.layer3.enabled) {
     layers.push({
       name: 'layer3',
+      version: '1.0.0',
       timeout: config.layers.layer3.timeout || 50,
       targetLatency: 10, // 10ms target for ontology concepts
+      async initialize(): Promise<void> {},
       async process(query: any): Promise<any> {
         // Stub implementation - would use OntologyEngine
         return { data: [], searchTime: 1 };
       },
       async dispose(): Promise<void> {},
       getDiagnostics(): any { return { name: 'layer3', active: true }; },
-      isHealthy(): boolean { return true; }
-    });
-  }
-
-  if (config.layers.layer4.enabled) {
-    layers.push({
-      name: 'layer4',
-      timeout: config.layers.layer4.timeout || 50,
-      targetLatency: 10, // 10ms target for pattern mining
-      async process(query: any): Promise<any> {
-        // Stub implementation - would use PatternLearner
-        return { data: [], searchTime: 1 };
+      getMetrics(): any { 
+        return {
+          name: 'layer3',
+          requestCount: 0,
+          averageLatency: 0,
+          p95Latency: 0,
+          errorCount: 0,
+          cacheHitRate: 0
+        };
       },
-      async dispose(): Promise<void> {},
-      getDiagnostics(): any { return { name: 'layer4', active: true }; },
       isHealthy(): boolean { return true; }
     });
   }
 
+  // Layer 4: Pattern Learner Layer (Real implementation!)
+  if (config.layers.layer4.enabled) {
+    const layer4 = new PatternLearnerLayer(patternLearnerConfig);
+    await layer4.initialize(); // Initialize the layer
+    layers.push(layer4);
+  }
+
+  // Layer 5: Placeholder for knowledge propagation (stub until implemented)
   if (config.layers.layer5.enabled) {
     layers.push({
       name: 'layer5',
+      version: '1.0.0',
       timeout: config.layers.layer5.timeout || 100,
       targetLatency: 20, // 20ms target for knowledge propagation
+      async initialize(): Promise<void> {},
       async process(query: any): Promise<any> {
         // Stub implementation - would use KnowledgeSpreader
         return { data: [], searchTime: 1 };
       },
       async dispose(): Promise<void> {},
       getDiagnostics(): any { return { name: 'layer5', active: true }; },
+      getMetrics(): any { 
+        return {
+          name: 'layer5',
+          requestCount: 0,
+          averageLatency: 0,
+          p95Latency: 0,
+          errorCount: 0,
+          cacheHitRate: 0
+        };
+      },
       isHealthy(): boolean { return true; }
     });
   }

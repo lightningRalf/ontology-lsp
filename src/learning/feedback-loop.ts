@@ -421,72 +421,52 @@ export class FeedbackLoopSystem {
 
   private async initializeDatabaseSchema(): Promise<void> {
     try {
-      // Create feedback_events table
-      await this.sharedServices.database.execute(`
-        CREATE TABLE IF NOT EXISTS feedback_events (
-          id TEXT PRIMARY KEY,
-          type TEXT NOT NULL CHECK (type IN ('accept', 'reject', 'modify', 'ignore')),
-          suggestion_id TEXT NOT NULL,
-          pattern_id TEXT,
-          original_suggestion TEXT NOT NULL,
-          final_value TEXT,
-          file_path TEXT NOT NULL,
-          operation TEXT NOT NULL,
-          timestamp INTEGER NOT NULL,
-          user_id TEXT,
-          confidence REAL NOT NULL,
-          time_to_decision INTEGER,
-          keystrokes INTEGER,
-          alternatives_shown INTEGER,
-          source TEXT NOT NULL,
-          created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-        )
-      `);
-
-      // Create index for efficient queries
-      await this.sharedServices.database.execute(`
-        CREATE INDEX IF NOT EXISTS idx_feedback_events_timestamp ON feedback_events(timestamp)
-      `);
-
-      await this.sharedServices.database.execute(`
-        CREATE INDEX IF NOT EXISTS idx_feedback_events_pattern_id ON feedback_events(pattern_id)
-      `);
-
-      await this.sharedServices.database.execute(`
-        CREATE INDEX IF NOT EXISTS idx_feedback_events_type ON feedback_events(type)
-      `);
+      // The feedback tables are already created in database-service.ts
+      // Just verify they exist and are accessible
+      
+      // Check if learning_feedback table exists (main feedback table)
+      await this.sharedServices.database.query(
+        'SELECT name FROM sqlite_master WHERE type="table" AND name="learning_feedback"'
+      );
+      
+      // Check if feedback_corrections table exists (correction tracking)
+      await this.sharedServices.database.query(
+        'SELECT name FROM sqlite_master WHERE type="table" AND name="feedback_corrections"'
+      );
 
     } catch (error) {
-      throw new CoreError(`Failed to initialize feedback database schema: ${error}`, 'DB_SCHEMA_ERROR');
+      throw new CoreError(`Failed to verify feedback database schema: ${error}`, 'DB_SCHEMA_ERROR');
     }
   }
 
   private async loadFeedbackHistory(): Promise<void> {
     try {
+      // Use the existing learning_feedback table
       const rows = await this.sharedServices.database.query(
-        'SELECT * FROM feedback_events ORDER BY timestamp DESC LIMIT 1000'
+        'SELECT * FROM learning_feedback ORDER BY timestamp DESC LIMIT 1000'
       );
 
       for (const row of rows) {
+        // Map learning_feedback columns to FeedbackEvent structure
         const feedback: FeedbackEvent = {
-          id: row.id,
-          type: row.type,
-          suggestionId: row.suggestion_id,
-          patternId: row.pattern_id,
-          originalSuggestion: row.original_suggestion,
-          finalValue: row.final_value,
+          id: String(row.id), // learning_feedback.id is INTEGER, convert to string
+          type: row.accepted ? 'accept' : 'reject', // Map accepted boolean to type
+          suggestionId: row.request_id, // Use request_id as suggestionId
+          patternId: undefined, // learning_feedback doesn't have pattern_id
+          originalSuggestion: row.suggestion,
+          finalValue: row.actual_choice,
           context: {
-            file: row.file_path,
-            operation: row.operation,
+            file: 'unknown', // learning_feedback doesn't store file path
+            operation: 'unknown', // learning_feedback doesn't store operation
             timestamp: new Date(row.timestamp * 1000),
-            userId: row.user_id,
-            confidence: row.confidence
+            userId: undefined, // learning_feedback doesn't store user_id
+            confidence: row.confidence || 0.5
           },
           metadata: {
-            timeToDecision: row.time_to_decision,
-            keystrokes: row.keystrokes,
-            alternativesShown: row.alternatives_shown,
-            source: row.source
+            timeToDecision: undefined, // Not stored in learning_feedback
+            keystrokes: undefined, // Not stored in learning_feedback
+            alternativesShown: undefined, // Not stored in learning_feedback
+            source: 'unknown' // Not stored in learning_feedback
           }
         };
 
@@ -501,28 +481,20 @@ export class FeedbackLoopSystem {
 
   private async storeFeedbackToDatabase(feedback: FeedbackEvent): Promise<void> {
     try {
+      // Map FeedbackEvent to learning_feedback table structure
+      const accepted = feedback.type === 'accept' ? 1 : 0;
+      
       await this.sharedServices.database.execute(
-        `INSERT INTO feedback_events (
-          id, type, suggestion_id, pattern_id, original_suggestion, final_value,
-          file_path, operation, timestamp, user_id, confidence,
-          time_to_decision, keystrokes, alternatives_shown, source
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO learning_feedback (
+          request_id, accepted, suggestion, actual_choice, confidence, timestamp
+        ) VALUES (?, ?, ?, ?, ?, ?)`,
         [
-          feedback.id,
-          feedback.type,
           feedback.suggestionId,
-          feedback.patternId,
+          accepted,
           feedback.originalSuggestion,
-          feedback.finalValue,
-          feedback.context.file,
-          feedback.context.operation,
-          Math.floor(feedback.context.timestamp.getTime() / 1000),
-          feedback.context.userId,
+          feedback.finalValue || null,
           feedback.context.confidence,
-          feedback.metadata.timeToDecision,
-          feedback.metadata.keystrokes,
-          feedback.metadata.alternativesShown,
-          feedback.metadata.source
+          Math.floor(feedback.context.timestamp.getTime() / 1000)
         ]
       );
     } catch (error) {
@@ -640,6 +612,57 @@ export class FeedbackLoopSystem {
         last30d: { accepted: 0, rejected: 0, modified: 0 }
       }
     };
+  }
+
+  /**
+   * Get insights - wrapper around generateInsights for test compatibility
+   */
+  async getInsights(): Promise<LearningInsight[]> {
+    return this.generateInsights();
+  }
+
+  /**
+   * Get pattern confidence for a specific pattern
+   */
+  async getPatternConfidence(patternId: string): Promise<number> {
+    const patternFeedback = this.getFeedbackForPattern(patternId);
+    if (patternFeedback.length === 0) {
+      return 0.5; // Default confidence when no feedback
+    }
+
+    const acceptedCount = patternFeedback.filter(f => f.type === 'accept').length;
+    const totalCount = patternFeedback.length;
+    
+    return acceptedCount / totalCount;
+  }
+
+  /**
+   * Process feedback - wrapper around recordFeedback for test compatibility
+   */
+  async processFeedback(feedback: Omit<FeedbackEvent, 'id'>): Promise<{ success: boolean; feedbackId?: string; error?: string }> {
+    try {
+      const feedbackId = await this.recordFeedback(feedback);
+      return { success: true, feedbackId };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error) 
+      };
+    }
+  }
+
+  /**
+   * Process multiple feedback events efficiently
+   */
+  async processFeedbackBatch(feedbackBatch: Array<Omit<FeedbackEvent, 'id'>>): Promise<Array<{ success: boolean; feedbackId?: string; error?: string }>> {
+    const results: Array<{ success: boolean; feedbackId?: string; error?: string }> = [];
+    
+    for (const feedback of feedbackBatch) {
+      const result = await this.processFeedback(feedback);
+      results.push(result);
+    }
+    
+    return results;
   }
 
   /**

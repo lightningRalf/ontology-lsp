@@ -1387,6 +1387,21 @@ export class TeamKnowledgeSystem {
   }
 
   /**
+   * Register member - wrapper around registerTeamMember for test compatibility
+   */
+  async registerMember(member: Omit<TeamMember, 'stats'>): Promise<{ success: boolean; memberId?: string; error?: string }> {
+    try {
+      const memberId = await this.registerTeamMember(member);
+      return { success: true, memberId };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error) 
+      };
+    }
+  }
+
+  /**
    * Get diagnostic information for debugging
    */
   getDiagnostics(): Record<string, any> {

@@ -9,6 +9,7 @@ import { describe, expect, test, beforeAll, afterAll } from "bun:test";
 import { CodeAnalyzer } from "../src/core/unified-analyzer.js";
 import { LayerManager } from "../src/core/layer-manager.js";
 import { SharedServices } from "../src/core/services/index.js";
+import { AnalyzerFactory } from "../src/core/analyzer-factory.js";
 import {
   FindDefinitionRequest,
   FindReferencesRequest,
@@ -106,19 +107,8 @@ const createPerformanceTestContext = async (): Promise<PerformanceTestContext> =
     }
   };
 
-  const sharedServices = new SharedServices(config);
-  await sharedServices.initialize();
-
-  const layerManager = new LayerManager(config, sharedServices.eventBus);
-  await layerManager.initialize();
-
-  const codeAnalyzer = new CodeAnalyzer(
-    layerManager,
-    sharedServices,
-    config,
-    sharedServices.eventBus
-  );
-  await codeAnalyzer.initialize();
+  // Use the proper analyzer factory to ensure layers are registered
+  const { analyzer: codeAnalyzer, layerManager, sharedServices } = await AnalyzerFactory.createTestAnalyzer();
 
   return { codeAnalyzer, layerManager, sharedServices, config };
 };

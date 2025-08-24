@@ -1114,6 +1114,21 @@ export class CodeEvolutionTracker {
   }
 
   /**
+   * Track change - wrapper around recordEvolutionEvent for test compatibility
+   */
+  async trackChange(event: Omit<EvolutionEvent, 'id'>): Promise<{ success: boolean; eventId?: string; error?: string }> {
+    try {
+      const eventId = await this.recordEvolutionEvent(event);
+      return { success: true, eventId };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error) 
+      };
+    }
+  }
+
+  /**
    * Get diagnostic information for debugging
    */
   getDiagnostics(): Record<string, any> {

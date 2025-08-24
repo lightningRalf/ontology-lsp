@@ -164,17 +164,18 @@
   },
   "active": "b50f4ac68bdf0f49",
   "lastOpenFiles": [
-    "NEXT_STEPS.md.tmp.113273.1756074763270",
-    "NEXT_STEPS.md.tmp.113273.1756074754395",
-    "docs/TROUBLESHOOTING_QUICK_REFERENCE.md.tmp.113273.1756074538886",
-    "PROJECT_STATUS.md.tmp.113273.1756074494896",
-    "CLAUDE.md.tmp.113273.1756074420827",
-    "CLAUDE.md.tmp.113273.1756074405272",
-    "justfile.tmp.113273.1756074187856",
-    "justfile.tmp.113273.1756074130492",
-    "justfile.tmp.113273.1756074102617",
-    "justfile.tmp.113273.1756074093455",
-    "justfile.tmp.113273.1756073563081",
+    "NEXT_STEPS.md.tmp.155877.1756078404991",
+    "NEXT_STEPS.md.tmp.155877.1756078391719",
+    "NEXT_STEPS.md.tmp.155877.1756078376472",
+    "NEXT_STEPS.md.tmp.155877.1756078369353",
+    "PROJECT_STATUS.md.tmp.155877.1756078268183",
+    "PROJECT_STATUS.md.tmp.155877.1756078210915",
+    "PROJECT_STATUS.md.tmp.155877.1756078154110",
+    "temp-benchmark-files/file99.txt",
+    "temp-benchmark-files/file98.txt",
+    "temp-benchmark-files/file97.txt",
+    "temp-benchmark-files/file96.txt",
+    "test-results/integration-test-summary.md",
     "docs/TROUBLESHOOTING_QUICK_REFERENCE.md",
     "docs/TROUBLESHOOTING.md",
     "web-ui/README.md",
@@ -198,7 +199,6 @@
     "node_modules/http-errors/HISTORY.md",
     "node_modules/bytes/Readme.md",
     "node_modules/bytes/History.md",
-    "node_modules/zod/README.md",
-    "node_modules/raw-body/SECURITY.md"
+    "node_modules/zod/README.md"
   ]
 }
