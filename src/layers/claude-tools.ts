@@ -1,4 +1,4 @@
-// Claude Tools Layer - Integration with Claude Code's native Grep, Glob, LS tools
+// Claude Tools Layer - Integration with enhanced search tools (independent of Claude CLI)
 import { 
     Layer, SearchQuery, EnhancedMatches, Match, SearchContext 
 } from '../types/core';
@@ -9,53 +9,108 @@ import {
     ClaudeToolError, ClaudeToolsLayerConfig
 } from '../types/claude-tools';
 import * as path from 'path';
+import { 
+    EnhancedSearchTools, 
+    EnhancedGrepParams,
+    EnhancedGlobParams, 
+    EnhancedLSParams 
+} from './enhanced-search-tools';
 
-// Import actual implementations instead of declaring them
-import { execSync } from 'child_process';
-import * as fs from 'fs';
-import { glob as globLib } from 'glob';
+// Create enhanced search tools instance with optimized config
+const searchTools = new EnhancedSearchTools({
+    grep: {
+        enableCache: true,
+        useRipgrep: true,
+        fallbackToNodeGrep: true,
+        timeout: 10000, // 10 seconds
+        maxFileSize: 10 * 1024 * 1024 // 10MB
+    },
+    glob: {
+        enableCache: true,
+        timeout: 5000, // 5 seconds
+        maxFiles: 5000,
+        respectGitignore: true
+    },
+    ls: {
+        enableCache: true,
+        timeout: 3000, // 3 seconds
+        maxEntries: 1000
+    }
+});
 
-// Implement Claude Code tool replacements
+// Wrapper functions to maintain compatibility with existing code
 const Grep = async (params: ClaudeGrepParams): Promise<ClaudeGrepResult[] | string[]> => {
     try {
-        const cmd = `rg "${params.pattern}" ${params.path || '.'} --json ${params['-i'] ? '-i' : ''} ${params['-n'] ? '-n' : ''} ${params.type ? `--type ${params.type}` : ''}`;
-        const result = execSync(cmd, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }).trim();
-        return result.split('\n').filter(Boolean).map(line => {
-            try {
-                return JSON.parse(line);
-            } catch {
-                return line;
-            }
-        });
-    } catch {
+        const enhancedParams: EnhancedGrepParams = {
+            pattern: params.pattern,
+            path: params.path,
+            outputMode: params.output_mode || 'content',
+            type: params.type,
+            caseInsensitive: params['-i'],
+            lineNumbers: params['-n'],
+            contextBefore: params['-B'],
+            contextAfter: params['-A'],
+            contextAround: params['-C'],
+            multiline: params.multiline,
+            headLimit: params.head_limit
+        };
+        
+        const results = await searchTools.grep.search(enhancedParams);
+        
+        // Convert to Claude-compatible format
+        return results.map(result => ({
+            file: result.file,
+            line: result.line,
+            column: result.column,
+            text: result.text,
+            match: result.match,
+            context: result.context
+        }));
+    } catch (error) {
+        console.warn('Enhanced grep failed, returning empty results:', error);
         return [];
     }
 };
 
 const Glob = async (params: ClaudeGlobParams): Promise<ClaudeGlobResult> => {
     try {
-        const files = await globLib(params.pattern, { 
-            cwd: params.path || process.cwd(),
-            ignore: ['node_modules/**', '.git/**']
-        });
-        return { files };
-    } catch {
-        return { files: [] };
+        const enhancedParams: EnhancedGlobParams = {
+            pattern: params.pattern,
+            path: params.path,
+            sortByModified: true, // Enhanced feature
+            ignorePatterns: ['node_modules/**', '.git/**', '**/*.tmp']
+        };
+        
+        const result = await searchTools.glob.search(enhancedParams);
+        return result.files;
+    } catch (error) {
+        console.warn('Enhanced glob failed, returning empty results:', error);
+        return [];
     }
 };
 
 const LS = async (params: ClaudeLSParams): Promise<ClaudeLSResult> => {
     try {
-        const entries = fs.readdirSync(params.path, { withFileTypes: true });
-        return {
-            entries: entries.map(e => ({
-                name: e.name,
-                type: e.isDirectory() ? 'directory' : 'file',
-                path: path.join(params.path, e.name)
-            }))
+        const enhancedParams: EnhancedLSParams = {
+            path: params.path,
+            ignorePatterns: params.ignore,
+            includeMetadata: true, // Enhanced feature
+            sortBy: 'name'
         };
-    } catch {
-        return { entries: [] };
+        
+        const result = await searchTools.ls.list(enhancedParams);
+        
+        // Convert to Claude-compatible format
+        return result.entries.map(entry => ({
+            name: entry.name,
+            path: entry.path,
+            type: entry.type,
+            size: entry.size,
+            modified: entry.modified
+        }));
+    } catch (error) {
+        console.warn('Enhanced LS failed, returning empty results:', error);
+        return [];
     }
 };
 
@@ -66,6 +121,12 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
     private cache = new Map<string, { result: EnhancedMatches; timestamp: number }>();
     private bloomFilter = new Set<string>();
     private frequencyMap = new Map<string, number>();
+    private performanceMetrics = {
+        searches: 0,
+        cacheHits: 0,
+        errors: 0,
+        avgResponseTime: 0
+    };
     
     private getErrorMessage(error: unknown): string {
         if (error instanceof Error) {
@@ -79,10 +140,12 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
     async process(query: SearchQuery): Promise<EnhancedMatches> {
         const startTime = Date.now();
         const cacheKey = this.getCacheKey(query);
+        this.performanceMetrics.searches++;
         
         // Check cache first
         const cached = this.getFromCache(cacheKey);
         if (cached) {
+            this.performanceMetrics.cacheHits++;
             return cached;
         }
         
@@ -93,7 +156,9 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 fuzzy: [],
                 conceptual: [],
                 files: new Set(),
-                searchTime: Date.now() - startTime
+                searchTime: Date.now() - startTime,
+                toolsUsed: ['bloomFilter'],
+                confidence: 0.0
             };
         }
         
@@ -102,28 +167,46 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             fuzzy: [],
             conceptual: [],
             files: new Set<string>(),
-            searchTime: 0
+            searchTime: 0,
+            toolsUsed: ['enhanced-grep', 'enhanced-glob', 'enhanced-ls'],
+            confidence: 0.0
         };
         
         try {
-            // Run all search strategies in parallel
-            await Promise.allSettled([
+            // Run all search strategies in parallel with enhanced tools
+            const searchResults = await Promise.allSettled([
                 this.searchWithGrep(query, matches),
                 this.searchWithGlob(query, matches),
                 this.analyzeWithLS(query, matches)
             ]);
             
+            // Log any search failures for debugging
+            searchResults.forEach((result, index) => {
+                if (result.status === 'rejected') {
+                    const toolName = ['grep', 'glob', 'ls'][index];
+                    console.warn(`Enhanced ${toolName} search failed:`, result.reason);
+                }
+            });
+            
             matches.searchTime = Date.now() - startTime;
+            
+            // Calculate overall confidence based on results
+            const totalMatches = matches.exact.length + matches.fuzzy.length + matches.conceptual.length;
+            matches.confidence = totalMatches > 0 ? 
+                (matches.exact.length * 1.0 + matches.fuzzy.length * 0.8 + matches.conceptual.length * 0.6) / totalMatches :
+                0.0;
             
             // Update caches and statistics
             this.updateCache(cacheKey, matches);
             this.updateStatistics(query, matches);
+            this.updatePerformanceMetrics(Date.now() - startTime);
             
             return matches;
             
         } catch (error) {
+            this.performanceMetrics.errors++;
             throw new ClaudeToolError(
-                `Claude tools search failed: ${this.getErrorMessage(error)}`,
+                `Enhanced search tools failed: ${this.getErrorMessage(error)}`,
                 'grep',
                 query,
                 error as Error
@@ -642,5 +725,33 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 }
             );
         });
+    }
+    
+    private updatePerformanceMetrics(responseTime: number): void {
+        const totalTime = this.performanceMetrics.avgResponseTime * (this.performanceMetrics.searches - 1) + responseTime;
+        this.performanceMetrics.avgResponseTime = totalTime / this.performanceMetrics.searches;
+    }
+    
+    // Get performance metrics and tool health
+    getMetrics() {
+        return {
+            layer: this.performanceMetrics,
+            tools: searchTools.getMetrics(),
+            cacheStats: {
+                size: this.cache.size,
+                bloomFilterSize: this.bloomFilter.size,
+                frequencyMapSize: this.frequencyMap.size
+            }
+        };
+    }
+    
+    // Health check for enhanced search tools
+    async healthCheck(): Promise<boolean> {
+        try {
+            const health = await searchTools.healthCheck();
+            return health.grep && health.glob && health.ls;
+        } catch {
+            return false;
+        }
     }
 }

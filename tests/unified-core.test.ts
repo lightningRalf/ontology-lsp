@@ -9,7 +9,7 @@ import { describe, expect, test, beforeAll, afterAll, beforeEach } from "bun:tes
 import { CodeAnalyzer } from "../src/core/unified-analyzer.js";
 import { LayerManager } from "../src/core/layer-manager.js";
 import { SharedServices } from "../src/core/services/index.js";
-import { createTestConfig, registerMockLayers } from "./test-helpers.js";
+import { createTestConfig, registerRealLayers } from "./test-helpers.js";
 import {
   FindDefinitionRequest,
   FindReferencesRequest,
@@ -42,8 +42,8 @@ const createTestContext = async (): Promise<TestContext> => {
   const layerManager = new LayerManager(config, sharedServices.eventBus);
   await layerManager.initialize();
 
-  // Register mock layers for testing
-  registerMockLayers(layerManager);
+  // Register real layers for testing
+  await registerRealLayers(layerManager, config);
 
   // Create unified analyzer
   const codeAnalyzer = new CodeAnalyzer(
@@ -399,8 +399,8 @@ describe("Unified Core Architecture", () => {
       const faultyLayerManager = new LayerManager(faultyConfig, faultyServices.eventBus);
       await faultyLayerManager.initialize();
 
-      // Register mock layers with delay to trigger timeout
-      registerMockLayers(faultyLayerManager, { delayMs: 10 });
+      // Register real layers for faulty layer manager  
+      await registerRealLayers(faultyLayerManager, faultyConfig);
 
       const faultyAnalyzer = new CodeAnalyzer(
         faultyLayerManager,
@@ -448,8 +448,8 @@ describe("Unified Core Architecture", () => {
       const testLayerManager = new LayerManager(context.config, testServices.eventBus);
       await testLayerManager.initialize();
 
-      // Register mock layers for test services
-      registerMockLayers(testLayerManager);
+      // Register real layers for test services
+      await registerRealLayers(testLayerManager, context.config);
 
       const testAnalyzer = new CodeAnalyzer(
         testLayerManager,
@@ -617,8 +617,8 @@ describe("Unified Core Architecture", () => {
       const partialLayerManager = new LayerManager(partialConfig, partialServices.eventBus);
       await partialLayerManager.initialize();
 
-      // Register mock layers for partial test (only enabled ones will be used)
-      registerMockLayers(partialLayerManager);
+      // Register real layers for partial test (only enabled ones will be used)
+      await registerRealLayers(partialLayerManager, partialConfig);
 
       const partialAnalyzer = new CodeAnalyzer(
         partialLayerManager,

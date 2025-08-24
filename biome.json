@@ -1,8 +1,5 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.2.0/schema.json",
-  "organizeImports": {
-    "enabled": true
-  },
   "linter": {
     "enabled": true,
     "rules": {
@@ -12,7 +9,6 @@
         "useOptionalChain": "warn"
       },
       "style": {
-        "noVar": "error",
         "useConst": "error",
         "useTemplate": "warn"
       },
@@ -40,14 +36,6 @@
     }
   },
   "files": {
-    "ignore": [
-      "node_modules",
-      "dist",
-      "out",
-      ".vscode-test",
-      "coverage",
-      "*.min.js",
-      "*.d.ts"
-    ]
+    "includes": ["src/**/*", "tests/**/*"]
   }
 }

@@ -276,104 +276,152 @@ export function isBunRuntime(): boolean {
 }
 
 /**
- * Create mock layers for testing with proper interface implementation
+ * Create real layer implementations for testing using the actual layer classes
  */
-export function createMockLayers(options: { 
-  delayMs?: number;
-  shouldError?: boolean;
-} = {}) {
-  const { delayMs = 0, shouldError = false } = options;
+export async function createRealLayers(config: any): Promise<any[]> {
+  const { ClaudeToolsLayer } = await import('../src/layers/claude-tools.js');
+  const { TreeSitterLayer } = await import('../src/layers/tree-sitter.js');
   
-  return [
-    {
-      name: 'layer1',
-      targetLatency: 5,
-      async process(request: any): Promise<any> {
-        if (delayMs > 0) {
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-        }
-        if (shouldError) {
-          throw new Error('Mock layer 1 error');
-        }
-        return { data: [], fromLayer: 'layer1' };
-      },
-      async dispose(): Promise<void> {},
-      getDiagnostics(): any { return { name: 'layer1', active: true }; },
-      isHealthy(): boolean { return true; }
+  // Create Claude Tools Layer (Layer 1) configuration
+  const claudeToolsConfig = {
+    grep: {
+      defaultTimeout: config.layers.layer1.timeout || 50,
+      maxResults: 100,
+      caseSensitive: false,
+      includeContext: true,
+      contextLines: 2
     },
-    {
-      name: 'layer2', 
-      targetLatency: 50,
-      async process(request: any): Promise<any> {
-        if (delayMs > 0) {
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-        }
-        if (shouldError) {
-          throw new Error('Mock layer 2 error');
-        }
-        return { data: [], fromLayer: 'layer2' };
-      },
-      async dispose(): Promise<void> {},
-      getDiagnostics(): any { return { name: 'layer2', active: true }; },
-      isHealthy(): boolean { return true; }
+    glob: {
+      defaultTimeout: config.layers.layer1.timeout || 50,
+      maxFiles: 50,
+      ignorePatterns: ['node_modules/**', '.git/**', 'dist/**', '*.log']
     },
-    {
+    ls: {
+      defaultTimeout: config.layers.layer1.timeout || 50,
+      maxDepth: 3,
+      followSymlinks: false,
+      includeDotfiles: false
+    },
+    optimization: {
+      bloomFilter: true,
+      frequencyCache: true,
+      recentSearches: true,
+      negativeLookup: true
+    },
+    caching: {
+      enabled: true,
+      ttl: 300, // 5 minutes
+      maxEntries: 1000
+    }
+  };
+
+  // Create Tree-sitter Layer (Layer 2) configuration
+  const treeSitterConfig = {
+    languages: ['typescript', 'javascript', 'python'],
+    maxFileSize: '1MB',
+    cacheSize: 100,
+    timeout: config.layers.layer2.timeout || 100
+  };
+
+  const layers = [];
+
+  // Layer 1: Claude Tools Layer (Fast search)
+  if (config.layers.layer1.enabled) {
+    const layer1 = new ClaudeToolsLayer(claudeToolsConfig);
+    layer1.name = 'layer1';
+    
+    // Add missing methods for layer manager compatibility
+    if (!layer1.isHealthy) {
+      layer1.isHealthy = () => true;
+    }
+    if (!layer1.dispose) {
+      layer1.dispose = async () => {};
+    }
+    if (!layer1.getDiagnostics) {
+      layer1.getDiagnostics = () => ({ name: 'layer1', active: true });
+    }
+    // Set targetLatency for layer manager
+    layer1.targetLatency = 5; // 5ms target for fast search
+    
+    layers.push(layer1);
+  }
+
+  // Layer 2: Tree-sitter Layer (AST analysis)  
+  if (config.layers.layer2.enabled) {
+    const layer2 = new TreeSitterLayer(treeSitterConfig);
+    layer2.name = 'layer2';
+    
+    // Add missing methods for layer manager compatibility
+    if (!layer2.isHealthy) {
+      layer2.isHealthy = () => true;
+    }
+    if (!layer2.dispose) {
+      layer2.dispose = async () => {};
+    }
+    if (!layer2.getDiagnostics) {
+      layer2.getDiagnostics = () => ({ name: 'layer2', active: true });
+    }
+    // Set targetLatency for layer manager
+    layer2.targetLatency = 50; // 50ms target for AST analysis
+    
+    layers.push(layer2);
+  }
+
+  // For now, we'll create placeholder layers for 3, 4, 5 until those implementations exist
+  if (config.layers.layer3.enabled) {
+    layers.push({
       name: 'layer3',
-      targetLatency: 10,
-      async process(request: any): Promise<any> {
-        if (delayMs > 0) {
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-        }
-        if (shouldError) {
-          throw new Error('Mock layer 3 error');
-        }
-        return { data: [], fromLayer: 'layer3' };
+      timeout: config.layers.layer3.timeout || 50,
+      targetLatency: 10, // 10ms target for ontology concepts
+      async process(query: any): Promise<any> {
+        // Stub implementation - would use OntologyEngine
+        return { data: [], searchTime: 1 };
       },
       async dispose(): Promise<void> {},
       getDiagnostics(): any { return { name: 'layer3', active: true }; },
       isHealthy(): boolean { return true; }
-    },
-    {
+    });
+  }
+
+  if (config.layers.layer4.enabled) {
+    layers.push({
       name: 'layer4',
-      targetLatency: 10,
-      async process(request: any): Promise<any> {
-        if (delayMs > 0) {
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-        }
-        if (shouldError) {
-          throw new Error('Mock layer 4 error');
-        }
-        return { data: [], fromLayer: 'layer4' };
+      timeout: config.layers.layer4.timeout || 50,
+      targetLatency: 10, // 10ms target for pattern mining
+      async process(query: any): Promise<any> {
+        // Stub implementation - would use PatternLearner
+        return { data: [], searchTime: 1 };
       },
       async dispose(): Promise<void> {},
       getDiagnostics(): any { return { name: 'layer4', active: true }; },
       isHealthy(): boolean { return true; }
-    },
-    {
+    });
+  }
+
+  if (config.layers.layer5.enabled) {
+    layers.push({
       name: 'layer5',
-      targetLatency: 20,
-      async process(request: any): Promise<any> {
-        if (delayMs > 0) {
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-        }
-        if (shouldError) {
-          throw new Error('Mock layer 5 error');
-        }
-        return { data: [], fromLayer: 'layer5' };
+      timeout: config.layers.layer5.timeout || 100,
+      targetLatency: 20, // 20ms target for knowledge propagation
+      async process(query: any): Promise<any> {
+        // Stub implementation - would use KnowledgeSpreader
+        return { data: [], searchTime: 1 };
       },
       async dispose(): Promise<void> {},
       getDiagnostics(): any { return { name: 'layer5', active: true }; },
       isHealthy(): boolean { return true; }
-    }
-  ];
+    });
+  }
+
+  return layers;
 }
 
 /**
- * Register mock layers with a layer manager
+ * Register real layers with a layer manager
  */
-export function registerMockLayers(layerManager: any, options?: Parameters<typeof createMockLayers>[0]): void {
-  const mockLayers = createMockLayers(options);
-  mockLayers.forEach(layer => {
+export async function registerRealLayers(layerManager: any, config: any): Promise<void> {
+  const realLayers = await createRealLayers(config);
+  realLayers.forEach(layer => {
     layerManager.registerLayer(layer);
   });
 }

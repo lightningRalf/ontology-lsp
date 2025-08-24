@@ -71,6 +71,14 @@ export interface EnhancedMatches {
     conceptual: Match[];
     files: Set<string>;
     searchTime: number;
+    toolsUsed?: string[];
+    confidence?: number;
+    metadata?: {
+        totalFiles?: number;
+        skippedFiles?: number;
+        cacheHit?: boolean;
+        errors?: string[];
+    };
 }
 
 // Ontology types

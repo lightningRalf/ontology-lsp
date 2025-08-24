@@ -750,30 +750,123 @@ export class CodeAnalyzer {
   // Private helper methods for layer execution
   
   private async executeLayer1Search(request: FindDefinitionRequest): Promise<Definition[]> {
-    // Implementation would use ClaudeToolsLayer for fast search
-    // This is a stub for the architecture with mock test data
-    return [{
-      uri: request.uri,
-      range: { start: { line: 5, character: 10 }, end: { line: 5, character: 25 } },
-      kind: 'function' as DefinitionKind,
-      name: request.identifier,
-      source: 'exact' as const,
-      confidence: 0.9,
-      layer: 'layer1'
-    }];
+    // Use the real ClaudeToolsLayer for fast search
+    const layer = this.layerManager.getLayer('layer1');
+    if (!layer) {
+      return [];
+    }
+
+    try {
+      // Create search query for ClaudeToolsLayer
+      const searchQuery = {
+        identifier: request.identifier,
+        searchPath: this.extractDirectoryFromUri(request.uri),
+        fileTypes: this.getFileTypesFromUri(request.uri),
+        caseSensitive: false,
+        includeTests: false
+      };
+
+      // Execute layer 1 search
+      const result = await layer.process(searchQuery);
+      
+      // Convert ClaudeToolsLayer result to Definition[]
+      const definitions: Definition[] = [];
+      
+      // Process exact matches
+      if (result.exact) {
+        for (const match of result.exact) {
+          definitions.push({
+            uri: this.pathToFileUri(match.file),
+            range: {
+              start: { line: match.line - 1, character: match.column },
+              end: { line: match.line - 1, character: match.column + match.length }
+            },
+            kind: this.inferDefinitionKind(match.text),
+            name: request.identifier,
+            source: 'exact' as const,
+            confidence: match.confidence,
+            layer: 'layer1'
+          });
+        }
+      }
+
+      // Process fuzzy matches
+      if (result.fuzzy) {
+        for (const match of result.fuzzy) {
+          definitions.push({
+            uri: this.pathToFileUri(match.file),
+            range: {
+              start: { line: match.line - 1, character: match.column },
+              end: { line: match.line - 1, character: match.column + match.length }
+            },
+            kind: this.inferDefinitionKind(match.text),
+            name: request.identifier,
+            source: 'fuzzy' as const,
+            confidence: match.confidence,
+            layer: 'layer1'
+          });
+        }
+      }
+
+      return definitions;
+
+    } catch (error) {
+      console.warn('Layer 1 search failed:', error);
+      return [];
+    }
   }
   
   private async executeLayer2Analysis(request: FindDefinitionRequest, existing: Definition[]): Promise<Definition[]> {
-    // Implementation would use TreeSitterLayer for AST analysis
-    return [{
-      uri: request.uri,
-      range: { start: { line: 8, character: 15 }, end: { line: 8, character: 30 } },
-      kind: 'function' as DefinitionKind,
-      name: request.identifier,
-      source: 'fuzzy' as const,
-      confidence: 0.8,
-      layer: 'layer2'
-    }];
+    // Use the real TreeSitterLayer for AST analysis
+    const layer = this.layerManager.getLayer('layer2');
+    if (!layer) {
+      return [];
+    }
+
+    try {
+      // Convert existing definitions to EnhancedMatches format for TreeSitter
+      const enhancedMatches = {
+        exact: existing.filter(d => d.source === 'exact').map(this.definitionToMatch),
+        fuzzy: existing.filter(d => d.source === 'fuzzy').map(this.definitionToMatch),
+        conceptual: existing.filter(d => d.source === 'conceptual').map(this.definitionToMatch),
+        files: new Set(existing.map(d => this.fileUriToPath(d.uri))),
+        searchTime: 0
+      };
+
+      // Execute tree-sitter analysis
+      const result = await layer.process(enhancedMatches);
+      
+      // Convert TreeSitter result to Definition[]
+      const definitions: Definition[] = [];
+      
+      // Process AST nodes
+      if (result.nodes) {
+        for (const node of result.nodes) {
+          // Filter nodes that match our identifier
+          if (node.text.includes(request.identifier) || 
+              node.metadata?.functionName === request.identifier ||
+              node.metadata?.className === request.identifier) {
+            
+            definitions.push({
+              uri: this.pathToFileUri(this.extractFilePathFromNodeId(node.id)),
+              range: node.range,
+              kind: this.inferDefinitionKindFromNodeType(node.type),
+              name: request.identifier,
+              source: 'fuzzy' as const,
+              confidence: 0.8,
+              layer: 'layer2',
+              metadata: node.metadata
+            });
+          }
+        }
+      }
+
+      return definitions;
+
+    } catch (error) {
+      console.warn('Layer 2 AST analysis failed:', error);
+      return [];
+    }
   }
   
   private async executeLayer3Concepts(request: FindDefinitionRequest): Promise<Definition[]> {
@@ -801,15 +894,70 @@ export class CodeAnalyzer {
   
   // Reference search implementations
   private async executeLayer1ReferenceSearch(request: FindReferencesRequest): Promise<Reference[]> {
-    return [{
-      uri: request.uri || 'file:///test/example.ts',
-      range: { start: { line: 10, character: 5 }, end: { line: 10, character: 20 } },
-      kind: 'usage' as ReferenceKind,
-      name: request.identifier,
-      source: 'exact' as const,
-      confidence: 0.9,
-      layer: 'layer1'
-    }];
+    // Use the real ClaudeToolsLayer for reference search
+    const layer = this.layerManager.getLayer('layer1');
+    if (!layer) {
+      return [];
+    }
+
+    try {
+      // Create search query for ClaudeToolsLayer
+      const searchQuery = {
+        identifier: request.identifier,
+        searchPath: request.uri ? this.extractDirectoryFromUri(request.uri) : '.',
+        fileTypes: request.uri ? this.getFileTypesFromUri(request.uri) : ['typescript'],
+        caseSensitive: false,
+        includeTests: true // Include tests for reference search
+      };
+
+      // Execute layer 1 search
+      const result = await layer.process(searchQuery);
+      
+      // Convert ClaudeToolsLayer result to Reference[]
+      const references: Reference[] = [];
+      
+      // Process exact matches as references
+      if (result.exact) {
+        for (const match of result.exact) {
+          references.push({
+            uri: this.pathToFileUri(match.file),
+            range: {
+              start: { line: match.line - 1, character: match.column },
+              end: { line: match.line - 1, character: match.column + match.length }
+            },
+            kind: 'usage' as ReferenceKind,
+            name: request.identifier,
+            source: 'exact' as const,
+            confidence: match.confidence,
+            layer: 'layer1'
+          });
+        }
+      }
+
+      // Process fuzzy matches as references
+      if (result.fuzzy) {
+        for (const match of result.fuzzy) {
+          references.push({
+            uri: this.pathToFileUri(match.file),
+            range: {
+              start: { line: match.line - 1, character: match.column },
+              end: { line: match.line - 1, character: match.column + match.length }
+            },
+            kind: 'usage' as ReferenceKind,
+            name: request.identifier,
+            source: 'fuzzy' as const,
+            confidence: match.confidence,
+            layer: 'layer1'
+          });
+        }
+      }
+
+      return references;
+
+    } catch (error) {
+      console.warn('Layer 1 reference search failed:', error);
+      return [];
+    }
   }
   
   private async executeLayer2ReferenceAnalysis(request: FindReferencesRequest, existing: Reference[]): Promise<Reference[]> {
@@ -1047,6 +1195,88 @@ export class CodeAnalyzer {
     };
   }
   
+
+  // Utility methods for layer integration
+
+  private extractDirectoryFromUri(uri: string): string {
+    const path = this.fileUriToPath(uri);
+    return path.substring(0, path.lastIndexOf('/')) || '.';
+  }
+
+  private getFileTypesFromUri(uri: string): string[] {
+    const ext = uri.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'ts':
+      case 'tsx':
+        return ['typescript'];
+      case 'js':
+      case 'jsx':
+        return ['javascript'];
+      case 'py':
+        return ['python'];
+      default:
+        return ['typescript']; // Default
+    }
+  }
+
+  private pathToFileUri(filePath: string): string {
+    // Convert file path to file:// URI
+    return filePath.startsWith('file://') ? filePath : `file://${filePath}`;
+  }
+
+  private fileUriToPath(uri: string): string {
+    // Convert file:// URI to file path
+    return uri.startsWith('file://') ? uri.substring(7) : uri;
+  }
+
+  private inferDefinitionKind(text: string): DefinitionKind {
+    if (text.includes('function ') || text.includes('async ')) {
+      return 'function';
+    } else if (text.includes('class ')) {
+      return 'class';
+    } else if (text.includes('interface ')) {
+      return 'interface';
+    } else if (text.includes('const ') || text.includes('let ') || text.includes('var ')) {
+      return 'variable';
+    } else {
+      return 'function'; // Default
+    }
+  }
+
+  private inferDefinitionKindFromNodeType(nodeType: string): DefinitionKind {
+    switch (nodeType) {
+      case 'function_declaration':
+      case 'method_definition':
+      case 'arrow_function':
+        return 'function';
+      case 'class_declaration':
+        return 'class';
+      case 'interface_declaration':
+        return 'interface';
+      case 'variable_declaration':
+        return 'variable';
+      default:
+        return 'function';
+    }
+  }
+
+  private definitionToMatch(definition: Definition): any {
+    return {
+      file: this.fileUriToPath(definition.uri),
+      line: definition.range.start.line + 1, // Convert to 1-based
+      column: definition.range.start.character,
+      text: definition.name,
+      length: definition.range.end.character - definition.range.start.character,
+      confidence: definition.confidence,
+      source: definition.source
+    };
+  }
+
+  private extractFilePathFromNodeId(nodeId: string): string {
+    // NodeId format is typically: "filePath:line:column"
+    const parts = nodeId.split(':');
+    return parts[0] || '';
+  }
 
   /**
    * Get system diagnostics and health information
