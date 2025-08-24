@@ -2,7 +2,7 @@
   "mcpServers": {
     "ontology-lsp": {
       "command": "/home/lightningralf/.bun/bin/bun",
-      "args": ["run", "/home/lightningralf/programming/ontology-lsp/mcp-ontology-server/src/stdio.ts"],
+      "args": ["run", "/home/lightningralf/programming/ontology-lsp/src/servers/mcp.ts"],
       "type": "stdio",
       "description": "Ontology-enhanced LSP with 5-layer architecture"
     },

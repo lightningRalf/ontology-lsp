@@ -164,17 +164,18 @@
   },
   "active": "b50f4ac68bdf0f49",
   "lastOpenFiles": [
-    "NEXT_STEPS.md.tmp.39415.1756045770737",
-    "NEXT_STEPS.md.tmp.39415.1756045758028",
-    "NEXT_STEPS.md.tmp.39415.1756045705027",
-    "NEXT_STEPS.md.tmp.39415.1756045691746",
-    "NEXT_STEPS.md.tmp.39415.1756045676728",
-    "NEXT_STEPS.md.tmp.39415.1756045667515",
-    "NEXT_STEPS.md.tmp.39415.1756045618559",
-    "PROJECT_STATUS.md.tmp.39415.1756045600064",
-    "PROJECT_STATUS.md.tmp.39415.1756045579725",
-    "PROJECT_STATUS.md.tmp.39415.1756045565864",
-    "PROJECT_STATUS.md.tmp.39415.1756045556145",
+    "NEXT_STEPS.md.tmp.49747.1756048607350",
+    "PROJECT_STATUS.md.tmp.49747.1756048548685",
+    "ARCHITECTURE_CLEANUP.md",
+    "ARCHITECTURE_CLEANUP.md.tmp.49747.1756048424694",
+    "Dockerfile.tmp.49747.1756048131701",
+    "claude-desktop-config.json.tmp.49747.1756048042823",
+    "package.json.tmp.49747.1756048019112",
+    "justfile.tmp.49747.1756047990574",
+    "justfile.tmp.49747.1756047928551",
+    "src/servers/cli.ts",
+    "src/servers/cli.ts.tmp.49747.1756047485573",
+    "src/servers/lsp.ts",
     "CLAUDE_SESSION_PROMPT.md",
     "node_modules/safer-buffer/Readme.md",
     "node_modules/safer-buffer/Porting-Buffer.md",
@@ -198,7 +199,6 @@
     "node_modules/raw-body/README.md",
     "node_modules/raw-body/HISTORY.md",
     "node_modules/content-type/README.md",
-    "node_modules/content-type/HISTORY.md",
-    "node_modules/@modelcontextprotocol/sdk/README.md"
+    "node_modules/content-type/HISTORY.md"
   ]
 }

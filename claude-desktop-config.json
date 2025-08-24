@@ -2,7 +2,7 @@
   "mcpServers": {
     "ontology-lsp": {
       "command": "bun",
-      "args": ["run", "/home/lightningralf/programming/ontology-lsp/adapters/mcp/index.ts"],
+      "args": ["run", "/home/lightningralf/programming/ontology-lsp/src/servers/mcp.ts"],
       "env": {
         "NODE_ENV": "development",
         "LOG_LEVEL": "debug",
@@ -10,9 +10,9 @@
         "ONTOLOGY_WORKSPACE": "/home/lightningralf/programming/ontology-lsp"
       }
     },
-    "ontology-legacy": {
+    "ontology-sse": {
       "command": "bun",
-      "args": ["run", "/home/lightningralf/programming/ontology-lsp/mcp-ontology-server/src/sse-server.ts"],
+      "args": ["run", "/home/lightningralf/programming/ontology-lsp/src/servers/mcp-sse.ts"],
       "env": {
         "MCP_SSE_HOST": "localhost",
         "MCP_SSE_PORT": "7001",

@@ -16,9 +16,9 @@ start: stop-quiet
     @echo "=================================="
     @mkdir -p .ontology/pids .ontology/logs
     @echo "Starting HTTP API Server (port 7000)..."
-    @sh -c '{{bun}} run src/api/http-server.ts > .ontology/logs/http-api.log 2>&1 & echo $$! > .ontology/pids/http-api.pid'
+    @sh -c '{{bun}} run src/servers/http.ts > .ontology/logs/http-api.log 2>&1 & echo $$! > .ontology/pids/http-api.pid'
     @echo "Starting MCP SSE Server (port 7001)..."
-    @sh -c '{{bun}} run mcp-ontology-server/src/sse-server.ts > .ontology/logs/mcp-sse.log 2>&1 & echo $$! > .ontology/pids/mcp-sse.pid'
+    @sh -c '{{bun}} run src/servers/mcp-sse.ts > .ontology/logs/mcp-sse.log 2>&1 & echo $$! > .ontology/pids/mcp-sse.pid'
     @sleep 3
     @just health
     @echo ""
@@ -185,9 +185,9 @@ dev: stop-quiet
     @{{bun}} run src/cli/analyze.ts --warm-cache 2>/dev/null || true
     
     # Start servers with hot-reload
-    @sh -c '{{bun}} run --watch src/server-new.ts > .ontology/logs/lsp.log 2>&1 & echo $$! > .ontology/pids/lsp.pid'
-    @sh -c '{{bun}} run --watch src/api/http-server-new.ts > .ontology/logs/http-api.log 2>&1 & echo $$! > .ontology/pids/http-api.pid'
-    @sh -c '{{bun}} run --watch mcp-ontology-server/src/index-new.ts > .ontology/logs/mcp-sse.log 2>&1 & echo $$! > .ontology/pids/mcp-sse.pid'
+    @sh -c '{{bun}} run --watch src/servers/lsp.ts > .ontology/logs/lsp.log 2>&1 & echo $$! > .ontology/pids/lsp.pid'
+    @sh -c '{{bun}} run --watch src/servers/http.ts > .ontology/logs/http-api.log 2>&1 & echo $$! > .ontology/pids/http-api.pid'
+    @sh -c '{{bun}} run --watch src/servers/mcp.ts > .ontology/logs/mcp-sse.log 2>&1 & echo $$! > .ontology/pids/mcp-sse.pid'
     
     @sleep 2
     @echo "🧠 Knowledge base loaded with $({{bun}} run src/cli/stats.ts --quiet 2>/dev/null | grep concepts | awk '{print $2}' || echo '0') concepts"
@@ -263,10 +263,10 @@ analyze-pr pr="":
 # Build for production
 build-prod:
     @echo "🔨 Building for production..."
-    {{bun}} build src/server-new.ts --target=bun --outdir=dist/lsp --minify
-    {{bun}} build src/api/http-server-new.ts --target=bun --outdir=dist/api --minify
-    {{bun}} build mcp-ontology-server/src/index-new.ts --target=bun --outdir=dist/mcp --minify
-    {{bun}} build src/cli/index-new.ts --target=bun --outdir=dist/cli --minify --sourcemap
+    {{bun}} build src/servers/lsp.ts --target=bun --outdir=dist/lsp --minify
+    {{bun}} build src/servers/http.ts --target=bun --outdir=dist/api --minify
+    {{bun}} build src/servers/mcp.ts --target=bun --outdir=dist/mcp --minify
+    {{bun}} build src/servers/cli.ts --target=bun --outdir=dist/cli --minify --sourcemap
 
 # Build Docker image
 docker-build: build-prod

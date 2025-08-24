@@ -29,7 +29,6 @@ WORKDIR /app
 # Copy package files for dependency installation
 COPY package.json bun.lock ./
 COPY vscode-client/package.json vscode-client/package-lock.json ./vscode-client/
-COPY mcp-ontology-server/package.json mcp-ontology-server/bun.lock ./mcp-ontology-server/
 
 # Install dependencies with frozen lockfile
 RUN bun install --frozen-lockfile --production
@@ -46,7 +45,6 @@ WORKDIR /app
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/vscode-client/node_modules ./vscode-client/node_modules
-COPY --from=deps /app/mcp-ontology-server/node_modules ./mcp-ontology-server/node_modules
 
 # Copy source code
 COPY . .
@@ -56,16 +54,16 @@ RUN bun run build:tsc
 
 # Build production bundles for all services
 RUN echo "Building LSP Server..." && \
-    bun build src/server-new.ts --target=bun --outdir=dist/lsp --minify --sourcemap && \
+    bun build src/servers/lsp.ts --target=bun --outdir=dist/lsp --minify --sourcemap && \
     \
     echo "Building HTTP API Server..." && \
-    bun build src/api/http-server-new.ts --target=bun --outdir=dist/api --minify --sourcemap && \
+    bun build src/servers/http.ts --target=bun --outdir=dist/api --minify --sourcemap && \
     \
     echo "Building MCP Server..." && \
-    bun build mcp-ontology-server/src/index-new.ts --target=bun --outdir=dist/mcp --minify --sourcemap && \
+    bun build src/servers/mcp.ts --target=bun --outdir=dist/mcp --minify --sourcemap && \
     \
     echo "Building CLI Tool..." && \
-    bun build src/cli/index-new.ts --target=bun --outdir=dist/cli --minify --sourcemap && \
+    bun build src/servers/cli.ts --target=bun --outdir=dist/cli --minify --sourcemap && \
     \
     echo "Building Adapters..." && \
     bun build src/adapters/index.ts --target=bun --outdir=dist/adapters --minify --sourcemap
@@ -151,15 +149,15 @@ mkdir -p data logs .ontology/{db,cache,logs,pids}
 
 # Start services in background with proper process management
 echo "Starting LSP Server (port 7002)..."
-bun run dist/lsp/server-new.js --port=7002 > logs/lsp.log 2>&1 &
+bun run dist/lsp/lsp.js --port=7002 > logs/lsp.log 2>&1 &
 echo $! > .ontology/pids/lsp.pid
 
 echo "Starting HTTP API Server (port 7000)..."  
-bun run dist/api/http-server-new.js --port=7000 > logs/http-api.log 2>&1 &
+bun run dist/api/http.js --port=7000 > logs/http-api.log 2>&1 &
 echo $! > .ontology/pids/http-api.pid
 
 echo "Starting MCP SSE Server (port 7001)..."
-bun run dist/mcp/index-new.js --port=7001 > logs/mcp-sse.log 2>&1 &
+bun run dist/mcp/mcp-sse.js --port=7001 > logs/mcp-sse.log 2>&1 &
 echo $! > .ontology/pids/mcp-sse.pid
 
 # Wait for services to start

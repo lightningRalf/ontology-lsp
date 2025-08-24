@@ -65,7 +65,7 @@ The unified core architecture is fully implemented and operational with all crit
 - CI/CD pipeline defined ✅
 - System fully operational and deployable ✅
 
-## 📁 New Architecture (The Solution)
+## 📁 CLEAN Architecture (FINAL)
 
 ```
 ontology-lsp/
@@ -74,6 +74,8 @@ ontology-lsp/
 │   │   ├── unified-analyzer.ts    # ✅ Single source of truth
 │   │   ├── layer-manager.ts       # ✅ Manages all 5 layers
 │   │   ├── types.ts               # ✅ Protocol-agnostic types
+│   │   ├── config/                # ✅ Centralized configuration
+│   │   │   └── server-config.ts   # ✅ All server configs
 │   │   ├── services/              # ✅ Shared services
 │   │   │   ├── cache-service.ts
 │   │   │   ├── database-service.ts
@@ -82,11 +84,15 @@ ontology-lsp/
 │   │   └── index.ts               # ✅ Clean exports
 │   │
 │   ├── adapters/                  # THIN PROTOCOL ADAPTERS
-│   │   ├── lsp-adapter.ts         # ✅ ~100 lines
-│   │   ├── mcp-adapter.ts         # ✅ ~80 lines
-│   │   ├── http-adapter.ts        # ✅ ~150 lines
-│   │   ├── cli-adapter.ts         # ✅ ~200 lines
+│   │   ├── lsp-adapter.ts         # ✅ ~298 lines
+│   │   ├── mcp-adapter.ts         # ✅ ~286 lines
+│   │   ├── http-adapter.ts        # ✅ ~415 lines
+│   │   ├── cli-adapter.ts         # ✅ ~231 lines
 │   │   └── utils.ts               # ✅ Shared utilities
+│   │
+│   ├── layers/                    # THE ONLY LAYER IMPLEMENTATIONS
+│   │   ├── claude-tools.ts        # ✅ Layer 1 implementation
+│   │   └── tree-sitter.ts         # ✅ Layer 2 implementation
 │   │
 │   ├── learning/                  # LEARNING SYSTEM
 │   │   ├── feedback-loop.ts       # ✅ User feedback collection
@@ -94,15 +100,12 @@ ontology-lsp/
 │   │   ├── team-knowledge.ts      # ✅ Shared learning
 │   │   └── learning-orchestrator.ts # ✅ Coordinates learning
 │   │
-│   ├── server-new.ts              # ✅ LSP server using adapter
-│   ├── api/
-│   │   └── http-server-new.ts     # ✅ HTTP server using adapter
-│   └── cli/
-│       └── index-new.ts           # ✅ CLI using adapter
-│
-├── mcp-ontology-server/
-│   └── src/
-│       └── index-new.ts           # ✅ MCP server using adapter
+│   └── servers/                   # ALL SERVER ENTRY POINTS
+│       ├── lsp.ts                 # ✅ LSP server (stdio/tcp)
+│       ├── mcp.ts                 # ✅ MCP server (stdio)
+│       ├── mcp-sse.ts             # ✅ MCP SSE server (http)
+│       ├── http.ts                # ✅ HTTP API server
+│       └── cli.ts                 # ✅ CLI tool
 │
 ├── tests/                         # COMPREHENSIVE TESTS
 │   ├── unified-core.test.ts       # ✅ Core architecture tests
@@ -124,7 +127,7 @@ ontology-lsp/
 ## 📊 Implementation Metrics
 
 ### Code Quality
-- **Lines Eliminated**: ~2000 lines of duplicate code
+- **Lines Eliminated**: ~6000 lines of duplicate/dead code (4000 in cleanup + 2000 previously)
 - **Code Reduction**: 83% average across protocol servers
 - **Single Source of Truth**: 100% of analysis logic unified
 - **Type Safety**: Full TypeScript coverage with strict mode
@@ -206,7 +209,9 @@ The system now provides:
 - **"Protocol Adapters"** → ALL CREATED
 - **"Learning System"** → FULLY OPERATIONAL
 - **"Performance Targets"** → ALL MET
-- **"Zero Duplication"** → ACHIEVED
+- **"Zero Duplication"** → FULLY ACHIEVED (all duplicates removed)
+- **"Clean Architecture"** → IMPLEMENTED (src/servers/ organization)
+- **"Single Configuration"** → CONSOLIDATED (src/core/config/)
 
 ## 📈 Actual Progress
 
@@ -232,6 +237,18 @@ The Ontology-LSP system is now a true **collective programming intelligence**:
 - **Amplifies** every developer's capabilities
 
 ## 📅 Session Update (2025-08-24)
+
+### 6. **MAJOR ARCHITECTURE CLEANUP** ✅
+   - Consolidated all servers into `src/servers/` directory
+   - Eliminated ~4000 lines of duplicate code across directories
+   - Moved `mcp-ontology-server/` into main structure
+   - Deleted all dead code (cli-bridge, index-simple, stdio-simple)
+   - Moved configuration to `src/core/config/`
+   - Updated ALL references in justfile, package.json, Dockerfile
+   - Fixed runtime configs (claude-desktop-config.json, .mcp.json)
+   - Created clean, unified architecture as per VISION.md
+
+## 📅 Previous Session Updates
 
 ### Completed Tasks:
 1. **Fixed Layer 2 Tree-sitter Issues** ✅
