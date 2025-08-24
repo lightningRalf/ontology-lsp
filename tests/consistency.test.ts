@@ -60,8 +60,11 @@ const createConsistencyTestContext = async (): Promise<ConsistencyTestContext> =
     },
     cache: {
       enabled: true,
-      defaultTtl: 600, // Longer cache for consistency testing
-      maxSize: 5000
+      strategy: 'memory' as const,
+      memory: {
+        maxSize: 5000 * 1024, // 5MB for consistency testing
+        ttl: 600 // 10 minutes
+      }
     },
     database: {
       path: ":memory:",
@@ -69,7 +72,17 @@ const createConsistencyTestContext = async (): Promise<ConsistencyTestContext> =
     },
     performance: {
       targetResponseTime: 100,
-      maxConcurrentRequests: 50
+      maxConcurrentRequests: 50,
+      healthCheckInterval: 30000
+    },
+    monitoring: {
+      enabled: false,
+      metricsInterval: 60000,
+      logLevel: 'error' as const,
+      tracing: {
+        enabled: false,
+        sampleRate: 0
+      }
     }
   };
 

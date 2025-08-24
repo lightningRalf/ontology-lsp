@@ -62,8 +62,11 @@ const createLearningTestContext = async (): Promise<LearningTestContext> => {
     },
     cache: {
       enabled: true,
-      defaultTtl: 300,
-      maxSize: 1000
+      strategy: 'memory' as const,
+      memory: {
+        maxSize: 1024 * 1024, // 1MB
+        ttl: 300
+      }
     },
     database: {
       path: ":memory:",
@@ -71,7 +74,17 @@ const createLearningTestContext = async (): Promise<LearningTestContext> => {
     },
     performance: {
       targetResponseTime: 100,
-      maxConcurrentRequests: 50
+      maxConcurrentRequests: 50,
+      healthCheckInterval: 30000
+    },
+    monitoring: {
+      enabled: false,
+      metricsInterval: 60000,
+      logLevel: 'error' as const,
+      tracing: {
+        enabled: false,
+        sampleRate: 0
+      }
     }
   };
 
@@ -80,32 +93,35 @@ const createLearningTestContext = async (): Promise<LearningTestContext> => {
   await sharedServices.initialize();
 
   // Initialize learning components
-  const feedbackLoop = new FeedbackLoopSystem({
-    database: sharedServices.database,
-    cache: sharedServices.cache,
+  const feedbackLoop = new FeedbackLoopSystem(
+    sharedServices, 
     eventBus,
-    confidenceThreshold: 0.5,
-    learningRate: 0.1,
-    batchSize: 10
-  });
+    {
+      minFeedbacksToLearn: 10,
+      weakPatternThreshold: 0.5,
+      strongPatternThreshold: 0.8
+    }
+  );
 
-  const evolutionTracker = new CodeEvolutionTracker({
-    database: sharedServices.database,
-    cache: sharedServices.cache,
+  const evolutionTracker = new CodeEvolutionTracker(
+    sharedServices,
     eventBus,
-    maxHistorySize: 1000,
-    analysisDepth: 5,
-    patternDetectionThreshold: 0.7
-  });
+    {
+      maxHistorySize: 1000,
+      analysisDepth: 5,
+      patternDetectionThreshold: 0.7
+    }
+  );
 
-  const teamKnowledge = new TeamKnowledgeSystem({
-    database: sharedServices.database,
-    cache: sharedServices.cache,
+  const teamKnowledge = new TeamKnowledgeSystem(
+    sharedServices,
     eventBus,
-    validationThreshold: 0.8,
-    sharingEnabled: true,
-    conflictResolutionStrategy: "vote"
-  });
+    {
+      validationThreshold: 0.8,
+      sharingEnabled: true,
+      conflictResolutionStrategy: "vote"
+    }
+  );
 
   // Initialize learning orchestrator
   const learningOrchestrator = new LearningOrchestrator(

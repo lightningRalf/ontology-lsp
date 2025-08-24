@@ -274,3 +274,106 @@ export function isTestEnvironment(): boolean {
 export function isBunRuntime(): boolean {
   return typeof Bun !== 'undefined'
 }
+
+/**
+ * Create mock layers for testing with proper interface implementation
+ */
+export function createMockLayers(options: { 
+  delayMs?: number;
+  shouldError?: boolean;
+} = {}) {
+  const { delayMs = 0, shouldError = false } = options;
+  
+  return [
+    {
+      name: 'layer1',
+      targetLatency: 5,
+      async process(request: any): Promise<any> {
+        if (delayMs > 0) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+        if (shouldError) {
+          throw new Error('Mock layer 1 error');
+        }
+        return { data: [], fromLayer: 'layer1' };
+      },
+      async dispose(): Promise<void> {},
+      getDiagnostics(): any { return { name: 'layer1', active: true }; },
+      isHealthy(): boolean { return true; }
+    },
+    {
+      name: 'layer2', 
+      targetLatency: 50,
+      async process(request: any): Promise<any> {
+        if (delayMs > 0) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+        if (shouldError) {
+          throw new Error('Mock layer 2 error');
+        }
+        return { data: [], fromLayer: 'layer2' };
+      },
+      async dispose(): Promise<void> {},
+      getDiagnostics(): any { return { name: 'layer2', active: true }; },
+      isHealthy(): boolean { return true; }
+    },
+    {
+      name: 'layer3',
+      targetLatency: 10,
+      async process(request: any): Promise<any> {
+        if (delayMs > 0) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+        if (shouldError) {
+          throw new Error('Mock layer 3 error');
+        }
+        return { data: [], fromLayer: 'layer3' };
+      },
+      async dispose(): Promise<void> {},
+      getDiagnostics(): any { return { name: 'layer3', active: true }; },
+      isHealthy(): boolean { return true; }
+    },
+    {
+      name: 'layer4',
+      targetLatency: 10,
+      async process(request: any): Promise<any> {
+        if (delayMs > 0) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+        if (shouldError) {
+          throw new Error('Mock layer 4 error');
+        }
+        return { data: [], fromLayer: 'layer4' };
+      },
+      async dispose(): Promise<void> {},
+      getDiagnostics(): any { return { name: 'layer4', active: true }; },
+      isHealthy(): boolean { return true; }
+    },
+    {
+      name: 'layer5',
+      targetLatency: 20,
+      async process(request: any): Promise<any> {
+        if (delayMs > 0) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+        if (shouldError) {
+          throw new Error('Mock layer 5 error');
+        }
+        return { data: [], fromLayer: 'layer5' };
+      },
+      async dispose(): Promise<void> {},
+      getDiagnostics(): any { return { name: 'layer5', active: true }; },
+      isHealthy(): boolean { return true; }
+    }
+  ];
+}
+
+/**
+ * Register mock layers with a layer manager
+ */
+export function registerMockLayers(layerManager: any, options?: Parameters<typeof createMockLayers>[0]): void {
+  const mockLayers = createMockLayers(options);
+  mockLayers.forEach(layer => {
+    layerManager.registerLayer(layer);
+  });
+}

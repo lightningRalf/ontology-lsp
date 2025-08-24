@@ -80,8 +80,11 @@ const createPerformanceTestContext = async (): Promise<PerformanceTestContext> =
     },
     cache: {
       enabled: true,
-      defaultTtl: 300,
-      maxSize: 10000 // Larger cache for performance testing
+      strategy: 'memory' as const,
+      memory: {
+        maxSize: 10000 * 1024, // 10MB for performance testing
+        ttl: 300 // 5 minutes
+      }
     },
     database: {
       path: ":memory:",
@@ -89,7 +92,17 @@ const createPerformanceTestContext = async (): Promise<PerformanceTestContext> =
     },
     performance: {
       targetResponseTime: 100,
-      maxConcurrentRequests: 100
+      maxConcurrentRequests: 100,
+      healthCheckInterval: 30000
+    },
+    monitoring: {
+      enabled: false,
+      metricsInterval: 60000,
+      logLevel: 'error' as const,
+      tracing: {
+        enabled: false,
+        sampleRate: 0
+      }
     }
   };
 

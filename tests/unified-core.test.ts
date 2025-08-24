@@ -9,6 +9,7 @@ import { describe, expect, test, beforeAll, afterAll, beforeEach } from "bun:tes
 import { CodeAnalyzer } from "../src/core/unified-analyzer.js";
 import { LayerManager } from "../src/core/layer-manager.js";
 import { SharedServices } from "../src/core/services/index.js";
+import { createTestConfig, registerMockLayers } from "./test-helpers.js";
 import {
   FindDefinitionRequest,
   FindReferencesRequest,
@@ -30,42 +31,8 @@ interface TestContext {
 }
 
 const createTestContext = async (): Promise<TestContext> => {
-  // Create test configuration with all layers enabled
-  const config: CoreConfig = {
-    workspaceRoot: "/test-workspace",
-    layers: {
-      layer1: { enabled: true, timeout: 50 },      // Fast search - 5ms target
-      layer2: { enabled: true, timeout: 100 },     // AST - 50ms target  
-      layer3: { enabled: true, timeout: 50 },      // Ontology - 10ms target
-      layer4: { enabled: true, timeout: 50 },      // Patterns - 10ms target
-      layer5: { enabled: true, timeout: 100 }      // Propagation - 20ms target
-    },
-    cache: {
-      enabled: true,
-      defaultTtl: 300,
-      maxSize: 1000,
-      memory: {
-        maxSize: 100 * 1024 * 1024, // 100MB
-        ttl: 300
-      },
-      redis: {
-        enabled: false
-      }
-    },
-    database: {
-      path: ":memory:",
-      maxConnections: 10
-    },
-    performance: {
-      targetResponseTime: 100,
-      maxConcurrentRequests: 50
-    },
-    monitoring: {
-      enabled: true,
-      collectMetrics: true,
-      logLevel: 'info'
-    }
-  };
+  // Create test configuration using test helpers
+  const config: CoreConfig = createTestConfig();
 
   // Initialize shared services
   const sharedServices = new SharedServices(config);
@@ -74,6 +41,9 @@ const createTestContext = async (): Promise<TestContext> => {
   // Initialize layer manager
   const layerManager = new LayerManager(config, sharedServices.eventBus);
   await layerManager.initialize();
+
+  // Register mock layers for testing
+  registerMockLayers(layerManager);
 
   // Create unified analyzer
   const codeAnalyzer = new CodeAnalyzer(
@@ -110,6 +80,11 @@ describe("Unified Core Architecture", () => {
     await context.codeAnalyzer.dispose();
     await context.layerManager.dispose();
     await context.sharedServices.dispose();
+  });
+
+  beforeEach(async () => {
+    // Clear cache before each test to ensure predictable behavior
+    await context.sharedServices.cache.clear();
   });
 
   describe("Initialization and Health", () => {
@@ -163,8 +138,9 @@ describe("Unified Core Architecture", () => {
     });
 
     test("should use cache for repeated requests", async () => {
+      const uniqueSymbol = "UniqueTestFunction" + Date.now();
       const request: FindDefinitionRequest = {
-        identifier: testSymbol,
+        identifier: uniqueSymbol,
         uri: testUri,
         position: testPosition,
         includeDeclaration: true
@@ -423,6 +399,9 @@ describe("Unified Core Architecture", () => {
       const faultyLayerManager = new LayerManager(faultyConfig, faultyServices.eventBus);
       await faultyLayerManager.initialize();
 
+      // Register mock layers with delay to trigger timeout
+      registerMockLayers(faultyLayerManager, { delayMs: 10 });
+
       const faultyAnalyzer = new CodeAnalyzer(
         faultyLayerManager,
         faultyServices,
@@ -468,6 +447,9 @@ describe("Unified Core Architecture", () => {
 
       const testLayerManager = new LayerManager(context.config, testServices.eventBus);
       await testLayerManager.initialize();
+
+      // Register mock layers for test services
+      registerMockLayers(testLayerManager);
 
       const testAnalyzer = new CodeAnalyzer(
         testLayerManager,
@@ -634,6 +616,9 @@ describe("Unified Core Architecture", () => {
 
       const partialLayerManager = new LayerManager(partialConfig, partialServices.eventBus);
       await partialLayerManager.initialize();
+
+      // Register mock layers for partial test (only enabled ones will be used)
+      registerMockLayers(partialLayerManager);
 
       const partialAnalyzer = new CodeAnalyzer(
         partialLayerManager,
