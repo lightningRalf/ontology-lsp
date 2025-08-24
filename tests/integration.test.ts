@@ -6,35 +6,29 @@ import { PatternLearner } from '../src/patterns/pattern-learner';
 import { KnowledgeSpreader } from '../src/propagation/knowledge-spreader';
 import * as fs from 'fs';
 import * as path from 'path';
+import { testPaths, ensureTestDirectories, cleanupTestDirectories, createTestFile, testFileContents } from './test-helpers';
 
 describe('Integration Tests', () => {
   let testDir: string;
 
   beforeAll(async () => {
-    // Create test directory
-    testDir = path.join(process.cwd(), '.test-workspace');
-    if (!fs.existsSync(testDir)) {
-      fs.mkdirSync(testDir, { recursive: true });
-    }
+    // Ensure test directories exist
+    ensureTestDirectories();
+    testDir = testPaths.testWorkspace();
 
-    // Create test files
-    fs.writeFileSync(
-      path.join(testDir, 'test.ts'),
-      `function getUserData(id: string) {
+    // Create test files using helpers
+    createTestFile('.test-workspace/test.ts', `function getUserData(id: string) {
         return { id, name: 'Test User' };
       }
       
       function setUserData(id: string, data: any) {
         console.log('Setting user data:', id, data);
-      }`
-    );
+      }`);
   });
 
   afterAll(async () => {
-    // Cleanup
-    if (fs.existsSync(testDir)) {
-      fs.rmSync(testDir, { recursive: true, force: true });
-    }
+    // Cleanup using helper
+    cleanupTestDirectories();
   });
 
   test('Claude Tools Layer - fuzzy search', async () => {

@@ -27,7 +27,10 @@ import { createCodeAnalyzer } from './core/index.js';
 import { createDefaultCoreConfig } from './adapters/utils.js';
 
 export class SimpleLSPServer {
-  private connection = createConnection(ProposedFeatures.all);
+  private connection = createConnection(
+    process.stdin,
+    process.stdout
+  );
   private documents = new TextDocuments(TextDocument);
   private hasConfigurationCapability = false;
   private coreAnalyzer!: CodeAnalyzer;

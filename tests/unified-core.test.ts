@@ -30,13 +30,6 @@ interface TestContext {
 }
 
 const createTestContext = async (): Promise<TestContext> => {
-  // Create test event bus
-  const eventBus: EventBus = {
-    emit: () => {},
-    on: () => {},
-    off: () => {}
-  };
-
   // Create test configuration with all layers enabled
   const config: CoreConfig = {
     workspaceRoot: "/test-workspace",
@@ -79,7 +72,7 @@ const createTestContext = async (): Promise<TestContext> => {
   await sharedServices.initialize();
 
   // Initialize layer manager
-  const layerManager = new LayerManager(config, sharedServices);
+  const layerManager = new LayerManager(config, sharedServices.eventBus);
   await layerManager.initialize();
 
   // Create unified analyzer
@@ -87,7 +80,7 @@ const createTestContext = async (): Promise<TestContext> => {
     layerManager,
     sharedServices,
     config,
-    eventBus
+    sharedServices.eventBus
   );
   
   await codeAnalyzer.initialize();
@@ -96,7 +89,7 @@ const createTestContext = async (): Promise<TestContext> => {
     codeAnalyzer,
     layerManager,
     sharedServices,
-    eventBus,
+    eventBus: sharedServices.eventBus,
     config
   };
 };
@@ -427,7 +420,7 @@ describe("Unified Core Architecture", () => {
       const faultyServices = new SharedServices(faultyConfig);
       await faultyServices.initialize();
 
-      const faultyLayerManager = new LayerManager(faultyConfig, faultyServices);
+      const faultyLayerManager = new LayerManager(faultyConfig, faultyServices.eventBus);
       await faultyLayerManager.initialize();
 
       const faultyAnalyzer = new CodeAnalyzer(
@@ -465,14 +458,15 @@ describe("Unified Core Architecture", () => {
           }
         },
         on: () => {},
-        off: () => {}
+        off: () => {},
+        once: () => {}
       };
 
       // Create analyzer with test event bus
       const testServices = new SharedServices(context.config);
       await testServices.initialize();
 
-      const testLayerManager = new LayerManager(context.config, testServices);
+      const testLayerManager = new LayerManager(context.config, testServices.eventBus);
       await testLayerManager.initialize();
 
       const testAnalyzer = new CodeAnalyzer(
@@ -511,7 +505,7 @@ describe("Unified Core Architecture", () => {
 
       // Test with uninitialized analyzer
       const uninitializedServices = new SharedServices(context.config);
-      const uninitializedLayerManager = new LayerManager(context.config, uninitializedServices);
+      const uninitializedLayerManager = new LayerManager(context.config, uninitializedServices.eventBus);
       const uninitializedAnalyzer = new CodeAnalyzer(
         uninitializedLayerManager,
         uninitializedServices,
@@ -638,7 +632,7 @@ describe("Unified Core Architecture", () => {
       const partialServices = new SharedServices(partialConfig);
       await partialServices.initialize();
 
-      const partialLayerManager = new LayerManager(partialConfig, partialServices);
+      const partialLayerManager = new LayerManager(partialConfig, partialServices.eventBus);
       await partialLayerManager.initialize();
 
       const partialAnalyzer = new CodeAnalyzer(

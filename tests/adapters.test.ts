@@ -22,6 +22,7 @@ import {
   RenameRequest,
   CompletionRequest
 } from "../src/core/types.js";
+import { createTestConfig, testPaths, toFileUri } from "./test-helpers";
 
 // Test fixtures
 interface AdapterTestContext {
@@ -39,50 +40,21 @@ interface AdapterTestContext {
 }
 
 const createAdapterTestContext = async (): Promise<AdapterTestContext> => {
-  // Create event bus
-  const eventBus: EventBus = {
-    emit: () => {},
-    on: () => {},
-    off: () => {}
-  };
-
-  // Create configuration
-  const config: CoreConfig = {
-    workspaceRoot: "/test-workspace",
-    layers: {
-      layer1: { enabled: true, timeout: 50 },
-      layer2: { enabled: true, timeout: 100 },
-      layer3: { enabled: true, timeout: 50 },
-      layer4: { enabled: true, timeout: 50 },
-      layer5: { enabled: true, timeout: 100 }
-    },
-    cache: {
-      enabled: true,
-      defaultTtl: 300,
-      maxSize: 1000
-    },
-    database: {
-      path: ":memory:",
-      maxConnections: 10
-    },
-    performance: {
-      targetResponseTime: 100,
-      maxConcurrentRequests: 50
-    }
-  };
+  // Create configuration using test helpers
+  const config: CoreConfig = createTestConfig();
 
   // Initialize services and core
   const sharedServices = new SharedServices(config);
   await sharedServices.initialize();
 
-  const layerManager = new LayerManager(config, sharedServices);
+  const layerManager = new LayerManager(config, sharedServices.eventBus);
   await layerManager.initialize();
 
   const codeAnalyzer = new CodeAnalyzer(
     layerManager,
     sharedServices,
     config,
-    eventBus
+    sharedServices.eventBus
   );
   await codeAnalyzer.initialize();
 
@@ -142,7 +114,7 @@ const createAdapterTestContext = async (): Promise<AdapterTestContext> => {
     codeAnalyzer,
     layerManager,
     sharedServices,
-    eventBus,
+    eventBus: sharedServices.eventBus,
     config,
     adapters: {
       lsp: lspAdapter,
@@ -153,8 +125,8 @@ const createAdapterTestContext = async (): Promise<AdapterTestContext> => {
   };
 };
 
-// Test data
-const testFile = "file:///test/example.ts";
+// Test data using proper path helpers
+const testFile = toFileUri("tests/fixtures/example.ts");
 const testPosition = { line: 10, character: 5 };
 const testSymbol = "TestFunction";
 

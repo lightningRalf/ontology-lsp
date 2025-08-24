@@ -68,12 +68,6 @@ interface PerformanceTestContext {
 }
 
 const createPerformanceTestContext = async (): Promise<PerformanceTestContext> => {
-  const eventBus: EventBus = {
-    emit: () => {},
-    on: () => {},
-    off: () => {}
-  };
-
   // Optimized configuration for performance testing
   const config: CoreConfig = {
     workspaceRoot: "/performance-test-workspace",
@@ -102,14 +96,14 @@ const createPerformanceTestContext = async (): Promise<PerformanceTestContext> =
   const sharedServices = new SharedServices(config);
   await sharedServices.initialize();
 
-  const layerManager = new LayerManager(config, sharedServices);
+  const layerManager = new LayerManager(config, sharedServices.eventBus);
   await layerManager.initialize();
 
   const codeAnalyzer = new CodeAnalyzer(
     layerManager,
     sharedServices,
     config,
-    eventBus
+    sharedServices.eventBus
   );
   await codeAnalyzer.initialize();
 
@@ -576,11 +570,11 @@ describe("Performance Benchmarks", () => {
       const initialMemory = measureMemoryUsage();
       
       // Create temporary analyzer for resource testing
-      const tempEventBus: EventBus = { emit: () => {}, on: () => {}, off: () => {} };
+      const tempEventBus: EventBus = { emit: () => {}, on: () => {}, off: () => {}, once: () => {} };
       const tempServices = new SharedServices(context.config);
       await tempServices.initialize();
       
-      const tempLayerManager = new LayerManager(context.config, tempServices);
+      const tempLayerManager = new LayerManager(context.config, tempServices.eventBus);
       await tempLayerManager.initialize();
       
       const tempAnalyzer = new CodeAnalyzer(

@@ -1,7 +1,8 @@
-import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
+import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
+import { testPaths } from '../test-helpers';
 
 describe('LSP Server Integration Tests', () => {
     let serverProcess: ChildProcess;
@@ -9,7 +10,7 @@ describe('LSP Server Integration Tests', () => {
 
     beforeAll(async () => {
         // Start the LSP server
-        const serverPath = path.join(__dirname, '../../dist/server.js');
+        const serverPath = testPaths.serverJs();
         serverProcess = spawn('bun', ['run', serverPath, '--stdio'], {
             stdio: ['pipe', 'pipe', 'pipe']
         });

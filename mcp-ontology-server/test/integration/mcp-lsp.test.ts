@@ -6,7 +6,7 @@
  */
 
 import { describe, test, expect, beforeAll, afterAll, mock } from "bun:test"
-import { LSPClient } from "../../src/utils/lsp-client.js"
+import { HttpApiClient as LSPClient } from "../../src/utils/http-api-client.js"
 import { OntologyLayer } from "../../src/layers/ontology.js"
 import { TreeSitterLayer } from "../../src/layers/tree-sitter.js"
 import { PatternLayer } from "../../src/layers/patterns.js"
@@ -30,7 +30,7 @@ describe("MCP-LSP Integration", () => {
       port: testPort,
       host: "localhost",
       dbPath: ":memory:", // Use in-memory database for tests
-      workspaceRoot: path.join(__dirname, "../fixtures"),
+      workspaceRoot: path.resolve(import.meta.dir, "../fixtures"),
       cors: true
     })
     

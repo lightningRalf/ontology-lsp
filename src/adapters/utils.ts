@@ -436,11 +436,47 @@ function mapCompletionKind(kind: string): number {
 export function createDefaultCoreConfig(): CoreConfig {
   return {
     layers: {
-      layer1: { enabled: true, timeout: 5000 },
-      layer2: { enabled: true, timeout: 50000 },
-      layer3: { enabled: true, timeout: 10000 },
-      layer4: { enabled: true, timeout: 10000 },
-      layer5: { enabled: true, timeout: 20000 }
+      layer1: { 
+        enabled: true, 
+        timeout: 5000,
+        maxResults: 100,
+        fileTypes: ['ts', 'tsx', 'js', 'jsx', 'py', 'java', 'go', 'rust'],
+        optimization: {
+          bloomFilter: true,
+          frequencyCache: true,
+          parallelSearch: true
+        }
+      },
+      layer2: { 
+        enabled: true, 
+        timeout: 50000,
+        languages: ['typescript', 'javascript', 'python'],
+        maxFileSize: 1024 * 1024, // 1MB
+        parseTimeout: 50
+      },
+      layer3: { 
+        enabled: true, 
+        timeout: 10000,
+        dbPath: '.ontology/ontology.db',
+        cacheSize: 1000,
+        conceptThreshold: 0.5,
+        relationshipDepth: 3
+      },
+      layer4: { 
+        enabled: true, 
+        timeout: 10000,
+        learningThreshold: 3,
+        confidenceThreshold: 0.7,
+        maxPatterns: 1000,
+        decayRate: 0.95
+      },
+      layer5: { 
+        enabled: true, 
+        timeout: 20000,
+        maxDepth: 3,
+        autoApplyThreshold: 0.8,
+        propagationTimeout: 100
+      }
     },
     cache: {
       enabled: true,

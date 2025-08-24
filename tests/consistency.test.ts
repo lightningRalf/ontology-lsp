@@ -45,7 +45,8 @@ const createConsistencyTestContext = async (): Promise<ConsistencyTestContext> =
       events.push({ type, data, timestamp: Date.now(), source });
     },
     on: (type: string, handler: Function) => {},
-    off: (type: string, handler: Function) => {}
+    off: (type: string, handler: Function) => {},
+    once: (type: string, handler: Function) => {}
   };
 
   const config: CoreConfig = {
@@ -76,14 +77,14 @@ const createConsistencyTestContext = async (): Promise<ConsistencyTestContext> =
   const sharedServices = new SharedServices(config);
   await sharedServices.initialize();
 
-  const layerManager = new LayerManager(config, sharedServices);
+  const layerManager = new LayerManager(config, sharedServices.eventBus);
   await layerManager.initialize();
 
   const codeAnalyzer = new CodeAnalyzer(
     layerManager,
     sharedServices,
     config,
-    eventBus
+    sharedServices.eventBus
   );
   await codeAnalyzer.initialize();
 
@@ -150,7 +151,7 @@ const createConsistencyTestContext = async (): Promise<ConsistencyTestContext> =
       http: httpAdapter,
       cli: cliAdapter
     },
-    eventBus,
+    eventBus: sharedServices.eventBus,
     config
   };
 };

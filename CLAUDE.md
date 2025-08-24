@@ -5,6 +5,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 @.claude/docs/software-principles.md  
 @.claude/docs/tech-stack-ts.md
 
+## SESSION WORKFLOW (MANDATORY)
+
+For every session, you MUST:
+
+1. **Initialize** (Start of session):
+   - Read VISION.md first
+   - Read PROJECT_STATUS.md second  
+   - Read NEXT_STEPS.md third
+   - Create TodoWrite list from NEXT_STEPS.md items
+
+2. **Execute** (For each task):
+   - Mark task as "in_progress" 
+   - Implement the task
+   - Test the implementation
+   - Update PROJECT_STATUS.md immediately
+   - Update NEXT_STEPS.md immediately
+   - Mark task as "completed" or document failure
+
+3. **Report** (After each task):
+   - Report specific success/failure
+   - If failed, update TodoWrite with fix needed
+   - If succeeded, continue to next task
+
+4. **Finalize** (End of session):
+   - Final update to PROJECT_STATUS.md
+   - Final update to NEXT_STEPS.md  
+   - Summary of accomplishments and blockers
+
 ## Project Overview
 
 This is an Ontology-Enhanced LSP (Language Server Protocol) proxy that provides intelligent code navigation, refactoring, and pattern learning capabilities. It's designed to handle LLM-generated code with fuzzy matching and adaptive learning. The project uses Bun runtime (not Node.js) for better performance and native SQLite support.

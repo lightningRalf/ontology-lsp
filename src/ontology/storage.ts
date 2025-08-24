@@ -87,10 +87,15 @@ export class OntologyStorage {
             CREATE TABLE IF NOT EXISTS concepts (
                 id TEXT PRIMARY KEY,
                 canonical_name TEXT NOT NULL,
-                confidence REAL NOT NULL DEFAULT 0.5,
-                data JSON NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                signature_fingerprint TEXT,
+                confidence REAL NOT NULL DEFAULT 0.0,
+                category TEXT,
+                is_interface INTEGER DEFAULT 0,
+                is_abstract INTEGER DEFAULT 0,
+                is_deprecated INTEGER DEFAULT 0,
+                created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+                updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+                metadata TEXT
             );
             
             CREATE TABLE IF NOT EXISTS representations (
@@ -171,8 +176,8 @@ export class OntologyStorage {
         const transaction = this.db.transaction(() => {
             // Save main concept
             const conceptStmt = this.db.prepare(`
-                INSERT OR REPLACE INTO concepts (id, canonical_name, confidence, data, updated_at)
-                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                INSERT OR REPLACE INTO concepts (id, canonical_name, confidence, metadata, updated_at)
+                VALUES (?, ?, ?, ?, strftime('%s', 'now'))
             `);
             
             conceptStmt.run(

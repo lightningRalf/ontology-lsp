@@ -1,7 +1,8 @@
 // Tree-sitter AST Analysis Layer
 import Parser, { SyntaxNode, Tree, Query } from 'tree-sitter';
-import { Layer, EnhancedMatches, ASTNode, NodeMetadata } from '../types/core';
+import { Layer, EnhancedMatches, ASTNode, NodeMetadata, Concept } from '../types/core';
 import { TreeSitterConfig } from '../types/core';
+import { OntologyEngine } from '../ontology/ontology-engine';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -54,10 +55,12 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
     private parsers = new Map<string, Parser>();
     private queries = new Map<string, Map<string, Query>>();
     private cache = new Map<string, { tree: Tree; timestamp: number }>();
+    private ontologyEngine?: OntologyEngine;
     
-    constructor(private config: TreeSitterConfig) {
+    constructor(private config: TreeSitterConfig, ontologyEngine?: OntologyEngine) {
         this.setupParsers();
         this.setupQueries();
+        this.ontologyEngine = ontologyEngine;
     }
     
     private setupParsers(): void {
@@ -237,11 +240,24 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
         // Get unique files from matches
         const filesToParse = new Set<string>();
         
-        [...matches.exact, ...matches.fuzzy, ...matches.conceptual].forEach(match => {
-            filesToParse.add(match.file);
+        // Safely handle spread operations by checking for null/undefined arrays
+        const exactMatches = matches.exact || [];
+        const fuzzyMatches = matches.fuzzy || [];
+        const conceptualMatches = matches.conceptual || [];
+        
+        [...exactMatches, ...fuzzyMatches, ...conceptualMatches].forEach(match => {
+            if (match && match.file) {
+                filesToParse.add(match.file);
+            }
         });
         
-        matches.files.forEach(file => filesToParse.add(file));
+        // Safely handle files array
+        const files = matches.files || [];
+        files.forEach(file => {
+            if (file) {
+                filesToParse.add(file);
+            }
+        });
         
         // Limit files for performance (only parse most relevant)
         const sortedFiles = this.sortFilesByRelevance([...filesToParse], matches);
@@ -339,14 +355,14 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
             }
         }
         
-        // Process identifiers
-        this.processIdentifiers(allCaptures.get('identifiers') || [], filePath, result, originalMatches);
+        // Process identifiers (now async)
+        await this.processIdentifiers(allCaptures.get('identifiers') || [], filePath, result, originalMatches);
         
-        // Process functions
-        this.processFunctions(allCaptures.get('functions') || [], filePath, result);
+        // Process functions (now async)
+        await this.processFunctions(allCaptures.get('functions') || [], filePath, result);
         
-        // Process classes
-        this.processClasses(allCaptures.get('classes') || [], filePath, result);
+        // Process classes (now async)
+        await this.processClasses(allCaptures.get('classes') || [], filePath, result);
         
         // Process imports/exports
         this.processImportsExports(
@@ -365,26 +381,33 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
         );
     }
     
-    private processIdentifiers(
+    private async processIdentifiers(
         captures: any[],
         filePath: string,
         result: TreeSitterResult,
         originalMatches: EnhancedMatches
-    ): void {
+    ): Promise<void> {
         for (const capture of captures) {
             const node = capture.node;
             
             // Check if this identifier is relevant to our search
-            const isRelevant = this.isNodeRelevant(node, originalMatches);
+            // Use enhanced relevance check if ontology engine is available
+            const isRelevant = this.ontologyEngine 
+                ? await this.isNodeRelevantWithOntology(node, originalMatches)
+                : this.isNodeRelevant(node, originalMatches);
             
             if (isRelevant) {
                 const astNode = this.createASTNode(node, filePath);
+                
+                // Enrich with concept information if available
+                await this.enrichNodeWithConcept(astNode);
+                
                 result.nodes.push(astNode);
             }
         }
     }
     
-    private processFunctions(captures: any[], filePath: string, result: TreeSitterResult): void {
+    private async processFunctions(captures: any[], filePath: string, result: TreeSitterResult): Promise<void> {
         for (const capture of captures) {
             const node = capture.node;
             const astNode = this.createASTNode(node, filePath);
@@ -394,18 +417,23 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
             const parameters = this.extractParameters(node);
             const returnType = this.extractReturnType(node);
             
+            // Safely spread metadata with null check
+            const existingMetadata = astNode.metadata || {};
             astNode.metadata = {
-                ...astNode.metadata,
+                ...existingMetadata,
                 functionName,
                 parameters,
                 returnType
             };
             
+            // Enrich with concept information if available
+            await this.enrichNodeWithConcept(astNode);
+            
             result.nodes.push(astNode);
         }
     }
     
-    private processClasses(captures: any[], filePath: string, result: TreeSitterResult): void {
+    private async processClasses(captures: any[], filePath: string, result: TreeSitterResult): Promise<void> {
         for (const capture of captures) {
             const node = capture.node;
             const astNode = this.createASTNode(node, filePath);
@@ -417,12 +445,17 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
             const extendsClass = this.extractExtendsClause(node);
             const implementsInterfaces = this.extractImplementsClause(node);
             
+            // Safely spread metadata with null check
+            const existingMetadata = astNode.metadata || {};
             astNode.metadata = {
-                ...astNode.metadata,
+                ...existingMetadata,
                 className,
                 extends: extendsClass,
                 implements: implementsInterfaces
             };
+            
+            // Enrich with concept information if available
+            await this.enrichNodeWithConcept(astNode);
             
             result.nodes.push(astNode);
         }
@@ -532,7 +565,11 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
         const nodeText = node.text.toLowerCase();
         
         // Check if node text matches any of our search terms
-        const allMatches = [...originalMatches.exact, ...originalMatches.fuzzy, ...originalMatches.conceptual];
+        // Safely handle spread operations with null/undefined checks
+        const exactMatches = originalMatches.exact || [];
+        const fuzzyMatches = originalMatches.fuzzy || [];
+        const conceptualMatches = originalMatches.conceptual || [];
+        const allMatches = [...exactMatches, ...fuzzyMatches, ...conceptualMatches];
         
         return allMatches.some(match => 
             nodeText.includes(match.text.toLowerCase()) ||
@@ -663,21 +700,26 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
         const fileScores = new Map<string, number>();
         
         // Score files based on match quality and quantity
+        // Safely handle arrays that might be null/undefined
+        const exactMatches = matches.exact || [];
+        const fuzzyMatches = matches.fuzzy || [];
+        const conceptualMatches = matches.conceptual || [];
+        
         for (const file of files) {
             let score = 0;
             
             // Exact matches get highest score
-            score += matches.exact.filter(m => m.file === file).length * 10;
+            score += exactMatches.filter(m => m && m.file === file).length * 10;
             
             // Fuzzy matches get medium score
-            score += matches.fuzzy.filter(m => m.file === file).length * 5;
+            score += fuzzyMatches.filter(m => m && m.file === file).length * 5;
             
             // Conceptual matches get lower score
-            score += matches.conceptual.filter(m => m.file === file).length * 2;
+            score += conceptualMatches.filter(m => m && m.file === file).length * 2;
             
             // Prefer certain file types
             if (file.endsWith('.ts') || file.endsWith('.tsx')) score += 2;
-            if (file.endsWith('') || file.endsWith('.jsx')) score += 1;
+            if (file.endsWith('.js') || file.endsWith('.jsx')) score += 1;
             
             // Prefer non-test files
             if (!file.includes('test') && !file.includes('spec')) score += 1;
@@ -695,7 +737,7 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
             case '.ts':
             case '.tsx':
                 return 'typescript';
-            case '':
+            case '.js':
             case '.jsx':
                 return 'javascript';
             case '.py':
@@ -852,5 +894,81 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
         }
         
         return null;
+    }
+    
+    /**
+     * Get concept information from the ontology engine
+     */
+    async getConcept(identifier: string): Promise<Concept | null> {
+        if (!this.ontologyEngine) {
+            console.warn('Ontology engine not available for getConcept');
+            return null;
+        }
+        
+        try {
+            return await this.ontologyEngine.findConcept(identifier);
+        } catch (error) {
+            console.warn(`Failed to get concept for ${identifier}:`, error);
+            return null;
+        }
+    }
+    
+    /**
+     * Enhanced node relevance check using ontology concepts
+     */
+    private async isNodeRelevantWithOntology(node: SyntaxNode, originalMatches: EnhancedMatches): Promise<boolean> {
+        // First check basic relevance
+        const basicRelevance = this.isNodeRelevant(node, originalMatches);
+        if (basicRelevance) return true;
+        
+        // If ontology engine is available, check semantic relevance
+        if (this.ontologyEngine && node.text) {
+            const concept = await this.getConcept(node.text);
+            if (concept) {
+                // Check if any of the search terms are related to this concept
+                const exactMatches = originalMatches.exact || [];
+                const fuzzyMatches = originalMatches.fuzzy || [];
+                const conceptualMatches = originalMatches.conceptual || [];
+                const allMatches = [...exactMatches, ...fuzzyMatches, ...conceptualMatches];
+                
+                for (const match of allMatches) {
+                    if (match?.text) {
+                        const relatedConcept = await this.getConcept(match.text);
+                        if (relatedConcept) {
+                            // Check if concepts are related
+                            const relatedConcepts = this.ontologyEngine.getRelatedConcepts(concept.id);
+                            if (relatedConcepts.some(rc => rc.concept.id === relatedConcept.id)) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Add concept metadata to AST nodes when ontology engine is available
+     */
+    private async enrichNodeWithConcept(astNode: ASTNode): Promise<void> {
+        if (!this.ontologyEngine || !astNode.text) return;
+        
+        try {
+            const concept = await this.getConcept(astNode.text);
+            if (concept) {
+                const existingMetadata = astNode.metadata || {};
+                astNode.metadata = {
+                    ...existingMetadata,
+                    conceptId: concept.id,
+                    conceptName: concept.canonicalName,
+                    conceptConfidence: concept.confidence,
+                    semanticType: concept.type
+                };
+            }
+        } catch (error) {
+            console.warn(`Failed to enrich node with concept for ${astNode.text}:`, error);
+        }
     }
 }

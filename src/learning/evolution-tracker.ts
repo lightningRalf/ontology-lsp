@@ -114,7 +114,7 @@ export interface EvolutionReport {
   summary: {
     totalEvents: number;
     majorRefactorings: number;
-    architectural Changes: number;
+    architecturalChanges: number;
     qualityTrend: 'improving' | 'degrading' | 'stable';
   };
   patterns: EvolutionPattern[];

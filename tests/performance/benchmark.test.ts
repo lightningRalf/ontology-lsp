@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll } from '@jest/globals';
+import { describe, test, expect, beforeAll } from 'bun:test';
 import { ClaudeToolsLayer } from '../../src/layers/claude-tools';
 import { TreeSitterLayer } from '../../src/layers/tree-sitter';
 import { OntologyEngine } from '../../src/ontology/ontology-engine';
@@ -6,6 +6,7 @@ import { PatternLearner } from '../../src/patterns/pattern-learner';
 import { KnowledgeSpreader } from '../../src/propagation/knowledge-spreader';
 import * as fs from 'fs';
 import * as path from 'path';
+import { testPaths, createTestFile } from '../test-helpers';
 
 describe('Performance Benchmarks', () => {
     let claudeTools: ClaudeToolsLayer;
@@ -229,8 +230,7 @@ describe('Performance Benchmarks', () => {
     test('Large File Handling', async () => {
         // Create a large test file
         const largeContent = Array(10000).fill('function test() { return true; }\n').join('');
-        const testFile = path.join(__dirname, 'large-test.ts');
-        fs.writeFileSync(testFile, largeContent);
+        const testFile = createTestFile('tests/temp/large-test.ts', largeContent);
 
         const start = performance.now();
         const result = await treeSitter.process({

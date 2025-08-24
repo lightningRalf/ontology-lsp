@@ -44,6 +44,9 @@ const createLearningTestContext = async (): Promise<LearningTestContext> => {
     },
     off: (type: string, handler: Function) => {
       // Remove handler
+    },
+    once: (type: string, handler: Function) => {
+      // Handle once event for testing
     }
   };
 
@@ -878,7 +881,8 @@ describe("Learning System Integration", () => {
           }
         },
         on: () => {},
-        off: () => {}
+        off: () => {},
+        once: () => {}
       };
 
       // Create learning orchestrator with error capturing
