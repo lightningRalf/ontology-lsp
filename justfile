@@ -453,3 +453,904 @@ test-endpoints:
 # Full CI/CD simulation
 ci: clean install build-all lint test-all test-coverage package-extension
     @echo "✓ CI pipeline complete!"
+
+# === TROUBLESHOOTING & DIAGNOSTICS ===
+
+# Run comprehensive system health check
+health-check:
+    @echo "🩺 Health Check Report - $(date)"
+    @echo "================================"
+    @echo "Testing HTTP API (7000):" && (curl -s http://localhost:7000/health >/dev/null 2>&1 && echo "✅ HTTP API (7000): HEALTHY" || echo "❌ HTTP API (7000): UNHEALTHY")
+    @echo "Testing MCP SSE (7001):" && (curl -s http://localhost:7001/health >/dev/null 2>&1 && echo "✅ MCP SSE (7001): HEALTHY" || echo "❌ MCP SSE (7001): UNHEALTHY")
+    @echo "Checking processes:" && (pgrep -f "bun run src/servers" >/dev/null && echo "✅ Server processes: RUNNING" || echo "❌ Server processes: NOT RUNNING")
+    @echo "Checking .ontology directory:" && ([ -d .ontology ] && echo "✅ .ontology directory: Present" || echo "⚠️  .ontology directory: Not found")
+    @echo "================================"
+
+# Analyze system logs for debugging issues
+analyze-logs:
+    @echo "📊 Log Analysis Report - $(date)"
+    @echo "================================"
+    @if [ ! -d .ontology/logs ]; then echo "❌ Log directory not found"; echo "Run 'just start' to initialize the system."; exit 1; fi
+    @echo "Log files:"
+    @ls -la .ontology/logs/*.log 2>/dev/null | wc -l | xargs -I {} echo "  Found {} log files"
+    @echo "Recent errors across all logs:"
+    @find .ontology/logs -name "*.log" -exec grep -l -i error {} \; 2>/dev/null | xargs -I {} basename {} | head -5 | xargs -I {} echo "  📁 {}"
+    @echo "Recent warnings across all logs:"
+    @find .ontology/logs -name "*.log" -exec grep -l -i "warn\|warning" {} \; 2>/dev/null | xargs -I {} basename {} | head -5 | xargs -I {} echo "  ⚠️ {}"
+    @echo "Quick troubleshooting commands:"
+    @echo "  just logs     # Follow logs in real-time"
+    @echo "  just restart  # Restart all services"
+
+# Collect comprehensive diagnostic information
+diagnostics:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    
+    # Safe command runner with fallback
+    safe_run() {
+        local cmd="$1"
+        local fallback="${2:-Not available}"
+        
+        if eval "$cmd" 2>/dev/null; then
+            return 0
+        else
+            echo "$fallback"
+            return 1
+        fi
+    }
+    
+    echo "🔍 Ontology-LSP Diagnostic Report"
+    echo "================================="
+    echo "Generated: $(date)"
+    echo "System: $(uname -a)"
+    echo ""
+    
+    echo "📦 Environment Information:"
+    echo "  Bun version: $(safe_run '{{bun}} --version' 'Not installed')"
+    echo "  Node version: $(safe_run 'node --version' 'Not installed')"
+    echo "  Platform: $OSTYPE"
+    echo "  Shell: $SHELL"
+    echo "  Working directory: $(pwd)"
+    echo "  User: $(whoami)"
+    echo ""
+    
+    echo "🏗️ Project Information:"
+    if [ -d .git ]; then
+        echo "  Git repository: Yes"
+        echo "  Git commit: $(safe_run 'git rev-parse --short HEAD' 'Unknown')"
+        echo "  Git branch: $(safe_run 'git branch --show-current' 'Unknown')"
+        echo "  Git status: $(safe_run 'git status --porcelain | wc -l' '0') modified files"
+    else
+        echo "  Git repository: No"
+    fi
+    
+    if [ -f package.json ]; then
+        echo "  Package.json: Yes"
+        if command -v jq >/dev/null 2>&1 && [ -f package.json ]; then
+            echo "  Project version: $(jq -r '.version // "Unknown"' package.json)"
+            echo "  Project name: $(jq -r '.name // "Unknown"' package.json)"
+        fi
+    else
+        echo "  Package.json: No"
+    fi
+    
+    if [ -f bun.lockb ]; then
+        echo "  Dependencies: $(echo "Lockfile present")"
+    else
+        echo "  Dependencies: No lockfile found"
+    fi
+    
+    echo ""
+    
+    echo "🔧 Configuration Status:"
+    if [ -f src/core/config/server-config.ts ]; then
+        echo "  Configuration file: Present"
+        echo "  Config validation:"
+        if {{bun}} run -e "
+        try {
+          const { getEnvironmentConfig, validatePorts } = require('./src/core/config/server-config.ts');
+          const config = getEnvironmentConfig();
+          validatePorts(config);
+          console.log('    ✅ Valid - HTTP: ' + config.ports.httpAPI + ', MCP: ' + config.ports.mcpSSE + ', LSP: ' + config.ports.lspServer);
+        } catch (e) {
+          console.log('    ❌ Error: ' + e.message);
+        }
+        " 2>/dev/null; then
+            true  # Success message already printed
+        else
+            echo "    ❌ Cannot validate configuration"
+        fi
+    else
+        echo "  Configuration file: Missing"
+    fi
+    
+    # Check environment variables
+    echo "  Environment variables:"
+    echo "    NODE_ENV: ${NODE_ENV:-Not set}"
+    echo "    BUN_ENV: ${BUN_ENV:-Not set}"
+    echo "    HTTP_API_PORT: ${HTTP_API_PORT:-Default (7000)}"
+    echo "    MCP_SSE_PORT: ${MCP_SSE_PORT:-Default (7001)}"
+    echo "    LSP_SERVER_PORT: ${LSP_SERVER_PORT:-Default (7002)}"
+    
+    echo ""
+    
+    echo "💾 Storage Information:"
+    if [ -d .ontology ]; then
+        echo "  .ontology directory: Present"
+        echo "    Size: $(du -sh .ontology 2>/dev/null | cut -f1 || echo 'Unknown')"
+        echo "    Permissions: $(ls -ld .ontology | awk '{print $1, $3, $4}')"
+        
+        if [ -f .ontology/db/ontology.sqlite ]; then
+            echo "  Database: Present"
+            echo "    Size: $(du -h .ontology/db/ontology.sqlite | cut -f1)"
+            echo "    Tables: $(sqlite3 .ontology/db/ontology.sqlite "SELECT name FROM sqlite_master WHERE type='table';" 2>/dev/null | wc -l || echo 'Cannot read')"
+            echo "    Concepts: $(sqlite3 .ontology/db/ontology.sqlite "SELECT COUNT(*) FROM concepts;" 2>/dev/null || echo 'Cannot count')"
+        else
+            echo "  Database: Not found"
+        fi
+        
+        if [ -d .ontology/cache ]; then
+            echo "  Cache directory: $(du -sh .ontology/cache 2>/dev/null | cut -f1 || echo 'Empty')"
+        else
+            echo "  Cache directory: Not found"
+        fi
+        
+        if [ -d .ontology/logs ]; then
+            log_count=$(find .ontology/logs -name "*.log" | wc -l)
+            echo "  Log files: $log_count files"
+            if [ "$log_count" -gt 0 ]; then
+                echo "    Total log size: $(du -sh .ontology/logs 2>/dev/null | cut -f1 || echo 'Unknown')"
+            fi
+        else
+            echo "  Log files: No log directory"
+        fi
+        
+        if [ -d .ontology/pids ]; then
+            pid_count=$(find .ontology/pids -name "*.pid" | wc -l)
+            echo "  PID files: $pid_count files"
+        else
+            echo "  PID files: No PID directory"
+        fi
+    else
+        echo "  .ontology directory: Not found (system not initialized)"
+    fi
+    
+    echo ""
+    
+    echo "🚀 Process Information:"
+    bun_processes=$(pgrep -f "bun" | wc -l)
+    ontology_processes=$(pgrep -f "ontology\|src/servers" | wc -l)
+    
+    echo "  Bun processes: $bun_processes"
+    echo "  Ontology processes: $ontology_processes"
+    
+    if [ "$ontology_processes" -gt 0 ]; then
+        echo "  Running processes:"
+        ps aux | grep -E "(bun.*src/servers|ontology)" | grep -v grep | sed 's/^/    /' || echo "    None found"
+    else
+        echo "  No Ontology-LSP processes running"
+    fi
+    
+    # Check for zombie/defunct processes
+    zombie_count=$(ps aux | grep -c '[Zz]ombie\|<defunct>' || echo "0")
+    if [ "$zombie_count" -gt 0 ]; then
+        echo "  ⚠️  Zombie processes detected: $zombie_count"
+    fi
+    
+    echo ""
+    
+    echo "🌐 Network Information:"
+    for port in 7000 7001 7002; do
+        if lsof -i ":$port" >/dev/null 2>&1; then
+            process_info=$(lsof -i ":$port" 2>/dev/null | tail -1 | awk '{print $1, $2}')
+            echo "  Port $port: IN USE ($process_info)"
+        else
+            echo "  Port $port: AVAILABLE"
+        fi
+    done
+    
+    # Test HTTP connectivity
+    echo "  HTTP connectivity:"
+    for port in 7000 7001; do
+        if curl -s --connect-timeout 2 "http://localhost:$port/health" >/dev/null 2>&1; then
+            echo "    localhost:$port: ✅ RESPONDING"
+        else
+            echo "    localhost:$port: ❌ NOT RESPONDING"
+        fi
+    done
+    
+    echo ""
+    
+    echo "📊 System Resources:"
+    # Memory information
+    if command -v free >/dev/null 2>&1; then
+        mem_info=$(free -h | grep "Mem:")
+        echo "  Memory: $(echo $mem_info | awk '{print "Used " $3 " / Total " $2}')"
+    else
+        echo "  Memory: Information not available"
+    fi
+    
+    # Disk space
+    echo "  Disk space:"
+    echo "    Current directory: $(df -h . | tail -1 | awk '{print $4 " available (" $5 " used)"}')"
+    if [ -d .ontology ]; then
+        echo "    .ontology directory: $(df -h .ontology | tail -1 | awk '{print $4 " available"}')"
+    fi
+    
+    # Load average (if available)
+    if [ -f /proc/loadavg ]; then
+        load_avg=$(cat /proc/loadavg | awk '{print $1, $2, $3}')
+        echo "  Load average (1m 5m 15m): $load_avg"
+    fi
+    
+    echo ""
+    
+    echo "📋 Recent Log Entries:"
+    if [ -d .ontology/logs ]; then
+        echo "  Log files found: $(find .ontology/logs -name "*.log" | wc -l)"
+        
+        for log in .ontology/logs/*.log; do
+            if [ -f "$log" ]; then
+                echo "  📁 $(basename "$log") (last 5 lines):"
+                tail -5 "$log" 2>/dev/null | sed 's/^/    /' || echo "    (cannot read log)"
+                echo ""
+            fi
+        done
+    else
+        echo "  No log directory found"
+    fi
+    
+    echo "❌ Recent Errors:"
+    error_found=false
+    if [ -d .ontology/logs ]; then
+        # Get recent errors from all logs
+        recent_errors=$(grep -h -i "error\|exception\|fail" .ontology/logs/*.log 2>/dev/null | tail -10)
+        if [ -n "$recent_errors" ]; then
+            echo "$recent_errors" | sed 's/^/  /'
+            error_found=true
+        fi
+    fi
+    
+    if [ "$error_found" = false ]; then
+        echo "  No recent errors found in logs"
+    fi
+    
+    echo ""
+    echo "🔍 Diagnostic Tests:"
+    
+    # Test basic functionality
+    echo "  Configuration loading:"
+    if {{bun}} run -e "require('./src/core/config/server-config.ts')" >/dev/null 2>&1; then
+        echo "    ✅ Can load configuration"
+    else
+        echo "    ❌ Cannot load configuration"
+    fi
+    
+    echo "  Database connectivity:"
+    if [ -f .ontology/db/ontology.sqlite ]; then
+        if sqlite3 .ontology/db/ontology.sqlite "SELECT 1;" >/dev/null 2>&1; then
+            echo "    ✅ Database accessible"
+        else
+            echo "    ❌ Database not accessible"
+        fi
+    else
+        echo "    ⚠️  Database file not found"
+    fi
+    
+    echo "  Build system:"
+    if [ -f package.json ] && command -v {{bun}} >/dev/null 2>&1; then
+        if {{bun}} --version >/dev/null 2>&1; then
+            echo "    ✅ Bun runtime available"
+        else
+            echo "    ❌ Bun runtime issues"
+        fi
+    else
+        echo "    ⚠️  Build environment not configured"
+    fi
+    
+    echo ""
+    echo "📋 Recommended Actions:"
+    
+    # Analyze issues and provide recommendations
+    recommendations=()
+    
+    if [ "$ontology_processes" -eq 0 ]; then
+        recommendations+=("Start the system: just start")
+    fi
+    
+    if [ ! -d .ontology ]; then
+        recommendations+=("Initialize the system: just init")
+    fi
+    
+    if [ "$error_found" = true ]; then
+        recommendations+=("Analyze errors: just analyze-logs")
+    fi
+    
+    if ! curl -s --connect-timeout 1 "http://localhost:7000/health" >/dev/null 2>&1; then
+        recommendations+=("Check service health: just health")
+    fi
+    
+    if pgrep -f "bun.*src/servers" >/dev/null && ! curl -s "http://localhost:7000/health" >/dev/null 2>&1; then
+        recommendations+=("Restart services: just restart")
+    fi
+    
+    if [ ${#recommendations[@]} -eq 0 ]; then
+        echo "  🎉 System appears to be functioning normally"
+        echo "  If you're experiencing issues, try:"
+        echo "    - just health    # Check service health"
+        echo "    - just logs      # Monitor real-time logs"
+    else
+        for rec in "${recommendations[@]}"; do
+            echo "  • $rec"
+        done
+    fi
+    
+    echo ""
+    echo "================================="
+    echo "📊 Diagnostic collection complete"
+    echo "💾 To save this report: just save-diagnostics"
+    echo "🆘 Include this report when requesting support"
+
+# Save diagnostic report to file
+save-diagnostics:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    
+    report_file="diagnostics-$(date +%Y%m%d-%H%M%S).txt"
+    echo "💾 Saving diagnostic report to $report_file..."
+    
+    # Run diagnostics and save to file
+    just diagnostics > "$report_file"
+    
+    echo "📄 Report saved: $report_file"
+    echo "📏 Size: $(du -h "$report_file" | cut -f1)"
+    echo ""
+    echo "🔗 You can share this report for troubleshooting support"
+
+# Create backup of system data
+backup:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    
+    BACKUP_DIR="backups"
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    
+    echo "🔄 Creating backup at $TIMESTAMP..."
+    
+    # Create backup directory
+    mkdir -p "$BACKUP_DIR/$TIMESTAMP"
+    
+    # Check what exists and backup accordingly
+    backed_up=0
+    
+    # Backup database
+    if [ -f .ontology/db/ontology.sqlite ]; then
+        echo "  💾 Backing up database..."
+        mkdir -p "$BACKUP_DIR/$TIMESTAMP/db"
+        cp .ontology/db/ontology.sqlite "$BACKUP_DIR/$TIMESTAMP/db/"
+        
+        # Backup any other database files
+        if [ -f .ontology/db/ontology.sqlite-wal ]; then
+            cp .ontology/db/ontology.sqlite-wal "$BACKUP_DIR/$TIMESTAMP/db/"
+        fi
+        if [ -f .ontology/db/ontology.sqlite-shm ]; then
+            cp .ontology/db/ontology.sqlite-shm "$BACKUP_DIR/$TIMESTAMP/db/"
+        fi
+        
+        backed_up=1
+    fi
+    
+    # Backup configuration
+    if [ -f .env ]; then
+        echo "  ⚙️  Backing up environment configuration..."
+        cp .env "$BACKUP_DIR/$TIMESTAMP/"
+        backed_up=1
+    fi
+    
+    # Backup custom configuration files
+    for config_file in claude-desktop-config.json .mcp.json ontology-lsp-config.yaml; do
+        if [ -f "$config_file" ]; then
+            echo "  📄 Backing up $config_file..."
+            cp "$config_file" "$BACKUP_DIR/$TIMESTAMP/"
+            backed_up=1
+        fi
+    done
+    
+    # Backup learned patterns and cache (if significant)
+    if [ -d .ontology/cache ] && [ "$(du -s .ontology/cache | cut -f1)" -gt 100 ]; then
+        echo "  🧠 Backing up cache..."
+        cp -r .ontology/cache "$BACKUP_DIR/$TIMESTAMP/"
+        backed_up=1
+    fi
+    
+    # Backup important logs (recent ones)
+    if [ -d .ontology/logs ]; then
+        echo "  📋 Backing up recent logs..."
+        mkdir -p "$BACKUP_DIR/$TIMESTAMP/logs"
+        
+        # Only backup logs from last 24 hours
+        find .ontology/logs -name "*.log" -mtime -1 -exec cp {} "$BACKUP_DIR/$TIMESTAMP/logs/" \; 2>/dev/null
+    fi
+    
+    if [ $backed_up -eq 0 ]; then
+        echo "  ⚠️  No data found to backup. System may not be initialized."
+        rmdir "$BACKUP_DIR/$TIMESTAMP" 2>/dev/null
+        exit 1
+    fi
+    
+    # Create backup manifest
+    echo "# Ontology-LSP Backup Manifest" > "$BACKUP_DIR/$TIMESTAMP/MANIFEST"
+    echo "Created: $(date)" >> "$BACKUP_DIR/$TIMESTAMP/MANIFEST"
+    echo "System: $(uname -a)" >> "$BACKUP_DIR/$TIMESTAMP/MANIFEST"
+    echo "Git commit: $(git rev-parse --short HEAD 2>/dev/null || echo 'Unknown')" >> "$BACKUP_DIR/$TIMESTAMP/MANIFEST"
+    echo "" >> "$BACKUP_DIR/$TIMESTAMP/MANIFEST"
+    echo "Contents:" >> "$BACKUP_DIR/$TIMESTAMP/MANIFEST"
+    find "$BACKUP_DIR/$TIMESTAMP" -type f | grep -v MANIFEST | sed 's|^.*/||' | sort >> "$BACKUP_DIR/$TIMESTAMP/MANIFEST"
+    
+    # Create compressed archive
+    echo "  📦 Creating compressed archive..."
+    (cd "$BACKUP_DIR" && tar -czf "$TIMESTAMP.tar.gz" "$TIMESTAMP/")
+    
+    if [ $? -eq 0 ]; then
+        # Clean up uncompressed backup
+        rm -rf "$BACKUP_DIR/$TIMESTAMP"
+        
+        backup_size=$(du -h "$BACKUP_DIR/$TIMESTAMP.tar.gz" | cut -f1)
+        echo "  ✅ Backup created: $BACKUP_DIR/$TIMESTAMP.tar.gz ($backup_size)"
+        
+        # Show backup contents
+        echo ""
+        echo "📋 Backup contents:"
+        tar -tzf "$BACKUP_DIR/$TIMESTAMP.tar.gz" | sed 's/^/  /'
+        
+        exit 0
+    else
+        echo "  ❌ Failed to create compressed archive"
+        rm -rf "$BACKUP_DIR/$TIMESTAMP"
+        exit 1
+    fi
+
+# List available backups
+list-backups:
+    @echo "📚 Available Backups:"
+    @echo "===================="
+    @if [ ! -d "backups" ]; then echo "No backups found (backup directory doesn't exist)"; echo "Create a backup with: just backup"; else find backups -name "*.tar.gz" -exec basename {} .tar.gz \; 2>/dev/null | head -10 | while read backup; do echo "  📦 $backup"; done; fi
+
+# Restore from backup (requires backup name)
+restore-backup backup="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    
+    BACKUP_DIR="backups"
+    backup_name="{{backup}}"
+    
+    if [ -z "$backup_name" ]; then
+        echo "❌ Please specify backup to restore"
+        echo "Usage: just restore-backup <backup-name>"
+        echo ""
+        echo "Available backups:"
+        just list-backups
+        exit 1
+    fi
+    
+    backup_file="$BACKUP_DIR/$backup_name.tar.gz"
+    
+    if [ ! -f "$backup_file" ]; then
+        echo "❌ Backup not found: $backup_file"
+        echo ""
+        echo "Available backups:"
+        just list-backups
+        exit 1
+    fi
+    
+    echo "🔄 Restoring backup: $backup_name"
+    echo ""
+    
+    # Show what will be restored
+    echo "📋 Backup contents:"
+    tar -tzf "$backup_file" | sed 's/^/  /'
+    echo ""
+    
+    # Confirm restore
+    read -p "⚠️  This will overwrite existing data. Continue? [y/N]: " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Restore cancelled"
+        exit 1
+    fi
+    
+    # Stop services before restore
+    echo "  🛑 Stopping services..."
+    just stop >/dev/null 2>&1 || true
+    
+    # Create backup of current state
+    if [ -d .ontology ]; then
+        echo "  💾 Creating backup of current state..."
+        current_backup="pre-restore-$(date +%Y%m%d-%H%M%S)"
+        mkdir -p "$BACKUP_DIR/$current_backup"
+        cp -r .ontology "$BACKUP_DIR/$current_backup/" 2>/dev/null || true
+        tar -czf "$BACKUP_DIR/$current_backup.tar.gz" -C "$BACKUP_DIR" "$current_backup/" && rm -rf "$BACKUP_DIR/$current_backup"
+        echo "    Current state saved as: $current_backup.tar.gz"
+    fi
+    
+    # Extract backup
+    echo "  📦 Extracting backup..."
+    temp_dir=$(mktemp -d)
+    
+    if tar -xzf "$backup_file" -C "$temp_dir"; then
+        backup_extract_dir="$temp_dir/$backup_name"
+        
+        # Restore database
+        if [ -f "$backup_extract_dir/db/ontology.sqlite" ]; then
+            echo "  💾 Restoring database..."
+            mkdir -p .ontology/db
+            cp "$backup_extract_dir/db/"* .ontology/db/ 2>/dev/null
+        fi
+        
+        # Restore configuration
+        for config_file in .env claude-desktop-config.json .mcp.json ontology-lsp-config.yaml; do
+            if [ -f "$backup_extract_dir/$config_file" ]; then
+                echo "  ⚙️  Restoring $config_file..."
+                cp "$backup_extract_dir/$config_file" .
+            fi
+        done
+        
+        # Restore cache if present
+        if [ -d "$backup_extract_dir/cache" ]; then
+            echo "  🧠 Restoring cache..."
+            mkdir -p .ontology
+            cp -r "$backup_extract_dir/cache" .ontology/
+        fi
+        
+        # Restore logs if present
+        if [ -d "$backup_extract_dir/logs" ]; then
+            echo "  📋 Restoring logs..."
+            mkdir -p .ontology/logs
+            cp "$backup_extract_dir/logs/"* .ontology/logs/ 2>/dev/null
+        fi
+        
+        echo "  ✅ Restore completed successfully"
+        
+    else
+        echo "  ❌ Failed to extract backup"
+        rm -rf "$temp_dir"
+        exit 1
+    fi
+    
+    # Cleanup
+    rm -rf "$temp_dir"
+    
+    echo ""
+    echo "🎉 Restore completed!"
+    echo "Next steps:"
+    echo "  - just start    # Start the system"
+    echo "  - just health   # Verify system health"
+
+# Verify backup integrity (optional backup name)
+verify-backup backup="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    
+    BACKUP_DIR="backups"
+    backup_name="{{backup}}"
+    
+    if [ -z "$backup_name" ]; then
+        echo "❌ Please specify backup to verify"
+        echo "Usage: just verify-backup <backup-name>"
+        echo ""
+        echo "Available backups:"
+        just list-backups
+        exit 1
+    fi
+    
+    backup_file="$BACKUP_DIR/$backup_name.tar.gz"
+    
+    if [ ! -f "$backup_file" ]; then
+        echo "❌ Backup not found: $backup_file"
+        exit 1
+    fi
+    
+    echo "🔍 Verifying backup: $backup_name"
+    echo ""
+    
+    # Test archive integrity
+    echo "  📦 Testing archive integrity..."
+    if tar -tzf "$backup_file" >/dev/null 2>&1; then
+        echo "    ✅ Archive is readable"
+    else
+        echo "    ❌ Archive is corrupted"
+        exit 1
+    fi
+    
+    # Check contents
+    echo "  📋 Checking contents..."
+    temp_dir=$(mktemp -d)
+    
+    if tar -xzf "$backup_file" -C "$temp_dir"; then
+        backup_extract_dir="$temp_dir/$backup_name"
+        
+        # Check database
+        if [ -f "$backup_extract_dir/db/ontology.sqlite" ]; then
+            echo "    💾 Database file: ✅ Present"
+            
+            # Verify database integrity if sqlite3 is available
+            if command -v sqlite3 >/dev/null 2>&1; then
+                if sqlite3 "$backup_extract_dir/db/ontology.sqlite" "PRAGMA integrity_check;" | grep -q "ok"; then
+                    echo "    💾 Database integrity: ✅ OK"
+                else
+                    echo "    💾 Database integrity: ❌ Corrupted"
+                fi
+            fi
+        else
+            echo "    💾 Database file: ❌ Missing"
+        fi
+        
+        # Check configuration files
+        config_count=0
+        for config_file in .env claude-desktop-config.json .mcp.json ontology-lsp-config.yaml; do
+            if [ -f "$backup_extract_dir/$config_file" ]; then
+                echo "    ⚙️  Configuration ($config_file): ✅ Present"
+                config_count=$((config_count + 1))
+            fi
+        done
+        
+        if [ $config_count -eq 0 ]; then
+            echo "    ⚙️  Configuration files: ⚠️  None found"
+        fi
+        
+        # Check manifest
+        if [ -f "$backup_extract_dir/MANIFEST" ]; then
+            echo "    📄 Manifest: ✅ Present"
+            echo ""
+            echo "  📋 Backup manifest:"
+            cat "$backup_extract_dir/MANIFEST" | sed 's/^/      /'
+        else
+            echo "    📄 Manifest: ⚠️  Missing"
+        fi
+        
+        echo ""
+        echo "  ✅ Backup verification completed"
+        
+    else
+        echo "    ❌ Failed to extract backup for verification"
+        rm -rf "$temp_dir"
+        exit 1
+    fi
+    
+    rm -rf "$temp_dir"
+
+# Clean old backups (keep last 10)
+clean-backups:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    
+    BACKUP_DIR="backups"
+    
+    echo "🧹 Cleaning old backups..."
+    
+    if [ ! -d "$BACKUP_DIR" ]; then
+        echo "No backup directory found"
+        exit 0
+    fi
+    
+    backup_count=$(find "$BACKUP_DIR" -name "*.tar.gz" | wc -l)
+    
+    if [ "$backup_count" -le 10 ]; then
+        echo "  Only $backup_count backups found, no cleanup needed (keeping up to 10)"
+        exit 0
+    fi
+    
+    echo "  Found $backup_count backups, keeping 10 most recent..."
+    
+    # Keep 10 most recent backups, remove the rest
+    find "$BACKUP_DIR" -name "*.tar.gz" -type f -printf '%T@ %p\n' | \
+        sort -rn | \
+        tail -n +11 | \
+        cut -d' ' -f2- | \
+        while read -r file; do
+            backup_name=$(basename "$file" .tar.gz)
+            echo "    🗑️  Removing old backup: $backup_name"
+            rm -f "$file"
+        done
+    
+    remaining_count=$(find "$BACKUP_DIR" -name "*.tar.gz" | wc -l)
+    echo "  ✅ Cleanup completed, $remaining_count backups remaining"
+
+# Test all diagnostic tools
+test-diagnostics:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    
+    echo "🧪 Testing Diagnostic Functions"
+    echo "==============================="
+    
+    test_passed=0
+    test_failed=0
+    
+    # Test function
+    run_test() {
+        local test_name="$1"
+        local test_command="$2"
+        local expected_exit_codes="${3:-0}"
+        
+        echo ""
+        echo "Testing: $test_name"
+        
+        # Run the command and capture output/exit code
+        if timeout 30s bash -c "$test_command" >/dev/null 2>&1; then
+            exit_code=$?
+        else
+            exit_code=$?
+            if [ $exit_code -eq 124 ]; then
+                echo "⏰ Test timed out (30s limit)"
+                ((test_failed++))
+                return 1
+            fi
+        fi
+        
+        # Check if exit code is acceptable
+        exit_code_ok=false
+        IFS='|' read -ra ACCEPTABLE_CODES <<< "$expected_exit_codes"
+        for code in "${ACCEPTABLE_CODES[@]}"; do
+            if [ $exit_code -eq $code ]; then
+                exit_code_ok=true
+                break
+            fi
+        done
+        
+        if [ "$exit_code_ok" = true ]; then
+            echo "✅ $test_name: PASSED (exit code: $exit_code)"
+            ((test_passed++))
+        else
+            echo "❌ $test_name: FAILED (exit code: $exit_code, expected: $expected_exit_codes)"
+            ((test_failed++))
+        fi
+    }
+    
+    echo "🔍 Testing diagnostic functions..."
+    
+    # Test each diagnostic function
+    run_test "Health check" "just health-check" "0|1"
+    run_test "Log analysis" "just analyze-logs" "0|1|2"
+    run_test "Diagnostic collection" "just diagnostics"
+    run_test "Backup listing" "just list-backups"
+    
+    # Test backup functions if directory exists
+    if [ -d backups ] && [ "$(find backups -name "*.tar.gz" | wc -l)" -gt 0 ]; then
+        backup_file=$(find backups -name "*.tar.gz" | head -1)
+        backup_name=$(basename "$backup_file" .tar.gz)
+        run_test "Backup verification" "just verify-backup $backup_name"
+    else
+        echo ""
+        echo "⚠️  Skipping backup verification test (no backups found)"
+    fi
+    
+    # Test dependency availability
+    echo ""
+    echo "🔧 Checking diagnostic dependencies:"
+    
+    deps_ok=true
+    
+    # Check for required commands
+    for cmd in curl sqlite3 lsof grep awk sed tar; do
+        if command -v "$cmd" >/dev/null 2>&1; then
+            echo "  ✅ $cmd: available"
+        else
+            echo "  ⚠️  $cmd: not available (some features may not work)"
+            if [ "$cmd" = "curl" ] || [ "$cmd" = "sqlite3" ]; then
+                deps_ok=false
+            fi
+        fi
+    done
+    
+    # Check for optional but useful commands  
+    for cmd in jq free df ps pgrep lsof netstat; do
+        if command -v "$cmd" >/dev/null 2>&1; then
+            echo "  ✅ $cmd: available"
+        else
+            echo "  ℹ️  $cmd: not available (optional, but recommended)"
+        fi
+    done
+    
+    if [ "$deps_ok" = true ]; then
+        echo "  ✅ All critical dependencies available"
+        ((test_passed++))
+    else
+        echo "  ❌ Missing critical dependencies"
+        ((test_failed++))
+    fi
+    
+    # Test file structure
+    echo ""
+    echo "📁 Validating expected file structure:"
+    
+    expected_files=(
+        "docs/TROUBLESHOOTING.md"
+        "justfile"
+        "src/core/config/server-config.ts"
+    )
+    
+    for file in "${expected_files[@]}"; do
+        if [ -f "$file" ]; then
+            echo "  ✅ $file: exists"
+            ((test_passed++))
+        else
+            echo "  ❌ $file: missing"
+            ((test_failed++))
+        fi
+    done
+    
+    # Test if .ontology directory can be created (simulate initialization)
+    echo ""
+    echo "📂 Testing directory creation:"
+    
+    test_dir=".test_ontology_$$"
+    if mkdir -p "$test_dir/db" "$test_dir/logs" "$test_dir/pids" 2>/dev/null; then
+        echo "  ✅ Can create required directories"
+        rm -rf "$test_dir"
+        ((test_passed++))
+    else
+        echo "  ❌ Cannot create required directories (permission issue?)"
+        ((test_failed++))
+    fi
+    
+    # Summary
+    echo ""
+    echo "=============================="
+    echo "🎯 Test Summary"
+    echo "=============================="
+    echo "✅ Tests passed: $test_passed"
+    echo "❌ Tests failed: $test_failed"
+    echo "📊 Total tests: $((test_passed + test_failed))"
+    
+    if [ $test_failed -eq 0 ]; then
+        echo ""
+        echo "🎉 All diagnostic tools are working correctly!"
+        echo ""
+        echo "Available diagnostic commands:"
+        echo "  just health-check        # System health check"
+        echo "  just analyze-logs        # Log analysis"
+        echo "  just diagnostics         # Full diagnostic report"
+        echo "  just save-diagnostics    # Save diagnostic report to file"
+        echo "  just backup              # Create system backup"
+        echo "  just list-backups        # List available backups"
+        echo "  just restore-backup      # Restore from backup"
+        echo "  just verify-backup       # Verify backup integrity"
+        echo "  just clean-backups       # Clean old backups"
+        echo ""
+        echo "Documentation:"
+        echo "  docs/TROUBLESHOOTING.md  # Complete troubleshooting guide"
+        
+        exit 0
+    else
+        echo ""
+        echo "⚠️  Some diagnostic tools have issues. Check the errors above."
+        echo "The troubleshooting guide is still available at docs/TROUBLESHOOTING.md"
+        
+        exit 1
+    fi
+
+# Emergency reset (stop everything, clean state, restart)
+emergency-reset:
+    @echo "🚨 EMERGENCY RESET - This will stop all services and clean state"
+    @read -p "Continue? [y/N]: " confirm && [ "$$confirm" = "y" ] || exit 1
+    @echo "🛑 Stopping services..."
+    @just stop >/dev/null 2>&1 || true
+    @pkill -f ontology >/dev/null 2>&1 || true
+    @pkill -f bun >/dev/null 2>&1 || true
+    @echo "🧹 Cleaning state..."
+    @rm -rf .ontology/
+    @echo "🎯 Initializing fresh..."
+    @just init
+    @echo "🚀 Starting clean..."
+    @just start
+    @echo "✅ Emergency reset complete"
+
+# Show troubleshooting guide
+troubleshoot:
+    @echo "📖 Opening troubleshooting guide..."
+    @if command -v less >/dev/null 2>&1; then \
+        less docs/TROUBLESHOOTING.md; \
+    else \
+        cat docs/TROUBLESHOOTING.md; \
+    fi

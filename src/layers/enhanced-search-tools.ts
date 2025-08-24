@@ -139,56 +139,90 @@ interface LegacySearchCache<T> {
     set(key: string, data: T, ttl?: number): void;
     clear(): void;
     size(): number;
-    getStats(): { hits: number; misses: number; hitRate: number };
+    getStats(): { hits: number; misses: number; hitRate: number; evictions?: number };
 }
 
 // Smart cache adapter that wraps SmartCache to provide legacy interface
 class SmartCacheAdapter<T> implements LegacySearchCache<T> {
+    private syncCache = new Map<string, { data: T; timestamp: number; ttl: number }>();
+    private stats = { hits: 0, misses: 0, evictions: 0 };
+
     constructor(private smartCache: SmartCache<T>) {}
 
     get(key: string): T | null {
-        // Use sync wrapper - in practice, SmartCache.get() should be fast for memory cache
-        const result = this.smartCache.get(key);
-        if (result instanceof Promise) {
-            // If it returns a Promise, we can't support sync interface properly
-            // This is a limitation of the legacy interface
-            console.warn('SmartCache returned Promise in sync context, returning null');
-            return null;
+        // Check sync cache first (fast path)
+        const entry = this.syncCache.get(key);
+        if (entry) {
+            // Check if expired
+            if (Date.now() - entry.timestamp <= entry.ttl) {
+                this.stats.hits++;
+                return entry.data;
+            } else {
+                this.syncCache.delete(key);
+            }
         }
-        return result as T | null;
+
+        this.stats.misses++;
+        
+        // Try to get from smart cache asynchronously in the background
+        this.smartCache.get(key).then(result => {
+            if (result) {
+                // Store in sync cache for next access
+                this.syncCache.set(key, {
+                    data: result,
+                    timestamp: Date.now(),
+                    ttl: 300000 // 5 minutes default
+                });
+            }
+        }).catch(() => {
+            // Ignore async errors in sync context
+        });
+
+        return null;
     }
 
     set(key: string, data: T, ttl?: number): void {
-        // Use async set but don't wait for it
-        this.smartCache.set(key, data, { ttl }).catch(error => {
+        const actualTtl = ttl || 300000; // 5 minutes default
+        
+        // Set in sync cache immediately
+        this.syncCache.set(key, {
+            data,
+            timestamp: Date.now(),
+            ttl: actualTtl
+        });
+
+        // Also set in smart cache asynchronously
+        this.smartCache.set(key, data, { ttl: actualTtl }).catch(error => {
             console.warn('SmartCache set failed:', error);
         });
     }
 
     clear(): void {
+        this.syncCache.clear();
+        this.stats = { hits: 0, misses: 0, evictions: 0 };
+        
         this.smartCache.clear().catch(error => {
             console.warn('SmartCache clear failed:', error);
         });
     }
 
     size(): number {
-        return this.smartCache.getSize().entries;
+        return this.syncCache.size;
     }
 
-    getStats(): { hits: number; misses: number; hitRate: number } {
-        const stats = this.smartCache.getStats();
+    getStats(): { hits: number; misses: number; hitRate: number; evictions?: number } {
+        const total = this.stats.hits + this.stats.misses;
         return {
-            hits: stats.hits,
-            misses: stats.misses,
-            hitRate: stats.hitRate
+            ...this.stats,
+            hitRate: total > 0 ? this.stats.hits / total : 0
         };
     }
 }
 
 // Enhanced Grep implementation with smart caching
 export class EnhancedGrep {
-    private cache: LegacySearchCache<EnhancedGrepResult[]>;
-    private smartCache?: SmartCache<EnhancedGrepResult[]>;
+    public cache: LegacySearchCache<EnhancedGrepResult[]>;
+    public smartCache?: SmartCache<EnhancedGrepResult[]>;
     private metrics: PerformanceMetrics = {
         searchCount: 0,
         totalTime: 0,
@@ -198,23 +232,83 @@ export class EnhancedGrep {
     };
 
     constructor(
-        private config: EnhancedToolsConfig = {
+        config: Partial<EnhancedToolsConfig> = {}
+    ) {
+        // Merge with defaults
+        this.config = {
             enableSmartCache: true,
             enableCache: true,
             maxFileSize: 50 * 1024 * 1024, // 50MB
             timeout: 30000, // 30 seconds
             maxConcurrentFiles: 10,
             useRipgrep: true,
-            fallbackToNodeGrep: true
-        }
-    ) {
-        if (config.enableSmartCache) {
-            this.smartCache = createSmartCache<EnhancedGrepResult[]>(config.cacheConfig);
+            fallbackToNodeGrep: true,
+            ...config // User config overrides defaults
+        };
+        
+        if (this.config.enableSmartCache) {
+            this.smartCache = createSmartCache<EnhancedGrepResult[]>(this.config.cacheConfig);
             this.cache = new SmartCacheAdapter(this.smartCache);
         } else {
             // Fallback to a simple in-memory cache for backward compatibility
             this.cache = this.createLegacyCache();
         }
+    }
+
+    private createLegacyCache(): LegacySearchCache<EnhancedGrepResult[]> {
+        const cache = new Map<string, { data: EnhancedGrepResult[]; timestamp: number }>();
+        const stats = { hits: 0, misses: 0 };
+        const TTL = 5 * 60 * 1000; // 5 minutes default TTL
+
+        return {
+            get(key: string): EnhancedGrepResult[] | null {
+                const entry = cache.get(key);
+                if (!entry) {
+                    stats.misses++;
+                    return null;
+                }
+                
+                // Check if expired
+                if (Date.now() - entry.timestamp > TTL) {
+                    cache.delete(key);
+                    stats.misses++;
+                    return null;
+                }
+                
+                stats.hits++;
+                return entry.data;
+            },
+            
+            set(key: string, data: EnhancedGrepResult[], ttl?: number): void {
+                cache.set(key, {
+                    data,
+                    timestamp: Date.now()
+                });
+                
+                // Limit cache size to prevent memory issues
+                if (cache.size > 1000) {
+                    const firstKey = cache.keys().next().value;
+                    if (firstKey) cache.delete(firstKey);
+                }
+            },
+            
+            clear(): void {
+                cache.clear();
+            },
+            
+            size(): number {
+                return cache.size;
+            },
+            
+            getStats(): { hits: number; misses: number; hitRate: number; evictions?: number } {
+                const total = stats.hits + stats.misses;
+                return {
+                    ...stats,
+                    hitRate: total > 0 ? stats.hits / total : 0,
+                    evictions: 0 // Legacy cache doesn't track evictions
+                };
+            }
+        };
     }
 
     async search(params: EnhancedGrepParams): Promise<EnhancedGrepResult[]> {
@@ -409,7 +503,8 @@ export class EnhancedGrep {
                     
                     // Check file size
                     const stats = await fs.stat(fullPath);
-                    if (stats.size > (params.maxFileSize || this.config.maxFileSize)) {
+                    const maxFileSize = params.maxFileSize || this.config.maxFileSize || (50 * 1024 * 1024); // 50MB default
+                    if (stats.size > maxFileSize) {
                         continue;
                     }
                     
@@ -566,11 +661,27 @@ export class EnhancedGrep {
     clearCache(): void {
         this.cache.clear();
     }
+
+    async dispose(): Promise<void> {
+        if (this.smartCache) {
+            await this.smartCache.dispose();
+        }
+    }
 }
 
 // Enhanced Glob implementation
 export class EnhancedGlob {
-    private smartCache?: SmartCache<EnhancedGlobResult>;
+    public cache: LegacySearchCache<EnhancedGlobResult>;
+    public smartCache?: SmartCache<EnhancedGlobResult>;
+    private config: {
+        enableSmartCache?: boolean;
+        cacheConfig?: Partial<SmartCacheConfig>;
+        enableCache?: boolean;
+        timeout?: number;
+        maxFiles?: number;
+        respectGitignore?: boolean;
+        followSymlinks?: boolean;
+    };
     private metrics: PerformanceMetrics = {
         searchCount: 0,
         totalTime: 0,
@@ -580,14 +691,34 @@ export class EnhancedGlob {
     };
 
     constructor(
-        private config = {
+        config: {
+            enableSmartCache?: boolean;
+            cacheConfig?: Partial<SmartCacheConfig>;
+            enableCache?: boolean;
+            timeout?: number;
+            maxFiles?: number;
+            respectGitignore?: boolean;
+            followSymlinks?: boolean;
+        } = {}
+    ) {
+        // Merge with defaults
+        this.config = {
+            enableSmartCache: true,
             enableCache: true,
             timeout: 30000,
             maxFiles: 10000,
             respectGitignore: true,
-            followSymlinks: false
+            followSymlinks: false,
+            ...config // User config overrides defaults
+        };
+        
+        if (this.config.enableSmartCache) {
+            this.smartCache = createSmartCache<EnhancedGlobResult>(this.config.cacheConfig);
+            this.cache = new SmartCacheAdapter(this.smartCache);
+        } else {
+            this.cache = this.createLegacyCache();
         }
-    ) {}
+    }
 
     async search(params: EnhancedGlobParams): Promise<EnhancedGlobResult> {
         const startTime = Date.now();
@@ -708,11 +839,82 @@ export class EnhancedGlob {
     clearCache(): void {
         this.cache.clear();
     }
+
+    async dispose(): Promise<void> {
+        if (this.smartCache) {
+            await this.smartCache.dispose();
+        }
+    }
+
+    private createLegacyCache(): LegacySearchCache<EnhancedGlobResult> {
+        const cache = new Map<string, { data: EnhancedGlobResult; timestamp: number }>();
+        const stats = { hits: 0, misses: 0 };
+        const TTL = 5 * 60 * 1000; // 5 minutes default TTL
+
+        return {
+            get(key: string): EnhancedGlobResult | null {
+                const entry = cache.get(key);
+                if (!entry) {
+                    stats.misses++;
+                    return null;
+                }
+                
+                // Check if expired
+                if (Date.now() - entry.timestamp > TTL) {
+                    cache.delete(key);
+                    stats.misses++;
+                    return null;
+                }
+                
+                stats.hits++;
+                return entry.data;
+            },
+            
+            set(key: string, data: EnhancedGlobResult, ttl?: number): void {
+                cache.set(key, {
+                    data,
+                    timestamp: Date.now()
+                });
+                
+                // Limit cache size to prevent memory issues
+                if (cache.size > 1000) {
+                    const firstKey = cache.keys().next().value;
+                    if (firstKey) cache.delete(firstKey);
+                }
+            },
+            
+            clear(): void {
+                cache.clear();
+            },
+            
+            size(): number {
+                return cache.size;
+            },
+            
+            getStats(): { hits: number; misses: number; hitRate: number; evictions?: number } {
+                const total = stats.hits + stats.misses;
+                return {
+                    ...stats,
+                    hitRate: total > 0 ? stats.hits / total : 0,
+                    evictions: 0 // Legacy cache doesn't track evictions
+                };
+            }
+        };
+    }
 }
 
 // Enhanced LS implementation
 export class EnhancedLS {
-    private smartCache?: SmartCache<EnhancedLSResult>;
+    public cache: LegacySearchCache<EnhancedLSResult>;
+    public smartCache?: SmartCache<EnhancedLSResult>;
+    private config: {
+        enableSmartCache?: boolean;
+        cacheConfig?: Partial<SmartCacheConfig>;
+        enableCache?: boolean;
+        timeout?: number;
+        maxEntries?: number;
+        includeMimeType?: boolean;
+    };
     private metrics: PerformanceMetrics = {
         searchCount: 0,
         totalTime: 0,
@@ -722,13 +924,32 @@ export class EnhancedLS {
     };
 
     constructor(
-        private config = {
+        config: {
+            enableSmartCache?: boolean;
+            cacheConfig?: Partial<SmartCacheConfig>;
+            enableCache?: boolean;
+            timeout?: number;
+            maxEntries?: number;
+            includeMimeType?: boolean;
+        } = {}
+    ) {
+        // Merge with defaults
+        this.config = {
+            enableSmartCache: true,
             enableCache: true,
             timeout: 30000,
             maxEntries: 5000,
-            includeMimeType: false
+            includeMimeType: false,
+            ...config // User config overrides defaults
+        };
+        
+        if (this.config.enableSmartCache) {
+            this.smartCache = createSmartCache<EnhancedLSResult>(this.config.cacheConfig);
+            this.cache = new SmartCacheAdapter(this.smartCache);
+        } else {
+            this.cache = this.createLegacyCache();
         }
-    ) {}
+    }
 
     async list(params: EnhancedLSParams): Promise<EnhancedLSResult> {
         const startTime = Date.now();
@@ -989,6 +1210,68 @@ export class EnhancedLS {
     clearCache(): void {
         this.cache.clear();
     }
+
+    async dispose(): Promise<void> {
+        if (this.smartCache) {
+            await this.smartCache.dispose();
+        }
+    }
+
+    private createLegacyCache(): LegacySearchCache<EnhancedLSResult> {
+        const cache = new Map<string, { data: EnhancedLSResult; timestamp: number }>();
+        const stats = { hits: 0, misses: 0 };
+        const TTL = 5 * 60 * 1000; // 5 minutes default TTL
+
+        return {
+            get(key: string): EnhancedLSResult | null {
+                const entry = cache.get(key);
+                if (!entry) {
+                    stats.misses++;
+                    return null;
+                }
+                
+                // Check if expired
+                if (Date.now() - entry.timestamp > TTL) {
+                    cache.delete(key);
+                    stats.misses++;
+                    return null;
+                }
+                
+                stats.hits++;
+                return entry.data;
+            },
+            
+            set(key: string, data: EnhancedLSResult, ttl?: number): void {
+                cache.set(key, {
+                    data,
+                    timestamp: Date.now()
+                });
+                
+                // Limit cache size to prevent memory issues
+                if (cache.size > 1000) {
+                    const firstKey = cache.keys().next().value;
+                    if (firstKey) cache.delete(firstKey);
+                }
+            },
+            
+            clear(): void {
+                cache.clear();
+            },
+            
+            size(): number {
+                return cache.size;
+            },
+            
+            getStats(): { hits: number; misses: number; hitRate: number; evictions?: number } {
+                const total = stats.hits + stats.misses;
+                return {
+                    ...stats,
+                    hitRate: total > 0 ? stats.hits / total : 0,
+                    evictions: 0 // Legacy cache doesn't track evictions
+                };
+            }
+        };
+    }
 }
 
 // Unified enhanced search tools factory
@@ -1041,6 +1324,78 @@ export class EnhancedSearchTools {
             ls: checks[2].status === 'fulfilled' ? checks[2].value : false
         };
     }
+
+    // Get unified cache statistics
+    getCacheStats() {
+        return {
+            grep: this.grep.getCacheStats(),
+            glob: this.glob.getCacheStats(),
+            ls: this.ls.getCacheStats()
+        };
+    }
+
+    // Get unified cache size information
+    getCacheSize() {
+        return {
+            grep: this.grep.smartCache ? this.grep.smartCache.getSize() : { entries: this.grep.cache.size(), memoryBytes: 0, watchers: 0 },
+            glob: this.glob.smartCache ? this.glob.smartCache.getSize() : { entries: this.glob.cache.size(), memoryBytes: 0, watchers: 0 },
+            ls: this.ls.smartCache ? this.ls.smartCache.getSize() : { entries: this.ls.cache.size(), memoryBytes: 0, watchers: 0 }
+        };
+    }
+
+    // Clear all caches
+    async clearAllCaches(): Promise<void> {
+        await Promise.all([
+            this.grep.smartCache?.clear(),
+            this.glob.smartCache?.clear(), 
+            this.ls.smartCache?.clear()
+        ]);
+        
+        this.grep.clearCache();
+        this.glob.clearCache();
+        this.ls.clearCache();
+    }
+
+    // Dispose all resources
+    async dispose(): Promise<void> {
+        await Promise.all([
+            this.grep.dispose(),
+            this.glob.dispose(),
+            this.ls.dispose()
+        ]);
+    }
+}
+
+// Factory function for creating enhanced search tools with custom configuration
+export function createEnhancedSearchTools(config?: {
+    globalSmartCache?: Partial<SmartCacheConfig>;
+    grep?: Partial<EnhancedToolsConfig>;
+    glob?: Partial<EnhancedGlob['config']>;
+    ls?: Partial<EnhancedLS['config']>;
+}): EnhancedSearchTools {
+    const grepConfig = {
+        ...config?.grep,
+        enableSmartCache: true,
+        cacheConfig: config?.globalSmartCache
+    };
+    
+    const globConfig = {
+        ...config?.glob,
+        enableSmartCache: true,
+        cacheConfig: config?.globalSmartCache
+    };
+    
+    const lsConfig = {
+        ...config?.ls,
+        enableSmartCache: true,
+        cacheConfig: config?.globalSmartCache
+    };
+
+    return new EnhancedSearchTools({
+        grep: grepConfig as any,
+        glob: globConfig as any,
+        ls: lsConfig as any
+    });
 }
 
 // Export default instance

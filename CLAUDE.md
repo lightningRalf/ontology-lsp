@@ -33,10 +33,46 @@ For every session, you MUST:
    - Final update to NEXT_STEPS.md  
    - Summary of accomplishments and blockers
 
+## CRITICAL: Justfile-First Philosophy
+
+**ALWAYS use justfile recipes instead of creating standalone scripts.**
+
+This project follows a **justfile-first** approach for ALL automation:
+- ✅ **DO**: Implement all commands as justfile recipes
+- ✅ **DO**: Keep all logic inline in the justfile
+- ✅ **DO**: Use `just <command>` for all operations
+- ❌ **DON'T**: Create standalone bash/shell scripts
+- ❌ **DON'T**: Create separate script files that justfile calls
+- ❌ **DON'T**: Scatter commands across multiple files
+
+**Why**: The justfile is our single source of truth for all project commands. This ensures consistency, discoverability, and maintainability.
+
+**Example of CORRECT approach:**
+```just
+# Good - logic is in justfile
+health-check:
+    @echo "🩺 Running health check..."
+    @curl -s http://localhost:7000/health || echo "API not responding"
+```
+
+**Example of INCORRECT approach:**
+```just
+# Bad - calling external script
+health-check:
+    @./scripts/health-check.sh  # DON'T DO THIS
+```
+
 ## Project Overview
 
 This is an Ontology-Enhanced LSP (Language Server Protocol) proxy that provides intelligent code navigation, refactoring, and pattern learning capabilities. It's designed to handle LLM-generated code with fuzzy matching and adaptive learning. The project uses Bun runtime (not Node.js) for better performance and native SQLite support.
 
+
+### Command Management via Justfile
+
+**IMPORTANT**: All project commands are in the justfile. To see available commands:
+```bash
+just --list        # Show all available commands
+```
 
 ### Server Management
 Use `just` commands to manage all servers (HTTP API, MCP SSE, LSP):
@@ -54,6 +90,21 @@ just status       # Show which servers are running
 just health       # Check server health endpoints
 just logs         # Tail server logs
 just dev          # Development mode with auto-reload
+```
+
+### Diagnostic Commands (All inline in justfile)
+```bash
+just health-check        # Comprehensive system health check
+just analyze-logs        # Analyze logs for errors and patterns
+just diagnostics         # Full system diagnostic report
+just save-diagnostics    # Save diagnostic report to file
+just backup              # Create system backup
+just list-backups        # List available backups
+just restore-backup <name>  # Restore from specific backup
+just verify-backup <name>   # Verify backup integrity
+just clean-backups       # Remove old backups
+just test-diagnostics    # Test diagnostic functionality
+just emergency-reset     # Nuclear option - full reset
 ```
 
 ### CLI Tool

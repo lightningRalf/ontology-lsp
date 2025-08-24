@@ -519,6 +519,17 @@ export function safeJsonParse(jsonString: string, fallback: any = null): any {
 }
 
 /**
+ * Strict JSON parse that throws on invalid JSON
+ */
+export function strictJsonParse(jsonString: string): any {
+  try {
+    return JSON.parse(jsonString);
+  } catch (error) {
+    throw new Error(`Invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
  * Debounce function for performance optimization
  */
 export function debounce<T extends (...args: any[]) => any>(

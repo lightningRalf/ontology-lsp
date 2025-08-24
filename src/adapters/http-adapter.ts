@@ -25,7 +25,8 @@ import {
   normalizePosition,
   createPosition,
   normalizeUri,
-  safeJsonParse
+  safeJsonParse,
+  strictJsonParse
 } from './utils.js';
 
 export interface HTTPAdapterConfig {
@@ -136,6 +137,8 @@ export class HTTPAdapter {
           return method === 'POST' ? this.handleAnalyze(request) : this.methodNotAllowed();
         case '/stats':
           return method === 'GET' ? this.handleStats() : this.methodNotAllowed();
+        case '/monitoring':
+          return method === 'GET' ? this.handleMonitoring() : this.methodNotAllowed();
         default:
           return this.notFound();
       }
@@ -148,76 +151,78 @@ export class HTTPAdapter {
    * Handle POST /api/v1/definition
    */
   private async handleFindDefinition(request: HTTPRequest): Promise<HTTPResponse> {
-    const body = safeJsonParse(request.body || '{}', {});
-    validateRequired(body, ['identifier']);
+    try {
+      const body = strictJsonParse(request.body || '{}');
+      validateRequired(body, ['identifier']);
 
-    const position = body.position ? 
-      normalizePosition(body.position) : 
-      createPosition(0, 0);
+      const position = body.position ? 
+        normalizePosition(body.position) : 
+        createPosition(0, 0);
 
-    const coreRequest = buildFindDefinitionRequest({
-      uri: normalizeUri(body.file || body.uri || 'file://unknown'),
-      position,
-      identifier: body.identifier,
-      maxResults: body.maxResults || this.config.maxResults,
-      includeDeclaration: body.includeDeclaration ?? true
-    });
+      const coreRequest = buildFindDefinitionRequest({
+        uri: normalizeUri(body.file || body.uri || 'file://unknown'),
+        position,
+        identifier: body.identifier,
+        maxResults: body.maxResults || this.config.maxResults,
+        includeDeclaration: body.includeDeclaration ?? true
+      });
 
-    const result = await this.coreAnalyzer.findDefinition(coreRequest);
-    
-    return {
-      status: 200,
-      headers: {},
-      body: JSON.stringify({
-        success: true,
-        data: {
-          definitions: result.data.map(def => definitionToApiResponse(def)),
-          count: result.data.length,
+      const result = await this.coreAnalyzer.findDefinition(coreRequest);
+      
+      return {
+        status: 200,
+        headers: {},
+        body: JSON.stringify({
+          success: true,
+          data: result.data.map(def => definitionToApiResponse(def)),
           performance: result.performance,
           requestId: result.requestId,
           timestamp: result.timestamp,
           cacheHit: result.cacheHit
-        }
-      })
-    };
+        })
+      };
+    } catch (error) {
+      return this.createErrorResponse(400, 'Bad Request', error);
+    }
   }
 
   /**
    * Handle POST /api/v1/references
    */
   private async handleFindReferences(request: HTTPRequest): Promise<HTTPResponse> {
-    const body = safeJsonParse(request.body || '{}', {});
-    validateRequired(body, ['identifier']);
+    try {
+      const body = strictJsonParse(request.body || '{}');
+      validateRequired(body, ['identifier']);
 
-    const position = body.position ? 
-      normalizePosition(body.position) : 
-      createPosition(0, 0);
+      const position = body.position ? 
+        normalizePosition(body.position) : 
+        createPosition(0, 0);
 
-    const coreRequest = buildFindReferencesRequest({
-      uri: normalizeUri(body.file || body.uri || 'file://workspace'),
-      position,
-      identifier: body.identifier,
-      maxResults: body.maxResults || this.config.maxResults,
-      includeDeclaration: body.includeDeclaration ?? false
-    });
+      const coreRequest = buildFindReferencesRequest({
+        uri: normalizeUri(body.file || body.uri || 'file://workspace'),
+        position,
+        identifier: body.identifier,
+        maxResults: body.maxResults || this.config.maxResults,
+        includeDeclaration: body.includeDeclaration ?? false
+      });
 
-    const result = await this.coreAnalyzer.findReferences(coreRequest);
-    
-    return {
-      status: 200,
-      headers: {},
-      body: JSON.stringify({
-        success: true,
-        data: {
-          references: result.data.map(ref => referenceToApiResponse(ref)),
-          count: result.data.length,
+      const result = await this.coreAnalyzer.findReferences(coreRequest);
+      
+      return {
+        status: 200,
+        headers: {},
+        body: JSON.stringify({
+          success: true,
+          data: result.data.map(ref => referenceToApiResponse(ref)),
           performance: result.performance,
           requestId: result.requestId,
           timestamp: result.timestamp,
           cacheHit: result.cacheHit
-        }
-      })
-    };
+        })
+      };
+    } catch (error) {
+      return this.createErrorResponse(400, 'Bad Request', error);
+    }
   }
 
   /**
@@ -262,31 +267,34 @@ export class HTTPAdapter {
    * Handle POST /api/v1/completions
    */
   private async handleCompletions(request: HTTPRequest): Promise<HTTPResponse> {
-    const body = safeJsonParse(request.body || '{}', {});
-    validateRequired(body, ['file', 'position']);
+    try {
+      const body = strictJsonParse(request.body || '{}');
+      validateRequired(body, ['position']);
 
-    const coreRequest = buildCompletionRequest({
-      uri: normalizeUri(body.file),
-      position: normalizePosition(body.position),
-      triggerCharacter: body.triggerCharacter,
-      maxResults: body.maxResults || this.config.maxResults
-    });
+      const coreRequest = buildCompletionRequest({
+        uri: normalizeUri(body.file || body.uri || 'file://unknown'),
+        position: normalizePosition(body.position),
+        triggerCharacter: body.triggerCharacter,
+        maxResults: body.maxResults || this.config.maxResults
+      });
 
-    const result = await this.coreAnalyzer.getCompletions(coreRequest);
-    
-    return {
-      status: 200,
-      headers: {},
-      body: JSON.stringify({
-        success: true,
-        data: {
-          completions: result.data,
-          count: result.data.length,
+      const result = await this.coreAnalyzer.getCompletions(coreRequest);
+      
+      return {
+        status: 200,
+        headers: {},
+        body: JSON.stringify({
+          success: true,
+          data: result.data,
           performance: result.performance,
-          requestId: result.requestId
-        }
-      })
-    };
+          requestId: result.requestId,
+          timestamp: result.timestamp,
+          cacheHit: result.cacheHit
+        })
+      };
+    } catch (error) {
+      return this.createErrorResponse(400, 'Bad Request', error);
+    }
   }
 
   /**
@@ -323,6 +331,121 @@ export class HTTPAdapter {
         }
       })
     };
+  }
+
+  /**
+   * Handle GET /api/v1/monitoring - Enhanced monitoring data for dashboard
+   */
+  private async handleMonitoring(): Promise<HTTPResponse> {
+    try {
+      const diagnostics = this.coreAnalyzer.getDiagnostics();
+      const monitoring = diagnostics.monitoring || {};
+      
+      // Get detailed monitoring stats if available
+      let detailedStats = {};
+      if (this.coreAnalyzer.getDetailedStats) {
+        detailedStats = await this.coreAnalyzer.getDetailedStats();
+      }
+      
+      return {
+        status: 200,
+        headers: {},
+        body: JSON.stringify({
+          success: true,
+          data: {
+            // System health
+            systemHealth: {
+              status: monitoring.healthy ? 'healthy' : 'degraded',
+              uptime: monitoring.uptime || 0,
+              timestamp: Date.now()
+            },
+            
+            // Performance metrics
+            performance: {
+              totalRequests: monitoring.totalRequests || 0,
+              averageLatency: monitoring.averageLatency || 0,
+              p95Latency: monitoring.p95Latency || 0,
+              p99Latency: monitoring.p99Latency || 0,
+              errorRate: monitoring.errorRate || 0
+            },
+            
+            // Cache metrics
+            cache: {
+              hitRate: monitoring.cacheHitRate || 0,
+              hits: monitoring.cacheHits || 0,
+              misses: monitoring.cacheMisses || 0,
+              totalRequests: (monitoring.cacheHits || 0) + (monitoring.cacheMisses || 0)
+            },
+            
+            // Layer performance breakdown
+            layers: this.formatLayerBreakdown(monitoring.layerBreakdown || {}),
+            
+            // Recent errors
+            recentErrors: monitoring.recentErrors || [],
+            
+            // Learning statistics
+            learning: {
+              patternsLearned: diagnostics.patternsCount || 0,
+              conceptsTracked: diagnostics.conceptsCount || 0,
+              learningAccuracy: diagnostics.learningAccuracy || 0,
+              totalAnalyses: diagnostics.totalAnalyses || 0
+            },
+            
+            // Additional stats from detailed monitoring
+            ...detailedStats,
+            
+            timestamp: Date.now()
+          }
+        })
+      };
+    } catch (error) {
+      return this.createErrorResponse(500, 'Failed to get monitoring data', error);
+    }
+  }
+
+  /**
+   * Format layer breakdown data for dashboard consumption
+   */
+  private formatLayerBreakdown(layerBreakdown: Record<string, any>): Record<string, any> {
+    const layerNames = {
+      layer1: 'Fast Search',
+      layer2: 'AST Analysis',
+      layer3: 'Semantic Graph',
+      layer4: 'Pattern Mining', 
+      layer5: 'Knowledge Spread'
+    };
+    
+    const formatted: Record<string, any> = {};
+    
+    for (const [layerId, metrics] of Object.entries(layerBreakdown)) {
+      formatted[layerId] = {
+        name: layerNames[layerId as keyof typeof layerNames] || layerId,
+        requestCount: metrics.requestCount || 0,
+        averageLatency: metrics.averageLatency || 0,
+        errorCount: metrics.errorCount || 0,
+        errorRate: metrics.requestCount > 0 ? 
+          (metrics.errorCount || 0) / metrics.requestCount : 0,
+        healthy: (metrics.averageLatency || 0) < this.getLayerLatencyThreshold(layerId) &&
+                 ((metrics.errorCount || 0) / Math.max(metrics.requestCount || 1, 1)) < 0.05
+      };
+    }
+    
+    return formatted;
+  }
+
+  /**
+   * Get latency threshold for layer health check
+   */
+  private getLayerLatencyThreshold(layer: string): number {
+    const thresholds = {
+      layer1: 10,   // 5ms target * 2
+      layer2: 100,  // 50ms target * 2
+      layer3: 20,   // 10ms target * 2
+      layer4: 20,   // 10ms target * 2
+      layer5: 40    // 20ms target * 2
+    };
+    
+    return thresholds[layer as keyof typeof thresholds] || 100;
   }
 
   /**

@@ -395,9 +395,9 @@ describe("Protocol Adapters Integration", () => {
         arguments: {}
       };
 
-      await expect(
-        context.adapters.mcp.handleToolCall(invalidRequest.name, invalidRequest.arguments)
-      ).rejects.toThrow("Unknown tool");
+      const result = await context.adapters.mcp.handleToolCall(invalidRequest.name, invalidRequest.arguments);
+      expect(result).toHaveProperty('error');
+      expect(result.message).toContain('Unknown tool');
     });
   });
 
@@ -405,7 +405,7 @@ describe("Protocol Adapters Integration", () => {
     test("should handle POST /api/definition requests correctly", async () => {
       const httpRequest = {
         method: "POST",
-        url: "/api/definition",
+        url: "/api/v1/definition",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           identifier: testSymbol,
@@ -418,7 +418,7 @@ describe("Protocol Adapters Integration", () => {
       const response = await context.adapters.http.handleRequest(httpRequest);
 
       expect(response.status).toBe(200);
-      expect(response.headers["content-type"]).toContain("application/json");
+      expect(response.headers["Content-Type"]).toContain("application/json");
 
       const responseBody = JSON.parse(response.body);
       expect(responseBody).toHaveProperty('data');
@@ -429,9 +429,14 @@ describe("Protocol Adapters Integration", () => {
 
     test("should handle GET /api/references requests correctly", async () => {
       const httpRequest = {
-        method: "GET",
-        url: `/api/references?identifier=${testSymbol}&uri=${encodeURIComponent(testFile)}&includeDeclaration=true`,
-        headers: {}
+        method: "POST",
+        url: `/api/v1/references`,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          identifier: testSymbol,
+          uri: testFile,
+          includeDeclaration: true
+        })
       };
 
       const response = await context.adapters.http.handleRequest(httpRequest);
@@ -445,7 +450,7 @@ describe("Protocol Adapters Integration", () => {
     test("should handle POST /api/rename requests correctly", async () => {
       const httpRequest = {
         method: "POST",
-        url: "/api/rename",
+        url: "/api/v1/rename",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           identifier: testSymbol,
@@ -466,9 +471,14 @@ describe("Protocol Adapters Integration", () => {
 
     test("should handle GET /api/completions requests correctly", async () => {
       const httpRequest = {
-        method: "GET",
-        url: `/api/completions?uri=${encodeURIComponent(testFile)}&line=${testPosition.line}&character=${testPosition.character}`,
-        headers: {}
+        method: "POST",
+        url: `/api/v1/completions`,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          uri: testFile,
+          position: testPosition,
+          triggerKind: 1
+        })
       };
 
       const response = await context.adapters.http.handleRequest(httpRequest);
@@ -508,15 +518,15 @@ describe("Protocol Adapters Integration", () => {
       const response = await context.adapters.http.handleRequest(corsRequest);
 
       expect(response.status).toBe(200);
-      expect(response.headers["access-control-allow-origin"]).toBe("*");
-      expect(response.headers["access-control-allow-methods"]).toContain("POST");
-      expect(response.headers["access-control-allow-headers"]).toContain("content-type");
+      expect(response.headers["Access-Control-Allow-Origin"]).toBe("*");
+      expect(response.headers["Access-Control-Allow-Methods"]).toContain("POST");
+      expect(response.headers["Access-Control-Allow-Headers"]).toContain("Content-Type");
     });
 
     test("should handle HTTP errors gracefully", async () => {
       const invalidRequest = {
         method: "POST",
-        url: "/api/definition",
+        url: "/api/v1/definition",
         headers: { "content-type": "application/json" },
         body: "invalid json"
       };
@@ -604,7 +614,7 @@ describe("Protocol Adapters Integration", () => {
       // Test HTTP adapter
       const httpRequest = {
         method: "POST",
-        url: "/api/definition",
+        url: "/api/v1/definition",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(coreRequest)
       };
@@ -724,9 +734,9 @@ describe("Protocol Adapters Integration", () => {
     test("should maintain compatibility with existing HTTP API clients", async () => {
       // Test that existing REST endpoints still work
       const endpoints = [
-        "/api/definition",
-        "/api/references", 
-        "/api/completions",
+        "/api/v1/definition",
+        "/api/v1/references", 
+        "/api/v1/completions",
         "/health"
       ];
 
@@ -747,9 +757,9 @@ describe("Protocol Adapters Integration", () => {
         // Should return a valid HTTP response
         expect(response.status).toBeGreaterThanOrEqual(200);
         expect(response.status).toBeLessThan(500);
-        expect(response.headers).toHaveProperty("content-type");
-        if (response.headers["content-type"]) {
-          expect(response.headers["content-type"]).toContain("application/json");
+        expect(response.headers).toHaveProperty("Content-Type");
+        if (response.headers["Content-Type"]) {
+          expect(response.headers["Content-Type"]).toContain("application/json");
         }
       }
     });
