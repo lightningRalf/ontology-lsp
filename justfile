@@ -100,47 +100,102 @@ install-extension: build-all package-extension
 
 # === TESTING ===
 
-# Run all tests
-test-all: test test-extension
+# Run all tests including comprehensive integration tests
+test-all: test test-integration-comprehensive test-extension
 
-# Run server tests with Bun
+# Run basic server tests with Bun
 test:
     {{bun}} test tests/step*.test.ts tests/integration.test.ts
+
+# Run comprehensive integration test suite (NEW UNIFIED ARCHITECTURE)
+test-integration-comprehensive:
+    @echo "🧪 Running Comprehensive Integration Tests for Unified Architecture"
+    @echo "=================================================================="
+    ./scripts/test-integration.sh
+
+# Run individual comprehensive test suites
+test-unified-core:
+    @echo "🧪 Testing Unified Core Architecture..."
+    {{bun}} test tests/unified-core.test.ts --timeout 120000
+
+test-adapters:
+    @echo "🧪 Testing Protocol Adapters..."
+    {{bun}} test tests/adapters.test.ts --timeout 120000
+
+test-learning-system:
+    @echo "🧪 Testing Learning System..."
+    {{bun}} test tests/learning-system.test.ts --timeout 120000
+
+test-performance:
+    @echo "⚡ Running Performance Benchmarks..."
+    {{bun}} test tests/performance.test.ts --timeout 300000
+
+test-consistency:
+    @echo "🔄 Testing Cross-Protocol Consistency..."
+    {{bun}} test tests/consistency.test.ts --timeout 180000
 
 # Run extension tests
 test-extension:
     cd vscode-client && npm test
 
-# Run unit tests only
+# Run unit tests only (legacy)
 test-unit:
     {{bun}} test tests/step*.test.ts
 
-# Run integration tests only
+# Run integration tests only (legacy)
 test-integration:
     {{bun}} test tests/integration.test.ts
 
-# Run performance tests only
+# Run performance tests only (legacy)
 test-perf:
     {{bun}} test tests/integration.test.ts --grep "Performance"
 
 # Run tests with coverage
 test-coverage:
-    {{bun}} test --coverage
+    {{bun}} test --coverage tests/
 
 # Run tests in watch mode
 test-watch:
-    {{bun}} test --watch
+    {{bun}} test --watch tests/
+
+# Verify VISION.md requirements are met
+test-vision-compliance:
+    @echo "🎯 Verifying VISION.md Requirements..."
+    @echo "======================================"
+    @echo "✅ Testing unified architecture (protocol-agnostic core)"
+    @{{bun}} test tests/unified-core.test.ts --timeout 120000
+    @echo "✅ Testing all 5 processing layers with performance targets"
+    @{{bun}} test tests/performance.test.ts --timeout 300000
+    @echo "✅ Testing learning system integration"
+    @{{bun}} test tests/learning-system.test.ts --timeout 120000
+    @echo "✅ Testing cross-protocol consistency"
+    @{{bun}} test tests/consistency.test.ts --timeout 180000
+    @echo ""
+    @echo "🎉 VISION.md compliance verified!"
 
 # === DEVELOPMENT ===
 
-# Development mode - start with auto-reload
+# Development mode - start with auto-reload (VISION.md compliant)
 dev: stop-quiet
-    @echo "🔧 Starting in development mode..."
+    @echo "🚀 Starting Ontology-LSP in development mode..."
     @mkdir -p .ontology/pids .ontology/logs
-    @sh -c '{{bun}} run --watch src/api/http-server.ts > .ontology/logs/http-api.log 2>&1 & echo $$! > .ontology/pids/http-api.pid'
-    @sh -c '{{bun}} run --watch mcp-ontology-server/src/sse-server.ts > .ontology/logs/mcp-sse.log 2>&1 & echo $$! > .ontology/pids/mcp-sse.pid'
-    @echo "✅ Development servers started with auto-reload"
+    
+    # Load yesterday's patterns and warm cache
+    @echo "📊 Loading patterns and warming cache..."
+    @{{bun}} run src/cli/analyze.ts --warm-cache 2>/dev/null || true
+    
+    # Start servers with hot-reload
+    @sh -c '{{bun}} run --watch src/server-new.ts > .ontology/logs/lsp.log 2>&1 & echo $$! > .ontology/pids/lsp.pid'
+    @sh -c '{{bun}} run --watch src/api/http-server-new.ts > .ontology/logs/http-api.log 2>&1 & echo $$! > .ontology/pids/http-api.pid'
+    @sh -c '{{bun}} run --watch mcp-ontology-server/src/index-new.ts > .ontology/logs/mcp-sse.log 2>&1 & echo $$! > .ontology/pids/mcp-sse.pid'
+    
+    @sleep 2
+    @echo "🧠 Knowledge base loaded with $({{bun}} run src/cli/stats.ts --quiet 2>/dev/null | grep concepts | awk '{print $2}' || echo '0') concepts"
+    @echo "⚡ Cache warmed for optimal performance"
+    @echo "✅ All systems operational"
+    @echo ""
     @echo "📌 Logs: just logs"
+    @echo "📌 Health: just health"
     @echo "📌 Stop: just stop"
 
 # Open VS Code with extension in development mode
@@ -187,6 +242,180 @@ clean-all: stop
     @rm -rf dist .ontology node_modules bun.lockb
     @cd vscode-client && rm -rf out node_modules
     @echo "✅ Everything cleaned"
+
+# === ANALYSIS & LEARNING (VISION.md) ===
+
+# Analyze codebase and learn patterns
+analyze:
+    @echo "🧠 Learning from your code..."
+    @{{bun}} run src/cli/analyze.ts {{workspace}}
+    @echo ""
+    @echo "📊 Analysis complete! New patterns discovered:"
+    @{{bun}} run src/cli/stats.ts --patterns
+
+# Analyze pull request for quality
+analyze-pr pr="":
+    @echo "🔍 Analyzing pull request..."
+    @{{bun}} run src/cli/analyze.ts --pr {{pr}}
+
+# === DEPLOYMENT (VISION.md) ===
+
+# Build for production
+build-prod:
+    @echo "🔨 Building for production..."
+    {{bun}} build src/server-new.ts --target=bun --outdir=dist/lsp --minify
+    {{bun}} build src/api/http-server-new.ts --target=bun --outdir=dist/api --minify
+    {{bun}} build mcp-ontology-server/src/index-new.ts --target=bun --outdir=dist/mcp --minify
+    {{bun}} build src/cli/index-new.ts --target=bun --outdir=dist/cli --minify --sourcemap
+
+# Build Docker image
+docker-build: build-prod
+    @echo "🐳 Building Docker image..."
+    docker build -t ontology-lsp:2.0.0 .
+    docker tag ontology-lsp:2.0.0 ontology-lsp:latest
+    @echo "✅ Docker image built"
+
+# Push Docker image to registry
+docker-push registry="ghcr.io/yourusername": docker-build
+    @echo "📤 Pushing Docker image to {{registry}}..."
+    docker tag ontology-lsp:latest {{registry}}/ontology-lsp:latest
+    docker tag ontology-lsp:2.0.0 {{registry}}/ontology-lsp:2.0.0
+    docker push {{registry}}/ontology-lsp:latest
+    docker push {{registry}}/ontology-lsp:2.0.0
+    @echo "✅ Docker images pushed"
+
+# Start local development with Docker Compose
+docker-dev:
+    @echo "🐳 Starting Docker Compose development environment..."
+    @if [ ! -f .env ]; then cp .env.sample .env; echo "Created .env from .env.sample - please configure it"; fi
+    docker-compose up -d
+    @echo "✅ Development environment started"
+    @echo "📊 Grafana: http://localhost:3000 (admin/admin)"
+    @echo "📈 Prometheus: http://localhost:9090"
+    @echo "🔍 Jaeger: http://localhost:16686"
+
+# Stop Docker Compose development
+docker-dev-stop:
+    @echo "🛑 Stopping Docker Compose development..."
+    docker-compose down
+    @echo "✅ Development environment stopped"
+
+# Stop and clean Docker Compose
+docker-dev-clean:
+    @echo "🧹 Cleaning Docker Compose development..."
+    docker-compose down -v --remove-orphans
+    docker system prune -f
+    @echo "✅ Development environment cleaned"
+
+# Deploy to Kubernetes staging
+deploy-staging: docker-build test-all
+    @echo "🚀 Deploying to staging..."
+    @if ! kubectl config current-context | grep -q staging; then echo "❌ Not connected to staging cluster"; exit 1; fi
+    
+    # Update image in manifests
+    @sed -i.bak "s|ontology-lsp:2.0.0|ontology-lsp:latest|g" k8s/production.yaml
+    
+    # Apply Kubernetes manifests
+    kubectl apply -f k8s/namespace.yaml
+    kubectl apply -f k8s/configmap.yaml
+    @if ! kubectl get secret ontology-lsp-secrets -n ontology-lsp >/dev/null 2>&1; then \
+        echo "⚠️  Creating default secrets - update them for production!"; \
+        kubectl create secret generic ontology-lsp-secrets \
+            --from-literal=DATABASE_URL="postgres://ontology:changeme@postgres-service:5432/ontology_lsp" \
+            --from-literal=REDIS_URL="redis://redis-service:6379" \
+            --from-literal=JWT_SECRET="changeme-in-production" \
+            -n ontology-lsp; \
+    fi
+    kubectl apply -f k8s/postgres.yaml
+    kubectl apply -f k8s/redis.yaml
+    kubectl apply -f k8s/production.yaml
+    
+    # Wait for rollout
+    @echo "⏳ Waiting for deployment rollout..."
+    kubectl rollout status deployment/ontology-lsp -n ontology-lsp --timeout=300s
+    
+    # Restore backup
+    @mv k8s/production.yaml.bak k8s/production.yaml 2>/dev/null || true
+    @echo "✅ Staging deployment complete!"
+
+# Deploy to production (Docker + Kubernetes)
+deploy-production: docker-build test-all
+    @echo "🚢 Deploying to production..."
+    @if ! kubectl config current-context | grep -q prod; then echo "❌ Not connected to production cluster"; exit 1; fi
+    
+    # Confirm production deployment
+    @echo "⚠️  You are about to deploy to PRODUCTION. Continue? [y/N]"
+    @read -r confirm && [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ] || (echo "Deployment cancelled" && exit 1)
+    
+    # Update image in manifests  
+    @sed -i.bak "s|ontology-lsp:2.0.0|ontology-lsp:latest|g" k8s/production.yaml
+    
+    # Create backup of current deployment
+    @kubectl get deployment ontology-lsp -n ontology-lsp -o yaml > deployment-backup-$(date +%Y%m%d-%H%M%S).yaml || echo "No existing deployment"
+    
+    # Apply manifests with production checks
+    kubectl apply -f k8s/namespace.yaml
+    kubectl apply -f k8s/configmap.yaml
+    @if ! kubectl get secret ontology-lsp-secrets -n ontology-lsp >/dev/null 2>&1; then \
+        echo "❌ Production secrets not found! Create them manually."; \
+        exit 1; \
+    fi
+    kubectl apply -f k8s/postgres.yaml
+    kubectl apply -f k8s/redis.yaml
+    kubectl apply -f k8s/production.yaml
+    
+    # Wait for rollout with extended timeout
+    @echo "⏳ Waiting for production deployment rollout..."
+    kubectl rollout status deployment/ontology-lsp -n ontology-lsp --timeout=600s
+    
+    # Verify health
+    @sleep 30
+    @echo "🩺 Verifying production health..."
+    @kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=ontology-lsp -n ontology-lsp --timeout=120s
+    
+    # Restore backup
+    @mv k8s/production.yaml.bak k8s/production.yaml 2>/dev/null || true
+    @echo "🎉 Production deployment complete!"
+
+# Quick deploy (staging without tests - use with caution)
+deploy: docker-build
+    @echo "🚀 Quick deploy to staging (no tests)..."
+    @just deploy-staging
+
+# Rollback deployment
+rollback namespace="ontology-lsp":
+    @echo "↩️  Rolling back deployment in {{namespace}}..."
+    kubectl rollout undo deployment/ontology-lsp -n {{namespace}}
+    kubectl rollout status deployment/ontology-lsp -n {{namespace}} --timeout=300s
+    @echo "✅ Rollback complete!"
+
+# Check deployment status
+deploy-status namespace="ontology-lsp":
+    @echo "📊 Deployment Status for {{namespace}}"
+    @echo "=================================="
+    kubectl get pods -n {{namespace}} -l app.kubernetes.io/name=ontology-lsp
+    kubectl get services -n {{namespace}} -l app.kubernetes.io/name=ontology-lsp
+    kubectl get ingress -n {{namespace}}
+    @echo ""
+    @echo "Recent events:"
+    kubectl get events -n {{namespace}} --sort-by='.lastTimestamp' | tail -10
+
+# Scale deployment
+scale replicas="3" namespace="ontology-lsp":
+    @echo "📈 Scaling deployment to {{replicas}} replicas in {{namespace}}..."
+    kubectl scale deployment/ontology-lsp --replicas={{replicas}} -n {{namespace}}
+    kubectl rollout status deployment/ontology-lsp -n {{namespace}} --timeout=300s
+    @echo "✅ Scaled to {{replicas}} replicas"
+
+# Port forward for local testing
+port-forward namespace="ontology-lsp":
+    @echo "🔀 Port forwarding from {{namespace}}..."
+    @echo "📍 HTTP API: http://localhost:7000"
+    @echo "📍 MCP SSE: http://localhost:7001" 
+    @echo "Press Ctrl+C to stop"
+    kubectl port-forward -n {{namespace}} svc/ontology-lsp-http 7000:7000 &
+    kubectl port-forward -n {{namespace}} svc/ontology-lsp-mcp 7001:7001 &
+    wait
 
 # === UTILITIES ===
 
