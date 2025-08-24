@@ -12,8 +12,8 @@
 
 import { serve } from 'bun';
 import { HTTPAdapter, type HTTPRequest } from '../adapters/http-adapter.js';
-import { CodeAnalyzer } from '../core/unified-analyzer.js';
-import { createCodeAnalyzer } from '../core/index.js';
+import { CodeAnalyzer } from '../core/unified-analyzer';
+import { createCodeAnalyzer } from '../core/index';
 import { createDefaultCoreConfig } from '../adapters/utils.js';
 import { getEnvironmentConfig, type ServerConfig } from '../../mcp-ontology-server/src/config/server-config.js';
 

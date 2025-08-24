@@ -19,8 +19,8 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { MCPAdapter } from "../../src/adapters/mcp-adapter.js";
-import { CodeAnalyzer } from "../../src/core/unified-analyzer.js";
-import { createCodeAnalyzer } from "../../src/core/index.js";
+import { CodeAnalyzer } from "../../src/core/unified-analyzer";
+import { createCodeAnalyzer } from "../../src/core/index";
 import { createDefaultCoreConfig } from "../../src/adapters/utils.js";
 
 export class SimpleMCPServer {

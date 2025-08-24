@@ -3,17 +3,20 @@
  * Export all main components and utilities
  */
 
+// Import for internal use
+import { AnalyzerFactory } from './analyzer-factory';
+
 // Core types
-export * from './types.js';
+export * from './types';
 
 // Learning system types
-export type * from '../learning/types.js';
+export type * from '../learning/types';
 
 // Main analyzer components
-export { CodeAnalyzer } from './unified-analyzer.js';
-export { LayerManager, DefaultEventBus } from './layer-manager.js';
-export { SharedServices } from './services/index.js';
-export { AnalyzerFactory } from './analyzer-factory.js';
+export { CodeAnalyzer } from './unified-analyzer';
+export { LayerManager, DefaultEventBus } from './layer-manager';
+export { SharedServices } from './services/index';
+export { AnalyzerFactory };
 
 // Individual services
 export {
@@ -21,7 +24,7 @@ export {
   DatabaseService,
   MonitoringService,
   EventBusService
-} from './services/index.js';
+} from './services/index';
 
 // Learning system components
 export {
@@ -32,12 +35,12 @@ export {
   createLearningSystem,
   LEARNING_SYSTEM_VERSION,
   LEARNING_SYSTEM_METADATA
-} from '../learning/index.js';
+} from '../learning/index';
 
 // Convenience function to create a fully configured analyzer
 export async function createUnifiedAnalyzer(
   workspacePath?: string,
-  config?: Partial<import('./types.js').CoreConfig>
+  config?: Partial<import('./types').CoreConfig>
 ) {
   if (workspacePath) {
     return AnalyzerFactory.createWorkspaceAnalyzer(workspacePath, config);
@@ -53,10 +56,10 @@ export async function createTestAnalyzer() {
 // Convenience function to create a complete system with learning enabled
 export async function createLearningEnabledAnalyzer(
   workspacePath?: string,
-  config?: Partial<import('./types.js').CoreConfig>
+  config?: Partial<import('./types').CoreConfig>
 ): Promise<{
-  analyzer: import('./unified-analyzer.js').CodeAnalyzer;
-  learningSystem: import('../learning/learning-orchestrator.js').LearningOrchestrator;
+  analyzer: import('./unified-analyzer').CodeAnalyzer;
+  learningSystem: import('../learning/learning-orchestrator').LearningOrchestrator;
 }> {
   // Create the unified analyzer
   const analyzer = await createUnifiedAnalyzer(workspacePath, config);
@@ -83,8 +86,8 @@ export async function createLearningEnabledAnalyzer(
 
 // Convenience function that matches adapter expectations
 export async function createCodeAnalyzer(
-  config: Partial<import('./types.js').CoreConfig> & { workspaceRoot?: string }
-): Promise<import('./unified-analyzer.js').CodeAnalyzer> {
+  config: Partial<import('./types').CoreConfig> & { workspaceRoot?: string }
+): Promise<import('./unified-analyzer').CodeAnalyzer> {
   const { workspaceRoot, ...coreConfig } = config;
   
   if (workspaceRoot) {

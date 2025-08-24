@@ -15,7 +15,7 @@ import type {
   Completion,
   WorkspaceEdit,
   CoreConfig
-} from '../core/types.js';
+} from '../core/types';
 
 // ===== URI CONVERSION UTILITIES =====
 
@@ -444,8 +444,11 @@ export function createDefaultCoreConfig(): CoreConfig {
     },
     cache: {
       enabled: true,
-      ttlMs: 300000, // 5 minutes
-      maxSize: 1000
+      strategy: 'memory',
+      memory: {
+        maxSize: 100 * 1024 * 1024, // 100MB
+        ttl: 300 // 5 minutes in seconds
+      }
     },
     performance: {
       enableTiming: true,
