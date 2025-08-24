@@ -870,7 +870,7 @@ export class TeamKnowledgeSystem {
 
       // Load shared patterns with validations and adoptions
       const patternRows = await this.sharedServices.database.query(`
-        SELECT sp.*, p.from_tokens, p.to_tokens, p.confidence, p.occurrences, p.examples, p.last_applied, p.category
+        SELECT sp.*, p.from_pattern, p.to_pattern, p.confidence, p.occurrences, p.examples, p.last_applied, p.category
         FROM shared_patterns sp
         JOIN patterns p ON sp.pattern_id = p.id
       `);
@@ -912,8 +912,8 @@ export class TeamKnowledgeSystem {
         const sharedPattern: SharedPattern = {
           pattern: {
             id: row.pattern_id,
-            from: JSON.parse(row.from_tokens),
-            to: JSON.parse(row.to_tokens),
+            from: JSON.parse(row.from_pattern),
+            to: JSON.parse(row.to_pattern),
             confidence: row.confidence,
             occurrences: row.occurrences,
             examples: JSON.parse(row.examples),

@@ -194,20 +194,21 @@ services:
   # Development Tools
   # ================================
   
-  # Web UI for development and testing
-  web-ui:
-    image: nginx:alpine
-    container_name: ontology-web-ui
-    ports:
-      - "8080:80"
-    volumes:
-      - ./web-ui/dist:/usr/share/nginx/html:ro
-      - ./config/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - ontology-lsp
-    networks:
-      - ontology-network
-    restart: unless-stopped
+  # Web UI for development and testing (COMMENTED OUT - web-ui/dist directory does not exist)
+  # TODO: Uncomment when web-ui is implemented
+  # web-ui:
+  #   image: nginx:alpine
+  #   container_name: ontology-web-ui
+  #   ports:
+  #     - "8080:80"
+  #   volumes:
+  #     - ./web-ui/dist:/usr/share/nginx/html:ro
+  #     - ./config/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+  #   depends_on:
+  #     - ontology-lsp
+  #   networks:
+  #     - ontology-network
+  #   restart: unless-stopped
 
   # Redis Commander for Redis management
   redis-commander:
