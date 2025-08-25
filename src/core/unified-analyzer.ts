@@ -1278,9 +1278,13 @@ export class CodeAnalyzer {
       throw new CoreError('CodeAnalyzer not initialized', 'NOT_INITIALIZED');
     }
     
-    // Validate required identifier field for definition/reference requests
-    if ('identifier' in request && (request.identifier === undefined || request.identifier === null || request.identifier === '')) {
-      throw new InvalidRequestError('Missing required field: identifier');
+    // Validate identifier field for definition/reference requests
+    // Allow empty identifier if position is provided (LSP pattern)
+    if ('identifier' in request && request.identifier !== undefined && request.identifier !== null) {
+      // Only validate non-empty if no position provided or if explicitly required
+      if (request.identifier === '' && !('position' in request && request.position)) {
+        throw new InvalidRequestError('Missing required field: identifier');
+      }
     }
     
     // Validate URI field if present

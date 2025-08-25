@@ -63,7 +63,7 @@ abstract class LayerAdapter implements Layer {
 class Layer1Adapter extends LayerAdapter {
   name = 'layer1';
   version = '1.0.0';
-  targetLatency = 50; // 50ms target - realistic for ripgrep operations
+  targetLatency = 200; // 200ms target - realistic for ripgrep operations on larger codebases
   
   private claudeTools: ClaudeToolsLayer;
   

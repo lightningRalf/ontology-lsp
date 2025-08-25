@@ -353,21 +353,20 @@ describe('Async Enhanced Search Performance', () => {
 describe('Process Pool Management', () => {
     test('should limit concurrent processes', async () => {
         const pool = new RipgrepProcessPool(2); // Max 2 processes
-        let concurrentCount = 0;
         let maxConcurrent = 0;
 
         const executions = [];
         for (let i = 0; i < 5; i++) {
             executions.push((async () => {
-                concurrentCount++;
-                maxConcurrent = Math.max(maxConcurrent, concurrentCount);
-                
                 const process = await pool.execute('echo', ['test']);
+                
+                // Track actual process pool concurrency
+                const currentActive = pool.getActiveCount();
+                maxConcurrent = Math.max(maxConcurrent, currentActive);
                 
                 // Simulate work
                 await new Promise(resolve => setTimeout(resolve, 50));
                 
-                concurrentCount--;
                 process.kill();
             })());
         }

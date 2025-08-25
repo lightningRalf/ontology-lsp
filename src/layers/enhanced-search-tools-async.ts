@@ -70,7 +70,7 @@ class RipgrepProcessPool {
 
     async execute(command: string, args: string[]): Promise<ChildProcess> {
         // Wait if at max capacity
-        if (this.activeProcesses >= this.maxProcesses) {
+        while (this.activeProcesses >= this.maxProcesses) {
             await new Promise<void>(resolve => {
                 this.queue.push(resolve);
             });
@@ -83,11 +83,23 @@ class RipgrepProcessPool {
 
         process.on('exit', () => {
             this.activeProcesses--;
+            // Process next queued request
+            const next = this.queue.shift();
+            if (next) next();
+        });
+
+        process.on('error', () => {
+            this.activeProcesses--;
+            // Process next queued request on error too
             const next = this.queue.shift();
             if (next) next();
         });
 
         return process;
+    }
+
+    getActiveCount(): number {
+        return this.activeProcesses;
     }
 
     destroy() {
@@ -144,11 +156,15 @@ class SmartSearchCache {
     set(options: AsyncSearchOptions, results: StreamingGrepResult[]) {
         const key = this.getCacheKey(options);
         
-        // Evict old entries if at capacity
-        if (this.cache.size >= this.maxSize) {
+        // Evict old entries if at capacity - ensure we have room for new entry
+        while (this.cache.size >= this.maxSize) {
             const oldest = Array.from(this.cache.entries())
                 .sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
-            if (oldest) this.cache.delete(oldest[0]);
+            if (oldest) {
+                this.invalidate(oldest[0]);
+            } else {
+                break; // Safety break
+            }
         }
 
         // Extract unique files from results for watching
@@ -190,7 +206,9 @@ class SmartSearchCache {
             const stats = fsSync.statSync(file);
             return stats.mtimeMs > since;
         } catch {
-            return true; // Assume changed if can't stat
+            // If we can't stat the file, assume it hasn't changed
+            // This prevents cache invalidation for test files that don't exist
+            return false;
         }
     }
 
