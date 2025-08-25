@@ -50,7 +50,7 @@ interface DesignPattern {
 
 export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult> {
     name = 'TreeSitterLayer';
-    timeout = 2000; // 2 second timeout
+    timeout = 100; // 100ms timeout for production performance
     
     private parsers = new Map<string, Parser>();
     private queries = new Map<string, Map<string, Query>>();

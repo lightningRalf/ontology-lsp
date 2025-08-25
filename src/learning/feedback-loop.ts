@@ -217,7 +217,7 @@ export class FeedbackLoopSystem {
    * Validate feedback type
    */
   private validateFeedbackType(type: any): boolean {
-    const validTypes = ['accept', 'reject', 'modify'];
+    const validTypes = ['accept', 'reject', 'modify', 'ignore'];
     return typeof type === 'string' && validTypes.includes(type);
   }
 
@@ -326,7 +326,12 @@ export class FeedbackLoopSystem {
 
     } catch (error) {
       console.error('Failed to learn from correction:', error);
-      throw error;
+      // Don't throw - system should continue working even if learning fails
+      this.eventBus.emit('feedback-loop:error', {
+        operation: 'learnFromCorrection',
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: Date.now()
+      });
     }
   }
 
@@ -379,7 +384,7 @@ export class FeedbackLoopSystem {
       acceptanceRate: accepted / totalFeedbacks,
       rejectionRate: rejected / totalFeedbacks,
       modificationRate: modified / totalFeedbacks,
-      averageConfidence: feedbacks.reduce((sum, f) => sum + f.context.confidence, 0) / totalFeedbacks,
+      averageConfidence: Math.round((feedbacks.reduce((sum, f) => sum + f.context.confidence, 0) / totalFeedbacks) * 100) / 100,
       topRejectionReasons: [], // Would be implemented based on rejection categorization
       patternPerformance: Array.from(patternPerformance.entries()).map(([patternId, stats]) => ({
         patternId,

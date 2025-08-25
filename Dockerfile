@@ -30,11 +30,15 @@ WORKDIR /app
 COPY package.json bun.lock ./
 COPY vscode-client/package.json vscode-client/package-lock.json ./vscode-client/
 
-# Install dependencies with frozen lockfile
-RUN bun install --frozen-lockfile --production
+# Install ALL dependencies first (including devDependencies needed for native module compilation)
+RUN bun install --frozen-lockfile
 
-# Install Tree-sitter languages (trusted dependencies)
-RUN bun install tree-sitter tree-sitter-typescript tree-sitter-javascript tree-sitter-python
+# Ensure tree-sitter native modules are properly built/available
+# The trustedDependencies in package.json should handle native module compilation
+RUN echo "Verifying tree-sitter native modules..." && \
+    ls -la node_modules/tree-sitter-typescript/prebuilds/linux-x64/ || echo "No prebuilts found, will compile..." && \
+    ls -la node_modules/tree-sitter-javascript/prebuilds/linux-x64/ || echo "No prebuilts found, will compile..." && \
+    ls -la node_modules/tree-sitter-python/prebuilds/linux-x64/ || echo "No prebuilds found, will compile..."
 
 # ================================
 # Stage 3: Build Application
@@ -52,21 +56,42 @@ COPY . .
 # Build TypeScript to JavaScript
 RUN bun run build:tsc
 
-# Build production bundles for all services
+# Build production bundles for all services with tree-sitter externals
+# External tree-sitter modules to avoid bundling native dependencies
 RUN echo "Building LSP Server..." && \
-    bun build src/servers/lsp.ts --target=bun --outdir=dist/lsp --minify --sourcemap && \
+    bun build src/servers/lsp.ts --target=bun --outdir=dist/lsp --minify --sourcemap \
+        --external tree-sitter \
+        --external tree-sitter-typescript \
+        --external tree-sitter-javascript \
+        --external tree-sitter-python && \
     \
     echo "Building HTTP API Server..." && \
-    bun build src/servers/http.ts --target=bun --outdir=dist/api --minify --sourcemap && \
+    bun build src/servers/http.ts --target=bun --outdir=dist/api --minify --sourcemap \
+        --external tree-sitter \
+        --external tree-sitter-typescript \
+        --external tree-sitter-javascript \
+        --external tree-sitter-python && \
     \
-    echo "Building MCP Server..." && \
-    bun build src/servers/mcp.ts --target=bun --outdir=dist/mcp --minify --sourcemap && \
+    echo "Building MCP SSE Server..." && \
+    bun build src/servers/mcp-sse.ts --target=bun --outdir=dist/mcp --minify --sourcemap \
+        --external tree-sitter \
+        --external tree-sitter-typescript \
+        --external tree-sitter-javascript \
+        --external tree-sitter-python && \
     \
     echo "Building CLI Tool..." && \
-    bun build src/servers/cli.ts --target=bun --outdir=dist/cli --minify --sourcemap && \
+    bun build src/servers/cli.ts --target=bun --outdir=dist/cli --minify --sourcemap \
+        --external tree-sitter \
+        --external tree-sitter-typescript \
+        --external tree-sitter-javascript \
+        --external tree-sitter-python && \
     \
     echo "Building Adapters..." && \
-    bun build src/adapters/index.ts --target=bun --outdir=dist/adapters --minify --sourcemap
+    bun build src/adapters/index.ts --target=bun --outdir=dist/adapters --minify --sourcemap \
+        --external tree-sitter \
+        --external tree-sitter-typescript \
+        --external tree-sitter-javascript \
+        --external tree-sitter-python
 
 # Run tests to ensure build quality
 RUN bun test
@@ -105,8 +130,17 @@ COPY --from=builder --chown=ontology:ontology /app/dist ./dist
 COPY --from=builder --chown=ontology:ontology /app/package.json ./
 COPY --from=builder --chown=ontology:ontology /app/justfile ./
 
-# Copy minimal runtime dependencies (production only)
+# Copy ALL node_modules including native modules and prebuilds
+# This is crucial for tree-sitter native modules to work in production
 COPY --from=deps --chown=ontology:ontology /app/node_modules ./node_modules
+
+# Specifically ensure tree-sitter native modules are present
+# These are required at runtime for AST parsing functionality
+RUN echo "Verifying tree-sitter native modules in production image..." && \
+    ls -la node_modules/tree-sitter-typescript/prebuilds/linux-x64/tree-sitter-typescript.node && \
+    ls -la node_modules/tree-sitter-javascript/prebuilds/linux-x64/ && \
+    ls -la node_modules/tree-sitter-python/prebuilds/linux-x64/tree-sitter-python.node && \
+    echo "✅ All tree-sitter native modules are present"
 
 # Copy configuration files
 COPY --chown=ontology:ontology config/ ./config/

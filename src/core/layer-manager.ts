@@ -303,9 +303,9 @@ export class LayerManager implements ILayerManager {
     const metrics = this.metrics.get(layerName)!;
     
     try {
-      // Set timeout based on layer target with realistic buffer for I/O operations
-      // Layer 1 needs more buffer due to ripgrep/file system operations
-      const timeoutMultiplier = layerName === 'layer1' ? 20 : 2; // 20x for Layer 1 (1000ms), 2x for others
+      // Set timeout based on layer target with realistic buffer for I/O operations  
+      // Balanced multipliers for production performance
+      const timeoutMultiplier = layerName === 'layer1' ? 8 : 3; // 8x for Layer 1 (1600ms), 3x for others
       const timeout = layer.targetLatency * timeoutMultiplier;
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {

@@ -10,39 +10,52 @@ workspace := env_var_or_default("ONTOLOGY_WORKSPACE", justfile_directory())
 
 # === SERVER MANAGEMENT (replaces session-start/stop) ===
 
-# Start all servers  
+# Start all servers with port availability checks
 start: stop-quiet
     @echo "🚀 Starting Ontology LSP System..."
     @echo "=================================="
     @mkdir -p .ontology/pids .ontology/logs
+    @echo "Checking port availability..."
+    @just check-ports-available
+    @echo "Starting LSP Server (port 7002)..."
+    @{{bun}} run src/servers/lsp.ts > .ontology/logs/lsp.log 2>&1 & printf '%s\n' $$! > .ontology/pids/lsp.pid
     @echo "Starting HTTP API Server (port 7000)..."
-    @sh -c '{{bun}} run src/servers/http.ts > .ontology/logs/http-api.log 2>&1 & echo $$! > .ontology/pids/http-api.pid'
+    @{{bun}} run src/servers/http.ts > .ontology/logs/http-api.log 2>&1 & printf '%s\n' $$! > .ontology/pids/http-api.pid
     @echo "Starting MCP SSE Server (port 7001)..."
-    @sh -c '{{bun}} run src/servers/mcp-sse.ts > .ontology/logs/mcp-sse.log 2>&1 & echo $$! > .ontology/pids/mcp-sse.pid'
+    @{{bun}} run src/servers/mcp-sse.ts > .ontology/logs/mcp-sse.log 2>&1 & printf '%s\n' $$! > .ontology/pids/mcp-sse.pid
     @sleep 3
     @just health
     @echo ""
     @echo "✅ All servers started!"
-    @echo "📌 Logs: tail -f .ontology/logs/*.log"
+    @echo "📌 Status: just status"
+    @echo "📌 Logs: just logs"
     @echo "📌 Stop: just stop"
 
-# Stop all servers
+# Stop all servers with improved process cleanup
 stop:
     @echo "🛑 Stopping Ontology LSP servers..."
-    @-bash -c "[ -f .ontology/pids/http-api.pid ] && kill \$$(cat .ontology/pids/http-api.pid) 2>/dev/null && rm .ontology/pids/http-api.pid || true"
-    @-bash -c "[ -f .ontology/pids/mcp-sse.pid ] && kill \$$(cat .ontology/pids/mcp-sse.pid) 2>/dev/null && rm .ontology/pids/mcp-sse.pid || true"
-    @-bash -c "command -v lsof >/dev/null 2>&1 && (lsof -ti:7000 | xargs -r kill -9 2>/dev/null || true) || true"
-    @-bash -c "command -v lsof >/dev/null 2>&1 && (lsof -ti:7001 | xargs -r kill -9 2>/dev/null || true) || true"
-    @-bash -c "command -v lsof >/dev/null 2>&1 && (lsof -ti:7002 | xargs -r kill -9 2>/dev/null || true) || true"
-    @echo "✅ All servers stopped"
+    @echo "  Stopping PID-tracked processes..."
+    @-bash -c "if [ -f .ontology/pids/lsp.pid ]; then pid=\$$(cat .ontology/pids/lsp.pid | sed 's/!//g'); kill \$$pid 2>/dev/null && echo '    ✅ LSP server stopped' || true; rm .ontology/pids/lsp.pid; fi"
+    @-bash -c "if [ -f .ontology/pids/http-api.pid ]; then pid=\$$(cat .ontology/pids/http-api.pid | sed 's/!//g'); kill \$$pid 2>/dev/null && echo '    ✅ HTTP API stopped' || true; rm .ontology/pids/http-api.pid; fi"
+    @-bash -c "if [ -f .ontology/pids/mcp-sse.pid ]; then pid=\$$(cat .ontology/pids/mcp-sse.pid | sed 's/!//g'); kill \$$pid 2>/dev/null && echo '    ✅ MCP SSE stopped' || true; rm .ontology/pids/mcp-sse.pid; fi"
+    @echo "  Cleaning up any remaining processes on target ports..."
+    @just clean-ports-quiet
+    @echo "  Terminating any orphaned processes..."
+    @-pkill -f "src/servers" 2>/dev/null || true
+    @-pkill -f "ontology-lsp" 2>/dev/null || true
+    @-pkill -f "http.server.*8081" 2>/dev/null || true
+    @sleep 1
+    @echo "✅ All servers stopped and ports cleaned"
 
 # Stop quietly (internal use)
 stop-quiet:
-    @-bash -c "[ -f .ontology/pids/http-api.pid ] && kill \$$(cat .ontology/pids/http-api.pid) 2>/dev/null && rm .ontology/pids/http-api.pid || true"
-    @-bash -c "[ -f .ontology/pids/mcp-sse.pid ] && kill \$$(cat .ontology/pids/mcp-sse.pid) 2>/dev/null && rm .ontology/pids/mcp-sse.pid || true"
-    @-bash -c "command -v lsof >/dev/null 2>&1 && (lsof -ti:7000 | xargs -r kill -9 2>/dev/null || true) || true"
-    @-bash -c "command -v lsof >/dev/null 2>&1 && (lsof -ti:7001 | xargs -r kill -9 2>/dev/null || true) || true"
-    @-bash -c "command -v lsof >/dev/null 2>&1 && (lsof -ti:7002 | xargs -r kill -9 2>/dev/null || true) || true"
+    @-bash -c "if [ -f .ontology/pids/lsp.pid ]; then pid=\$$(cat .ontology/pids/lsp.pid | sed 's/!//g'); kill \$$pid 2>/dev/null; rm .ontology/pids/lsp.pid; fi" 2>/dev/null || true
+    @-bash -c "if [ -f .ontology/pids/http-api.pid ]; then pid=\$$(cat .ontology/pids/http-api.pid | sed 's/!//g'); kill \$$pid 2>/dev/null; rm .ontology/pids/http-api.pid; fi" 2>/dev/null || true
+    @-bash -c "if [ -f .ontology/pids/mcp-sse.pid ]; then pid=\$$(cat .ontology/pids/mcp-sse.pid | sed 's/!//g'); kill \$$pid 2>/dev/null; rm .ontology/pids/mcp-sse.pid; fi" 2>/dev/null || true
+    @just clean-ports-quiet
+    @-pkill -f "src/servers" 2>/dev/null || true
+    @-pkill -f "ontology-lsp" 2>/dev/null || true
+    @-pkill -f "http.server.*8081" 2>/dev/null || true
 
 # Restart servers
 restart: stop start
@@ -53,24 +66,85 @@ health:
     @curl -s http://localhost:7000/health >/dev/null 2>&1 && echo "✅ HTTP API (7000): HEALTHY" || echo "❌ HTTP API (7000): NOT RESPONDING"
     @curl -s http://localhost:7001/health >/dev/null 2>&1 && echo "✅ MCP SSE (7001): HEALTHY" || echo "❌ MCP SSE (7001): NOT RESPONDING"
 
-# Show server status
+# Show server status with port information
 status:
     @echo "📊 Server Status"
     @echo "=================="
-    @if [ -f .ontology/pids/http-api.pid ] && kill -0 $(cat .ontology/pids/http-api.pid) 2>/dev/null; then \
-        echo "✅ HTTP API: Running (PID: $(cat .ontology/pids/http-api.pid))"; \
-    else \
-        echo "❌ HTTP API: Not running"; \
-    fi
-    @if [ -f .ontology/pids/mcp-sse.pid ] && kill -0 $(cat .ontology/pids/mcp-sse.pid) 2>/dev/null; then \
-        echo "✅ MCP SSE: Running (PID: $(cat .ontology/pids/mcp-sse.pid))"; \
-    else \
-        echo "❌ MCP SSE: Not running"; \
-    fi
+    @curl -s http://localhost:7002 >/dev/null 2>&1 && echo "✅ LSP Server: Running on port 7002" || echo "❌ LSP Server: Not responding on port 7002"
+    @curl -s http://localhost:7000/health >/dev/null 2>&1 && echo "✅ HTTP API: Running on port 7000" || echo "❌ HTTP API: Not responding on port 7000"  
+    @curl -s http://localhost:7001/health >/dev/null 2>&1 && echo "✅ MCP SSE: Running on port 7001" || echo "❌ MCP SSE: Not responding on port 7001"
+    @echo ""
+    @echo "🌐 Port Status:"
+    @just check-ports-status
 
 # Show logs
 logs:
     @tail -f .ontology/logs/*.log
+
+# === PORT MANAGEMENT ===
+
+# Show process management improvements
+process-management-info:
+    @echo "🔧 Process Management Improvements"
+    @echo "=================================="
+    @echo "✅ Improved Commands:"
+    @echo "  • just start      - Clean startup with port availability checks"
+    @echo "  • just stop       - Graceful shutdown with complete cleanup"
+    @echo "  • just restart    - Clean restart without port conflicts"
+    @echo "  • just status     - HTTP-based status checking"
+    @echo "  • just clean-ports - Force clean all target ports (7000-7002, 8081)"
+    @echo ""
+    @echo "✅ Port Management:"
+    @echo "  • Pre-startup port availability checks"
+    @echo "  • Multiple cleanup methods (PID, port-based, pattern-based)"
+    @echo "  • Clean handling of orphaned processes"
+    @echo ""
+    @echo "✅ Target Ports:"
+    @echo "  • 7000: HTTP API Server"
+    @echo "  • 7001: MCP SSE Server"  
+    @echo "  • 7002: LSP Server"
+    @echo "  • 8081: Monitoring Dashboard"
+    @echo ""
+    @echo "🚀 Ready for clean deployment startup!"
+
+# === PORT MANAGEMENT ===
+
+# Check if required ports are available
+check-ports-available:
+    @echo "  Checking port 7000..." && (ss -tulnp 2>/dev/null | grep ":7000 " >/dev/null && echo "  ❌ Port 7000 is in use" && exit 1 || echo "  ✅ Port 7000 is available")
+    @echo "  Checking port 7001..." && (ss -tulnp 2>/dev/null | grep ":7001 " >/dev/null && echo "  ❌ Port 7001 is in use" && exit 1 || echo "  ✅ Port 7001 is available")
+    @echo "  Checking port 7002..." && (ss -tulnp 2>/dev/null | grep ":7002 " >/dev/null && echo "  ❌ Port 7002 is in use" && exit 1 || echo "  ✅ Port 7002 is available")
+    @echo "  🎯 All required ports are available"
+
+# Check status of all ports  
+check-ports-status:
+    @echo "  Port 7000:" && (ss -tulnp 2>/dev/null | grep ":7000 " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE")
+    @echo "  Port 7001:" && (ss -tulnp 2>/dev/null | grep ":7001 " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE")
+    @echo "  Port 7002:" && (ss -tulnp 2>/dev/null | grep ":7002 " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE")
+    @echo "  Port 8081:" && (ss -tulnp 2>/dev/null | grep ":8081 " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE")
+
+# Force clean all target ports (use with caution)
+clean-ports:
+    @echo "🧹 Force cleaning target ports..."
+    @echo "⚠️  This will terminate ALL processes on ports 7000-7002 and 8081"
+    @read -p "Continue? [y/N]: " confirm && [ "$$confirm" = "y" ] || exit 1
+    @just clean-ports-force
+    @echo "✅ All target ports cleaned"
+
+# Internal port cleaning (quiet)
+clean-ports-quiet:
+    @just clean-ports-force >/dev/null 2>&1 || true
+
+# Force port cleanup implementation  
+clean-ports-force:
+    @echo "    Cleaning port 7000..." && (ss -tulnp 2>/dev/null | grep ":7000 " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true)
+    @echo "    Cleaning port 7001..." && (ss -tulnp 2>/dev/null | grep ":7001 " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true)
+    @echo "    Cleaning port 7002..." && (ss -tulnp 2>/dev/null | grep ":7002 " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true)
+    @echo "    Cleaning port 8081..." && (ss -tulnp 2>/dev/null | grep ":8081 " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true)
+    @-pkill -f "src/servers" 2>/dev/null || true
+    @-pkill -f "ontology-lsp" 2>/dev/null || true
+    @-pkill -f "http.server.*8081" 2>/dev/null || true
+    @sleep 1
 
 # Get stats from servers
 stats:
@@ -215,21 +289,27 @@ test-vision-compliance:
 dev: stop-quiet
     @echo "🚀 Starting Ontology-LSP in development mode..."
     @mkdir -p .ontology/pids .ontology/logs
+    @echo "Checking port availability..."
+    @just check-ports-available
     
     # Load yesterday's patterns and warm cache
     @echo "📊 Loading patterns and warming cache..."
     @{{bun}} run src/cli/analyze.ts --warm-cache 2>/dev/null || true
     
     # Start servers with hot-reload
-    @sh -c '{{bun}} run --watch src/servers/lsp.ts > .ontology/logs/lsp.log 2>&1 & echo $$! > .ontology/pids/lsp.pid'
-    @sh -c '{{bun}} run --watch src/servers/http.ts > .ontology/logs/http-api.log 2>&1 & echo $$! > .ontology/pids/http-api.pid'
-    @sh -c '{{bun}} run --watch src/servers/mcp.ts > .ontology/logs/mcp-sse.log 2>&1 & echo $$! > .ontology/pids/mcp-sse.pid'
+    @echo "Starting LSP Server with hot-reload (port 7002)..."
+    @{{bun}} run --watch src/servers/lsp.ts > .ontology/logs/lsp.log 2>&1 & printf '%s\n' $$! > .ontology/pids/lsp.pid
+    @echo "Starting HTTP API with hot-reload (port 7000)..."
+    @{{bun}} run --watch src/servers/http.ts > .ontology/logs/http-api.log 2>&1 & printf '%s\n' $$! > .ontology/pids/http-api.pid
+    @echo "Starting MCP SSE with hot-reload (port 7001)..."
+    @{{bun}} run --watch src/servers/mcp.ts > .ontology/logs/mcp-sse.log 2>&1 & printf '%s\n' $$! > .ontology/pids/mcp-sse.pid
     
     @sleep 2
     @echo "🧠 Knowledge base loaded with $({{bun}} run src/cli/stats.ts --quiet 2>/dev/null | grep concepts | awk '{print $2}' || echo '0') concepts"
     @echo "⚡ Cache warmed for optimal performance"
-    @echo "✅ All systems operational"
+    @echo "✅ All systems operational in development mode"
     @echo ""
+    @echo "📌 Status: just status"
     @echo "📌 Logs: just logs"
     @echo "📌 Health: just health"
     @echo "📌 Stop: just stop"
@@ -1370,10 +1450,10 @@ test-diagnostics:
 emergency-reset:
     @echo "🚨 EMERGENCY RESET - This will stop all services and clean state"
     @read -p "Continue? [y/N]: " confirm && [ "$$confirm" = "y" ] || exit 1
-    @echo "🛑 Stopping services..."
+    @echo "🛑 Stopping all services..."
     @just stop >/dev/null 2>&1 || true
-    @pkill -f ontology >/dev/null 2>&1 || true
-    @pkill -f bun >/dev/null 2>&1 || true
+    @echo "🧹 Force cleaning all ports..."
+    @just clean-ports-force >/dev/null 2>&1 || true
     @echo "🧹 Cleaning state..."
     @rm -rf .ontology/
     @echo "🎯 Initializing fresh..."

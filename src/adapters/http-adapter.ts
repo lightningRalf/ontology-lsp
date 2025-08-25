@@ -58,6 +58,9 @@ export interface HTTPResponse {
 export class HTTPAdapter {
   private coreAnalyzer: CodeAnalyzer;
   private config: HTTPAdapterConfig;
+  private responseCache = new Map<string, { response: string; timestamp: number }>();
+  private static readonly RESPONSE_CACHE_TTL = 30000; // 30 seconds
+  private static readonly RESPONSE_CACHE_SIZE = 500; // Smaller cache for better performance
 
   constructor(coreAnalyzer: CodeAnalyzer, config: HTTPAdapterConfig = {}) {
     this.coreAnalyzer = coreAnalyzer;
@@ -162,6 +165,19 @@ export class HTTPAdapter {
       const body = strictJsonParse(request.body || '{}');
       validateRequired(body, ['identifier']);
 
+      // Simple cache key for HTTP responses
+      const cacheKey = `def:${body.identifier}:${body.file || ''}:${JSON.stringify(body.position || {})}`;
+
+      // Check for cached response - fast path
+      const cached = this.responseCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < HTTPAdapter.RESPONSE_CACHE_TTL) {
+        return {
+          status: 200,
+          headers: { 'X-Cache': 'HIT' },
+          body: cached.response
+        };
+      }
+
       const position = body.position ? 
         normalizePosition(body.position) : 
         createPosition(0, 0);
@@ -176,17 +192,23 @@ export class HTTPAdapter {
 
       const result = await this.coreAnalyzer.findDefinition(coreRequest);
       
+      // Build and serialize response
+      const responseBody = JSON.stringify({
+        success: true,
+        data: result.data.map(def => definitionToApiResponse(def)),
+        performance: result.performance,
+        requestId: result.requestId,
+        timestamp: result.timestamp,
+        cacheHit: result.cacheHit
+      });
+      
+      // Cache the complete response string
+      this.setResponseCache(cacheKey, responseBody);
+      
       return {
         status: 200,
-        headers: {},
-        body: JSON.stringify({
-          success: true,
-          data: result.data.map(def => definitionToApiResponse(def)),
-          performance: result.performance,
-          requestId: result.requestId,
-          timestamp: result.timestamp,
-          cacheHit: result.cacheHit
-        })
+        headers: { 'X-Cache': result.cacheHit ? 'CORE-HIT' : 'MISS' },
+        body: responseBody
       };
     } catch (error) {
       return this.createErrorResponse(400, 'Bad Request', error);
@@ -200,6 +222,19 @@ export class HTTPAdapter {
     try {
       const body = strictJsonParse(request.body || '{}');
       validateRequired(body, ['identifier']);
+
+      // Simple cache key for HTTP responses
+      const cacheKey = `ref:${body.identifier}:${body.file || ''}:${body.position?.line || 0}:${body.position?.character || 0}`;
+
+      // Check for cached response
+      const cached = this.responseCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < HTTPAdapter.RESPONSE_CACHE_TTL) {
+        return {
+          status: 200,
+          headers: { 'X-Cache': 'HIT' },
+          body: cached.response
+        };
+      }
 
       const position = body.position ? 
         normalizePosition(body.position) : 
@@ -215,17 +250,23 @@ export class HTTPAdapter {
 
       const result = await this.coreAnalyzer.findReferences(coreRequest);
       
+      // Build and serialize response
+      const responseBody = JSON.stringify({
+        success: true,
+        data: result.data.map(ref => referenceToApiResponse(ref)),
+        performance: result.performance,
+        requestId: result.requestId,
+        timestamp: result.timestamp,
+        cacheHit: result.cacheHit
+      });
+      
+      // Cache the complete response string
+      this.setResponseCache(cacheKey, responseBody);
+      
       return {
         status: 200,
-        headers: {},
-        body: JSON.stringify({
-          success: true,
-          data: result.data.map(ref => referenceToApiResponse(ref)),
-          performance: result.performance,
-          requestId: result.requestId,
-          timestamp: result.timestamp,
-          cacheHit: result.cacheHit
-        })
+        headers: { 'X-Cache': result.cacheHit ? 'CORE-HIT' : 'MISS' },
+        body: responseBody
       };
     } catch (error) {
       return this.createErrorResponse(400, 'Bad Request', error);
@@ -278,6 +319,24 @@ export class HTTPAdapter {
       const body = strictJsonParse(request.body || '{}');
       validateRequired(body, ['position']);
 
+      // Create cache key from request essentials
+      const cacheKey = this.createCacheKey('completions', {
+        file: body.file || body.uri,
+        position: body.position,
+        triggerCharacter: body.triggerCharacter,
+        maxResults: body.maxResults
+      });
+
+      // Check response cache first
+      const cached = this.getFromResponseCache(cacheKey);
+      if (cached) {
+        return {
+          status: 200,
+          headers: { 'X-Cache': 'HIT' },
+          body: cached
+        };
+      }
+
       const coreRequest = buildCompletionRequest({
         uri: normalizeUri(body.file || body.uri || 'file://unknown'),
         position: normalizePosition(body.position),
@@ -287,17 +346,23 @@ export class HTTPAdapter {
 
       const result = await this.coreAnalyzer.getCompletions(coreRequest);
       
+      // Build and serialize response
+      const responseBody = JSON.stringify({
+        success: true,
+        data: result.data,
+        performance: result.performance,
+        requestId: result.requestId,
+        timestamp: result.timestamp,
+        cacheHit: result.cacheHit
+      });
+      
+      // Cache the complete response string
+      this.setResponseCache(cacheKey, responseBody);
+      
       return {
         status: 200,
-        headers: {},
-        body: JSON.stringify({
-          success: true,
-          data: result.data,
-          performance: result.performance,
-          requestId: result.requestId,
-          timestamp: result.timestamp,
-          cacheHit: result.cacheHit
-        })
+        headers: { 'X-Cache': result.cacheHit ? 'CORE-HIT' : 'MISS' },
+        body: responseBody
       };
     } catch (error) {
       return this.createErrorResponse(400, 'Bad Request', error);
@@ -656,6 +721,33 @@ export class HTTPAdapter {
     
     return chunks.join('');
   }
+
+  /**
+   * Create simple cache key for request parameters
+   */
+  private createCacheKey(operation: string, params: any): string {
+    return `${operation}:${params.identifier || ''}:${params.file || ''}:${params.position?.line || 0}:${params.position?.character || 0}`;
+  }
+
+  /**
+   * Cache response string for fast retrieval
+   */
+  private setResponseCache(key: string, response: string): void {
+    // Maintain cache size limit
+    if (this.responseCache.size >= HTTPAdapter.RESPONSE_CACHE_SIZE) {
+      // Remove oldest entry
+      const firstKey = this.responseCache.keys().next().value;
+      if (firstKey) {
+        this.responseCache.delete(firstKey);
+      }
+    }
+    
+    this.responseCache.set(key, {
+      response,
+      timestamp: Date.now()
+    });
+  }
+
 
   private createErrorResponse(status: number, message: string, cause?: any): HTTPResponse {
     const error = handleAdapterError(cause, 'http');

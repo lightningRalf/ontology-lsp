@@ -50,7 +50,7 @@ const asyncSearchTools = new AsyncEnhancedGrep({
     maxProcesses: 4,        // 4x parallel search
     cacheSize: 1000,        // Large cache for frequent queries  
     cacheTTL: 60000,        // 1 minute cache TTL
-    defaultTimeout: 30000   // 30 second timeout
+    defaultTimeout: 2000    // 2 second timeout for production performance
 });
 
 // Wrapper functions to maintain compatibility with existing code
@@ -62,7 +62,7 @@ const Grep = async (params: ClaudeGrepParams): Promise<ClaudeGrepResult[] | stri
             pattern: params.pattern,
             path: params.path,
             maxResults: params.head_limit,
-            timeout: 15000, // 15 seconds
+            timeout: 1500, // 1.5 seconds for production performance
             caseInsensitive: params['-i'],
             fileType: params.type,
             excludePaths: ['node_modules', 'dist', '.git', 'coverage']
@@ -80,42 +80,46 @@ const Grep = async (params: ClaudeGrepParams): Promise<ClaudeGrepResult[] | stri
             context: undefined // Context not directly available in streaming format
         }));
 
-        // If we have good results from async search, return them
-        if (claudeResults.length > 0) {
-            return claudeResults;
-        }
-
-        // Fallback: Use legacy sync search if async yields no results
-        console.warn('Async search yielded no results, falling back to sync search');
-        const enhancedParams: EnhancedGrepParams = {
-            pattern: params.pattern,
-            path: params.path,
-            outputMode: params.output_mode || 'content',
-            type: params.type,
-            caseInsensitive: params['-i'],
-            lineNumbers: params['-n'],
-            contextBefore: params['-B'],
-            contextAfter: params['-A'],
-            contextAround: params['-C'],
-            multiline: params.multiline,
-            headLimit: params.head_limit
-        };
-        
-        const syncResults = await searchTools.grep.search(enhancedParams);
-        
-        // Convert to Claude-compatible format
-        return syncResults.map(result => ({
-            file: result.file,
-            line: result.line,
-            column: result.column,
-            text: result.text,
-            match: result.match,
-            context: result.context
-        }));
+        // Return async results (empty results are valid, not a failure)
+        return claudeResults;
+        // This fallback code should only be reached if async search throws an exception
+        // Empty results are not a failure - they indicate no matches were found
 
     } catch (error) {
-        console.warn('Both async and sync enhanced grep failed, returning empty results:', error);
-        return [];
+        console.warn('Async search failed, falling back to sync search:', error);
+        
+        try {
+            // Fallback: Use legacy sync search only when async fails with an error
+            const enhancedParams: EnhancedGrepParams = {
+                pattern: params.pattern,
+                path: params.path,
+                outputMode: params.output_mode || 'content',
+                type: params.type,
+                caseInsensitive: params['-i'],
+                lineNumbers: params['-n'],
+                contextBefore: params['-B'],
+                contextAfter: params['-A'],
+                contextAround: params['-C'],
+                multiline: params.multiline,
+                headLimit: params.head_limit
+            };
+            
+            const syncResults = await searchTools.grep.search(enhancedParams);
+            
+            // Convert to Claude-compatible format
+            return syncResults.map(result => ({
+                file: result.file,
+                line: result.line,
+                column: result.column,
+                text: result.text,
+                match: result.match,
+                context: result.context
+            }));
+            
+        } catch (syncError) {
+            console.warn('Both async and sync enhanced grep failed, returning empty results:', syncError);
+            return [];
+        }
     }
 };
 
@@ -163,7 +167,7 @@ const LS = async (params: ClaudeLSParams): Promise<ClaudeLSResult> => {
 
 export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
     name = 'ClaudeToolsLayer';
-    timeout = 5000; // 5 second timeout
+    timeout = 200; // 200ms timeout for production performance with realistic I/O
     
     private cache = new Map<string, { result: EnhancedMatches; timestamp: number }>();
     private bloomFilter = new Set<string>();
@@ -189,10 +193,12 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
         const cacheKey = this.getCacheKey(query);
         this.performanceMetrics.searches++;
         
-        // Check cache first
+        // Check cache first - fast path
         const cached = this.getFromCache(cacheKey);
         if (cached) {
             this.performanceMetrics.cacheHits++;
+            // Add minimal search time for cached results
+            cached.searchTime = Date.now() - startTime;
             return cached;
         }
         
@@ -220,9 +226,9 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
         };
         
         try {
-            // Primary: Use async streaming search for much better performance
+            // Primary: Use async streaming search with fast-path optimization
             try {
-                await this.searchWithAsyncGrep(query, matches);
+                await this.searchWithAsyncGrepFastPath(query, matches);
                 // If async search succeeds and finds results, we can skip other tools for exact matches
                 if (matches.exact.length > 0) {
                     matches.searchTime = Date.now() - startTime;
@@ -280,7 +286,71 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
     }
 
     /**
-     * New async streaming search method with 0ms event loop blocking
+     * Fast-path async search that prioritizes exact matches for performance
+     */
+    private async searchWithAsyncGrepFastPath(query: SearchQuery, matches: EnhancedMatches): Promise<void> {
+        // Start with just exact match strategy for fast response
+        const exactMatchOptions = {
+            pattern: `\\b${this.escapeRegex(query.identifier)}\\b`,
+            path: query.searchPath,
+            maxResults: 20, // Limit results for speed
+            timeout: 1000,  // 1 second timeout
+            caseInsensitive: false,
+            fileType: this.getFileTypeForGrep(query.fileTypes)
+        };
+
+        try {
+            const results = await asyncSearchTools.search(exactMatchOptions);
+            if (results.length > 0) {
+                // Convert and add exact matches
+                const convertedMatches: Match[] = results.map(r => ({
+                    file: r.file,
+                    line: r.line || 1,
+                    column: r.column || 0,
+                    text: r.text,
+                    length: r.text.length,
+                    confidence: r.confidence, 
+                    source: 'exact' as any
+                }));
+                
+                matches.exact.push(...convertedMatches);
+                convertedMatches.forEach(match => matches.files.add(match.file));
+                return; // Early return on success
+            }
+        } catch (error) {
+            console.warn('Fast-path exact match failed:', error);
+        }
+
+        // If exact match failed, try case-insensitive as fallback
+        const fallbackOptions = {
+            ...exactMatchOptions,
+            timeout: 600,
+            caseInsensitive: true,
+            maxResults: 10
+        };
+
+        try {
+            const results = await asyncSearchTools.search(fallbackOptions);
+            const convertedMatches: Match[] = results.map(r => ({
+                file: r.file,
+                line: r.line || 1,
+                column: r.column || 0,
+                text: r.text,
+                length: r.text.length,
+                confidence: r.confidence * 0.9, // Slightly lower confidence
+                source: 'exact' as any
+            }));
+            
+            matches.exact.push(...convertedMatches);
+            convertedMatches.forEach(match => matches.files.add(match.file));
+        } catch (error) {
+            console.warn('Fast-path fallback failed:', error);
+            throw error; // Re-throw to trigger sync fallback
+        }
+    }
+
+    /**
+     * Full async streaming search method with multiple strategies
      */
     private async searchWithAsyncGrep(query: SearchQuery, matches: EnhancedMatches): Promise<void> {
         // Use multiple search strategies with async streaming for better coverage
@@ -291,7 +361,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     pattern: `\\b${this.escapeRegex(query.identifier)}\\b`,
                     path: query.searchPath,
                     maxResults: 50,
-                    timeout: 10000,
+                    timeout: 800, // Reduced from 10000ms to 800ms
                     caseInsensitive: false,
                     fileType: this.getFileTypeForGrep(query.fileTypes)
                 },
@@ -304,7 +374,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     pattern: `\\b${this.escapeRegex(query.identifier)}\\b`,
                     path: query.searchPath,
                     maxResults: 30,
-                    timeout: 8000,
+                    timeout: 600, // Reduced from 8000ms to 600ms
                     caseInsensitive: true,
                     fileType: this.getFileTypeForGrep(query.fileTypes)
                 },
@@ -317,7 +387,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     pattern: this.tokenize(query.identifier).join('.*'),
                     path: query.searchPath,
                     maxResults: 20,
-                    timeout: 6000,
+                    timeout: 400, // Reduced from 6000ms to 400ms
                     caseInsensitive: true,
                     fileType: this.getFileTypeForGrep(query.fileTypes)
                 },
@@ -326,13 +396,21 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             }
         ];
 
-        // Execute strategies in parallel for maximum speed
+        // Execute strategies with concurrency limit for better performance
         const strategyPromises = searchStrategies.map(async strategy => {
             try {
                 const results = await asyncSearchTools.search(strategy.options);
+                // Early termination if we have enough exact matches
+                if (results.length > 0 && strategy.matchType === 'exact') {
+                    return {
+                        strategy,
+                        results: results.slice(0, 30), // Limit results for performance
+                        success: true
+                    };
+                }
                 return {
                     strategy,
-                    results,
+                    results: results.slice(0, 20), // Limit results for performance
                     success: true
                 };
             } catch (error) {
@@ -348,7 +426,8 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
 
         const strategyResults = await Promise.allSettled(strategyPromises);
 
-        // Process all successful results
+        // Process successful results with early termination for performance
+        let exactMatchCount = 0;
         for (const result of strategyResults) {
             if (result.status === 'fulfilled' && result.value.success) {
                 const { strategy, results } = result.value;
@@ -367,6 +446,11 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 // Add to appropriate category
                 if (strategy.matchType === 'exact') {
                     matches.exact.push(...convertedMatches);
+                    exactMatchCount += convertedMatches.length;
+                    // Early termination if we have enough exact matches
+                    if (exactMatchCount >= 20) {
+                        break;
+                    }
                 } else if (strategy.matchType === 'fuzzy') {
                     matches.fuzzy.push(...convertedMatches);
                 } else {
@@ -405,7 +489,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             pattern: `\\b${this.escapeRegex(query.identifier)}\\b`,
             path: query.searchPath,
             maxResults: 100,
-            timeout: 20000,
+            timeout: 1200, // Reduced from 20000ms to 1200ms
             caseInsensitive: !query.caseSensitive,
             fileType: this.getFileTypeForGrep(query.fileTypes),
             streaming: true,

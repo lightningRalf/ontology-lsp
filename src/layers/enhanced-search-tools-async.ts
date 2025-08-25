@@ -66,6 +66,18 @@ class RipgrepProcessPool {
 
     constructor(maxProcesses = 4) {
         this.maxProcesses = maxProcesses;
+        // Validate ripgrep availability during initialization
+        this.validateRipgrepAvailability();
+    }
+
+    private validateRipgrepAvailability() {
+        try {
+            const { execSync } = require('child_process');
+            execSync('rg --version', { stdio: 'pipe' });
+        } catch (error) {
+            console.error('AsyncEnhancedGrep: ripgrep not available or not working:', error);
+            throw new Error('ripgrep is required for async search functionality');
+        }
     }
 
     async execute(command: string, args: string[]): Promise<ChildProcess> {
@@ -88,8 +100,9 @@ class RipgrepProcessPool {
             if (next) next();
         });
 
-        process.on('error', () => {
+        process.on('error', (error) => {
             this.activeProcesses--;
+            console.error('RipgrepProcessPool: Process error:', error);
             // Process next queued request on error too
             const next = this.queue.shift();
             if (next) next();
@@ -263,12 +276,18 @@ export class AsyncEnhancedGrep {
             maxProcesses: 4,
             cacheSize: 1000,
             cacheTTL: 60000,
-            defaultTimeout: 30000,
+            defaultTimeout: 2000, // Default 2 second timeout for production performance
             ...config
         };
 
-        this.processPool = new RipgrepProcessPool(this.config.maxProcesses);
-        this.cache = new SmartSearchCache(this.config.cacheSize, this.config.cacheTTL);
+        try {
+            this.processPool = new RipgrepProcessPool(this.config.maxProcesses);
+            this.cache = new SmartSearchCache(this.config.cacheSize, this.config.cacheTTL);
+            console.log('AsyncEnhancedGrep initialized successfully with config:', this.config);
+        } catch (error) {
+            console.error('AsyncEnhancedGrep initialization failed:', error);
+            throw error;
+        }
     }
 
     /**
@@ -375,7 +394,12 @@ export class AsyncEnhancedGrep {
 
                 // Build ripgrep command
                 const args = this.buildRipgrepArgs(options);
-                process = await this.processPool.execute('rg', args);
+                try {
+                    process = await this.processPool.execute('rg', args);
+                } catch (poolError) {
+                    console.error('Process pool execute failed:', poolError);
+                    throw poolError;
+                }
 
                 // Set up timeout
                 let timeout: NodeJS.Timeout | null = null;
