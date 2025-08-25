@@ -3,6 +3,7 @@
  * This is the single source of truth for code analysis, used by all protocol adapters
  */
 
+import * as path from 'path';
 import {
   FindDefinitionRequest,
   FindDefinitionResult,
@@ -33,6 +34,8 @@ import { LayerManager } from './layer-manager.js';
 import { SharedServices } from './services/index.js';
 import { LearningOrchestrator } from '../learning/learning-orchestrator.js';
 import { v4 as uuidv4 } from 'uuid';
+import { AsyncEnhancedGrep, SearchStream, AsyncSearchOptions, StreamingGrepResult } from '../layers/enhanced-search-tools-async.js';
+import { EventEmitter } from 'events';
 
 /**
  * The unified code analyzer that orchestrates all 5 layers
@@ -49,6 +52,7 @@ export class CodeAnalyzer {
   private eventBus: EventBus;
   private learningOrchestrator: LearningOrchestrator | null = null;
   private initialized = false;
+  private asyncSearchTools: AsyncEnhancedGrep;
 
   constructor(
     layerManager: LayerManager,
@@ -60,6 +64,14 @@ export class CodeAnalyzer {
     this.sharedServices = sharedServices;
     this.config = config;
     this.eventBus = eventBus;
+    
+    // Initialize async search tools with performance optimization
+    this.asyncSearchTools = new AsyncEnhancedGrep({
+      maxProcesses: 4,        // 4x parallel search capability
+      cacheSize: 1000,        // Large cache for frequent queries
+      cacheTTL: 60000,        // 1 minute cache TTL
+      defaultTimeout: 30000   // 30 second timeout
+    });
   }
 
   async initialize(): Promise<void> {
@@ -93,6 +105,164 @@ export class CodeAnalyzer {
     });
   }
 
+  /**
+   * Async streaming search with 0ms event loop blocking
+   * This is the primary search method - use instead of synchronous findDefinition
+   */
+  async findDefinitionAsync(request: FindDefinitionRequest): Promise<FindDefinitionResult> {
+    this.validateRequest(request);
+    
+    const requestId = uuidv4();
+    const startTime = Date.now();
+    
+    try {
+      // Use AsyncEnhancedGrep as primary search method
+      const asyncOptions: AsyncSearchOptions = {
+        pattern: `\\b${this.escapeRegex(request.identifier)}\\b`,
+        path: this.extractDirectoryFromUri(request.uri),
+        maxResults: 50,
+        timeout: 15000,
+        caseInsensitive: false,
+        fileType: this.getFileTypeFromUri(request.uri),
+        excludePaths: ['node_modules', 'dist', '.git', 'coverage']
+      };
+      
+      const streamingResults = await this.asyncSearchTools.search(asyncOptions);
+      
+      // Convert streaming results to Definition objects
+      const definitions: Definition[] = streamingResults.map(result => ({
+        uri: this.pathToFileUri(result.file),
+        range: {
+          start: { line: (result.line || 1) - 1, character: result.column || 0 },
+          end: { line: (result.line || 1) - 1, character: (result.column || 0) + request.identifier.length }
+        },
+        kind: this.inferDefinitionKind(result.text),
+        name: request.identifier,
+        source: 'exact' as const,
+        confidence: result.confidence,
+        layer: 'async-layer1'
+      }));
+      
+      const performance: LayerPerformance = {
+        layer1: Date.now() - startTime,
+        layer2: 0, layer3: 0, layer4: 0, layer5: 0,
+        total: Date.now() - startTime
+      };
+      
+      return {
+        data: definitions,
+        performance,
+        requestId,
+        cacheHit: false,
+        timestamp: Date.now()
+      };
+      
+    } catch (error) {
+      throw this.createError(
+        `Async find definition failed: ${error instanceof Error ? error.message : String(error)}`,
+        'ASYNC_DEFINITION_ERROR',
+        undefined,
+        requestId
+      );
+    }
+  }
+  
+  /**
+   * Streaming search that returns results as they arrive via SearchStream
+   */
+  findDefinitionStream(request: FindDefinitionRequest): SearchStream {
+    this.validateRequest(request);
+    
+    const asyncOptions: AsyncSearchOptions = {
+      pattern: `\\b${this.escapeRegex(request.identifier)}\\b`,
+      path: this.extractDirectoryFromUri(request.uri),
+      maxResults: 100,
+      timeout: 20000,
+      caseInsensitive: false,
+      fileType: this.getFileTypeFromUri(request.uri),
+      streaming: true
+    };
+    
+    return this.asyncSearchTools.searchStream(asyncOptions);
+  }
+  
+  /**
+   * Async streaming reference search
+   */
+  async findReferencesAsync(request: FindReferencesRequest): Promise<FindReferencesResult> {
+    this.validateRequest(request);
+    
+    const requestId = uuidv4();
+    const startTime = Date.now();
+    
+    try {
+      const asyncOptions: AsyncSearchOptions = {
+        pattern: `\\b${this.escapeRegex(request.identifier)}\\b`,
+        path: request.includeDeclaration ? undefined : this.extractDirectoryFromUri(request.uri),
+        maxResults: 200,
+        timeout: 20000,
+        caseInsensitive: false,
+        fileType: this.getFileTypeFromUri(request.uri)
+      };
+      
+      const streamingResults = await this.asyncSearchTools.search(asyncOptions);
+      
+      // Convert to Reference objects
+      const references: Reference[] = streamingResults.map(result => ({
+        uri: this.pathToFileUri(result.file),
+        range: {
+          start: { line: (result.line || 1) - 1, character: result.column || 0 },
+          end: { line: (result.line || 1) - 1, character: (result.column || 0) + request.identifier.length }
+        },
+        kind: this.inferReferenceKind(result.text),
+        name: request.identifier,
+        source: 'exact' as const,
+        confidence: result.confidence,
+        layer: 'async-layer1'
+      }));
+      
+      const performance: LayerPerformance = {
+        layer1: Date.now() - startTime,
+        layer2: 0, layer3: 0, layer4: 0, layer5: 0,
+        total: Date.now() - startTime
+      };
+      
+      return {
+        data: references,
+        performance,
+        requestId,
+        cacheHit: false,
+        timestamp: Date.now()
+      };
+      
+    } catch (error) {
+      throw this.createError(
+        `Async find references failed: ${error instanceof Error ? error.message : String(error)}`,
+        'ASYNC_REFERENCES_ERROR',
+        undefined,
+        requestId
+      );
+    }
+  }
+  
+  /**
+   * Streaming reference search
+   */
+  findReferencesStream(request: FindReferencesRequest): SearchStream {
+    this.validateRequest(request);
+    
+    const asyncOptions: AsyncSearchOptions = {
+      pattern: `\\b${this.escapeRegex(request.identifier)}\\b`,
+      path: request.includeDeclaration ? undefined : this.extractDirectoryFromUri(request.uri),
+      maxResults: 500,
+      timeout: 30000,
+      caseInsensitive: false,
+      streaming: true
+    };
+    
+    return this.asyncSearchTools.searchStream(asyncOptions);
+  }
+
   async dispose(): Promise<void> {
     if (!this.initialized) {
       return;
@@ -104,6 +274,11 @@ export class CodeAnalyzer {
       this.learningOrchestrator = null;
     }
 
+    // Clean up async search tools
+    if (this.asyncSearchTools) {
+      this.asyncSearchTools.destroy();
+    }
+    
     await this.layerManager.dispose();
     await this.sharedServices.dispose();
     
@@ -1279,6 +1454,67 @@ export class CodeAnalyzer {
     return parts[0] || '';
   }
 
+  /**
+   * Helper methods for async search
+   */
+  private escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+  
+  private extractDirectoryFromUri(uri: string): string {
+    try {
+      const url = new URL(uri);
+      const filePath = url.pathname;
+      const dir = path.dirname(filePath);
+      return dir === '.' ? process.cwd() : dir;
+    } catch {
+      return process.cwd();
+    }
+  }
+  
+  private getFileTypeFromUri(uri: string): string | undefined {
+    try {
+      const url = new URL(uri);
+      const ext = path.extname(url.pathname).slice(1);
+      const typeMap: Record<string, string> = {
+        'ts': 'typescript',
+        'js': 'javascript',
+        'jsx': 'javascript',
+        'tsx': 'typescript',
+        'py': 'python',
+        'java': 'java',
+        'go': 'go',
+        'rs': 'rust'
+      };
+      return typeMap[ext];
+    } catch {
+      return undefined;
+    }
+  }
+  
+  private pathToFileUri(filePath: string): string {
+    if (filePath.startsWith('file://')) {
+      return filePath;
+    }
+    const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
+    return `file://${absolutePath}`;
+  }
+  
+  private inferDefinitionKind(text: string): DefinitionKind {
+    if (text.includes('function') || text.includes('=>')) return 'function';
+    if (text.includes('class')) return 'class';
+    if (text.includes('interface') || text.includes('type')) return 'interface';
+    if (text.includes('const') || text.includes('let') || text.includes('var')) return 'variable';
+    return 'property';
+  }
+  
+  private inferReferenceKind(text: string): ReferenceKind {
+    if (text.includes('(')) return 'call';
+    if (text.includes('import') || text.includes('from')) return 'import';
+    if (text.includes('=')) return 'write';
+    return 'read';
+  }
+  
   /**
    * Get system diagnostics and health information
    */

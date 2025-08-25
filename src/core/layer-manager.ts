@@ -518,7 +518,8 @@ export class LayerManager implements ILayerManager {
     const layerNames = ['layer1', 'layer2', 'layer3', 'layer4', 'layer5'];
     
     for (const layerName of layerNames) {
-      if (this.config.layers[layerName as keyof typeof this.config.layers]?.enabled) {
+      // Only register mock if no real layer exists and it's enabled
+      if (this.config.layers[layerName as keyof typeof this.config.layers]?.enabled && !this.layers.has(layerName)) {
         const mockLayer: Layer = {
           name: layerName,
           targetLatency: LAYER_TARGETS[layerName as keyof typeof LAYER_TARGETS],

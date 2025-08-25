@@ -82,10 +82,11 @@ export class HTTPServer {
         try {
           const url = new URL(request.url);
           
-          // Handle SSE streaming endpoints at server level
-          if (url.pathname.includes('/stream/') && request.method === 'POST') {
-            return await this.handleSSEStream(request, url.pathname);
-          }
+          // Let adapter handle streaming endpoints for now
+          // TODO: Implement proper server-level SSE streaming
+          // if (url.pathname.includes('/stream/') && request.method === 'POST') {
+          //   return await this.handleSSEStream(request, url.pathname);
+          // }
 
           // Convert Bun request to our HTTPRequest format
           const httpRequest: HTTPRequest = {

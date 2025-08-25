@@ -12,6 +12,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import * as fs from 'fs/promises';
+import * as fsSync from 'fs';
 import * as path from 'path';
 import { createReadStream } from 'fs';
 import { createInterface } from 'readline';
@@ -170,12 +171,15 @@ class SmartSearchCache {
         filesToWatch.forEach(file => {
             if (!this.watchers.has(file)) {
                 try {
-                    const watcher = fs.watch(file, () => {
-                        this.invalidate(cacheKey);
+                    const watcher = fsSync.watch(file, (eventType) => {
+                        if (eventType === 'change' || eventType === 'rename') {
+                            this.invalidate(cacheKey);
+                        }
                     });
                     this.watchers.set(file, watcher);
                 } catch (e) {
-                    // File might not exist or be watchable
+                    // File might not exist or be watchable - this is normal for some files
+                    // console.warn(`Cannot watch file ${file}:`, e.message);
                 }
             }
         });
@@ -183,7 +187,7 @@ class SmartSearchCache {
 
     private hasFileChanged(file: string, since: number): boolean {
         try {
-            const stats = fs.statSync(file);
+            const stats = fsSync.statSync(file);
             return stats.mtimeMs > since;
         } catch {
             return true; // Assume changed if can't stat

@@ -13,6 +13,7 @@
  */
 
 import type { CodeAnalyzer } from '../core/unified-analyzer.js';
+import type { SearchStream } from '../layers/enhanced-search-tools-async.js';
 import {
   buildFindDefinitionRequest,
   buildFindReferencesRequest,
@@ -123,6 +124,7 @@ export class HTTPAdapter {
     
     if (path.startsWith(apiPrefix)) {
       const endpoint = path.slice(apiPrefix.length);
+      console.log('[DEBUG] API path:', path, 'Endpoint:', endpoint, 'Method:', method);
       
       switch (endpoint) {
         case '/definition':
@@ -550,27 +552,30 @@ export class HTTPAdapter {
       const body = strictJsonParse(request.body || '{}');
       validateRequired(body, ['pattern']);
 
-      // This is a placeholder - actual SSE streaming would need to be handled
-      // at the server level, not the adapter level. The adapter just validates
-      // the request and provides the stream setup parameters.
+      // Create async search request
+      const searchRequest = {
+        identifier: body.pattern,
+        uri: normalizeUri(body.file || body.uri || 'file://search'),
+        position: createPosition(0, 0),
+        maxResults: body.maxResults || 100
+      };
+      
+      // Use the new async search method from unified analyzer
+      const result = await this.coreAnalyzer.findDefinitionAsync(searchRequest);
+      
+      // Convert to SSE format (simplified for now)
+      const sseData = this.formatAsSSE(result, 'search');
       
       return {
         status: 200,
         headers: {
-          'Content-Type': 'text/plain',
+          'Content-Type': 'text/event-stream',
           'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive'
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'Cache-Control'
         },
-        body: JSON.stringify({
-          success: true,
-          message: 'Stream search endpoint ready - needs SSE implementation at server level',
-          streamConfig: {
-            pattern: body.pattern,
-            path: body.path || '.',
-            maxResults: body.maxResults || 100,
-            timeout: body.timeout || 20000
-          }
-        })
+        body: sseData
       };
     } catch (error) {
       return this.createErrorResponse(400, 'Bad Request', error);
@@ -581,31 +586,75 @@ export class HTTPAdapter {
    * Handle POST /api/v1/stream/definition - Streaming definition search via SSE
    */
   private async handleStreamDefinition(request: HTTPRequest): Promise<HTTPResponse> {
+    console.log('[DEBUG] handleStreamDefinition called with:', request.url);
     try {
       const body = strictJsonParse(request.body || '{}');
+      console.log('[DEBUG] Body parsed:', body);
       validateRequired(body, ['identifier']);
 
+      // Create definition search request
+      const searchRequest = {
+        identifier: body.identifier,
+        uri: normalizeUri(body.file || body.uri || 'file://definition'),
+        position: normalizePosition(body.position) || createPosition(0, 0),
+        maxResults: body.maxResults || 50
+      };
+      
+      // Use the new async definition search method
+      const result = await this.coreAnalyzer.findDefinitionAsync(searchRequest);
+      
+      // Convert to SSE format (simplified for now)
+      const sseData = this.formatAsSSE(result, 'definition');
+      
       return {
         status: 200,
         headers: {
-          'Content-Type': 'text/plain',
+          'Content-Type': 'text/event-stream',
           'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive'
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'Cache-Control'
         },
-        body: JSON.stringify({
-          success: true,
-          message: 'Stream definition endpoint ready - needs SSE implementation at server level',
-          streamConfig: {
-            identifier: body.identifier,
-            file: body.file,
-            maxResults: body.maxResults || 50,
-            timeout: body.timeout || 15000
-          }
-        })
+        body: sseData
       };
     } catch (error) {
       return this.createErrorResponse(400, 'Bad Request', error);
     }
+  }
+
+  /**
+   * Convert search result to SSE format (simplified version)
+   */
+  private formatAsSSE(result: any, eventType: string): string {
+    const chunks: string[] = [];
+    
+    // Send start event
+    chunks.push(`event: ${eventType}-start\n`);
+    chunks.push(`data: {"type":"start","message":"Search started"}\n\n`);
+    
+    // Send results
+    result.data.forEach((item: any, index: number) => {
+      const data = {
+        type: 'result',
+        data: {
+          uri: item.uri,
+          range: item.range,
+          kind: item.kind,
+          name: item.name,
+          confidence: item.confidence
+        },
+        count: index + 1
+      };
+      
+      chunks.push(`event: ${eventType}-data\n`);
+      chunks.push(`data: ${JSON.stringify(data)}\n\n`);
+    });
+    
+    // Send completion event
+    chunks.push(`event: ${eventType}-end\n`);
+    chunks.push(`data: {"type":"end","message":"Search completed","totalResults":${result.data.length}}\n\n`);
+    
+    return chunks.join('');
   }
 
   private createErrorResponse(status: number, message: string, cause?: any): HTTPResponse {
