@@ -370,7 +370,7 @@ export class EnhancedGrep {
             const output = execSync(command, {
                 encoding: 'utf8',
                 maxBuffer: 50 * 1024 * 1024, // 50MB
-                timeout: params.timeout || this.config.timeout
+                timeout: 5000 // Fixed 5 second timeout for ripgrep
             });
 
             return this.parseRipgrepOutput(output, params);
@@ -400,13 +400,22 @@ export class EnhancedGrep {
             args.push('-l');
         } else if (params.outputMode === 'count') {
             args.push('-c');
-        } else {
-            args.push('--json'); // Use JSON output for easier parsing
         }
+        // Don't use --json by default as it can cause parsing issues
         
-        // File type filtering
+        // File type filtering - map common types to ripgrep types
         if (params.type) {
-            args.push(`--type ${params.type}`);
+            // Map common type names to ripgrep types
+            const typeMap: Record<string, string> = {
+                'javascript': 'js',
+                'typescript': 'ts',
+                'python': 'py',
+                'rust': 'rust',
+                'go': 'go',
+                'java': 'java'
+            };
+            const rgType = typeMap[params.type.toLowerCase()] || params.type;
+            args.push(`--type ${rgType}`);
         }
         
         // Path
@@ -417,6 +426,9 @@ export class EnhancedGrep {
         // Limits
         if (params.headLimit) {
             args.push(`-m ${params.headLimit}`);
+        } else {
+            // Default limit to prevent hanging on large searches
+            args.push('-m 1000');
         }
 
         return args;

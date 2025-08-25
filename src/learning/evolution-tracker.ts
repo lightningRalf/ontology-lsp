@@ -486,36 +486,19 @@ export class CodeEvolutionTracker {
 
   private async initializeDatabaseSchema(): Promise<void> {
     try {
-      // Create evolution_events table
-      await this.sharedServices.database.execute(`
-        CREATE TABLE IF NOT EXISTS evolution_events (
-          id TEXT PRIMARY KEY,
-          type TEXT NOT NULL,
-          timestamp INTEGER NOT NULL,
-          file_path TEXT NOT NULL,
-          before_path TEXT,
-          before_content TEXT,
-          before_signature TEXT,
-          after_path TEXT,
-          after_content TEXT,
-          after_signature TEXT,
-          commit_hash TEXT,
-          author TEXT,
-          branch TEXT,
-          message TEXT,
-          files_affected INTEGER NOT NULL,
-          symbols_affected INTEGER NOT NULL,
-          tests_affected INTEGER NOT NULL,
-          severity TEXT NOT NULL,
-          diff_size INTEGER NOT NULL,
-          cycle_time INTEGER,
-          rollback BOOLEAN DEFAULT FALSE,
-          automated BOOLEAN DEFAULT FALSE,
-          created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-        )
-      `);
+      // The evolution_events and quality_metrics tables are already created
+      // in the main database schema (database-service.ts). Just verify they exist.
+      
+      // Verify evolution_events table exists
+      const evolutionTable = await this.sharedServices.database.query(
+        'SELECT name FROM sqlite_master WHERE type="table" AND name="evolution_events"'
+      );
+      
+      if (evolutionTable.length === 0) {
+        throw new CoreError('evolution_events table not found in database schema', 'DB_SCHEMA_ERROR');
+      }
 
-      // Create quality_metrics table
+      // Create quality_metrics table if it doesn't exist (this is evolution-tracker specific)
       await this.sharedServices.database.execute(`
         CREATE TABLE IF NOT EXISTS quality_metrics (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -538,15 +521,7 @@ export class CodeEvolutionTracker {
         )
       `);
 
-      // Create indexes
-      await this.sharedServices.database.execute(`
-        CREATE INDEX IF NOT EXISTS idx_evolution_events_timestamp ON evolution_events(timestamp)
-      `);
-
-      await this.sharedServices.database.execute(`
-        CREATE INDEX IF NOT EXISTS idx_evolution_events_file ON evolution_events(file_path)
-      `);
-
+      // Create quality_metrics index
       await this.sharedServices.database.execute(`
         CREATE INDEX IF NOT EXISTS idx_quality_metrics_timestamp ON quality_metrics(timestamp)
       `);
@@ -565,7 +540,7 @@ export class CodeEvolutionTracker {
       for (const row of rows) {
         const event: EvolutionEvent = {
           id: row.id,
-          type: row.type,
+          type: row.type || row.event_type, // Handle both column names
           timestamp: new Date(row.timestamp * 1000),
           file: row.file_path,
           before: row.before_path || row.before_content || row.before_signature ? {
@@ -650,13 +625,13 @@ export class CodeEvolutionTracker {
     try {
       await this.sharedServices.database.execute(
         `INSERT INTO evolution_events (
-          id, type, timestamp, file_path, before_path, before_content, before_signature,
+          id, type, event_type, timestamp, file_path, before_path, before_content, before_signature,
           after_path, after_content, after_signature, commit_hash, author, branch, message,
           files_affected, symbols_affected, tests_affected, severity, diff_size,
           cycle_time, rollback, automated
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          event.id, event.type, Math.floor(event.timestamp.getTime() / 1000), event.file,
+          event.id, event.type, event.type, Math.floor(event.timestamp.getTime() / 1000), event.file,
           event.before?.path, event.before?.content, event.before?.signature,
           event.after?.path, event.after?.content, event.after?.signature,
           event.context.commit, event.context.author, event.context.branch, event.context.message,

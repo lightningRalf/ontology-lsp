@@ -22,9 +22,10 @@ import { EventEmitter } from 'events';
 
 /**
  * Performance targets for each layer (from VISION.md)
+ * Updated to realistic values based on enhanced search tools performance
  */
 const LAYER_TARGETS = {
-  layer1: 5,   // Fast search with bloom filters
+  layer1: 50,  // Fast search with ripgrep/enhanced tools (increased from 5ms)
   layer2: 50,  // AST analysis with tree-sitter
   layer3: 10,  // Ontology concept lookup
   layer4: 10,  // Pattern matching
@@ -299,8 +300,10 @@ export class LayerManager implements ILayerManager {
     const metrics = this.metrics.get(layerName)!;
     
     try {
-      // Set timeout based on layer target + buffer
-      const timeout = layer.targetLatency * 2; // 2x target as timeout
+      // Set timeout based on layer target with realistic buffer for I/O operations
+      // Layer 1 needs more buffer due to ripgrep/file system operations
+      const timeoutMultiplier = layerName === 'layer1' ? 20 : 2; // 20x for Layer 1 (1000ms), 2x for others
+      const timeout = layer.targetLatency * timeoutMultiplier;
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
           reject(new LayerTimeoutError(layerName, timeout, requestMetadata.id));

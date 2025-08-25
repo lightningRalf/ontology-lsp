@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS learning_feedback (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   request_id TEXT NOT NULL,
   accepted INTEGER NOT NULL,
-  suggestion TEXT NOT NULL,
+  suggestion TEXT, -- Allow NULL suggestions
   actual_choice TEXT,
   confidence REAL,
   timestamp INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
@@ -143,13 +143,31 @@ CREATE TABLE IF NOT EXISTS evolution_events (
   id TEXT PRIMARY KEY,
   file_path TEXT NOT NULL,
   event_type TEXT NOT NULL,
+  type TEXT NOT NULL, -- Add legacy 'type' column for compatibility
   change_summary TEXT,
   impact_score REAL NOT NULL DEFAULT 0.0,
   architectural_impact TEXT,
   commit_hash TEXT,
   author TEXT,
   timestamp INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-  metadata TEXT -- JSON metadata
+  metadata TEXT, -- JSON metadata
+  -- Additional columns for evolution tracker compatibility
+  before_path TEXT,
+  before_content TEXT,
+  before_signature TEXT,
+  after_path TEXT,
+  after_content TEXT,
+  after_signature TEXT,
+  branch TEXT,
+  message TEXT,
+  files_affected INTEGER DEFAULT 0,
+  symbols_affected INTEGER DEFAULT 0,
+  tests_affected INTEGER DEFAULT 0,
+  severity TEXT DEFAULT 'low',
+  diff_size INTEGER DEFAULT 0,
+  cycle_time INTEGER,
+  rollback BOOLEAN DEFAULT FALSE,
+  automated BOOLEAN DEFAULT FALSE
 );
 
 -- Team knowledge table for shared patterns

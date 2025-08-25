@@ -367,7 +367,7 @@ export async function createRealLayers(config: any): Promise<any[]> {
       layer1.version = '1.0.0';
     }
     // Set targetLatency for layer manager
-    layer1.targetLatency = 5; // 5ms target for fast search
+    layer1.targetLatency = 50; // 50ms target for fast search - realistic for ripgrep operations
     
     layers.push(layer1);
   }

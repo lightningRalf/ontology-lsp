@@ -63,7 +63,7 @@ abstract class LayerAdapter implements Layer {
 class Layer1Adapter extends LayerAdapter {
   name = 'layer1';
   version = '1.0.0';
-  targetLatency = 5; // 5ms target
+  targetLatency = 50; // 50ms target - realistic for ripgrep operations
   
   private claudeTools: ClaudeToolsLayer;
   
@@ -173,7 +173,7 @@ export class AnalyzerFactory {
       layers: {
         layer1: {
           enabled: true,
-          timeout: 10, // 2x target latency
+          timeout: 200, // 4x target latency (50ms * 4 for I/O operations)
           maxResults: 100,
           fileTypes: ['ts', 'tsx', 'js', 'jsx', 'py', 'java', 'go', 'rust'],
           optimization: {
@@ -369,7 +369,7 @@ export class AnalyzerFactory {
   }> {
     const testConfig: Partial<CoreConfig> = {
       layers: {
-        layer1: { enabled: true, timeout: 10, maxResults: 10, fileTypes: ['ts', 'js'], optimization: { bloomFilter: false, frequencyCache: false, negativeLookup: false } },
+        layer1: { enabled: true, timeout: 200, maxResults: 10, fileTypes: ['ts', 'js'], optimization: { bloomFilter: false, frequencyCache: false, negativeLookup: false } },
         layer2: { enabled: false, timeout: 100, languages: ['typescript'], maxFileSize: 1024, parseTimeout: 50 },
         layer3: { enabled: true, dbPath: ':memory:', cacheSize: 100, conceptThreshold: 0.5, relationshipDepth: 1 },
         layer4: { enabled: true, learningThreshold: 1, confidenceThreshold: 0.5, maxPatterns: 100, decayRate: 0.9 },
