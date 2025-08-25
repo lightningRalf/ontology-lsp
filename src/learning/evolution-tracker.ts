@@ -1129,6 +1129,127 @@ export class CodeEvolutionTracker {
   }
 
   /**
+   * Get evolution patterns detected from the events
+   */
+  async getEvolutionPatterns(): Promise<EvolutionPattern[]> {
+    return Array.from(this.detectedPatterns.values());
+  }
+
+  /**
+   * Get architectural trends over time
+   */
+  async getArchitecturalTrends(): Promise<Array<{
+    pattern: string;
+    frequency: number;
+    confidence: number;
+    timeRange: { start: Date; end: Date };
+  }>> {
+    const trends = [];
+    const events = Array.from(this.evolutionEvents.values());
+    
+    if (events.length === 0) {
+      return [];
+    }
+
+    // Sort events by timestamp
+    events.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    const firstEvent = events[0];
+    const lastEvent = events[events.length - 1];
+
+    // Analyze class to interface refactoring trend
+    const classToInterfaceCount = events.filter(e => 
+      e.before?.content?.includes('class ') && 
+      e.after?.content?.includes('interface ')
+    ).length;
+
+    if (classToInterfaceCount > 0) {
+      trends.push({
+        pattern: 'class_to_interface_migration',
+        frequency: classToInterfaceCount,
+        confidence: Math.min(0.9, classToInterfaceCount * 0.3),
+        timeRange: { start: firstEvent.timestamp, end: lastEvent.timestamp }
+      });
+    }
+
+    return trends;
+  }
+
+  /**
+   * Get refactoring patterns detected
+   */
+  async getRefactoringPatterns(): Promise<Array<{
+    type: string;
+    before: string;
+    after: string;
+    confidence: number;
+  }>> {
+    const patterns = [];
+    const events = Array.from(this.evolutionEvents.values())
+      .filter(e => e.type === 'refactoring' || 
+                  (e.before?.content && e.after?.content));
+
+    for (const event of events) {
+      if (event.before?.content && event.after?.content) {
+        patterns.push({
+          type: event.context?.refactoringType || 'general_refactoring',
+          before: event.before.content,
+          after: event.after.content,
+          confidence: 0.7 // Base confidence for detected refactorings
+        });
+      }
+    }
+
+    return patterns;
+  }
+
+  /**
+   * Get evolution metrics and analytics
+   */
+  async getEvolutionMetrics(): Promise<{
+    totalChanges: number;
+    averageChangeSize: number;
+    mostActiveFiles: string[];
+    changeVelocity: number;
+  }> {
+    const events = Array.from(this.evolutionEvents.values());
+    const totalChanges = events.length;
+
+    // Calculate average change size
+    const totalDiffSize = events.reduce((sum, e) => 
+      sum + (e.metadata?.diffSize || 0), 0);
+    const averageChangeSize = totalChanges > 0 ? totalDiffSize / totalChanges : 0;
+
+    // Find most active files
+    const fileActivity = new Map<string, number>();
+    events.forEach(e => {
+      const count = fileActivity.get(e.file) || 0;
+      fileActivity.set(e.file, count + 1);
+    });
+
+    const mostActiveFiles = Array.from(fileActivity.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([file]) => file);
+
+    // Calculate change velocity (changes per day)
+    let changeVelocity = 0;
+    if (events.length > 1) {
+      const sortedEvents = events.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+      const timespan = sortedEvents[sortedEvents.length - 1].timestamp.getTime() - 
+                      sortedEvents[0].timestamp.getTime();
+      const days = timespan / (1000 * 60 * 60 * 24);
+      changeVelocity = days > 0 ? events.length / days : 0;
+    }
+
+    return {
+      totalChanges,
+      averageChangeSize,
+      mostActiveFiles,
+      changeVelocity
+    };
+  }
+
+  /**
    * Get diagnostic information for debugging
    */
   getDiagnostics(): Record<string, any> {

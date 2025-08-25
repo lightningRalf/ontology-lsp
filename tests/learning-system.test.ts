@@ -179,13 +179,31 @@ const createTestEvolutionEvent = (): EvolutionEvent => ({
   type: "file_modified",
   file: "file:///test/example.ts",
   timestamp: new Date(),
-  before: "function oldImplementation() { return 'old'; }",
-  after: "function newImplementation() { return 'new'; }",
+  before: {
+    path: "file:///test/example.ts",
+    content: "function oldImplementation() { return 'old'; }",
+    signature: "oldImplementation()"
+  },
+  after: {
+    path: "file:///test/example.ts", 
+    content: "function newImplementation() { return 'new'; }",
+    signature: "newImplementation()"
+  },
   context: {
     commit: "abc123",
     author: "test@example.com",
     message: "Refactor implementation",
     branch: "main"
+  },
+  impact: {
+    filesAffected: 1,
+    symbolsAffected: 1,
+    testsAffected: 0,
+    severity: "low"
+  },
+  metadata: {
+    diffSize: 2,
+    automated: false
   }
 });
 

@@ -9,7 +9,9 @@ import {
   PerformanceConfig,
   CacheConfig,
   MonitoringConfig,
-  Layer
+  Layer,
+  SearchQuery,
+  EnhancedMatches
 } from './types';
 
 import { CodeAnalyzer } from './unified-analyzer';
@@ -72,6 +74,10 @@ class Layer1Adapter extends LayerAdapter {
   
   getClaudeTools(): ClaudeToolsLayer {
     return this.claudeTools;
+  }
+  
+  async process(query: SearchQuery): Promise<EnhancedMatches> {
+    return this.claudeTools.process(query);
   }
 }
 

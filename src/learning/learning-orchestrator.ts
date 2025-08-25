@@ -43,6 +43,7 @@ export interface LearningContext {
 
 export interface LearningResult {
   success: boolean;
+  confidence?: number;
   data?: any;
   insights?: LearningInsight[];
   patterns?: Pattern[];
@@ -85,6 +86,10 @@ export interface SystemHealth {
     feedbackLoop: { status: 'healthy' | 'degraded' | 'critical'; details?: string };
     evolutionTracker: { status: 'healthy' | 'degraded' | 'critical'; details?: string };
     teamKnowledge: { status: 'healthy' | 'degraded' | 'critical'; details?: string };
+  };
+  performance: {
+    averageProcessingTime: number;
+    successRate: number;
   };
   metrics: {
     learningOperationsPerSecond: number;
@@ -273,6 +278,11 @@ export class LearningOrchestrator {
       // Get recommendations
       result.recommendations = await this.generateRecommendations(context, result.insights);
       
+      // Calculate overall confidence based on insights
+      result.confidence = result.insights && result.insights.length > 0 
+        ? result.insights.reduce((sum, insight) => sum + (Number(insight.confidence) || 0), 0) / result.insights.length 
+        : 0.5;
+      
       result.success = true;
       
       // Update performance metrics
@@ -448,6 +458,10 @@ export class LearningOrchestrator {
         evolutionTracker: { status: 'healthy' },
         teamKnowledge: { status: 'healthy' }
       },
+      performance: {
+        averageProcessingTime: this.operationCount > 0 ? this.totalOperationTime / this.operationCount : 0,
+        successRate: this.operationCount > 0 ? (this.operationCount - this.errorCount) / this.operationCount : 1.0
+      },
       metrics: {
         learningOperationsPerSecond: this.calculateOperationsPerSecond(),
         averageResponseTime: this.operationCount > 0 ? this.totalOperationTime / this.operationCount : 0,
@@ -526,6 +540,10 @@ export class LearningOrchestrator {
    * Get learning statistics and insights
    */
   async getLearningStats(): Promise<{
+    totalFeedbackEvents: number;
+    totalEvolutionEvents: number;
+    patternsLearned: number;
+    averageConfidence: number;
     patterns: any;
     feedback: FeedbackStats;
     evolution: any;
@@ -534,6 +552,10 @@ export class LearningOrchestrator {
     performance: any;
   }> {
     const stats = {
+      totalFeedbackEvents: 0,
+      totalEvolutionEvents: 0,
+      patternsLearned: 0,
+      averageConfidence: 0.5,
       patterns: null,
       feedback: {} as FeedbackStats,
       evolution: null,
@@ -558,6 +580,8 @@ export class LearningOrchestrator {
     try {
       if (this.feedbackLoop) {
         stats.feedback = await this.feedbackLoop.getFeedbackStats();
+        stats.totalFeedbackEvents = stats.feedback.totalFeedbacks;
+        stats.averageConfidence = stats.feedback.averageConfidence;
       }
     } catch (error) {
       console.warn('Failed to get feedback loop stats:', error);
@@ -1088,6 +1112,94 @@ export class LearningOrchestrator {
   private async loadPipelinesFromDatabase(): Promise<void> {
     // Implementation would load additional pipelines from database
     console.log('Would load additional pipelines from database');
+  }
+
+  /**
+   * Get real-time learning metrics
+   */
+  async getRealTimeMetrics(): Promise<{
+    timestamp: Date;
+    learningRate: number;
+    processingLatency: number;
+    systemLoad: number;
+    memoryUsage: number;
+    activeOperations: number;
+  }> {
+    const now = new Date();
+    const timeSinceStart = now.getTime() - this.lastHealthCheck.getTime();
+    
+    return {
+      timestamp: now,
+      learningRate: timeSinceStart > 0 ? (this.operationCount * 1000) / timeSinceStart : 0,
+      processingLatency: this.operationCount > 0 ? this.totalOperationTime / this.operationCount : 0,
+      systemLoad: Math.min(1.0, this.activePipelines.size / this.config.performanceTargets.maxConcurrentOperations),
+      memoryUsage: this.getMemoryUsage(),
+      activeOperations: this.activePipelines.size
+    };
+  }
+
+  /**
+   * Get correlation analysis between different learning components
+   */
+  async getCorrelationAnalysis(): Promise<{
+    feedbackEvolutionCorrelations: any[];
+    patternTeamCorrelations: any[];
+    crossSystemInsights: any[];
+  }> {
+    return {
+      feedbackEvolutionCorrelations: [],
+      patternTeamCorrelations: [],
+      crossSystemInsights: []
+    };
+  }
+
+  /**
+   * Get comprehensive insights from all learning systems
+   */
+  async getComprehensiveInsights(): Promise<{
+    feedbackInsights: any;
+    evolutionInsights: any;
+    teamInsights: any;
+    crossSystemCorrelations: any;
+  }> {
+    const insights = {
+      feedbackInsights: null,
+      evolutionInsights: null,
+      teamInsights: null,
+      crossSystemCorrelations: null
+    };
+
+    try {
+      if (this.feedbackLoop) {
+        insights.feedbackInsights = await this.feedbackLoop.getInsights();
+      }
+    } catch (error) {
+      console.warn('Failed to get feedback insights:', error);
+    }
+
+    try {
+      if (this.evolutionTracker) {
+        insights.evolutionInsights = await this.evolutionTracker.getEvolutionPatterns();
+      }
+    } catch (error) {
+      console.warn('Failed to get evolution insights:', error);
+    }
+
+    try {
+      if (this.teamKnowledge) {
+        insights.teamInsights = await this.teamKnowledge.getTeamInsights();
+      }
+    } catch (error) {
+      console.warn('Failed to get team insights:', error);
+    }
+
+    try {
+      insights.crossSystemCorrelations = await this.getCorrelationAnalysis();
+    } catch (error) {
+      console.warn('Failed to get cross-system correlations:', error);
+    }
+
+    return insights;
   }
 
   /**
