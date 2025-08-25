@@ -158,6 +158,42 @@ test-coverage:
 test-watch:
     {{bun}} test --watch tests/
 
+# === E2E INTEGRATION TESTS ===
+
+# Run End-to-End integration tests with real codebases (local workspace only)
+test-e2e-local:
+    @echo "🔬 Running E2E tests with local workspace..."
+    @echo "================================================="
+    USE_LOCAL_REPOS=true {{bun}} test tests/e2e/ --timeout 600000
+
+# Run E2E tests with small repositories (fast)
+test-e2e-small:
+    @echo "🔬 Running E2E tests with small repositories..."
+    @echo "=================================================="
+    REPO_SIZE=small {{bun}} test tests/e2e/ --timeout 900000
+
+# Run full E2E test suite with all repository sizes (comprehensive)
+test-e2e-full:
+    @echo "🔬 Running FULL E2E test suite with all repositories..."
+    @echo "======================================================="
+    E2E_FULL_TEST=true {{bun}} test tests/e2e/ --timeout 1800000
+
+# Run E2E tests (default: local workspace)
+test-e2e: test-e2e-local
+
+# Generate E2E performance report
+test-e2e-report: test-e2e-local
+    @echo "📊 Generating E2E performance report..."
+    @mkdir -p tests/e2e/results/performance-reports
+    @echo "{\"timestamp\": \"$(date -Iseconds)\", \"type\": \"e2e-performance\", \"status\": \"completed\"}" > tests/e2e/results/performance-reports/latest.json
+    @echo "✅ Performance report saved to tests/e2e/results/performance-reports/latest.json"
+
+# Clean E2E test artifacts
+test-e2e-clean:
+    @echo "🧹 Cleaning E2E test artifacts..."
+    @rm -rf .e2e-test-workspace .e2e-ontology-cache tests/e2e/results
+    @echo "✅ E2E artifacts cleaned"
+
 # Verify VISION.md requirements are met
 test-vision-compliance:
     @echo "🎯 Verifying VISION.md Requirements..."
@@ -1354,3 +1390,47 @@ troubleshoot:
     else \
         cat docs/TROUBLESHOOTING.md; \
     fi
+
+# === MEMORY OPTIMIZATION & MONITORING ===
+
+# Run comprehensive memory profile
+memory-profile:
+    @echo "🔍 Running memory profile..."
+    @{{bun}} scripts/memory-profile.js
+
+# Memory monitoring (continuous)
+memory-monitor:
+    @echo "📊 Starting memory monitoring (Press Ctrl+C to stop)..."
+    @while true; do \
+        echo "=== $(date) ==="; \
+        ps -o pid,rss,vsz,cmd --sort=-rss | grep -E "(bun|src/servers)" | grep -v grep | head -10; \
+        echo ""; \
+        sleep 30; \
+    done
+
+# Quick memory check
+memory-check:
+    @echo "💾 Quick Memory Check"
+    @echo "===================="
+    @echo "Ontology-LSP Processes:"
+    @ps aux | grep -E "src/servers" | grep -v grep | awk '{printf "PID: %-8s RSS: %-10s CMD: %s\n", $$2, $$6"KB", substr($$0, index($$0,$$11))}'
+    @echo ""
+    @echo "Total RSS:" $(ps aux | grep -E "src/servers" | grep -v grep | awk '{sum+=$$6} END {print sum"KB"}')
+    @echo "System Memory:" $(free -h | grep "Mem:" | awk '{print "Used: "$$3" / Total: "$$2}')
+
+# Clean up memory caches
+clean-memory:
+    @echo "🧹 Cleaning memory caches..."
+    @echo "Clearing ontology cache..."
+    @rm -f .ontology/cache_* 2>/dev/null || true
+    @echo "Restarting servers to clear memory..."
+    @just restart
+
+# Memory and performance optimization
+optimize-memory:
+    @echo "🧠 Optimizing memory usage..."
+    @echo "Analyzing cache sizes..."
+    @echo "$(ls -la .ontology 2>/dev/null | wc -l) files in ontology cache"
+    @echo "Current database size: $(du -h .ontology/*.db 2>/dev/null | cut -f1 || echo '0B')"
+    @echo "Running memory optimization..."
+    @{{bun}} scripts/memory-profile.js

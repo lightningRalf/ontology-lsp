@@ -175,6 +175,9 @@ export class CacheService {
   private hitCount = 0;
   private missCount = 0;
   private initialized = false;
+  private memoryWarningThreshold = 0.8; // 80% of max memory
+  private lastMemoryCheck = 0;
+  private memoryCheckInterval = 30000; // 30 seconds
 
   constructor(config: CacheConfig, eventBus: EventBus) {
     this.config = config;
@@ -307,6 +310,9 @@ export class CacheService {
     }
 
     try {
+      // Check memory usage before setting
+      this.checkMemoryUsage();
+      
       // Always cache in memory
       this.memoryCache.set(key, data, ttl);
 
@@ -421,9 +427,14 @@ export class CacheService {
     memoryStats: any;
     redisConnected: boolean;
     strategy: string;
+    currentMemoryUsage: number;
+    memoryThreshold: number;
+    memoryUtilization: number;
   } {
     const totalRequests = this.hitCount + this.missCount;
     const hitRate = totalRequests > 0 ? this.hitCount / totalRequests : 0;
+    const currentMemory = this.getCurrentMemoryUsage();
+    const maxMemory = this.config.memory.maxSize;
 
     return {
       hitCount: this.hitCount,
@@ -431,7 +442,10 @@ export class CacheService {
       hitRate,
       memoryStats: this.memoryCache.getStats(),
       redisConnected: !!this.redisCache,
-      strategy: this.config.strategy
+      strategy: this.config.strategy,
+      currentMemoryUsage: currentMemory,
+      memoryThreshold: maxMemory * this.memoryWarningThreshold,
+      memoryUtilization: maxMemory > 0 ? currentMemory / maxMemory : 0
     };
   }
 
@@ -462,5 +476,121 @@ export class CacheService {
       healthy: this.isHealthy(),
       timestamp: Date.now()
     };
+  }
+
+  /**
+   * Get current memory usage in bytes
+   */
+  private getCurrentMemoryUsage(): number {
+    let totalSize = 0;
+    
+    // Calculate size from memory cache
+    for (const entry of this.memoryCache['cache'].values()) {
+      totalSize += entry.size || 0;
+    }
+    
+    return totalSize;
+  }
+
+  /**
+   * Check memory usage and emit warnings if necessary
+   */
+  private checkMemoryUsage(): void {
+    const now = Date.now();
+    
+    // Only check memory usage periodically
+    if (now - this.lastMemoryCheck < this.memoryCheckInterval) {
+      return;
+    }
+    
+    this.lastMemoryCheck = now;
+    const currentMemory = this.getCurrentMemoryUsage();
+    const maxMemory = this.config.memory.maxSize;
+    const utilization = maxMemory > 0 ? currentMemory / maxMemory : 0;
+    
+    if (utilization >= this.memoryWarningThreshold) {
+      this.eventBus.emit('cache-service:memory-warning', {
+        currentUsage: currentMemory,
+        maxMemory,
+        utilization,
+        threshold: this.memoryWarningThreshold,
+        timestamp: now
+      });
+      
+      // Trigger more aggressive eviction if we're at 90%+
+      if (utilization >= 0.9) {
+        this.eventBus.emit('cache-service:memory-critical', {
+          currentUsage: currentMemory,
+          maxMemory,
+          utilization,
+          timestamp: now
+        });
+        
+        // Force eviction of 25% of entries
+        this.forceEviction(0.25);
+      }
+    }
+  }
+
+  /**
+   * Force eviction of a percentage of cache entries
+   */
+  private forceEviction(percentage: number): void {
+    const currentSize = this.memoryCache.size();
+    const toEvict = Math.floor(currentSize * percentage);
+    
+    if (toEvict > 0) {
+      // Access the private cache and accessOrder maps
+      const cache = this.memoryCache['cache'];
+      const accessOrder = this.memoryCache['accessOrder'];
+      
+      // Get LRU entries
+      const accessEntries = Array.from(accessOrder.entries())
+        .sort((a, b) => a[1] - b[1]); // Sort by access order (oldest first)
+      
+      let evicted = 0;
+      for (const [key] of accessEntries) {
+        if (evicted >= toEvict) break;
+        
+        cache.delete(key);
+        accessOrder.delete(key);
+        evicted++;
+      }
+      
+      this.eventBus.emit('cache-service:forced-eviction', {
+        entriesEvicted: evicted,
+        reason: 'memory-pressure',
+        timestamp: Date.now()
+      });
+    }
+  }
+
+  /**
+   * Optimize cache configuration based on current usage patterns
+   */
+  optimizeConfiguration(): void {
+    const stats = this.getStats();
+    
+    // If hit rate is very low, consider reducing cache size
+    if (stats.hitRate < 0.1 && stats.hitCount + stats.missCount > 100) {
+      this.eventBus.emit('cache-service:optimization-suggestion', {
+        type: 'reduce-size',
+        reason: 'low-hit-rate',
+        currentHitRate: stats.hitRate,
+        suggestion: 'Consider reducing cache size due to low hit rate',
+        timestamp: Date.now()
+      });
+    }
+    
+    // If memory utilization is consistently low, suggest reducing max size
+    if (stats.memoryUtilization < 0.3) {
+      this.eventBus.emit('cache-service:optimization-suggestion', {
+        type: 'reduce-memory-allocation',
+        reason: 'low-utilization',
+        currentUtilization: stats.memoryUtilization,
+        suggestion: 'Consider reducing memory allocation due to low utilization',
+        timestamp: Date.now()
+      });
+    }
   }
 }

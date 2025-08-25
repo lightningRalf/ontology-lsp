@@ -73,11 +73,11 @@ graph TB
     SLACK["Slack Bot<br/>Team chat"]
   end
 
-  subgraph ECOSYSTEM["Ecosystem Extensions"]
-    PLUGINS["Plugin System<br/>Community extensions"]
-    MARKETPLACE["Pattern Marketplace<br/>Share learnings"]
-    AITRAINING["AI Training<br/>Dataset generation"]
-    METRICS["Analytics<br/>Code health metrics"]
+  subgraph ECOSYSTEM["🌐 Ecosystem Extensions - Four Pillars"]
+    PLUGINS["🔌 Plugin System<br/>Code extensions"]
+    MARKETPLACE["🎯 Pattern Marketplace<br/>Knowledge assets"]
+    AITRAINING["🤖 AI Training<br/>Custom models"]
+    ANALYTICS["📊 Analytics<br/>Insights & metrics"]
   end
 
   %% Core connections
@@ -208,6 +208,43 @@ $ just analyze --pr
 📈 Improves consistency by +2.3%
 ```
 
+## Ecosystem Extensions: The Four Pillars
+
+The Ecosystem Extensions create a self-reinforcing knowledge economy through four interconnected pillars. Each pillar serves a distinct purpose while synergistically enhancing the others. For complete architectural details, see [[ECOSYSTEM_ARCHITECTURE]].
+
+### 1. Plugin System - Code Extensions
+**What**: Executable code that extends core functionality through sandboxed runtime environments  
+**Value**: Add new features, language support, protocol adapters, and integrations  
+**Examples**: Rust language parser, GitHub integration, security scanner  
+**Details**: [[PLUGIN_ARCHITECTURE]]
+
+### 2. Pattern Marketplace - Knowledge Assets  
+**What**: Learned patterns as tradeable data assets (JSON/YAML, not executable code)  
+**Value**: Transform team knowledge into intellectual property that can be shared or sold  
+**Examples**: Error handling patterns, architectural blueprints, refactoring recipes  
+**Details**: [[PATTERN_MARKETPLACE]]
+
+### 3. AI Training - Custom Intelligence
+**What**: Dataset generation from your codebase to train team-specific models  
+**Value**: AI that understands your domain, architecture, and coding style  
+**Examples**: Custom completion models, naming conventions, code style enforcement  
+**Details**: [[AI_TRAINING_PIPELINE]]
+
+### 4. Analytics - Insights & Metrics
+**What**: Comprehensive code health and team performance measurement  
+**Value**: Data-driven decisions, early problem detection, productivity tracking  
+**Examples**: Technical debt tracking, velocity metrics, quality scores  
+**Details**: [[ANALYTICS_SYSTEM]]
+
+### The Synergistic Effect
+Each pillar enhances the others in a continuous improvement cycle:
+- **Plugins** discover patterns → Feed the **Pattern Marketplace**
+- **Patterns** provide training data → Improve **AI Models**
+- **AI** generates insights → Enhance **Analytics**
+- **Analytics** identify gaps → Drive new **Plugin** development
+
+This creates a compound effect where knowledge accumulates, value increases exponentially, and expertise becomes democratized across the entire ecosystem.
+
 ## Impact: Second to Fifth Order Effects
 
 ### Second Order (Immediate)
@@ -256,8 +293,10 @@ Enable team features:
 
 ### Phase 4: Ecosystem (Weeks 7-8)
 Build community:
-- Plugin system
-- Pattern marketplace
+- Plugin system - See [[PLUGIN_ARCHITECTURE]]
+- Pattern marketplace - See [[PATTERN_MARKETPLACE]]
+- AI training pipeline - See [[AI_TRAINING_PIPELINE]]
+- Analytics system - See [[ANALYTICS_SYSTEM]]
 - Public API
 
 ## Success Metrics
