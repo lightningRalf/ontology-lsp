@@ -268,7 +268,7 @@ describe("Cross-Protocol Consistency", () => {
 
       const httpRequest = {
         method: "POST",
-        url: "/api/definition",
+        url: "/api/v1/definition",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(coreRequest)
       };
@@ -395,7 +395,7 @@ describe("Cross-Protocol Consistency", () => {
         try {
           const httpResponse = await context.adapters.http.handleRequest({
             method: "POST",
-            url: "/api/definition",
+            url: "/api/v1/definition",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               identifier: symbol,
@@ -479,9 +479,14 @@ describe("Cross-Protocol Consistency", () => {
 
       // HTTP
       const httpResponse = await context.adapters.http.handleRequest({
-        method: "GET",
-        url: `/api/references?identifier=${encodeURIComponent(symbol)}&uri=${encodeURIComponent(file)}&includeDeclaration=true`,
-        headers: {}
+        method: "POST",
+        url: `/api/v1/references`,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          identifier: symbol,
+          uri: file,
+          includeDeclaration: true
+        })
       });
       const httpResult = JSON.parse(httpResponse.body);
 
@@ -627,7 +632,7 @@ describe("Cross-Protocol Consistency", () => {
           const request = getRequest();
           const httpRequest = {
             method: "POST",
-            url: "/api/definition",
+            url: "/api/v1/definition",
             headers: { "content-type": "application/json" },
             body: request ? JSON.stringify(request) : "invalid json"
           };
@@ -735,7 +740,7 @@ describe("Cross-Protocol Consistency", () => {
           case 'http':
             await context.adapters.http.handleRequest({
               method: "POST",
-              url: "/api/definition",
+              url: "/api/v1/definition",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({
                 identifier: symbol,
@@ -790,7 +795,7 @@ describe("Cross-Protocol Consistency", () => {
           case 'http':
             await context.adapters.http.handleRequest({
               method: "POST",
-              url: "/api/definition",
+              url: "/api/v1/definition",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({
                 identifier: symbol,
@@ -863,7 +868,7 @@ describe("Cross-Protocol Consistency", () => {
 
       const httpResponse = await context.adapters.http.handleRequest({
         method: "POST",
-        url: "/api/definition",
+        url: "/api/v1/definition",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           identifier: testSymbol,
@@ -1103,7 +1108,7 @@ describe("Cross-Protocol Consistency", () => {
         const httpStart = performance.now();
         await context.adapters.http.handleRequest({
           method: "POST",
-          url: "/api/definition",
+          url: "/api/v1/definition",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             identifier: testSymbol,

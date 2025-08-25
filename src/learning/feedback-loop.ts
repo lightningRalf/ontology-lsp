@@ -144,10 +144,13 @@ export class FeedbackLoopSystem {
     }
 
     try {
+      // Validate and sanitize input data for corrupted/invalid feedback
+      const sanitizedFeedback = this.validateAndSanitizeFeedback(feedback);
+      
       const feedbackId = uuidv4();
       const fullFeedback: FeedbackEvent = {
         id: feedbackId,
-        ...feedback
+        ...sanitizedFeedback
       };
 
       // Store in memory for quick access
@@ -157,16 +160,16 @@ export class FeedbackLoopSystem {
       await this.storeFeedbackToDatabase(fullFeedback);
 
       // Update pattern confidence immediately for real-time learning
-      if (feedback.patternId) {
-        const confidence = feedback.context?.confidence ?? 0.5;
-        await this.updatePatternConfidence(feedback.patternId, feedback.type, confidence);
+      if (sanitizedFeedback.patternId) {
+        const confidence = sanitizedFeedback.context?.confidence ?? 0.5;
+        await this.updatePatternConfidence(sanitizedFeedback.patternId, sanitizedFeedback.type, confidence);
       }
 
       // Emit event for other systems
       this.eventBus.emit('feedback-recorded', {
         feedbackId,
-        type: feedback.type,
-        patternId: feedback.patternId,
+        type: sanitizedFeedback.type,
+        patternId: sanitizedFeedback.patternId,
         timestamp: Date.now()
       });
 
@@ -185,6 +188,80 @@ export class FeedbackLoopSystem {
       });
       throw error;
     }
+  }
+
+  /**
+   * Validate and sanitize feedback data to handle corrupted input
+   */
+  private validateAndSanitizeFeedback(feedback: any): FeedbackEvent {
+    // Handle null/undefined original feedback
+    if (!feedback) {
+      throw new CoreError('Feedback cannot be null or undefined', 'INVALID_FEEDBACK');
+    }
+
+    // Provide defaults for required fields if missing/corrupted
+    const sanitized: any = {
+      suggestionId: feedback.suggestionId || `fallback-${Date.now()}`,
+      type: this.validateFeedbackType(feedback.type) ? feedback.type : 'accept',
+      originalSuggestion: feedback.originalSuggestion || 'unknown',
+      finalValue: feedback.finalValue || feedback.originalSuggestion || 'unknown',
+      context: this.sanitizeContext(feedback.context),
+      metadata: this.sanitizeMetadata(feedback.metadata),
+      patternId: feedback.patternId || undefined
+    };
+
+    return sanitized;
+  }
+
+  /**
+   * Validate feedback type
+   */
+  private validateFeedbackType(type: any): boolean {
+    const validTypes = ['accept', 'reject', 'modify'];
+    return typeof type === 'string' && validTypes.includes(type);
+  }
+
+  /**
+   * Sanitize context data
+   */
+  private sanitizeContext(context: any): FeedbackEvent['context'] {
+    if (!context || typeof context !== 'object') {
+      return {
+        file: 'unknown',
+        operation: 'unknown',
+        confidence: 0.5,
+        timestamp: new Date()
+      };
+    }
+
+    return {
+      file: typeof context.file === 'string' ? context.file : 'unknown',
+      operation: typeof context.operation === 'string' ? context.operation : 'unknown',
+      confidence: typeof context.confidence === 'number' ? 
+        Math.max(0, Math.min(1, context.confidence)) : 0.5,
+      timestamp: context.timestamp instanceof Date ? context.timestamp : new Date()
+    };
+  }
+
+  /**
+   * Sanitize metadata
+   */
+  private sanitizeMetadata(metadata: any): FeedbackEvent['metadata'] {
+    if (!metadata || typeof metadata !== 'object') {
+      return {
+        source: 'unknown',
+        keystrokes: 0,
+        timeToDecision: 0
+      };
+    }
+
+    return {
+      source: typeof metadata.source === 'string' ? metadata.source : 'unknown',
+      keystrokes: typeof metadata.keystrokes === 'number' ? 
+        Math.max(0, metadata.keystrokes) : 0,
+      timeToDecision: typeof metadata.timeToDecision === 'number' ? 
+        Math.max(0, metadata.timeToDecision) : 0
+    };
   }
 
   /**

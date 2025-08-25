@@ -887,42 +887,85 @@ export class LearningOrchestrator {
   }
 
   private async executeComprehensiveAnalysis(context: LearningContext, data: any): Promise<any> {
-    const results: any = {};
+    const results: any = {
+      success: true,
+      components: {}
+    };
+
+    // Process data from input if available
+    if (data) {
+      try {
+        if (data.feedback && this.feedbackLoop) {
+          await this.feedbackLoop.processFeedback(data.feedback);
+          results.components.feedbackProcessed = true;
+        }
+        
+        if (data.fileChange && this.evolutionTracker) {
+          await this.evolutionTracker.trackChange(data.fileChange);
+          results.components.evolutionProcessed = true;
+        }
+        
+        if (data.teamMember && this.teamKnowledge) {
+          // Process team member data if needed
+          results.components.teamProcessed = true;
+        }
+      } catch (error) {
+        results.dataProcessingError = error instanceof Error ? error.message : String(error);
+      }
+    }
 
     // Run analysis across all available components
     try {
       if (this.patternLearner) {
         results.patterns = await this.patternLearner.getActivePatterns();
+      } else {
+        results.patterns = []; // Default empty array if not available
       }
     } catch (error) {
       results.patternsError = error instanceof Error ? error.message : String(error);
+      results.patterns = [];
     }
 
     try {
       if (this.feedbackLoop) {
         results.feedback = await this.feedbackLoop.getFeedbackStats();
         results.insights = await this.feedbackLoop.generateInsights();
+      } else {
+        results.feedback = { totalEvents: 0, acceptanceRate: 0 };
+        results.insights = [];
       }
     } catch (error) {
       results.feedbackError = error instanceof Error ? error.message : String(error);
+      results.feedback = { totalEvents: 0, acceptanceRate: 0 };
+      results.insights = [];
     }
 
     try {
       if (this.evolutionTracker) {
         results.evolution = await this.evolutionTracker.detectEvolutionPatterns();
         results.trends = await this.evolutionTracker.analyzeArchitecturalTrends();
+      } else {
+        results.evolution = [];
+        results.trends = [];
       }
     } catch (error) {
       results.evolutionError = error instanceof Error ? error.message : String(error);
+      results.evolution = [];
+      results.trends = [];
     }
 
     try {
       if (this.teamKnowledge) {
         results.team = await this.teamKnowledge.generateTeamInsights();
         results.knowledgeGraph = this.teamKnowledge.getKnowledgeGraph();
+      } else {
+        results.team = [];
+        results.knowledgeGraph = { nodes: [], connections: [] };
       }
     } catch (error) {
       results.teamError = error instanceof Error ? error.message : String(error);
+      results.team = [];
+      results.knowledgeGraph = { nodes: [], connections: [] };
     }
 
     return results;

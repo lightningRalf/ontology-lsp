@@ -257,6 +257,21 @@ export class LSPAdapter {
   }
 
   /**
+   * Initialize the LSP adapter
+   */
+  async initialize(): Promise<void> {
+    // LSP adapter doesn't need special initialization - just ensure core analyzer is ready
+    // Core analyzer is passed in constructor and should already be initialized
+  }
+
+  /**
+   * Dispose the LSP adapter
+   */
+  async dispose(): Promise<void> {
+    // LSP adapter doesn't hold resources that need cleanup
+  }
+
+  /**
    * Get adapter diagnostics and health information
    */
   getDiagnostics(): Record<string, any> {

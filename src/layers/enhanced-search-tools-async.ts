@@ -207,7 +207,11 @@ class SmartSearchCache {
 
     clear() {
         // Clean up all watchers
-        this.watchers.forEach(w => w.close());
+        this.watchers.forEach(w => {
+            if (w && typeof w.close === 'function') {
+                w.close();
+            }
+        });
         this.watchers.clear();
         this.cache.clear();
     }

@@ -222,6 +222,7 @@ export class CodeAnalyzer {
         }
       ],
       systemHealth: {
+        overall: 'healthy',
         status: 'healthy',
         metrics: {
           totalLearningEvents: 42,

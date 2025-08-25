@@ -272,6 +272,28 @@ export class MCPAdapter {
   }
 
   /**
+   * Initialize the MCP adapter
+   */
+  async initialize(): Promise<void> {
+    // MCP adapter doesn't need special initialization - just ensure core analyzer is ready
+    // Core analyzer is passed in constructor and should already be initialized
+  }
+
+  /**
+   * Dispose the MCP adapter
+   */
+  async dispose(): Promise<void> {
+    // MCP adapter doesn't hold resources that need cleanup
+  }
+
+  /**
+   * Execute MCP tool call (alias for handleToolCall for consistency)
+   */
+  async executeTool(request: { name: string; arguments: Record<string, any> }): Promise<any> {
+    return await this.handleToolCall(request.name, request.arguments);
+  }
+
+  /**
    * Get adapter diagnostics
    */
   getDiagnostics(): Record<string, any> {

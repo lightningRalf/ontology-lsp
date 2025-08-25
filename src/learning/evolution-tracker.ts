@@ -227,46 +227,67 @@ export class CodeEvolutionTracker {
       throw new CoreError('CodeEvolutionTracker not initialized', 'NOT_INITIALIZED');
     }
 
-    try {
-      const eventId = uuidv4();
-      const fullEvent: EvolutionEvent = {
-        id: eventId,
-        ...event
-      };
+    let attempt = 0;
+    const maxAttempts = 3;
 
-      // Store in memory for quick access
-      this.evolutionEvents.set(eventId, fullEvent);
+    while (attempt < maxAttempts) {
+      try {
+        // Generate unique ID with timestamp and random component to avoid collisions
+        const eventId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${uuidv4().substr(0, 8)}`;
+        const fullEvent: EvolutionEvent = {
+          id: eventId,
+          ...event
+        };
 
-      // Persist to database
-      await this.storeEventToDatabase(fullEvent);
+        // Store in memory for quick access
+        this.evolutionEvents.set(eventId, fullEvent);
 
-      // Check for new patterns (async to avoid blocking)
-      setImmediate(() => this.detectNewPatterns([fullEvent]));
+        // Persist to database with retry logic
+        await this.storeEventToDatabase(fullEvent);
 
-      // Emit event for other systems
-      this.eventBus.emit('evolution-event-recorded', {
-        eventId,
-        type: event.type,
-        file: event.file,
-        impact: event.impact,
-        timestamp: Date.now()
-      });
+        // Check for new patterns (async to avoid blocking)
+        setImmediate(() => this.detectNewPatterns([fullEvent]));
 
-      const duration = Date.now() - startTime;
-      if (duration > this.performanceTargets.recordEvent) {
-        console.warn(`CodeEvolutionTracker.recordEvolutionEvent took ${duration}ms (target: ${this.performanceTargets.recordEvent}ms)`);
+        // Emit event for other systems
+        this.eventBus.emit('evolution-event-recorded', {
+          eventId,
+          type: event.type,
+          file: event.file,
+          impact: event.impact,
+          timestamp: Date.now()
+        });
+
+        const duration = Date.now() - startTime;
+        if (duration > this.performanceTargets.recordEvent) {
+          console.warn(`CodeEvolutionTracker.recordEvolutionEvent took ${duration}ms (target: ${this.performanceTargets.recordEvent}ms)`);
+        }
+
+        return eventId;
+        
+      } catch (error) {
+        attempt++;
+        
+        // Check if it's a UNIQUE constraint violation
+        if (error instanceof CoreError && 
+            error.message.includes('UNIQUE constraint failed') && 
+            attempt < maxAttempts) {
+          // Wait a bit before retrying to avoid rapid collision
+          await new Promise(resolve => setTimeout(resolve, 10 * attempt));
+          continue;
+        }
+
+        // If it's not a retryable error or we've exceeded max attempts
+        this.eventBus.emit('evolution-tracker:error', {
+          operation: 'recordEvolutionEvent',
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: Date.now(),
+          attempt
+        });
+        throw error;
       }
-
-      return eventId;
-      
-    } catch (error) {
-      this.eventBus.emit('evolution-tracker:error', {
-        operation: 'recordEvolutionEvent',
-        error: error instanceof Error ? error.message : String(error),
-        timestamp: Date.now()
-      });
-      throw error;
     }
+
+    throw new CoreError(`Failed to record evolution event after ${maxAttempts} attempts`, 'MAX_RETRIES_EXCEEDED');
   }
 
   /**
@@ -623,25 +644,42 @@ export class CodeEvolutionTracker {
 
   private async storeEventToDatabase(event: EvolutionEvent): Promise<void> {
     try {
-      await this.sharedServices.database.execute(
-        `INSERT INTO evolution_events (
-          id, type, event_type, timestamp, file_path, before_path, before_content, before_signature,
-          after_path, after_content, after_signature, commit_hash, author, branch, message,
-          files_affected, symbols_affected, tests_affected, severity, diff_size,
-          cycle_time, rollback, automated
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          event.id, event.type, event.type, Math.floor(event.timestamp.getTime() / 1000), event.file,
-          event.before?.path, event.before?.content, event.before?.signature,
-          event.after?.path, event.after?.content, event.after?.signature,
-          event.context.commit, event.context.author, event.context.branch, event.context.message,
-          event.impact.filesAffected, event.impact.symbolsAffected, event.impact.testsAffected,
-          event.impact.severity, event.metadata.diffSize, event.metadata.cycleTime,
-          event.metadata.rollback, event.metadata.automated
-        ]
-      );
+      // Use a transaction to prevent constraint violations and ensure atomicity
+      await this.sharedServices.database.transaction(async (query) => {
+        // First check if the event already exists
+        const existing = await query(
+          'SELECT id FROM evolution_events WHERE id = ?',
+          [event.id]
+        );
+
+        if (existing && existing.length > 0) {
+          // Event already exists, this is likely a race condition
+          console.warn(`Evolution event ${event.id} already exists, skipping insert`);
+          return;
+        }
+
+        // Insert the new event
+        await query(
+          `INSERT INTO evolution_events (
+            id, type, event_type, timestamp, file_path, before_path, before_content, before_signature,
+            after_path, after_content, after_signature, commit_hash, author, branch, message,
+            files_affected, symbols_affected, tests_affected, severity, diff_size,
+            cycle_time, rollback, automated
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            event.id, event.type, event.type, Math.floor(event.timestamp.getTime() / 1000), event.file,
+            event.before?.path, event.before?.content, event.before?.signature,
+            event.after?.path, event.after?.content, event.after?.signature,
+            event.context.commit, event.context.author, event.context.branch, event.context.message,
+            event.impact.filesAffected, event.impact.symbolsAffected, event.impact.testsAffected,
+            event.impact.severity, event.metadata.diffSize, event.metadata.cycleTime,
+            event.metadata.rollback, event.metadata.automated
+          ]
+        );
+      });
     } catch (error) {
       console.error('Failed to store evolution event to database:', error);
+      throw error; // Re-throw to trigger retry logic in caller
     }
   }
 

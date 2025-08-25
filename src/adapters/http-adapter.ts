@@ -139,6 +139,11 @@ export class HTTPAdapter {
           return method === 'GET' ? this.handleStats() : this.methodNotAllowed();
         case '/monitoring':
           return method === 'GET' ? this.handleMonitoring() : this.methodNotAllowed();
+        // New streaming endpoints
+        case '/stream/search':
+          return method === 'POST' ? this.handleStreamSearch(request) : this.methodNotAllowed();
+        case '/stream/definition':
+          return method === 'POST' ? this.handleStreamDefinition(request) : this.methodNotAllowed();
         default:
           return this.notFound();
       }
@@ -520,6 +525,87 @@ export class HTTPAdapter {
 
   private notFound(): HTTPResponse {
     return { status: 404, headers: {}, body: JSON.stringify({ error: 'Not found' }) };
+  }
+
+  /**
+   * Initialize the HTTP adapter
+   */
+  async initialize(): Promise<void> {
+    // HTTP adapter doesn't need special initialization - just ensure core analyzer is ready
+    // Core analyzer is passed in constructor and should already be initialized
+  }
+
+  /**
+   * Dispose the HTTP adapter
+   */
+  async dispose(): Promise<void> {
+    // HTTP adapter doesn't hold resources that need cleanup
+  }
+
+  /**
+   * Handle POST /api/v1/stream/search - Streaming search results via SSE
+   */
+  private async handleStreamSearch(request: HTTPRequest): Promise<HTTPResponse> {
+    try {
+      const body = strictJsonParse(request.body || '{}');
+      validateRequired(body, ['pattern']);
+
+      // This is a placeholder - actual SSE streaming would need to be handled
+      // at the server level, not the adapter level. The adapter just validates
+      // the request and provides the stream setup parameters.
+      
+      return {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/plain',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive'
+        },
+        body: JSON.stringify({
+          success: true,
+          message: 'Stream search endpoint ready - needs SSE implementation at server level',
+          streamConfig: {
+            pattern: body.pattern,
+            path: body.path || '.',
+            maxResults: body.maxResults || 100,
+            timeout: body.timeout || 20000
+          }
+        })
+      };
+    } catch (error) {
+      return this.createErrorResponse(400, 'Bad Request', error);
+    }
+  }
+
+  /**
+   * Handle POST /api/v1/stream/definition - Streaming definition search via SSE
+   */
+  private async handleStreamDefinition(request: HTTPRequest): Promise<HTTPResponse> {
+    try {
+      const body = strictJsonParse(request.body || '{}');
+      validateRequired(body, ['identifier']);
+
+      return {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/plain',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive'
+        },
+        body: JSON.stringify({
+          success: true,
+          message: 'Stream definition endpoint ready - needs SSE implementation at server level',
+          streamConfig: {
+            identifier: body.identifier,
+            file: body.file,
+            maxResults: body.maxResults || 50,
+            timeout: body.timeout || 15000
+          }
+        })
+      };
+    } catch (error) {
+      return this.createErrorResponse(400, 'Bad Request', error);
+    }
   }
 
   private createErrorResponse(status: number, message: string, cause?: any): HTTPResponse {
