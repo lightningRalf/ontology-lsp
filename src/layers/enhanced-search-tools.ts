@@ -370,7 +370,7 @@ export class EnhancedGrep {
             const output = execSync(command, {
                 encoding: 'utf8',
                 maxBuffer: 50 * 1024 * 1024, // 50MB
-                timeout: 5000 // Fixed 5 second timeout for ripgrep
+                timeout: params.timeout || 5000 // Use param timeout if provided
             });
 
             return this.parseRipgrepOutput(output, params);
@@ -385,6 +385,23 @@ export class EnhancedGrep {
         
         // Basic pattern and options
         args.push(`"${this.escapeShellArg(params.pattern)}"`);
+        
+        // CRITICAL: Add default exclusions and respect .gitignore
+        args.push('--no-ignore-parent');  // Don't search parent .gitignore files
+        args.push('--glob');
+        args.push('"!node_modules/**"');
+        args.push('--glob');
+        args.push('"!dist/**"');
+        args.push('--glob');
+        args.push('"!.git/**"');
+        args.push('--glob');
+        args.push('"!coverage/**"');
+        args.push('--glob');
+        args.push('"!*.min.js"');
+        args.push('--glob');
+        args.push('"!package-lock.json"');
+        args.push('--max-depth');
+        args.push('5');  // Limit search depth
         
         if (params.caseInsensitive) args.push('-i');
         if (params.lineNumbers) args.push('-n');
@@ -401,7 +418,7 @@ export class EnhancedGrep {
         } else if (params.outputMode === 'count') {
             args.push('-c');
         }
-        // Don't use --json by default as it can cause parsing issues
+        // Note: We don't use --json for compatibility with older ripgrep versions
         
         // File type filtering - map common types to ripgrep types
         if (params.type) {
@@ -423,13 +440,11 @@ export class EnhancedGrep {
             args.push(`"${this.escapeShellArg(params.path)}"`);
         }
         
-        // Limits
+        // Limits - only add if explicitly requested
         if (params.headLimit) {
             args.push(`-m ${params.headLimit}`);
-        } else {
-            // Default limit to prevent hanging on large searches
-            args.push('-m 1000');
         }
+        // Don't add a default limit - let ripgrep return naturally
 
         return args;
     }
