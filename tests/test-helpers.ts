@@ -481,6 +481,15 @@ export async function createRealLayers(config: any): Promise<any[]> {
 export async function registerRealLayers(layerManager: any, config: any): Promise<void> {
   const realLayers = await createRealLayers(config);
   realLayers.forEach(layer => {
-    layerManager.registerLayer(layer);
+    try {
+      layerManager.registerLayer(layer);
+    } catch (error) {
+      // Layer already registered - continue with existing layer
+      if (error instanceof Error && error.message.includes('already registered')) {
+        console.log(`Layer ${layer.name} already registered, skipping...`);
+      } else {
+        throw error;
+      }
+    }
   });
 }

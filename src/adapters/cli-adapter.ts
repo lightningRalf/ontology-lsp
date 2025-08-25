@@ -228,14 +228,14 @@ export class CLIAdapter {
       
       switch (command) {
         case 'find':
-          if (!args[1]) {
+          if (args[1] === undefined) {
             return { success: false, message: 'Identifier required for find command' };
           }
           result = await this.handleFind(args[1], options);
           return { success: true, data: result };
 
         case 'references':
-          if (!args[1]) {
+          if (args[1] === undefined) {
             return { success: false, message: 'Identifier required for references command' };
           }
           result = await this.handleReferences(args[1], options);

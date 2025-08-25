@@ -20,7 +20,7 @@ import { SharedServices } from './services/index';
 
 // Import existing layer implementations
 import { ClaudeToolsLayer } from '../layers/claude-tools';
-import { TreeSitterLayer } from '../layers/tree-sitter';
+import { TreeSitterLayer, TreeSitterResult } from '../layers/tree-sitter';
 import { OntologyEngine } from '../ontology/ontology-engine';
 import { PatternLearner } from '../patterns/pattern-learner';
 import { KnowledgeSpreader } from '../propagation/knowledge-spreader';
@@ -98,6 +98,10 @@ class Layer2Adapter extends LayerAdapter {
   
   getTreeSitter(): TreeSitterLayer {
     return this.treeSitter;
+  }
+  
+  async process(matches: EnhancedMatches): Promise<TreeSitterResult> {
+    return this.treeSitter.process(matches);
   }
 }
 

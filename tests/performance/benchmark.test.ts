@@ -38,7 +38,7 @@ describe('Performance Benchmarks', () => {
         });
 
         ontology = new OntologyEngine({
-            dbPath: ':memory:',
+            dbPath: '/tmp/test-ontology.db',
             caching: { enabled: true, ttl: 3600, maxEntries: 1000 }
         });
 

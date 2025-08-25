@@ -304,9 +304,9 @@ describe('Async Enhanced Search Performance', () => {
         test('should handle timeout gracefully', async () => {
             try {
                 await grep.search({
-                    pattern: 'xxxxxxxxxxxxxxxxx', // Complex pattern
-                    path: '/',  // Search entire filesystem
-                    timeout: 100 // Very short timeout
+                    pattern: 'xxxxxxxxxxxxxxxxx', // Complex pattern  
+                    path: '.',  // Search current directory instead of root
+                    timeout: 1 // Extremely short timeout (1ms) to force timeout
                 });
                 expect(true).toBe(false); // Should not reach here
             } catch (error: any) {

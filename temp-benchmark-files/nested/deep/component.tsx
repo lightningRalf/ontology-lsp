@@ -1,1 +1,0 @@
-<div>React Component</div>

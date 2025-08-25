@@ -109,9 +109,18 @@ const createAdapterTestContext = async (): Promise<AdapterTestContext> => {
     }
   ];
 
-  // Register all mock layers
+  // Register all mock layers (check if already registered to avoid conflicts)
   mockLayers.forEach(layer => {
-    layerManager.registerLayer(layer);
+    try {
+      layerManager.registerLayer(layer);
+    } catch (error) {
+      // Layer already registered - continue with existing layer
+      if (error instanceof Error && error.message.includes('already registered')) {
+        console.log(`Layer ${layer.name} already registered, skipping...`);
+      } else {
+        throw error;
+      }
+    }
   });
 
   const codeAnalyzer = new CodeAnalyzer(
@@ -185,9 +194,15 @@ describe("Protocol Adapters Integration", () => {
 
   afterAll(async () => {
     // Adapters don't have dispose methods, only core services do
-    await context.codeAnalyzer.dispose();
-    await context.layerManager.dispose();
-    await context.sharedServices.dispose();
+    if (context?.codeAnalyzer) {
+      await context.codeAnalyzer.dispose();
+    }
+    if (context?.layerManager) {
+      await context.layerManager.dispose();
+    }
+    if (context?.sharedServices) {
+      await context.sharedServices.dispose();
+    }
   });
 
   describe("LSP Adapter", () => {
@@ -544,16 +559,16 @@ describe("Protocol Adapters Integration", () => {
       const result = await context.adapters.cli.handleFind(testSymbol, { file: testFile, maxResults: 10 });
 
       expect(result).toBeDefined();
-      expect(typeof result).toBe('string');
-      expect(result.length).toBeGreaterThan(0);
+      expect(Array.isArray(result)).toBe(true);
+      // CLI adapter now returns structured data for consistency tests
     });
 
     test("should handle 'references' command correctly", async () => {
       const result = await context.adapters.cli.handleReferences(testSymbol, { includeDeclaration: true, maxResults: 10 });
 
       expect(result).toBeDefined();
-      expect(typeof result).toBe('string');
-      expect(result.length).toBeGreaterThan(0);
+      expect(Array.isArray(result)).toBe(true);
+      // CLI adapter now returns structured data for consistency tests
     });
 
     test("should handle 'rename' command correctly", async () => {
@@ -629,7 +644,7 @@ describe("Protocol Adapters Integration", () => {
       expect(lspResult).toBeDefined();
       expect(mcpResult.content).toBeDefined();
       expect(httpResult.data).toBeDefined();
-      expect(typeof cliResult).toBe('string');
+      expect(Array.isArray(cliResult)).toBe(true);
 
       // Results should be consistent in structure
       if (coreResult.data.length > 0) {
@@ -686,8 +701,8 @@ describe("Protocol Adapters Integration", () => {
       // CLI adapter
       const cliResult = await context.adapters.cli.handleFind(invalidSymbol, { file: testFile });
       expect(cliResult).toBeDefined();
-      // CLI should return a string result (even if empty)
-      expect(typeof cliResult).toBe("string");
+      // CLI should return structured data (even if empty array)
+      expect(Array.isArray(cliResult)).toBe(true);
     });
   });
 

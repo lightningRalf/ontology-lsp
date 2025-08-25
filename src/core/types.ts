@@ -240,12 +240,18 @@ export type CompletionResult = AnalysisResult<Completion[]>;
 // Layer interfaces
 export interface Layer {
   name: string;
-  version: string;
+  version?: string;
   targetLatency: number; // in milliseconds
-  initialize(): Promise<void>;
-  dispose(): Promise<void>;
-  isHealthy(): boolean;
-  getMetrics(): LayerMetrics;
+  initialize?(): Promise<void>;
+  dispose?(): Promise<void>;
+  isHealthy?(): boolean;
+  getMetrics?(): LayerMetrics;
+  // Generic process method - layers can implement with specific types
+  process?(input: any): Promise<any>;
+  // Fallback method for when process fails
+  fallback?(): any;
+  // Timeout property (compatible with Layer<T,R>)
+  timeout?: number;
 }
 
 export interface LayerMetrics {
