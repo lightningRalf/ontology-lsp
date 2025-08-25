@@ -272,10 +272,18 @@ class ConnectionPool {
   constructor(dbPath: string, maxConnections: number = 10) {
     this.maxConnections = maxConnections;
     
-    // Pre-create connections
+    // Pre-create connections with optimized settings
     for (let i = 0; i < maxConnections; i++) {
       try {
         const db = new Database(dbPath);
+        
+        // Configure each connection for optimal concurrency
+        db.exec('PRAGMA busy_timeout = 30000');
+        db.exec('PRAGMA journal_mode = WAL');
+        db.exec('PRAGMA synchronous = NORMAL');
+        db.exec('PRAGMA cache_size = -8000'); // 8MB cache per connection
+        db.exec('PRAGMA temp_store = MEMORY');
+        
         this.connections.push(db);
       } catch (error) {
         console.error(`Failed to create database connection ${i}:`, error);
@@ -421,32 +429,62 @@ export class DatabaseService {
   }
 
   /**
-   * Execute a query with automatic connection management
+   * Execute a query with automatic connection management and retry logic
    */
   async query<T = any>(sql: string, params: any[] = []): Promise<T[]> {
     if (!this.initialized || !this.pool) {
       throw new CoreError('Database service not initialized', 'DB_NOT_INITIALIZED');
     }
 
-    const db = await this.pool.acquire();
+    const maxRetries = 2; // Fewer retries for queries since they're typically faster
+    let attempt = 0;
     
-    try {
-      const stmt = db.prepare(sql);
-      const result = stmt.all(...params) as T[];
-      return result;
-    } catch (error) {
-      this.eventBus.emit('database-service:query-error', {
-        sql: sql.substring(0, 100) + (sql.length > 100 ? '...' : ''),
-        error: error instanceof Error ? error.message : String(error),
-        timestamp: Date.now()
-      });
-      throw new CoreError(
-        `Database query failed: ${error instanceof Error ? error.message : String(error)}`,
-        'DB_QUERY_ERROR'
-      );
-    } finally {
-      this.pool.release(db);
+    while (attempt < maxRetries) {
+      const db = await this.pool.acquire();
+      
+      try {
+        // Set busy timeout for better concurrency handling
+        db.exec('PRAGMA busy_timeout = 3000'); // 3 second timeout for queries
+        
+        const stmt = db.prepare(sql);
+        const result = stmt.all(...params) as T[];
+        
+        this.pool.release(db);
+        return result;
+        
+      } catch (error) {
+        this.pool.release(db);
+        
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const isRetryable = errorMessage.includes('database is locked') ||
+                           errorMessage.includes('SQLITE_BUSY') ||
+                           errorMessage.includes('database is busy');
+        
+        attempt++;
+        
+        if (isRetryable && attempt < maxRetries) {
+          // Short delay for query retries
+          const delay = 5 * attempt + Math.random() * 5;
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        this.eventBus.emit('database-service:query-error', {
+          sql: sql.substring(0, 100) + (sql.length > 100 ? '...' : ''),
+          error: errorMessage,
+          attempt,
+          retryable: isRetryable,
+          timestamp: Date.now()
+        });
+        
+        throw new CoreError(
+          `Database query failed after ${attempt} attempts: ${errorMessage}`,
+          'DB_QUERY_ERROR'
+        );
+      }
     }
+    
+    throw new CoreError('Database query failed: max retries exceeded', 'DB_QUERY_ERROR');
   }
 
   /**
@@ -458,87 +496,153 @@ export class DatabaseService {
   }
 
   /**
-   * Execute a query that doesn't return data (INSERT, UPDATE, DELETE)
+   * Execute a query that doesn't return data (INSERT, UPDATE, DELETE) with retry logic
    */
   async execute(sql: string, params: any[] = []): Promise<{ changes: number; lastInsertRowid: number }> {
     if (!this.initialized || !this.pool) {
       throw new CoreError('Database service not initialized', 'DB_NOT_INITIALIZED');
     }
 
-    const db = await this.pool.acquire();
+    const maxRetries = 3;
+    let attempt = 0;
     
-    try {
-      const stmt = db.prepare(sql);
-      const result = stmt.run(...params);
-      return {
-        changes: result.changes,
-        lastInsertRowid: Number(result.lastInsertRowid)
-      };
-    } catch (error) {
-      this.eventBus.emit('database-service:execute-error', {
-        sql: sql.substring(0, 100) + (sql.length > 100 ? '...' : ''),
-        error: error instanceof Error ? error.message : String(error),
-        timestamp: Date.now()
-      });
-      throw new CoreError(
-        `Database execute failed: ${error instanceof Error ? error.message : String(error)}`,
-        'DB_EXECUTE_ERROR'
-      );
-    } finally {
-      this.pool.release(db);
+    while (attempt < maxRetries) {
+      const db = await this.pool.acquire();
+      
+      try {
+        // Set busy timeout for better concurrency handling
+        db.exec('PRAGMA busy_timeout = 5000'); // 5 second timeout
+        
+        const stmt = db.prepare(sql);
+        const result = stmt.run(...params);
+        
+        this.pool.release(db);
+        return {
+          changes: result.changes,
+          lastInsertRowid: Number(result.lastInsertRowid)
+        };
+        
+      } catch (error) {
+        this.pool.release(db);
+        
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const isRetryable = errorMessage.includes('database is locked') ||
+                           errorMessage.includes('SQLITE_BUSY') ||
+                           errorMessage.includes('database is busy') ||
+                           (errorMessage.includes('FOREIGN KEY constraint') && attempt === 0);
+        
+        attempt++;
+        
+        if (isRetryable && attempt < maxRetries) {
+          // Reduced backoff with jitter for faster retries
+          const delay = Math.min(10 * Math.pow(2, attempt) + Math.random() * 10, 250);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        this.eventBus.emit('database-service:execute-error', {
+          sql: sql.substring(0, 100) + (sql.length > 100 ? '...' : ''),
+          error: errorMessage,
+          attempt,
+          retryable: isRetryable,
+          timestamp: Date.now()
+        });
+        
+        throw new CoreError(
+          `Database execute failed after ${attempt} attempts: ${errorMessage}`,
+          'DB_EXECUTE_ERROR'
+        );
+      }
     }
+    
+    throw new CoreError('Database execute failed: max retries exceeded', 'DB_EXECUTE_ERROR');
   }
 
   /**
-   * Execute multiple queries in a transaction
+   * Execute multiple queries in a transaction with retry logic and proper isolation
    */
   async transaction<T>(callback: (query: (sql: string, params?: any[]) => Promise<any>) => Promise<T>): Promise<T> {
     if (!this.initialized || !this.pool) {
       throw new CoreError('Database service not initialized', 'DB_NOT_INITIALIZED');
     }
 
-    const db = await this.pool.acquire();
+    const maxRetries = 3;
+    let attempt = 0;
     
-    try {
-      // Start transaction
-      db.exec('BEGIN TRANSACTION');
+    while (attempt < maxRetries) {
+      const db = await this.pool.acquire();
+      let transactionStarted = false;
       
-      const transactionQuery = async (sql: string, params: any[] = []) => {
-        const stmt = db.prepare(sql);
-        if (sql.trim().toUpperCase().startsWith('SELECT')) {
-          return stmt.all(...params);
-        } else {
-          return stmt.run(...params);
-        }
-      };
-      
-      const result = await callback(transactionQuery);
-      
-      // Commit transaction
-      db.exec('COMMIT');
-      
-      return result;
-      
-    } catch (error) {
-      // Rollback on error
       try {
-        db.exec('ROLLBACK');
-      } catch (rollbackError) {
-        console.error('Rollback failed:', rollbackError);
+        // Set busy timeout and isolation level for better concurrency
+        db.exec('PRAGMA busy_timeout = 10000'); // 10 second timeout
+        db.exec('PRAGMA journal_mode = WAL'); // Write-Ahead Logging for better concurrency
+        db.exec('PRAGMA synchronous = NORMAL'); // Faster than FULL sync
+        db.exec('PRAGMA cache_size = -16000'); // 16MB cache for better performance
+        
+        // Start transaction with deferred mode for better concurrency
+        db.exec('BEGIN DEFERRED TRANSACTION');
+        transactionStarted = true;
+        
+        const transactionQuery = async (sql: string, params: any[] = []) => {
+          const stmt = db.prepare(sql);
+          if (sql.trim().toUpperCase().startsWith('SELECT')) {
+            return stmt.all(...params);
+          } else {
+            return stmt.run(...params);
+          }
+        };
+        
+        const result = await callback(transactionQuery);
+        
+        // Commit transaction
+        db.exec('COMMIT');
+        
+        this.pool.release(db);
+        return result;
+        
+      } catch (error) {
+        // Rollback on error if transaction was started
+        if (transactionStarted) {
+          try {
+            db.exec('ROLLBACK');
+          } catch (rollbackError) {
+            console.error('Rollback failed:', rollbackError);
+          }
+        }
+        
+        this.pool.release(db);
+        
+        // Check if this is a retryable error
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const isRetryable = errorMessage.includes('database is locked') || 
+                           errorMessage.includes('SQLITE_BUSY') ||
+                           errorMessage.includes('database is busy');
+        
+        attempt++;
+        
+        if (isRetryable && attempt < maxRetries) {
+          // Reduced backoff with jitter for faster retries
+          const delay = Math.min(25 * Math.pow(2, attempt) + Math.random() * 25, 500);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        this.eventBus.emit('database-service:transaction-error', {
+          error: errorMessage,
+          attempt,
+          retryable: isRetryable,
+          timestamp: Date.now()
+        });
+        
+        throw new CoreError(
+          `Database transaction failed after ${attempt} attempts: ${errorMessage}`,
+          'DB_TRANSACTION_ERROR'
+        );
       }
-      
-      this.eventBus.emit('database-service:transaction-error', {
-        error: error instanceof Error ? error.message : String(error),
-        timestamp: Date.now()
-      });
-      
-      throw new CoreError(
-        `Database transaction failed: ${error instanceof Error ? error.message : String(error)}`,
-        'DB_TRANSACTION_ERROR'
-      );
-    } finally {
-      this.pool.release(db);
     }
+    
+    throw new CoreError('Database transaction failed: max retries exceeded', 'DB_TRANSACTION_ERROR');
   }
 
   private async initializeSchema(): Promise<void> {
@@ -549,19 +653,31 @@ export class DatabaseService {
     const db = await this.pool.acquire();
     
     try {
-      // Configure SQLite for better performance
+      // Configure SQLite for better performance and concurrency
       if (this.config.enableWAL !== false) {
         db.exec('PRAGMA journal_mode = WAL');
       }
-      if (this.config.enableForeignKeys !== false) {
-        db.exec('PRAGMA foreign_keys = ON');
-      }
+      // Temporarily disable foreign keys during schema creation
+      db.exec('PRAGMA foreign_keys = OFF');
+      
       if (this.config.busyTimeout) {
         db.exec(`PRAGMA busy_timeout = ${this.config.busyTimeout}`);
+      } else {
+        db.exec('PRAGMA busy_timeout = 30000'); // Default 30 second timeout
       }
+      
+      // Additional performance settings
+      db.exec('PRAGMA synchronous = NORMAL'); // Better performance than FULL
+      db.exec('PRAGMA cache_size = -64000'); // 64MB cache
+      db.exec('PRAGMA temp_store = MEMORY'); // Store temp tables in memory
       
       // Execute schema SQL
       db.exec(SCHEMA_SQL);
+      
+      // Re-enable foreign keys after schema creation
+      if (this.config.enableForeignKeys !== false) {
+        db.exec('PRAGMA foreign_keys = ON');
+      }
       
       // Check/update schema version
       const versionResult = db.prepare('SELECT MAX(version) as version FROM schema_version').get() as { version: number | null };
@@ -630,6 +746,119 @@ export class DatabaseService {
 
   isHealthy(): boolean {
     return this.initialized && !!this.pool;
+  }
+
+  /**
+   * Ensure a record exists before inserting a child record with FOREIGN KEY constraint
+   */
+  async ensureRecordExists(table: string, idColumn: string, id: string, defaultRecord?: Record<string, any>): Promise<boolean> {
+    try {
+      const existing = await this.queryOne(`SELECT ${idColumn} FROM ${table} WHERE ${idColumn} = ?`, [id]);
+      
+      if (!existing && defaultRecord) {
+        // Insert default record if provided
+        const columns = Object.keys(defaultRecord);
+        const placeholders = columns.map(() => '?').join(', ');
+        const values = Object.values(defaultRecord);
+        
+        await this.execute(
+          `INSERT OR IGNORE INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`,
+          values
+        );
+        return true;
+      }
+      
+      return !!existing;
+    } catch (error) {
+      console.warn(`Failed to ensure record exists in ${table}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Insert record with FOREIGN KEY constraint validation
+   */
+  async insertWithConstraintValidation(
+    table: string, 
+    data: Record<string, any>,
+    foreignKeys?: Array<{ table: string; column: string; value: any; defaultRecord?: Record<string, any> }>
+  ): Promise<{ changes: number; lastInsertRowid: number }> {
+    
+    // Validate FOREIGN KEY constraints first
+    if (foreignKeys) {
+      for (const fk of foreignKeys) {
+        if (fk.value !== null && fk.value !== undefined) {
+          const exists = await this.ensureRecordExists(fk.table, fk.column, fk.value, fk.defaultRecord);
+          if (!exists && !fk.defaultRecord) {
+            throw new CoreError(
+              `FOREIGN KEY constraint would fail: ${fk.table}.${fk.column} = ${fk.value} does not exist`,
+              'FK_CONSTRAINT_ERROR'
+            );
+          }
+        }
+      }
+    }
+
+    // Proceed with insert
+    const columns = Object.keys(data);
+    const placeholders = columns.map(() => '?').join(', ');
+    const values = Object.values(data);
+    
+    return await this.execute(
+      `INSERT OR REPLACE INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`,
+      values
+    );
+  }
+
+  /**
+   * Execute transaction with constraint validation
+   */
+  async transactionWithConstraintValidation<T>(
+    callback: (
+      query: (sql: string, params?: any[]) => Promise<any>,
+      insertSafe: (table: string, data: Record<string, any>, foreignKeys?: Array<{ table: string; column: string; value: any; defaultRecord?: Record<string, any> }>) => Promise<any>
+    ) => Promise<T>
+  ): Promise<T> {
+    return await this.transaction(async (query) => {
+      const insertSafe = async (
+        table: string, 
+        data: Record<string, any>,
+        foreignKeys?: Array<{ table: string; column: string; value: any; defaultRecord?: Record<string, any> }>
+      ) => {
+        // Validate FOREIGN KEY constraints within transaction
+        if (foreignKeys) {
+          for (const fk of foreignKeys) {
+            if (fk.value !== null && fk.value !== undefined) {
+              const existing = await query(`SELECT ${fk.column} FROM ${fk.table} WHERE ${fk.column} = ?`, [fk.value]);
+              
+              if ((!existing || existing.length === 0) && fk.defaultRecord) {
+                // Insert default record if provided
+                const columns = Object.keys(fk.defaultRecord);
+                const placeholders = columns.map(() => '?').join(', ');
+                const values = Object.values(fk.defaultRecord);
+                
+                await query(
+                  `INSERT OR IGNORE INTO ${fk.table} (${columns.join(', ')}) VALUES (${placeholders})`,
+                  values
+                );
+              }
+            }
+          }
+        }
+
+        // Proceed with insert
+        const columns = Object.keys(data);
+        const placeholders = columns.map(() => '?').join(', ');
+        const values = Object.values(data);
+        
+        return await query(
+          `INSERT OR REPLACE INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`,
+          values
+        );
+      };
+
+      return await callback(query, insertSafe);
+    });
   }
 
   getDiagnostics(): Record<string, any> {

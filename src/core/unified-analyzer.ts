@@ -99,6 +99,11 @@ export class CodeAnalyzer {
     
     this.initialized = true;
     
+    // Start cache warming in background (don't await to avoid blocking initialization)
+    this.warmCacheForWorkspace(this.config.workspaceRoot).catch(error => {
+      console.debug('Background cache warming failed:', error);
+    });
+    
     this.eventBus.emit('code-analyzer:initialized', {
       timestamp: Date.now(),
       version: '1.0.0'
@@ -471,9 +476,10 @@ export class CodeAnalyzer {
           definitions.push(...fastResults);
           layerTimes.layer1 = Date.now() - layer1Start;
           
-          // If we found exact matches, we can skip fuzzy search in some cases
+          // If we found exact matches, cache with optimized TTL and skip further layers
           if (fastResults.some(d => d.source === 'exact')) {
-            await this.sharedServices.cache.set(cacheKey, definitions, 300); // 5min cache
+            const cacheTtl = this.calculateOptimalCacheTtl(fastResults, 'exact');
+            await this.sharedServices.cache.set(cacheKey, definitions, cacheTtl);
             return this.buildResult(definitions, layerTimes, requestId, startTime);
           }
         } catch (error) {
@@ -575,8 +581,9 @@ export class CodeAnalyzer {
         ? rankedDefinitions.slice(0, request.maxResults)
         : rankedDefinitions;
       
-      // Cache results
-      await this.sharedServices.cache.set(cacheKey, limitedResults, 300);
+      // Cache results with optimized TTL
+      const cacheTtl = this.calculateOptimalCacheTtl(limitedResults, 'mixed');
+      await this.sharedServices.cache.set(cacheKey, limitedResults, cacheTtl);
       
       return this.buildResult(limitedResults, layerTimes, requestId, startTime);
       
@@ -1294,7 +1301,187 @@ export class CodeAnalyzer {
   }
   
   private generateCacheKey(operation: string, request: any): string {
-    return `${operation}:${JSON.stringify(request)}`;
+    // Use only stable, request-identifying properties for cache key
+    // Avoid volatile properties like requestId, timestamp, etc.
+    const stableKey = {
+      operation,
+      identifier: request.identifier,
+      uri: this.normalizeUriForCaching(request.uri),
+      position: request.position ? {
+        line: request.position.line,
+        character: request.position.character
+      } : null,
+      maxResults: request.maxResults,
+      includeDeclaration: request.includeDeclaration,
+      // Only include properties that affect the result
+      ...(request.newName && { newName: request.newName }),
+      ...(request.dryRun !== undefined && { dryRun: request.dryRun })
+    };
+    
+    // Create a stable, consistent cache key
+    return this.hashObject(stableKey);
+  }
+  
+  private normalizeUriForCaching(uri: string): string {
+    // Normalize URI to ensure consistent cache keys across different URI formats
+    if (!uri) return 'file://unknown';
+    
+    // Convert to consistent file:// format
+    if (uri.startsWith('file://')) {
+      return uri;
+    }
+    
+    // Handle relative paths and normalize
+    if (uri.startsWith('/')) {
+      return `file://${uri}`;
+    }
+    
+    return `file://${path.resolve(uri)}`;
+  }
+  
+  private hashObject(obj: any): string {
+    // Create a deterministic hash of the object
+    const str = JSON.stringify(obj, Object.keys(obj).sort());
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return `cache_${Math.abs(hash).toString(36)}`;
+  }
+  
+  /**
+   * Calculate optimal cache TTL based on result quality and type
+   */
+  private calculateOptimalCacheTtl(results: Definition[] | Reference[], resultType: 'exact' | 'fuzzy' | 'mixed'): number {
+    if (!results || results.length === 0) {
+      return 60; // 1 minute for empty results
+    }
+    
+    // Base TTL values in seconds
+    const baseTtls = {
+      exact: 1800,  // 30 minutes for exact matches (very stable)
+      fuzzy: 300,   // 5 minutes for fuzzy matches (less stable)
+      mixed: 600    // 10 minutes for mixed results
+    };
+    
+    let ttl = baseTtls[resultType] || 300;
+    
+    // Adjust TTL based on result confidence
+    const avgConfidence = results.reduce((sum, r) => sum + (r.confidence || 0.5), 0) / results.length;
+    
+    if (avgConfidence > 0.9) {
+      ttl = Math.floor(ttl * 2); // Double TTL for high-confidence results
+    } else if (avgConfidence < 0.3) {
+      ttl = Math.floor(ttl * 0.5); // Half TTL for low-confidence results
+    }
+    
+    // Adjust based on result count (more results = more stable)
+    if (results.length >= 10) {
+      ttl = Math.floor(ttl * 1.5);
+    } else if (results.length <= 2) {
+      ttl = Math.floor(ttl * 0.7);
+    }
+    
+    // Ensure reasonable bounds
+    return Math.max(30, Math.min(ttl, 3600)); // 30 seconds to 1 hour
+  }
+  
+  /**
+   * Warm cache for common operations to improve hit rate
+   */
+  async warmCacheForWorkspace(workspaceRoot: string): Promise<void> {
+    try {
+      // Common identifiers that are frequently searched
+      const commonIdentifiers = [
+        'function', 'class', 'interface', 'type', 'const', 'let', 'var',
+        'export', 'import', 'default', 'async', 'await', 'return',
+        'React', 'Component', 'useState', 'useEffect', 'props', 'state'
+      ];
+      
+      const warmingRequests = commonIdentifiers.map(identifier => ({
+        identifier,
+        uri: `file://${workspaceRoot}`,
+        position: { line: 0, character: 0 },
+        includeDeclaration: true,
+        maxResults: 10
+      }));
+      
+      // Execute warming requests with minimal processing
+      const warmingPromises = warmingRequests.map(async (request) => {
+        try {
+          const cacheKey = this.generateCacheKey('definition', request);
+          
+          // Check if already cached
+          if (await this.sharedServices.cache.has(cacheKey)) {
+            return;
+          }
+          
+          // Do a lightweight search and cache the result
+          const fastResult = await this.executeLayer1Search(request as FindDefinitionRequest);
+          if (fastResult.length > 0) {
+            const ttl = this.calculateOptimalCacheTtl(fastResult, 'exact');
+            await this.sharedServices.cache.set(cacheKey, fastResult, ttl);
+          }
+        } catch (error) {
+          // Ignore warming errors - they shouldn't block normal operation
+          console.debug(`Cache warming failed for ${request.identifier}:`, error);
+        }
+      });
+      
+      // Execute warming in batches to avoid overwhelming the system
+      const batchSize = 5;
+      for (let i = 0; i < warmingPromises.length; i += batchSize) {
+        const batch = warmingPromises.slice(i, i + batchSize);
+        await Promise.all(batch);
+        
+        // Small delay between batches to avoid blocking
+        if (i + batchSize < warmingPromises.length) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      }
+      
+      this.eventBus.emit('cache:warmed', {
+        workspace: workspaceRoot,
+        identifiers: commonIdentifiers.length,
+        timestamp: Date.now()
+      });
+      
+    } catch (error) {
+      console.warn('Cache warming failed:', error);
+    }
+  }
+  
+  /**
+   * Smart cache invalidation based on file changes
+   */
+  async invalidateCacheForFile(fileUri: string): Promise<void> {
+    try {
+      // Normalize the file URI for consistent invalidation
+      const normalizedUri = this.normalizeUriForCaching(fileUri);
+      
+      // Pattern to match cache entries for this file
+      const filePattern = new RegExp(`cache_.*${this.escapeRegexForUri(normalizedUri)}`);
+      
+      // Invalidate specific file-related entries
+      const invalidated = await this.sharedServices.cache.invalidatePattern(filePattern);
+      
+      if (invalidated > 0) {
+        this.eventBus.emit('cache:invalidated', {
+          fileUri: normalizedUri,
+          entriesInvalidated: invalidated,
+          reason: 'file-change',
+          timestamp: Date.now()
+        });
+      }
+    } catch (error) {
+      console.warn('Cache invalidation failed:', error);
+    }
+  }
+  
+  private escapeRegexForUri(uri: string): string {
+    return uri.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
   
   private deduplicateDefinitions(definitions: Definition[]): Definition[] {

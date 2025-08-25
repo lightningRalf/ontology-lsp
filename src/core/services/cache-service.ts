@@ -593,4 +593,129 @@ export class CacheService {
       });
     }
   }
+  
+  /**
+   * Warm cache with frequently accessed data
+   */
+  async warmCache(warmingData: Array<{ key: CacheKey; data: any; ttl?: number }>): Promise<void> {
+    if (!this.initialized) {
+      return;
+    }
+    
+    let warmed = 0;
+    const startTime = Date.now();
+    
+    for (const { key, data, ttl } of warmingData) {
+      try {
+        await this.set(key, data, ttl);
+        warmed++;
+      } catch (error) {
+        console.warn(`Cache warming failed for key ${key}:`, error);
+      }
+    }
+    
+    this.eventBus.emit('cache-service:warmed', {
+      entriesWarmed: warmed,
+      totalRequested: warmingData.length,
+      duration: Date.now() - startTime,
+      timestamp: Date.now()
+    });
+  }
+  
+  /**
+   * Pre-warm cache with common query patterns
+   */
+  async prewarmCommonPatterns(commonIdentifiers: string[]): Promise<void> {
+    if (!this.initialized) {
+      return;
+    }
+    
+    const warmingData = commonIdentifiers.map(identifier => ({
+      key: `prewarmed:${identifier}` as CacheKey,
+      data: { 
+        identifier, 
+        prewarmed: true, 
+        timestamp: Date.now() 
+      },
+      ttl: this.config.memory.ttl * 2 // Longer TTL for prewarmed data
+    }));
+    
+    await this.warmCache(warmingData);
+  }
+  
+  /**
+   * Check if a key exists in cache (without affecting LRU order)
+   */
+  async has(key: CacheKey): Promise<boolean> {
+    if (!this.initialized) {
+      return false;
+    }
+    
+    try {
+      const entry = this.memoryCache['cache'].get(key);
+      if (!entry) {
+        return false;
+      }
+      
+      // Check TTL without updating access order
+      const now = Date.now();
+      if (now - entry.timestamp > entry.ttl * 1000) {
+        // Entry is expired, remove it
+        this.memoryCache.delete(key);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+  
+  /**
+   * Get cache keys matching a pattern (for cache management)
+   */
+  getKeysMatching(pattern: RegExp): CacheKey[] {
+    if (!this.initialized) {
+      return [];
+    }
+    
+    const keys: CacheKey[] = [];
+    const cache = this.memoryCache['cache'];
+    
+    for (const key of cache.keys()) {
+      if (pattern.test(key)) {
+        keys.push(key);
+      }
+    }
+    
+    return keys;
+  }
+  
+  /**
+   * Invalidate cache entries matching a pattern
+   */
+  async invalidatePattern(pattern: RegExp): Promise<number> {
+    if (!this.initialized) {
+      return 0;
+    }
+    
+    const keysToDelete = this.getKeysMatching(pattern);
+    let deleted = 0;
+    
+    for (const key of keysToDelete) {
+      if (await this.delete(key)) {
+        deleted++;
+      }
+    }
+    
+    if (deleted > 0) {
+      this.eventBus.emit('cache-service:pattern-invalidated', {
+        pattern: pattern.source,
+        keysDeleted: deleted,
+        timestamp: Date.now()
+      });
+    }
+    
+    return deleted;
+  }
 }

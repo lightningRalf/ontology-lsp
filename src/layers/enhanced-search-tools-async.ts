@@ -300,6 +300,7 @@ export class AsyncEnhancedGrep {
         let matchesFound = 0;
         let cancelled = false;
         let process: ChildProcess | null = null;
+        let readline: any = null;
 
         // Implement cancel method
         emitter.cancel = () => {
@@ -307,6 +308,14 @@ export class AsyncEnhancedGrep {
             if (process) {
                 process.kill('SIGTERM');
             }
+            if (readline) {
+                readline.close();
+            }
+            // Emit end event when cancelled to resolve promises waiting for completion
+            setImmediate(() => {
+                if (!emitter.listenerCount('end')) return;
+                emitter.emit('end');
+            });
         };
 
         // Start async search
@@ -315,25 +324,52 @@ export class AsyncEnhancedGrep {
                 // Check cache first
                 const cached = this.cache.get(options);
                 if (cached) {
-                    // Emit cached results with slight delay to simulate streaming
-                    for (const result of cached) {
+                    // Emit cached results with proper timing delays to simulate streaming
+                    let delay = 0;
+                    let timeouts: NodeJS.Timeout[] = [];
+                    
+                    for (let i = 0; i < cached.length; i++) {
                         if (cancelled) break;
-                        emitter.emit('data', result);
-                        matchesFound++;
                         
-                        // Emit progress
-                        if (matchesFound % 10 === 0) {
-                            emitter.emit('progress', {
-                                filesSearched,
-                                matchesFound,
-                                elapsedMs: Date.now() - startTime
-                            });
-                        }
+                        const result = cached[i];
+                        const timeout = setTimeout(() => {
+                            if (!cancelled) {
+                                emitter.emit('data', result);
+                                matchesFound++;
+                                
+                                // Emit progress
+                                if (matchesFound % 10 === 0) {
+                                    emitter.emit('progress', {
+                                        filesSearched,
+                                        matchesFound,
+                                        elapsedMs: Date.now() - startTime
+                                    });
+                                }
+                                
+                                // Emit end after last result
+                                if (i === cached.length - 1) {
+                                    emitter.emit('end');
+                                }
+                            }
+                        }, delay);
                         
-                        // Tiny delay to not flood
-                        await new Promise(resolve => setImmediate(resolve));
+                        timeouts.push(timeout);
+                        
+                        // Increment delay for next result (1-5ms per result)
+                        delay += Math.random() * 4 + 1;
                     }
-                    emitter.emit('end');
+                    
+                    // Clear timeouts if cancelled
+                    const originalCancel = emitter.cancel;
+                    emitter.cancel = () => {
+                        timeouts.forEach(clearTimeout);
+                        originalCancel();
+                    };
+                    
+                    // If no results, emit end immediately
+                    if (cached.length === 0) {
+                        emitter.emit('end');
+                    }
                     return;
                 }
 
@@ -357,6 +393,7 @@ export class AsyncEnhancedGrep {
                     input: process.stdout!,
                     crlfDelay: Infinity
                 });
+                readline = rl;
 
                 const results: StreamingGrepResult[] = [];
 
@@ -409,15 +446,39 @@ export class AsyncEnhancedGrep {
 
                 // Handle errors
                 process.stderr?.on('data', (data) => {
-                    // Ignore non-critical ripgrep warnings
-                    const error = data.toString();
-                    if (!error.includes('No such file') && !error.includes('Permission denied')) {
-                        emitter.emit('error', new Error(error));
+                    // Ignore non-critical ripgrep warnings and common error patterns
+                    const errorText = data.toString().trim();
+                    if (!errorText || 
+                        errorText.includes('No such file') || 
+                        errorText.includes('Permission denied') ||
+                        errorText.includes('Is a directory') ||
+                        errorText.includes('(os error 2)') ||
+                        errorText.includes('No files were searched')) {
+                        // These are expected errors that should result in empty results, not failures
+                        return;
+                    }
+                    
+                    // Only emit errors for truly unexpected issues
+                    if (errorText.includes('ripgrep') || errorText.includes('regex')) {
+                        emitter.emit('error', new Error(errorText));
                     }
                 });
 
                 process.on('error', (err) => {
                     if (timeout) clearTimeout(timeout);
+                    
+                    // Check if this is a common path/command error that should result in empty results
+                    const errorMessage = err.message.toLowerCase();
+                    if (errorMessage.includes('enoent') || 
+                        errorMessage.includes('no such file') ||
+                        errorMessage.includes('spawn rg') ||
+                        errorMessage.includes('(os error 2)')) {
+                        // Path doesn't exist or ripgrep not found - return empty results gracefully
+                        emitter.emit('end');
+                        return;
+                    }
+                    
+                    // Otherwise, it's a real error
                     emitter.emit('error', err);
                     emitter.emit('end');
                 });
@@ -553,6 +614,16 @@ export class AsyncEnhancedGrep {
             });
 
             stream.on('error', (error) => {
+                // For path-related errors, return empty results instead of rejecting
+                const errorMessage = error.message.toLowerCase();
+                if (errorMessage.includes('enoent') || 
+                    errorMessage.includes('no such file') ||
+                    errorMessage.includes('(os error 2)') ||
+                    errorMessage.includes('permission denied')) {
+                    resolve([]);
+                    return;
+                }
+                
                 reject(error);
             });
 

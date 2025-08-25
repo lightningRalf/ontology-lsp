@@ -1263,19 +1263,26 @@ export class TeamKnowledgeSystem {
 
   private async storeTeamMemberToDatabase(member: TeamMember): Promise<void> {
     try {
-      await this.sharedServices.database.execute(`
-        INSERT OR REPLACE INTO team_members (
-          id, name, role, expertise, joined_at, last_active, sharing_level,
-          receive_suggestions, auto_sync, patterns_contributed, patterns_adopted,
-          feedback_given, expertise_score
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        member.id, member.name, member.role, JSON.stringify(member.expertise),
-        Math.floor(member.joinedAt.getTime() / 1000), Math.floor(member.lastActive.getTime() / 1000),
-        member.preferences.patternSharingLevel, member.preferences.receivePatternSuggestions,
-        member.preferences.autoSyncPatterns, member.stats.patternsContributed,
-        member.stats.patternsAdopted, member.stats.feedbackGiven, member.stats.expertise
-      ]);
+      const memberData = {
+        id: member.id,
+        name: member.name,
+        role: member.role,
+        expertise: JSON.stringify(member.expertise),
+        joined_at: Math.floor(member.joinedAt.getTime() / 1000),
+        last_active: Math.floor(member.lastActive.getTime() / 1000),
+        sharing_level: member.preferences.patternSharingLevel,
+        receive_suggestions: member.preferences.receivePatternSuggestions,
+        auto_sync: member.preferences.autoSyncPatterns,
+        patterns_contributed: member.stats.patternsContributed,
+        patterns_adopted: member.stats.patternsAdopted,
+        feedback_given: member.stats.feedbackGiven,
+        expertise_score: member.stats.expertise
+      };
+
+      await this.sharedServices.database.insertWithConstraintValidation(
+        'team_members',
+        memberData
+      );
     } catch (error) {
       console.error('Failed to store team member to database:', error);
     }
@@ -1283,22 +1290,98 @@ export class TeamKnowledgeSystem {
 
   private async storeSharedPatternToDatabase(sharedPattern: SharedPattern): Promise<void> {
     try {
-      await this.sharedServices.database.execute(`
-        INSERT OR REPLACE INTO shared_patterns (
-          pattern_id, contributor_id, contributed_at, status, scope, tags,
-          description, when_to_use, when_not_to_use, examples, related_patterns,
-          usage_count, success_rate, average_confidence, last_used
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        sharedPattern.pattern.id, sharedPattern.contributor,
-        Math.floor(sharedPattern.contributedAt.getTime() / 1000), sharedPattern.status,
-        sharedPattern.scope, JSON.stringify(sharedPattern.tags),
-        sharedPattern.documentation.description, sharedPattern.documentation.whenToUse,
-        sharedPattern.documentation.whenNotToUse, JSON.stringify(sharedPattern.documentation.examples),
-        JSON.stringify(sharedPattern.documentation.relatedPatterns),
-        sharedPattern.metrics.usageCount, sharedPattern.metrics.successRate,
-        sharedPattern.metrics.averageConfidence, Math.floor(sharedPattern.metrics.lastUsed.getTime() / 1000)
-      ]);
+      await this.sharedServices.database.transactionWithConstraintValidation(async (query, insertSafe) => {
+        // First, ensure the pattern exists in the main patterns table
+        const patternData = {
+          id: sharedPattern.pattern.id,
+          from_pattern: JSON.stringify({}), // Empty from pattern for shared patterns
+          to_pattern: JSON.stringify({
+            name: sharedPattern.pattern.name,
+            description: sharedPattern.pattern.description,
+            category: sharedPattern.pattern.category
+          }),
+          confidence: sharedPattern.pattern.confidence,
+          occurrences: 1,
+          category: sharedPattern.pattern.category,
+          last_applied: Math.floor(Date.now() / 1000),
+          examples: JSON.stringify(sharedPattern.pattern.examples || [])
+        };
+
+        await insertSafe('patterns', patternData);
+
+        // Ensure the contributor exists as a team member
+        const contributor = this.teamMembers.get(sharedPattern.contributor);
+        if (contributor) {
+          const memberData = {
+            id: contributor.id,
+            name: contributor.name,
+            role: contributor.role,
+            expertise: JSON.stringify(contributor.expertise),
+            joined_at: Math.floor(contributor.joinedAt.getTime() / 1000),
+            last_active: Math.floor(contributor.lastActive.getTime() / 1000),
+            sharing_level: contributor.preferences.patternSharingLevel,
+            receive_suggestions: contributor.preferences.receivePatternSuggestions,
+            auto_sync: contributor.preferences.autoSyncPatterns,
+            patterns_contributed: contributor.stats.patternsContributed,
+            patterns_adopted: contributor.stats.patternsAdopted,
+            feedback_given: contributor.stats.feedbackGiven,
+            expertise_score: contributor.stats.expertise
+          };
+          await insertSafe('team_members', memberData);
+        } else {
+          // Create a default team member entry if not exists
+          const defaultMember = {
+            id: sharedPattern.contributor,
+            name: 'Unknown Member',
+            role: 'developer',
+            expertise: JSON.stringify([]),
+            joined_at: Math.floor(Date.now() / 1000),
+            last_active: Math.floor(Date.now() / 1000),
+            sharing_level: 'team',
+            receive_suggestions: true,
+            auto_sync: true,
+            patterns_contributed: 0,
+            patterns_adopted: 0,
+            feedback_given: 0,
+            expertise_score: 0.5
+          };
+          await insertSafe('team_members', defaultMember);
+        }
+
+        // Now insert the shared pattern with validated constraints
+        const sharedPatternData = {
+          pattern_id: sharedPattern.pattern.id,
+          contributor_id: sharedPattern.contributor,
+          contributed_at: Math.floor(sharedPattern.contributedAt.getTime() / 1000),
+          status: sharedPattern.status,
+          scope: sharedPattern.scope,
+          tags: JSON.stringify(sharedPattern.tags),
+          description: sharedPattern.documentation.description,
+          when_to_use: sharedPattern.documentation.whenToUse,
+          when_not_to_use: sharedPattern.documentation.whenNotToUse,
+          examples: JSON.stringify(sharedPattern.documentation.examples),
+          related_patterns: JSON.stringify(sharedPattern.documentation.relatedPatterns),
+          usage_count: sharedPattern.metrics.usageCount,
+          success_rate: sharedPattern.metrics.successRate,
+          average_confidence: sharedPattern.metrics.averageConfidence,
+          last_used: Math.floor(sharedPattern.metrics.lastUsed.getTime() / 1000)
+        };
+
+        const foreignKeys = [
+          {
+            table: 'patterns',
+            column: 'id',
+            value: sharedPattern.pattern.id
+          },
+          {
+            table: 'team_members',
+            column: 'id',
+            value: sharedPattern.contributor
+          }
+        ];
+
+        await insertSafe('shared_patterns', sharedPatternData, foreignKeys);
+      });
     } catch (error) {
       console.error('Failed to store shared pattern to database:', error);
     }
@@ -1308,33 +1391,98 @@ export class TeamKnowledgeSystem {
     try {
       await this.storeSharedPatternToDatabase(sharedPattern);
       
-      // Store validations
-      for (const validation of sharedPattern.validations) {
-        await this.sharedServices.database.execute(`
-          INSERT OR REPLACE INTO pattern_validations (
-            id, pattern_id, validator_id, validated_at, status, score, feedback,
-            correctness, usefulness, clarity, completeness
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
-          uuidv4(), sharedPattern.pattern.id, validation.validatorId,
-          Math.floor(validation.validatedAt.getTime() / 1000), validation.status,
-          validation.score, validation.feedback, validation.criteria.correctness,
-          validation.criteria.usefulness, validation.criteria.clarity, validation.criteria.completeness
-        ]);
-      }
+      await this.sharedServices.database.transactionWithConstraintValidation(async (query, insertSafe) => {
+        // Store validations with constraint validation
+        for (const validation of sharedPattern.validations) {
+          const validationData = {
+            id: uuidv4(),
+            pattern_id: sharedPattern.pattern.id,
+            validator_id: validation.validatorId,
+            validated_at: Math.floor(validation.validatedAt.getTime() / 1000),
+            status: validation.status,
+            score: validation.score,
+            feedback: validation.feedback,
+            correctness: validation.criteria.correctness,
+            usefulness: validation.criteria.usefulness,
+            clarity: validation.criteria.clarity,
+            completeness: validation.criteria.completeness
+          };
 
-      // Store adoptions
-      for (const adoption of sharedPattern.adoptions) {
-        await this.sharedServices.database.execute(`
-          INSERT OR REPLACE INTO pattern_adoptions (
-            id, pattern_id, adopter_id, adopted_at, context, outcome, feedback, modifications
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
-          uuidv4(), sharedPattern.pattern.id, adoption.adopterId,
-          Math.floor(adoption.adoptedAt.getTime() / 1000), adoption.context,
-          adoption.outcome, adoption.feedback, adoption.modifications
-        ]);
-      }
+          const validationForeignKeys = [
+            {
+              table: 'shared_patterns',
+              column: 'pattern_id',
+              value: sharedPattern.pattern.id
+            },
+            {
+              table: 'team_members',
+              column: 'id',
+              value: validation.validatorId,
+              defaultRecord: {
+                id: validation.validatorId,
+                name: 'Unknown Validator',
+                role: 'developer',
+                expertise: JSON.stringify([]),
+                joined_at: Math.floor(Date.now() / 1000),
+                last_active: Math.floor(Date.now() / 1000),
+                sharing_level: 'team',
+                receive_suggestions: true,
+                auto_sync: true,
+                patterns_contributed: 0,
+                patterns_adopted: 0,
+                feedback_given: 0,
+                expertise_score: 0.5
+              }
+            }
+          ];
+
+          await insertSafe('pattern_validations', validationData, validationForeignKeys);
+        }
+
+        // Store adoptions with constraint validation
+        for (const adoption of sharedPattern.adoptions) {
+          const adoptionData = {
+            id: uuidv4(),
+            pattern_id: sharedPattern.pattern.id,
+            adopter_id: adoption.adopterId,
+            adopted_at: Math.floor(adoption.adoptedAt.getTime() / 1000),
+            context: adoption.context,
+            outcome: adoption.outcome,
+            feedback: adoption.feedback || null,
+            modifications: adoption.modifications || null
+          };
+
+          const adoptionForeignKeys = [
+            {
+              table: 'shared_patterns',
+              column: 'pattern_id',
+              value: sharedPattern.pattern.id
+            },
+            {
+              table: 'team_members',
+              column: 'id',
+              value: adoption.adopterId,
+              defaultRecord: {
+                id: adoption.adopterId,
+                name: 'Unknown Adopter',
+                role: 'developer',
+                expertise: JSON.stringify([]),
+                joined_at: Math.floor(Date.now() / 1000),
+                last_active: Math.floor(Date.now() / 1000),
+                sharing_level: 'team',
+                receive_suggestions: true,
+                auto_sync: true,
+                patterns_contributed: 0,
+                patterns_adopted: 0,
+                feedback_given: 0,
+                expertise_score: 0.5
+              }
+            }
+          ];
+
+          await insertSafe('pattern_adoptions', adoptionData, adoptionForeignKeys);
+        }
+      });
     } catch (error) {
       console.error('Failed to update shared pattern in database:', error);
     }
@@ -1609,11 +1757,16 @@ export class TeamKnowledgeSystem {
           const pattern1 = patterns[i];
           const pattern2 = patterns[j];
           
+          // Skip if patterns or pattern data is invalid
+          if (!pattern1?.pattern?.name || !pattern2?.pattern?.name) {
+            continue;
+          }
+          
           if (pattern1.pattern.name.toLowerCase().includes('error') && 
               pattern2.pattern.name.toLowerCase().includes('error')) {
             conflicts.push({
-              id: `conflict-${pattern1.pattern.id}-${pattern2.pattern.id}`,
-              patterns: [pattern1.pattern.id, pattern2.pattern.id],
+              id: `conflict-${pattern1.pattern.id || 'unknown'}-${pattern2.pattern.id || 'unknown'}`,
+              patterns: [pattern1.pattern.id || 'unknown', pattern2.pattern.id || 'unknown'],
               type: 'naming_conflict',
               description: 'Similar patterns with potential conflicts'
             });
