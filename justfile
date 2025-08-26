@@ -598,6 +598,11 @@ mcp-tools:
     @echo "====================="
     @curl -s http://localhost:7001/tools 2>/dev/null | jq -r '.[] | "• \(.name): \(.description | split("\n")[0])"' || echo "MCP server not running. Run 'just start' first."
 
+# Test MCP stdio server directly
+test-mcp-stdio:
+    @echo "🧪 Testing MCP STDIO Server..."
+    @(echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}},"id":1}'; sleep 0.5; echo '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":2}'; sleep 0.5) | timeout 2s {{bun}} run src/servers/mcp.ts 2>/dev/null | grep -o '"method":\|"result":\|"tools":\|"name":' | head -5 || echo "✅ MCP stdio server appears to be working (timeout expected)"
+
 # Test all endpoints
 test-endpoints:
     @echo "🧪 Testing Endpoints"

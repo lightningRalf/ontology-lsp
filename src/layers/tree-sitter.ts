@@ -95,7 +95,9 @@ function loadLanguageParser(language: string): any {
                     const tsModule = require(modulePath);
                     TypeScript = tsModule.typescript;
                     loadedLanguages.add('typescript');
-                    console.error(`✓ Loaded TypeScript parser from ${modulePath}`);
+                    if (process.env.DEBUG && !process.env.SILENT_MODE) {
+                        console.error(`✓ Loaded TypeScript parser from ${modulePath}`);
+                    }
                 }
                 return TypeScript;
             case 'javascript':
@@ -104,7 +106,9 @@ function loadLanguageParser(language: string): any {
                     const tsModule = require(modulePath);
                     JavaScript = tsModule.javascript || tsModule.tsx; // Some versions use tsx for JSX
                     loadedLanguages.add('javascript');
-                    console.error(`✓ Loaded JavaScript parser from ${modulePath}`);
+                    if (process.env.DEBUG && !process.env.SILENT_MODE) {
+                        console.error(`✓ Loaded JavaScript parser from ${modulePath}`);
+                    }
                 }
                 return JavaScript;
             case 'python':
@@ -112,7 +116,9 @@ function loadLanguageParser(language: string): any {
                     const modulePath = findModulePath('tree-sitter-python');
                     Python = require(modulePath);
                     loadedLanguages.add('python');
-                    console.error(`✓ Loaded Python parser from ${modulePath}`);
+                    if (process.env.DEBUG && !process.env.SILENT_MODE) {
+                        console.error(`✓ Loaded Python parser from ${modulePath}`);
+                    }
                 }
                 return Python;
             default:
@@ -171,8 +177,10 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
             this.config.languages = ['typescript', 'javascript'];
         }
         
-        console.error(`TreeSitter: Detected languages: ${Array.from(detectedLanguages).join(', ')}`);
-        console.error(`TreeSitter: Loading parsers for: ${this.config.languages.join(', ')}`);
+        if (process.env.DEBUG && !process.env.SILENT_MODE) {
+            console.error(`TreeSitter: Detected languages: ${Array.from(detectedLanguages).join(', ')}`);
+            console.error(`TreeSitter: Loading parsers for: ${this.config.languages.join(', ')}`);
+        }
         
         this.setupParsers();
         this.setupQueries();
@@ -189,12 +197,18 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
                     const parser = new Parser();
                     parser.setLanguage(language);
                     this.parsers.set(langName, parser);
-                    console.error(`✓ Initialized ${langName} parser`);
+                    if (process.env.DEBUG && !process.env.SILENT_MODE) {
+                        console.error(`✓ Initialized ${langName} parser`);
+                    }
                 } catch (e) {
-                    console.warn(`✗ Failed to initialize ${langName} parser:`, e);
+                    if (!process.env.SILENT_MODE) {
+                        console.warn(`✗ Failed to initialize ${langName} parser:`, e);
+                    }
                 }
             } else {
-                console.warn(`✗ No parser available for ${langName}`);
+                if (!process.env.SILENT_MODE) {
+                    console.warn(`✗ No parser available for ${langName}`);
+                }
             }
         }
         

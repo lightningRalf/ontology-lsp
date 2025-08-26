@@ -132,6 +132,7 @@ ontology-lsp/
 - **Performance Optimization**: Layer 1 (0.20ms) and Layer 2 (1.8ms) now exceed targets
 - **Process Management**: Robust port management and cleanup preventing deployment failures
 - **Production Deployment**: Verified all services, health checks, and build artifacts
+- **MCP STDIO Protocol**: Fixed console output pollution breaking stdio communication (2025-08-26)
 
 ## 🎬 System Status
 

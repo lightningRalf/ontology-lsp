@@ -9,6 +9,10 @@
  * All analysis work is delegated to the MCP adapter and core analyzer.
  */
 
+// CRITICAL: Set silent mode BEFORE any imports to prevent stdio pollution
+process.env.SILENT_MODE = 'true';
+process.env.STDIO_MODE = 'true';
+
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
