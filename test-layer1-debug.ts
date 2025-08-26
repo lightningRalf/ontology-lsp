@@ -1,51 +1,97 @@
 #!/usr/bin/env bun
 
-import { CodeAnalyzer } from './src/core/unified-analyzer.js';
+import { ClaudeToolsLayer } from './src/layers/claude-tools.js';
 import { createDefaultCoreConfig } from './src/adapters/utils.js';
 
-async function debugLayer1Search() {
-    console.log("🔍 Debugging Layer 1 search for AsyncEnhancedGrep class definition");
+async function testLayer1() {
+  console.log("🔍 Debugging Layer 1 search for AsyncEnhancedGrep class definition");
+  
+  const config = createDefaultCoreConfig();
+  const layer = new ClaudeToolsLayer(config.layers.layer1);
+  
+  const searchQuery = {
+    identifier: 'AsyncEnhancedGrep',
+    searchPath: '.',
+    fileTypes: ['typescript'],
+    caseSensitive: false,
+    includeTests: false
+  };
+  
+  console.log('Search query:', JSON.stringify(searchQuery, null, 2));
+  
+  try {
+    console.log('\n⏳ Running Layer 1 search...');
+    const result = await layer.process(searchQuery);
     
-    const config = createDefaultCoreConfig();
-    const analyzer = new CodeAnalyzer(config);
-    await analyzer.initialize();
+    console.log(`\n📊 Results summary:`);
+    console.log(`- Exact matches: ${result.exact?.length || 0}`);
+    console.log(`- Fuzzy matches: ${result.fuzzy?.length || 0}`);  
+    console.log(`- Conceptual matches: ${result.conceptual?.length || 0}`);
+    console.log(`- Search time: ${result.searchTime}ms`);
+    console.log(`- Confidence: ${result.confidence}`);
+    console.log(`- Tools used: ${result.toolsUsed?.join(', ')}`);
     
-    console.log("\n📍 Testing with NO URI (should search entire workspace):");
-    const result1 = await analyzer.findDefinition({
-        identifier: 'AsyncEnhancedGrep',
-        uri: '',  // Empty URI should search everywhere
-        position: { line: 0, character: 0 }
-    });
-    
-    console.log(`Found ${result1.definitions.length} definitions`);
-    
-    // Look for the actual class definition
-    const classDefinition = result1.definitions.find(d => 
-        d.uri.includes('enhanced-search-tools-async.ts') && 
-        d.uri.includes('src/layers/')
-    );
-    
-    if (classDefinition) {
-        console.log("✅ Found class definition in src/layers/enhanced-search-tools-async.ts");
-        console.log(`   Line: ${classDefinition.range.start.line + 1}`);
-        console.log(`   Kind: ${classDefinition.kind}`);
-        console.log(`   Source: ${classDefinition.source}`);
-        console.log(`   Layer: ${classDefinition.layer}`);
-    } else {
-        console.log("❌ Class definition NOT found in src/layers/enhanced-search-tools-async.ts");
-        console.log("\n📋 All found locations:");
-        result1.definitions.forEach((d, i) => {
-            const file = d.uri.replace('file://', '').replace(process.cwd(), '.');
-            console.log(`   ${i + 1}. ${file}:${d.range.start.line + 1}`);
-        });
+    // Check exact matches for source file
+    if (result.exact && result.exact.length > 0) {
+      console.log('\n📍 Exact matches:');
+      let foundSourceFile = false;
+      for (const match of result.exact) {
+        console.log(`- ${match.file}:${match.line} (conf: ${match.confidence}) - ${match.text?.slice(0, 80)}...`);
+        if (match.file.includes('src/layers/enhanced-search-tools-async.ts')) {
+          console.log('  ✅ Found source file in exact matches!');
+          foundSourceFile = true;
+        }
+      }
+      
+      if (!foundSourceFile) {
+        console.log('  ❌ Source file not found in exact matches');
+      }
     }
     
-    console.log("\n⏱️ Performance breakdown:");
-    console.log(`   Layer 1: ${result1.performance.layer1}ms`);
-    console.log(`   Layer 2: ${result1.performance.layer2}ms`);
-    console.log(`   Layer 3: ${result1.performance.layer3}ms`);
+    // Check fuzzy matches for source file
+    if (result.fuzzy && result.fuzzy.length > 0) {
+      console.log('\n🔍 Fuzzy matches:');
+      let foundSourceFile = false;
+      for (const match of result.fuzzy) {
+        console.log(`- ${match.file}:${match.line} (conf: ${match.confidence}) - ${match.text?.slice(0, 80)}...`);
+        if (match.file.includes('src/layers/enhanced-search-tools-async.ts')) {
+          console.log('  ✅ Found source file in fuzzy matches!');
+          foundSourceFile = true;
+        }
+      }
+      
+      if (!foundSourceFile) {
+        console.log('  ❌ Source file not found in fuzzy matches');
+      }
+    }
     
-    await analyzer.dispose();
+    // Check if source file is in files set
+    if (result.files) {
+      console.log(`\n📁 Files found: ${result.files.size}`);
+      for (const file of result.files) {
+        if (file.includes('src/layers/enhanced-search-tools-async.ts')) {
+          console.log('  ✅ Source file is in files set!');
+          break;
+        }
+      }
+    }
+    
+    // Health check
+    console.log('\n🩺 Layer health check...');
+    const isHealthy = await layer.healthCheck();
+    console.log(`Health check: ${isHealthy ? '✅ Healthy' : '❌ Unhealthy'}`);
+    
+    // Get metrics
+    console.log('\n📈 Layer metrics:');
+    const metrics = layer.getMetrics();
+    console.log(JSON.stringify(metrics, null, 2));
+    
+    // Dispose
+    await layer.dispose();
+    
+  } catch (error) {
+    console.error('❌ Layer 1 search failed:', error);
+  }
 }
 
-debugLayer1Search().catch(console.error);
+testLayer1().catch(console.error);

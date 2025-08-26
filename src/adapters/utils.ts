@@ -441,10 +441,33 @@ export function createDefaultCoreConfig(): CoreConfig {
         timeout: 5000,
         maxResults: 100,
         fileTypes: ['ts', 'tsx', 'js', 'jsx', 'py', 'java', 'go', 'rust'],
+        grep: {
+          defaultTimeout: 5000,
+          maxResults: 100,
+          caseSensitive: false,
+          includeContext: true,
+          contextLines: 3
+        },
+        glob: {
+          defaultTimeout: 3000,
+          maxFiles: 1000,
+          ignorePatterns: ['node_modules/**', 'dist/**', '.git/**', 'coverage/**']
+        },
+        ls: {
+          defaultTimeout: 2000,
+          maxDepth: 10,
+          followSymlinks: false,
+          includeDotfiles: false
+        },
         optimization: {
           bloomFilter: true,  // Re-enabled - fixed logic to populate after search, not before
           frequencyCache: true,
           parallelSearch: true
+        },
+        caching: {
+          enabled: true,
+          ttl: 300, // 5 minutes in seconds
+          maxEntries: 1000
         }
       },
       layer2: { 
