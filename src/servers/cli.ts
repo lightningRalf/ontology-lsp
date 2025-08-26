@@ -12,17 +12,15 @@
  */
 
 import { Command } from 'commander';
-import { CLIAdapter } from '../adapters/cli-adapter.js';
-import { CodeAnalyzer } from '../core/unified-analyzer.js';
-import { createCodeAnalyzer } from '../core/index.js';
-import { createDefaultCoreConfig } from '../adapters/utils.js';
+// Note: defer heavy imports (tree-sitter, analyzer, adapter) to runtime.
+// This keeps `--help` and `init` working even if native deps are unavailable.
 import * as path from 'path';
 import * as fs from 'fs';
 
 class CLI {
   private program: Command;
-  private coreAnalyzer!: CodeAnalyzer;
-  private cliAdapter!: CLIAdapter;
+  private coreAnalyzer!: any;
+  private cliAdapter!: any;
   private initialized = false;
 
   constructor() {
@@ -113,15 +111,21 @@ class CLI {
     }
 
     try {
-      // Initialize core analyzer
+      // Lazy import heavy modules only when needed
+      const [{ createDefaultCoreConfig }, { createCodeAnalyzer }, { CLIAdapter }] = await Promise.all([
+        import('../adapters/utils.js'),
+        import('../core/index.js'),
+        import('../adapters/cli-adapter.js'),
+      ]);
+
       const config = createDefaultCoreConfig();
       const workspaceRoot = this.findWorkspaceRoot();
-      
+
       this.coreAnalyzer = await createCodeAnalyzer({
         ...config,
-        workspaceRoot
+        workspaceRoot,
       });
-      
+
       await this.coreAnalyzer.initialize();
 
       // Create CLI adapter
@@ -269,8 +273,5 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-// Run CLI
-cli.run(process.argv).catch((error) => {
-  console.error('CLI failed:', error);
-  process.exit(1);
-});
+// Run CLI with top-level await to ensure completion before exit (ESM)
+await cli.run(process.argv);

@@ -14,10 +14,6 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
-  ListResourcesRequestSchema,
-  ReadResourceRequestSchema,
-  ListPromptsRequestSchema,
-  GetPromptRequestSchema,
   ErrorCode,
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
@@ -41,8 +37,6 @@ export class FastMCPServer {
       {
         capabilities: {
           tools: {},
-          resources: {},
-          prompts: {},
         },
       }
     );
@@ -210,36 +204,6 @@ export class FastMCPServer {
           `Tool ${name} failed: ${error instanceof Error ? error.message : String(error)}`
         );
       }
-    });
-
-    // Handle resource listing - return empty list since we don't expose resources yet
-    this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
-      return {
-        resources: []
-      };
-    });
-
-    // Handle resource reading - return error since we don't have resources
-    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-      throw new McpError(
-        ErrorCode.InvalidRequest,
-        `Resource not found: ${request.params.uri}`
-      );
-    });
-
-    // Handle prompt listing - return empty list since we don't expose prompts yet  
-    this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
-      return {
-        prompts: []
-      };
-    });
-
-    // Handle prompt retrieval - return error since we don't have prompts
-    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
-      throw new McpError(
-        ErrorCode.InvalidRequest,
-        `Prompt not found: ${request.params.name}`
-      );
     });
   }
 

@@ -1,17 +1,18 @@
 /**
- * MCP Adapter - Convert MCP tool calls to core analyzer with SSE transport
- * Target: <150 lines
+ * MCP Adapter - Convert MCP tool calls to core analyzer with enhanced error handling
  * 
- * This adapter handles MCP-specific concerns only:
+ * This adapter handles MCP-specific concerns:
  * - MCP tool call/response format
- * - SSE transport layer
- * - MCP error handling
- * - Parameter validation
+ * - Enhanced error handling and validation
+ * - Timeout management
+ * - Request/response logging
  * 
  * All actual analysis work is delegated to the unified core analyzer.
  */
 
 import type { CodeAnalyzer } from '../core/unified-analyzer.js';
+import { mcpLogger, adapterLogger } from '../core/utils/file-logger.js';
+import { withMcpErrorHandling, createValidationError, ErrorContext } from '../core/utils/error-handler.js';
 import {
   buildFindDefinitionRequest,
   buildFindReferencesRequest,
@@ -119,32 +120,58 @@ export class MCPAdapter {
   }
 
   /**
-   * Handle MCP tool call
+   * Handle MCP tool call with enhanced error handling
    */
   async handleToolCall(name: string, arguments_: Record<string, any>): Promise<any> {
-    try {
+    const context: ErrorContext = {
+      component: 'MCPAdapter',
+      operation: `tool_${name}`,
+      timestamp: Date.now()
+    };
+
+    return await withMcpErrorHandling('MCPAdapter', `tool_${name}`, async () => {
+      adapterLogger.debug(`Handling tool call: ${name}`, {
+        args: this.sanitizeForLogging(arguments_)
+      });
+
+      // Validate tool name
+      const validTools = ['find_definition', 'find_references', 'rename_symbol', 'generate_tests'];
+      if (!validTools.includes(name)) {
+        throw createValidationError(`Unknown tool: ${name}. Valid tools: ${validTools.join(', ')}`, context);
+      }
+
+      const startTime = Date.now();
+      let result: any;
+
       switch (name) {
         case 'find_definition':
-          return await this.handleFindDefinition(arguments_);
+          result = await this.handleFindDefinition(arguments_, context);
+          break;
         case 'find_references':
-          return await this.handleFindReferences(arguments_);
+          result = await this.handleFindReferences(arguments_, context);
+          break;
         case 'rename_symbol':
-          return await this.handleRenameSymbol(arguments_);
+          result = await this.handleRenameSymbol(arguments_, context);
+          break;
         case 'generate_tests':
-          return await this.handleGenerateTests(arguments_);
-        default:
-          throw new Error(`Unknown tool: ${name}`);
+          result = await this.handleGenerateTests(arguments_, context);
+          break;
       }
-    } catch (error) {
-      return handleAdapterError(error, 'mcp');
-    }
+
+      const duration = Date.now() - startTime;
+      adapterLogger.logPerformance(`tool_${name}`, duration, true, {
+        resultSize: JSON.stringify(result).length
+      });
+
+      return result;
+    });
   }
 
   /**
-   * Handle find_definition tool call
+   * Handle find_definition tool call with validation
    */
-  private async handleFindDefinition(args: Record<string, any>) {
-    validateRequired(args, ['symbol']);
+  private async handleFindDefinition(args: Record<string, any>, context: ErrorContext) {
+    this.validateArgs(args, ['symbol'], context);
     
     const position = args.position ? 
       normalizePosition(args.position) : 
@@ -206,10 +233,10 @@ export class MCPAdapter {
   }
 
   /**
-   * Handle find_references tool call
+   * Handle find_references tool call with validation
    */
-  private async handleFindReferences(args: Record<string, any>) {
-    validateRequired(args, ['symbol']);
+  private async handleFindReferences(args: Record<string, any>, context: ErrorContext) {
+    this.validateArgs(args, ['symbol'], context);
     
     // For MCP, we don't have exact position, so use symbol-based search
     const request = buildFindReferencesRequest({
@@ -238,10 +265,10 @@ export class MCPAdapter {
   }
 
   /**
-   * Handle rename_symbol tool call
+   * Handle rename_symbol tool call with validation
    */
-  private async handleRenameSymbol(args: Record<string, any>) {
-    validateRequired(args, ['oldName', 'newName']);
+  private async handleRenameSymbol(args: Record<string, any>, context: ErrorContext) {
+    this.validateArgs(args, ['oldName', 'newName'], context);
     
     const request = buildRenameRequest({
       uri: normalizeUri('file://workspace'),
@@ -281,10 +308,10 @@ export class MCPAdapter {
   }
 
   /**
-   * Handle generate_tests tool call (stub - not implemented in core yet)
+   * Handle generate_tests tool call with validation (stub - not implemented in core yet)
    */
-  private async handleGenerateTests(args: Record<string, any>) {
-    validateRequired(args, ['target']);
+  private async handleGenerateTests(args: Record<string, any>, context: ErrorContext) {
+    this.validateArgs(args, ['target'], context);
     
     // This is a stub implementation - core analyzer doesn't have test generation yet
     return {
@@ -322,6 +349,53 @@ export class MCPAdapter {
    */
   async executeTool(request: { name: string; arguments: Record<string, any> }): Promise<any> {
     return await this.handleToolCall(request.name, request.arguments);
+  }
+
+  /**
+   * Validate tool arguments with enhanced error messages
+   */
+  private validateArgs(args: Record<string, any>, requiredFields: string[], context: ErrorContext): void {
+    if (!args || typeof args !== 'object') {
+      throw createValidationError('Arguments must be an object', context);
+    }
+
+    for (const field of requiredFields) {
+      if (args[field] === undefined || args[field] === null) {
+        throw createValidationError(`Missing required parameter: ${field}`, context);
+      }
+      
+      if (typeof args[field] === 'string' && args[field].trim() === '') {
+        throw createValidationError(`Parameter '${field}' cannot be empty`, context);
+      }
+    }
+
+    // Additional validation for specific fields
+    if (args.position && typeof args.position === 'object') {
+      if (typeof args.position.line !== 'number' || args.position.line < 0) {
+        throw createValidationError('position.line must be a non-negative number', context);
+      }
+      if (typeof args.position.character !== 'number' || args.position.character < 0) {
+        throw createValidationError('position.character must be a non-negative number', context);
+      }
+    }
+  }
+
+  /**
+   * Sanitize arguments for logging
+   */
+  private sanitizeForLogging(args: any): any {
+    if (!args || typeof args !== 'object') return args;
+
+    const sanitized = { ...args };
+    const sensitiveFields = ['password', 'token', 'secret', 'key', 'authorization'];
+
+    for (const field of sensitiveFields) {
+      if (sanitized[field]) {
+        sanitized[field] = '[REDACTED]';
+      }
+    }
+
+    return sanitized;
   }
 
   /**

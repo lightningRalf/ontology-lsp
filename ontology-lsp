@@ -1,2 +1,10 @@
 #!/usr/bin/env bash
-exec /home/lightningralf/.bun/bin/bun run /home/lightningralf/programming/ontology-lsp/dist/cli/index.js "$@"
+set -euo pipefail
+
+# Prefer local repo build
+if command -v bun >/dev/null 2>&1; then
+  exec bun dist/cli/cli.js "$@"
+fi
+
+# Fallback to Node if bun not available (requires bun-shebang compatible file)
+exec node dist/cli/cli.js "$@"
