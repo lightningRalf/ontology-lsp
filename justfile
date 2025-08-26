@@ -210,7 +210,8 @@ build:
 # Build only the MCP fast server (optimized for Claude integration)
 build-mcp:
     @echo "🚀 Building MCP fast server..."
-    {{bun}} build src/servers/mcp-fast.ts --target=bun --outfile=dist/mcp-fast/mcp-fast.js --format=esm \
+    @mkdir -p dist/mcp-fast
+    {{bun}} build src/servers/mcp-fast.ts --target=bun --outdir=dist/mcp-fast --format=esm \
         --minify --sourcemap
     @echo "✅ MCP fast server built at dist/mcp-fast/mcp-fast.js"
 

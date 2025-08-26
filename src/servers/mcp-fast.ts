@@ -223,9 +223,15 @@ export class FastMCPServer {
       this.mcpAdapter = new MCPAdapter(this.coreAnalyzer);
       
       this.initialized = true;
-      console.error("Ontology MCP Server core initialized");
+      // Only log in debug mode, never in stdio mode
+      if (process.env.DEBUG && !process.env.STDIO_MODE) {
+        console.error("Ontology MCP Server core initialized");
+      }
     } catch (error) {
-      console.error("Failed to initialize core:", error);
+      // Only log errors in debug mode or non-stdio mode
+      if (process.env.DEBUG || !process.env.STDIO_MODE) {
+        console.error("Failed to initialize core:", error);
+      }
       throw error;
     }
   }
@@ -236,14 +242,20 @@ export class FastMCPServer {
     
     // Connect and listen immediately
     await this.server.connect(transport);
-    console.error("Ontology Fast MCP Server running on stdio");
+    // Only log in debug mode, never in stdio mode to prevent protocol pollution
+    if (process.env.DEBUG && !process.env.STDIO_MODE) {
+      console.error("Ontology Fast MCP Server running on stdio");
+    }
   }
 
   async shutdown(): Promise<void> {
     if (this.coreAnalyzer) {
       await this.coreAnalyzer.dispose();
     }
-    console.error("Ontology MCP Server shut down");
+    // Only log in debug mode, never in stdio mode
+    if (process.env.DEBUG && !process.env.STDIO_MODE) {
+      console.error("Ontology MCP Server shut down");
+    }
   }
 }
 
