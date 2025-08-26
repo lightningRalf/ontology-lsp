@@ -48,6 +48,10 @@
 **Pending**: Layer 3 ontology implementation for accurate semantic search
 
 ### 3. Performance Optimization
+- **Bloom Filter Re-Implementation**: Fix and re-enable bloom filter optimization
+  - Current issue: Bloom filter prevents first-time searches (disabled in `src/adapters/utils.ts:445`)
+  - Solution: Populate bloom filter AFTER search, not before
+  - Expected benefit: Avoid repeated failed searches, improve negative cache performance
 - **Startup Time**: Reduce cold start latency (currently ~2s)
 - **Large Codebase**: Optimize for projects with 100K+ files
 - **Concurrent Users**: Support 100+ simultaneous connections

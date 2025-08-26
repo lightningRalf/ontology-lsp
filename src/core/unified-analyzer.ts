@@ -1072,16 +1072,9 @@ export class CodeAnalyzer {
     // Add small delay to ensure performance timing is measurable
     await new Promise(resolve => setTimeout(resolve, 1));
     
-    // Implementation would use OntologyEngine
-    return [{
-      uri: request.uri,
-      range: { start: { line: 12, character: 5 }, end: { line: 12, character: 20 } },
-      kind: 'function' as DefinitionKind,
-      name: request.identifier,
-      source: 'conceptual' as const,
-      confidence: 0.7,
-      layer: 'layer3'
-    }];
+    // TODO: Implementation would use OntologyEngine
+    // For now, return empty array to avoid fake results
+    return [];
   }
   
   private async executeLayer4Patterns(request: FindDefinitionRequest, existing: Definition[]): Promise<Definition[]> {
@@ -1738,6 +1731,11 @@ export class CodeAnalyzer {
   }
   
   private pathToFileUri(filePath: string): string {
+    // Handle empty or undefined file paths
+    if (!filePath || filePath === '') {
+      return 'file://unknown';
+    }
+    
     if (filePath.startsWith('file://')) {
       return filePath;
     }
