@@ -136,6 +136,11 @@ export function getServiceUrl(service: keyof ServerPorts, config?: ServerConfig)
  * Log the current configuration
  */
 export function logConfig(config: ServerConfig): void {
+  // Skip logging in stdio/silent modes to avoid polluting MCP protocol
+  if (process.env.STDIO_MODE || process.env.SILENT_MODE) {
+    return
+  }
+  
   console.log('Server Configuration:')
   console.log('=====================')
   console.log(`HTTP API Server: ${config.host}:${config.ports.httpAPI}`)

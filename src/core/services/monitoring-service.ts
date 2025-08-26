@@ -412,9 +412,9 @@ export class MonitoringService {
         timestamp: Date.now()
       });
       
-      // Log metrics if configured
-      if (this.config.enabled) {
-        console.log(`[Metrics] Requests: ${summary.requestCount}, Avg Latency: ${summary.averageLatency.toFixed(2)}ms, Error Rate: ${(summary.errorRate * 100).toFixed(2)}%, Cache Hit Rate: ${(summary.cacheHitRate * 100).toFixed(2)}%`);
+      // Log metrics if configured (suppress for stdio/MCP to avoid protocol corruption)
+      if (this.config.enabled && !process.env.STDIO_MODE && !process.env.SILENT_MODE) {
+        console.error(`[Metrics] Requests: ${summary.requestCount}, Avg Latency: ${summary.averageLatency.toFixed(2)}ms, Error Rate: ${(summary.errorRate * 100).toFixed(2)}%, Cache Hit Rate: ${(summary.cacheHitRate * 100).toFixed(2)}%`);
       }
     }, interval);
   }
