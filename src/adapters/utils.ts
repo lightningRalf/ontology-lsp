@@ -442,7 +442,7 @@ export function createDefaultCoreConfig(): CoreConfig {
         maxResults: 100,
         fileTypes: ['ts', 'tsx', 'js', 'jsx', 'py', 'java', 'go', 'rust'],
         optimization: {
-          bloomFilter: false,  // Disabled - was preventing first searches from executing
+          bloomFilter: true,  // Re-enabled - fixed logic to populate after search, not before
           frequencyCache: true,
           parallelSearch: true
         }

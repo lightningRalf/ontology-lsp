@@ -188,6 +188,11 @@ Uses Bun's built-in SQLite (no better-sqlite3):
 
 ## Important Notes
 
+### MCP Configuration
+- **CRITICAL**: The `.mcp.json` file in the project root directory is the main MCP (Model Context Protocol) configuration file
+- This file defines how MCP servers are configured and connected
+- Do NOT look elsewhere for MCP configuration - always check `.mcp.json` first
+
 ### Bun-Specific Requirements
 - All build/test commands use Bun (check ~/.bun/bin/bun path)
 - SQLite is built into Bun (no native module compilation)
@@ -198,6 +203,7 @@ Uses Bun's built-in SQLite (no better-sqlite3):
 - `.ontology/` - Local database and cache
 - `.ontologyignore` - Files to exclude from analysis
 - `.ontology-lsp-config.yaml` - Project configuration
+- `.mcp.json` - MCP server configuration (Model Context Protocol)
 
 ### Performance Targets
 - Find Definition: <200ms for 10K+ files

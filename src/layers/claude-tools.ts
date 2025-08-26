@@ -1,7 +1,7 @@
 // Claude Tools Layer - Integration with enhanced search tools (independent of Claude CLI)
 // Updated to use async streaming architecture for better performance
 import { 
-    Layer, SearchQuery, EnhancedMatches, Match, SearchContext 
+    Layer, SearchQuery, EnhancedMatches, Match, SearchContext, MatchCategory 
 } from '../types/core';
 import { 
     ClaudeGrepParams, ClaudeGlobParams, ClaudeLSParams,
@@ -202,8 +202,12 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             return cached;
         }
         
-        // Check bloom filter for negative results
-        if (this.config.optimization.bloomFilter && !this.bloomFilter.has(query.identifier)) {
+        // Check bloom filter for negative results (only for queries we've searched before)
+        // Note: Don't early return on empty bloom filter - that prevents first-time searches
+        const bloomFilterHit = this.config.optimization.bloomFilter && 
+                              this.bloomFilter.has(query.identifier + ':negative');
+        if (bloomFilterHit) {
+            // We've searched for this before and found nothing
             return {
                 exact: [],
                 fuzzy: [],
@@ -333,16 +337,21 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             try {
                 const results = await asyncSearchTools.search(searchOptions);
                 if (results.length > 0) {
-                    // Convert and add matches with strategy confidence
-                    const convertedMatches: Match[] = results.map(r => ({
-                        file: r.file,
-                        line: r.line || 1,
-                        column: r.column || 0,
-                        text: r.text,
-                        length: r.text.length,
-                        confidence: r.confidence * strategy.confidence, 
-                        source: 'exact' as any
-                    }));
+                    // Convert and add matches with strategy confidence and categorization
+                    const convertedMatches: Match[] = results.map(r => {
+                        const categorization = this.categorizeMatch(r.text, query.identifier);
+                        return {
+                            file: r.file,
+                            line: r.line || 1,
+                            column: r.column || 0,
+                            text: r.text,
+                            length: r.text.length,
+                            confidence: r.confidence * strategy.confidence,
+                            source: 'exact' as any,
+                            category: categorization.category,
+                            categoryConfidence: categorization.confidence
+                        };
+                    });
                     
                     matches.exact.push(...convertedMatches);
                     convertedMatches.forEach(match => matches.files.add(match.file));
@@ -369,15 +378,20 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
 
         try {
             const results = await asyncSearchTools.search(fallbackOptions);
-            const convertedMatches: Match[] = results.map(r => ({
-                file: r.file,
-                line: r.line || 1,
-                column: r.column || 0,
-                text: r.text,
-                length: r.text.length,
-                confidence: r.confidence * 0.9, // Slightly lower confidence
-                source: 'exact' as any
-            }));
+            const convertedMatches: Match[] = results.map(r => {
+                const categorization = this.categorizeMatch(r.text, query.identifier);
+                return {
+                    file: r.file,
+                    line: r.line || 1,
+                    column: r.column || 0,
+                    text: r.text,
+                    length: r.text.length,
+                    confidence: r.confidence * 0.9, // Slightly lower confidence
+                    source: 'exact' as any,
+                    category: categorization.category,
+                    categoryConfidence: categorization.confidence
+                };
+            });
             
             matches.exact.push(...convertedMatches);
             convertedMatches.forEach(match => matches.files.add(match.file));
@@ -499,15 +513,20 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 const { strategy, results } = result.value;
                 
                 // Convert StreamingGrepResult to Match and categorize
-                const convertedMatches: Match[] = results.map(r => ({
-                    file: r.file,
-                    line: r.line || 1,
-                    column: r.column || 0,
-                    text: r.text,
-                    length: r.text.length,
-                    confidence: r.confidence * strategy.confidence, // Combined confidence
-                    source: strategy.matchType as any
-                }));
+                const convertedMatches: Match[] = results.map(r => {
+                    const categorization = this.categorizeMatch(r.text, query.identifier);
+                    return {
+                        file: r.file,
+                        line: r.line || 1,
+                        column: r.column || 0,
+                        text: r.text,
+                        length: r.text.length,
+                        confidence: r.confidence * strategy.confidence, // Combined confidence
+                        source: strategy.matchType as any,
+                        category: categorization.category,
+                        categoryConfidence: categorization.confidence
+                    };
+                });
 
                 // Add to appropriate category
                 if (strategy.matchType === 'exact') {
@@ -532,6 +551,11 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
         matches.exact = this.deduplicateMatches(matches.exact);
         matches.fuzzy = this.deduplicateMatches(matches.fuzzy);
         matches.conceptual = this.deduplicateMatches(matches.conceptual);
+        
+        // Sort matches by category priority within each category
+        matches.exact = this.sortMatchesByPriority(matches.exact);
+        matches.fuzzy = this.sortMatchesByPriority(matches.fuzzy);
+        matches.conceptual = this.sortMatchesByPriority(matches.conceptual);
     }
 
     private deduplicateMatches(matches: Match[]): Match[] {
@@ -544,6 +568,106 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             seen.add(key);
             return true;
         });
+    }
+
+    /**
+     * Categorizes a match based on the line content to distinguish between
+     * definitions, imports, usage, and other occurrences
+     */
+    private categorizeMatch(text: string, identifier: string): { category: MatchCategory, confidence: number } {
+        const line = text.trim();
+        const escapedIdentifier = this.escapeRegex(identifier);
+        
+        // Import patterns (check BEFORE definition patterns to catch require statements)
+        
+        // CommonJS require statements - check early to catch require patterns
+        if (line.includes('require(') && (line.includes('const ') || line.includes('let ') || line.includes('var '))) {
+            return { category: 'likely-import', confidence: 0.85 };
+        }
+        
+        // ES6 imports
+        if (line.match(/^import/)) {
+            // Named imports
+            if (line.match(new RegExp(`\\{[^}]*${escapedIdentifier}[^}]*\\}`))) {
+                return { category: 'likely-import', confidence: 0.90 };
+            }
+            // Default imports
+            if (line.match(new RegExp(`import\\s+${escapedIdentifier}\\s+from`))) {
+                return { category: 'likely-import', confidence: 0.90 };
+            }
+            // Generic import match
+            return { category: 'likely-import', confidence: 0.85 };
+        }
+        
+        // Definition patterns (after imports)
+        
+        // TypeScript/JavaScript class definitions
+        if (line.match(new RegExp(`^export\\s+(class|interface|type|enum)\\s+${escapedIdentifier}\\b`))) {
+            return { category: 'likely-definition', confidence: 0.95 };
+        }
+        
+        // Function/variable declarations (but exclude require statements)
+        if (line.match(new RegExp(`^(export\\s+)?(const|let|var|function)\\s+${escapedIdentifier}\\b`)) && !line.includes('require(')) {
+            return { category: 'likely-definition', confidence: 0.85 };
+        }
+        
+        // Method definitions in classes
+        if (line.match(new RegExp(`^\\s*(public|private|protected|async)?\\s*${escapedIdentifier}\\s*\\(`))) {
+            return { category: 'likely-definition', confidence: 0.80 };
+        }
+        
+        // Arrow function definitions
+        if (line.match(new RegExp(`^(export\\s+)?(const|let|var)\\s+${escapedIdentifier}\\s*=\\s*(async\\s+)?\\(`))) {
+            return { category: 'likely-definition', confidence: 0.85 };
+        }
+        
+        
+        // Usage patterns (third priority)
+        
+        // Constructor usage
+        if (line.match(new RegExp(`new\\s+${escapedIdentifier}\\(`))) {
+            return { category: 'likely-usage', confidence: 0.80 };
+        }
+        
+        // Method calls (higher confidence than function calls)
+        if (line.match(new RegExp(`\\.${escapedIdentifier}\\(`))) {
+            return { category: 'likely-usage', confidence: 0.75 };
+        }
+        
+        // Function calls
+        if (line.match(new RegExp(`\\b${escapedIdentifier}\\(`))) {
+            return { category: 'likely-usage', confidence: 0.70 };
+        }
+        
+        // Property assignment (e.g., obj.prop = value) - this is usage, not definition
+        if (line.match(new RegExp(`\\.${escapedIdentifier}\\s*=`))) {
+            return { category: 'likely-usage', confidence: 0.65 };
+        }
+        
+        // Variable assignment patterns (direct assignment is definition)
+        if (line.match(new RegExp(`^\\s*${escapedIdentifier}\\s*[=:]`))) {
+            return { category: 'likely-definition', confidence: 0.60 };
+        }
+        
+        // Property access (without assignment)
+        if (line.match(new RegExp(`\\.${escapedIdentifier}\\b`)) && !line.includes('=')) {
+            return { category: 'likely-usage', confidence: 0.65 };
+        }
+        
+        // Check for comments and strings (lower priority patterns)
+        if (line.match(/^\s*\/\//) || line.match(/^\s*\/\*/) || 
+            line.includes(`'${identifier}'`) || line.includes(`"${identifier}"`) ||
+            line.includes(`\`${identifier}\``) || line.match(/console\.(log|error|warn|info)/)) {
+            return { category: 'unknown', confidence: 0.5 };
+        }
+        
+        // Generic usage in expressions
+        if (line.match(new RegExp(`\\b${escapedIdentifier}\\b`))) {
+            return { category: 'likely-usage', confidence: 0.60 };
+        }
+        
+        // Default case - unknown pattern
+        return { category: 'unknown', confidence: 0.5 };
     }
 
     /**
@@ -592,7 +716,8 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 const grepMatches = this.parseGrepResults(
                     result.value.matches,
                     strategy.confidence,
-                    strategy.name
+                    strategy.name,
+                    query.identifier
                 );
                 
                 // Categorize matches based on strategy
@@ -867,7 +992,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 });
                 
                 if (Array.isArray(results)) {
-                    const fileMatches = this.parseGrepResults(results as ClaudeGrepResult[], 0.6, 'file_search');
+                    const fileMatches = this.parseGrepResults(results as ClaudeGrepResult[], 0.6, 'file_search', query.identifier);
                     matches.conceptual.push(...fileMatches);
                 }
                 
@@ -882,12 +1007,14 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
     private parseGrepResults(
         results: ClaudeGrepResult[],
         baseConfidence: number,
-        source: string
+        source: string,
+        identifier: string
     ): Match[] {
         const matches: Match[] = [];
         
         for (const result of results) {
             if (result.file && result.line && result.text) {
+                const categorization = this.categorizeMatch(result.text, identifier);
                 matches.push({
                     file: result.file,
                     line: result.line,
@@ -896,6 +1023,8 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     length: (result.match || result.text).length,
                     confidence: baseConfidence,
                     source: source as any,
+                    category: categorization.category,
+                    categoryConfidence: categorization.confidence,
                     context: result.context ? 
                         [...(result.context.before || []), ...(result.context.after || [])].join('\n') :
                         undefined
@@ -1061,9 +1190,15 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
         const freq = this.frequencyMap.get(query.identifier) || 0;
         this.frequencyMap.set(query.identifier, freq + 1);
         
-        // Update bloom filter
-        if (matches.exact.length > 0 || matches.fuzzy.length > 0) {
-            this.bloomFilter.add(query.identifier);
+        // Update bloom filter with both positive and negative results
+        if (this.config.optimization.bloomFilter) {
+            if (matches.exact.length > 0 || matches.fuzzy.length > 0) {
+                // Record positive result (we found something)
+                this.bloomFilter.add(query.identifier + ':positive');
+            } else {
+                // Record negative result (we searched but found nothing)
+                this.bloomFilter.add(query.identifier + ':negative');
+            }
         }
     }
     

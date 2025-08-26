@@ -18,10 +18,13 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "~/.bun/bin/bun build ./src/servers/lsp.ts --target=bun --outdir=dist/lsp --format=esm --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python && ~/.bun/bin/bun build ./src/servers/mcp.ts --target=bun --outdir=dist/mcp --format=esm",
+    "build": "bun run build:all",
+    "build:all": "bun run build:lsp && bun run build:mcp-stdio && bun run build:mcp-sse && bun run build:http && bun run build:cli",
+    "build:lsp": "~/.bun/bin/bun build ./src/servers/lsp.ts --target=bun --outdir=dist/lsp --format=esm --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python",
+    "build:mcp-stdio": "~/.bun/bin/bun build ./src/servers/mcp.ts --target=bun --outdir=dist/mcp --format=esm --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python",
+    "build:mcp-sse": "~/.bun/bin/bun build ./src/servers/mcp-sse.ts --target=bun --outdir=dist/mcp-sse --format=esm --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python",
+    "build:http": "~/.bun/bin/bun build ./src/servers/http.ts --target=bun --outdir=dist/http --format=esm --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python",
     "build:cli": "bun build ./src/servers/cli.ts --target=bun --outdir=dist/cli --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python",
-    "build:api": "bun build ./src/servers/http.ts --target=bun --outdir=dist/api --format=cjs --external tree-sitter-typescript --external tree-sitter-javascript --external tree-sitter-python",
-    "build:mcp": "bun build ./src/servers/mcp.ts --target=bun --outdir=dist/mcp --format=esm",
     "build:tsc": "tsc",
     "start": "bun run dist/lsp/lsp.js --stdio",
     "start:mcp": "bun run src/servers/mcp.ts",

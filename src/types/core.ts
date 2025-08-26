@@ -54,6 +54,9 @@ export interface SearchContext {
     surroundingCode?: string;
 }
 
+// Match categorization types for smart prioritization
+export type MatchCategory = 'likely-definition' | 'likely-import' | 'likely-usage' | 'unknown';
+
 export interface Match {
     file: string;
     line: number;
@@ -63,6 +66,9 @@ export interface Match {
     confidence: number;
     source: 'exact' | 'fuzzy' | 'conceptual' | 'pattern';
     context?: string;
+    // Smart categorization for Layer 1 results
+    category?: MatchCategory;
+    categoryConfidence?: number;
 }
 
 export interface EnhancedMatches {

@@ -476,11 +476,13 @@ export class CodeAnalyzer {
           definitions.push(...fastResults);
           layerTimes.layer1 = Date.now() - layer1Start;
           
-          // If we found exact matches, cache with optimized TTL and skip further layers
-          if (fastResults.some(d => d.source === 'exact')) {
-            const cacheTtl = this.calculateOptimalCacheTtl(fastResults, 'exact');
-            await this.sharedServices.cache.set(cacheKey, definitions, cacheTtl);
-            return this.buildResult(definitions, layerTimes, requestId, startTime);
+          // Smart escalation to Layer 2 based on Layer 1 categorization results
+          // If Layer 1 found likely definitions with high confidence, we may skip Layer 2
+          // Otherwise, Layer 2 (AST analysis) helps distinguish true definitions vs usages
+          const shouldEscalateToLayer2 = this.shouldEscalateToLayer2(fastResults);
+          
+          if (!shouldEscalateToLayer2) {
+            console.debug(`Skipping Layer 2 escalation: Layer 1 found ${fastResults.length} high-confidence definitions`);
           }
         } catch (error) {
           layerTimes.layer1 = Date.now() - layer1Start;
@@ -488,16 +490,70 @@ export class CodeAnalyzer {
         }
       }
       
-      // Layer 2: AST analysis for precise structural understanding (~50ms target) 
-      if (this.config.layers.layer2.enabled && definitions.length < 10) {
+      // Layer 2: AST analysis for precise structural understanding (~50ms target)
+      // Use smart escalation based on Layer 1 categorization results
+      const shouldRunLayer2 = this.config.layers.layer2.enabled && 
+                             (definitions.length < 10 || this.shouldEscalateToLayer2(definitions));
+      if (shouldRunLayer2) {
         const layer2Start = Date.now();
         try {
+          // Extract candidate files from Layer 1 results for optimized parsing
+          const candidateFiles = new Set<string>();
+          const allPotentialFiles = new Set<string>();
+          
+          // Add files from Layer 1 definitions (prioritize likely-definition matches)
+          const layer1Definitions = definitions.filter(d => d.layer === 'layer1');
+          for (const def of layer1Definitions) {
+            const filePath = this.fileUriToPath(def.uri);
+            if (filePath && filePath !== 'unknown') {
+              allPotentialFiles.add(filePath);
+              candidateFiles.add(filePath);
+            }
+          }
+          
+          // Also collect files from any other layer definitions for comparison
+          const otherDefinitions = definitions.filter(d => d.layer !== 'layer1');
+          for (const def of otherDefinitions) {
+            const filePath = this.fileUriToPath(def.uri);
+            if (filePath && filePath !== 'unknown') {
+              allPotentialFiles.add(filePath);
+            }
+          }
+          
+          // If we have very few candidate files, also include files with high-confidence matches
+          if (candidateFiles.size < 5) {
+            const highConfidenceDefinitions = definitions.filter(d => 
+              d.confidence > 0.8 && d.layer === 'layer1'
+            );
+            for (const def of highConfidenceDefinitions) {
+              const filePath = this.fileUriToPath(def.uri);
+              if (filePath && filePath !== 'unknown') {
+                candidateFiles.add(filePath);
+              }
+            }
+          }
+          
+          // Performance monitoring: log optimization gains
+          if (process.env.DEBUG) {
+            const optimizationRatio = allPotentialFiles.size > 0 ? 
+              (candidateFiles.size / allPotentialFiles.size) : 1;
+            const filesSkipped = allPotentialFiles.size - candidateFiles.size;
+            
+            console.debug(`🚀 Layer 2 Optimization:`, {
+              candidateFiles: candidateFiles.size,
+              totalPotentialFiles: allPotentialFiles.size,
+              filesSkipped,
+              optimizationRatio: `${(optimizationRatio * 100).toFixed(1)}%`,
+              estimatedSpeedup: `${(1 / Math.max(0.1, optimizationRatio)).toFixed(1)}x`
+            });
+          }
+          
           const astResults = await this.layerManager.executeWithLayer(
             'layer2',
             'findDefinition',
             requestMetadata,
             async (layer) => {
-              return await this.executeLayer2Analysis(request, definitions);
+              return await this.executeLayer2Analysis(request, definitions, candidateFiles);
             }
           );
           
@@ -1012,7 +1068,11 @@ export class CodeAnalyzer {
     }
   }
   
-  private async executeLayer2Analysis(request: FindDefinitionRequest, existing: Definition[]): Promise<Definition[]> {
+  private async executeLayer2Analysis(
+    request: FindDefinitionRequest, 
+    existing: Definition[],
+    candidateFiles?: Set<string>
+  ): Promise<Definition[]> {
     // Add small delay to ensure performance timing is measurable
     await new Promise(resolve => setTimeout(resolve, 1));
     
@@ -1028,9 +1088,15 @@ export class CodeAnalyzer {
         exact: existing.filter(d => d.source === 'exact').map(this.definitionToMatch),
         fuzzy: existing.filter(d => d.source === 'fuzzy').map(this.definitionToMatch),
         conceptual: existing.filter(d => d.source === 'conceptual').map(this.definitionToMatch),
-        files: new Set(existing.map(d => this.fileUriToPath(d.uri))),
+        files: candidateFiles || new Set(existing.map(d => this.fileUriToPath(d.uri))),
         searchTime: 0
       };
+      
+      // Log performance optimization when using candidate files
+      if (candidateFiles && process.env.DEBUG) {
+        const totalFiles = new Set(existing.map(d => this.fileUriToPath(d.uri))).size;
+        console.debug(`Layer 2 optimization: parsing ${candidateFiles.size} candidate files instead of ${totalFiles} files`);
+      }
 
       // Execute tree-sitter analysis
       const result = await layer.process(enhancedMatches);
@@ -1069,12 +1135,50 @@ export class CodeAnalyzer {
   }
   
   private async executeLayer3Concepts(request: FindDefinitionRequest): Promise<Definition[]> {
-    // Add small delay to ensure performance timing is measurable
-    await new Promise(resolve => setTimeout(resolve, 1));
-    
-    // TODO: Implementation would use OntologyEngine
-    // For now, return empty array to avoid fake results
-    return [];
+    try {
+      const definitions: Definition[] = [];
+      
+      // Query concepts database for semantic matches
+      const concepts = await this.queryConceptsDatabase(request.identifier);
+      
+      // For each concept, find its symbol representations
+      for (const concept of concepts) {
+        const representations = await this.querySymbolRepresentations(concept.id);
+        
+        for (const rep of representations) {
+          // Convert database representation to Definition
+          const definition: Definition = {
+            identifier: rep.name,
+            uri: rep.uri,
+            range: {
+              start: { line: rep.start_line, character: rep.start_character },
+              end: { line: rep.end_line, character: rep.end_character }
+            },
+            kind: this.inferDefinitionKind(concept.category, rep.context),
+            confidence: this.calculateSemanticConfidence(concept, rep, request.identifier),
+            source: 'conceptual' as const,
+            context: rep.context,
+            metadata: {
+              conceptId: concept.id,
+              canonicalName: concept.canonical_name,
+              occurrences: rep.occurrences,
+              lastSeen: rep.last_seen
+            }
+          };
+          
+          definitions.push(definition);
+        }
+      }
+      
+      // Sort by confidence (highest first)
+      return definitions
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, request.maxResults || 50); // Limit results
+        
+    } catch (error) {
+      console.warn('Layer 3 semantic analysis failed:', error);
+      return [];
+    }
   }
   
   private async executeLayer4Patterns(request: FindDefinitionRequest, existing: Definition[]): Promise<Definition[]> {
@@ -1085,6 +1189,173 @@ export class CodeAnalyzer {
   private async executeLayer5Propagation(request: FindDefinitionRequest, existing: Definition[]): Promise<Definition[]> {
     // Implementation would use KnowledgeSpreader
     return [];
+  }
+
+  /**
+   * Query concepts database for semantic matches
+   */
+  private async queryConceptsDatabase(identifier: string): Promise<any[]> {
+    // Query concepts table with fuzzy matching on canonical_name
+    const exactMatches = await this.sharedServices.database.query(
+      `SELECT id, canonical_name, confidence, category, signature_fingerprint, metadata
+       FROM concepts 
+       WHERE canonical_name = ? 
+       ORDER BY confidence DESC
+       LIMIT 20`,
+      [identifier]
+    );
+
+    if (exactMatches.length > 0) {
+      return exactMatches;
+    }
+
+    // Fuzzy search using LIKE with wildcards
+    const fuzzyMatches = await this.sharedServices.database.query(
+      `SELECT id, canonical_name, confidence, category, signature_fingerprint, metadata
+       FROM concepts 
+       WHERE canonical_name LIKE ? OR canonical_name LIKE ? OR canonical_name LIKE ?
+       ORDER BY confidence DESC, 
+                CASE 
+                  WHEN canonical_name = ? THEN 1
+                  WHEN canonical_name LIKE ? THEN 2
+                  WHEN canonical_name LIKE ? THEN 3
+                  ELSE 4
+                END
+       LIMIT 20`,
+      [
+        identifier + '%',        // starts with
+        '%' + identifier,        // ends with  
+        '%' + identifier + '%',  // contains
+        identifier,              // exact (for sorting)
+        identifier + '%',        // starts with (for sorting)
+        '%' + identifier         // ends with (for sorting)
+      ]
+    );
+
+    return fuzzyMatches;
+  }
+
+  /**
+   * Query symbol representations for a concept
+   */
+  private async querySymbolRepresentations(conceptId: string): Promise<any[]> {
+    return await this.sharedServices.database.query(
+      `SELECT name, uri, start_line, start_character, end_line, end_character, 
+              occurrences, context, first_seen, last_seen
+       FROM symbol_representations 
+       WHERE concept_id = ?
+       ORDER BY occurrences DESC, last_seen DESC
+       LIMIT 10`,
+      [conceptId]
+    );
+  }
+
+  /**
+   * Infer DefinitionKind from concept category and context
+   */
+  private inferDefinitionKind(category: string | null, context: string | null): DefinitionKind {
+    if (!category && !context) {
+      return DefinitionKind.Variable; // Default fallback
+    }
+
+    const categoryLower = (category || '').toLowerCase();
+    const contextLower = (context || '').toLowerCase();
+
+    // Check category first
+    if (categoryLower.includes('function') || categoryLower.includes('method')) {
+      return DefinitionKind.Function;
+    }
+    if (categoryLower.includes('class')) {
+      return DefinitionKind.Class;
+    }
+    if (categoryLower.includes('interface')) {
+      return DefinitionKind.Interface;
+    }
+    if (categoryLower.includes('type')) {
+      return DefinitionKind.Type;
+    }
+    if (categoryLower.includes('module')) {
+      return DefinitionKind.Module;
+    }
+
+    // Check context for additional clues
+    if (contextLower.includes('function') || contextLower.includes('=>')) {
+      return contextLower.includes('method') ? DefinitionKind.Method : DefinitionKind.Function;
+    }
+    if (contextLower.includes('class ') || contextLower.includes('class{')) {
+      return DefinitionKind.Class;
+    }
+    if (contextLower.includes('interface ')) {
+      return DefinitionKind.Interface;
+    }
+    if (contextLower.includes('const ') || contextLower.includes('let ') || contextLower.includes('var ')) {
+      return DefinitionKind.Variable;
+    }
+    if (contextLower.includes('import ') || contextLower.includes('from ')) {
+      return DefinitionKind.Import;
+    }
+    if (contextLower.includes('export ')) {
+      return DefinitionKind.Export;
+    }
+
+    return DefinitionKind.Variable; // Default fallback
+  }
+
+  /**
+   * Calculate semantic confidence score based on concept and symbol match quality
+   */
+  private calculateSemanticConfidence(concept: any, representation: any, searchIdentifier: string): number {
+    let confidence = 0.0;
+
+    // Base confidence from concept (0.0 to 1.0)
+    confidence += Math.max(0.0, Math.min(1.0, concept.confidence || 0.5));
+
+    // Exact name match bonus
+    if (representation.name === searchIdentifier) {
+      confidence += 0.3;
+    } else if (representation.name.toLowerCase() === searchIdentifier.toLowerCase()) {
+      confidence += 0.2;
+    } else if (representation.name.includes(searchIdentifier) || searchIdentifier.includes(representation.name)) {
+      confidence += 0.1;
+    }
+
+    // Canonical name match bonus  
+    if (concept.canonical_name === searchIdentifier) {
+      confidence += 0.2;
+    } else if (concept.canonical_name.toLowerCase() === searchIdentifier.toLowerCase()) {
+      confidence += 0.15;
+    } else if (concept.canonical_name.includes(searchIdentifier)) {
+      confidence += 0.05;
+    }
+
+    // Occurrence frequency bonus (more occurrences = higher confidence)
+    const occurrences = representation.occurrences || 1;
+    confidence += Math.min(0.2, occurrences * 0.01); // Cap at 0.2 bonus
+
+    // Recent usage bonus (within last 30 days)
+    const lastSeen = representation.last_seen || 0;
+    const now = Math.floor(Date.now() / 1000);
+    const daysSinceLastSeen = (now - lastSeen) / (24 * 60 * 60);
+    
+    if (daysSinceLastSeen <= 30) {
+      confidence += 0.1 * (1 - daysSinceLastSeen / 30); // Decay over 30 days
+    }
+
+    // Context quality bonus
+    if (representation.context && representation.context.trim().length > 10) {
+      confidence += 0.05;
+    }
+
+    // URI validity check
+    if (representation.uri && representation.uri !== 'file://unknown' && !representation.uri.includes('unknown')) {
+      confidence += 0.1;
+    } else {
+      // Penalize invalid URIs heavily
+      confidence -= 0.3;
+    }
+
+    // Clamp to valid range [0.0, 1.0]
+    return Math.max(0.0, Math.min(1.0, confidence));
   }
   
   // Reference search implementations
@@ -1756,6 +2027,65 @@ export class CodeAnalyzer {
     if (text.includes('import') || text.includes('from')) return 'import';
     if (text.includes('=')) return 'write';
     return 'read';
+  }
+  
+  /**
+   * Determines if Layer 2 escalation is needed based on Layer 1 categorization results
+   * Smart escalation: skip Layer 2 if Layer 1 found high-confidence definitions
+   */
+  private shouldEscalateToLayer2(definitions: Definition[]): boolean {
+    if (definitions.length === 0) {
+      return true; // No results from Layer 1, definitely need Layer 2
+    }
+    
+    // Count high-confidence likely definitions
+    let highConfidenceDefinitions = 0;
+    let likelyDefinitions = 0;
+    let totalConfidenceScore = 0;
+    
+    for (const def of definitions) {
+      // Check if this definition has categorization metadata (from Layer 1)
+      const hasCategory = 'category' in def && 'categoryConfidence' in def;
+      
+      if (hasCategory) {
+        const category = (def as any).category;
+        const categoryConfidence = (def as any).categoryConfidence || 0;
+        
+        if (category === 'likely-definition') {
+          likelyDefinitions++;
+          totalConfidenceScore += categoryConfidence;
+          
+          // High confidence definition: category confidence > 0.8 AND overall confidence > 0.7
+          if (categoryConfidence > 0.8 && def.confidence > 0.7) {
+            highConfidenceDefinitions++;
+          }
+        }
+      }
+    }
+    
+    // Skip Layer 2 if we have multiple high-confidence definitions
+    if (highConfidenceDefinitions >= 2) {
+      return false;
+    }
+    
+    // Skip Layer 2 if we have a single very high confidence definition
+    if (highConfidenceDefinitions === 1 && likelyDefinitions === 1) {
+      const avgCategoryConfidence = totalConfidenceScore / likelyDefinitions;
+      if (avgCategoryConfidence > 0.9) {
+        return false;
+      }
+    }
+    
+    // Skip Layer 2 if we have multiple likely definitions with high average confidence
+    if (likelyDefinitions >= 3) {
+      const avgCategoryConfidence = totalConfidenceScore / likelyDefinitions;
+      if (avgCategoryConfidence > 0.8) {
+        return false;
+      }
+    }
+    
+    // Default: escalate to Layer 2 for better precision
+    return true;
   }
   
   /**
