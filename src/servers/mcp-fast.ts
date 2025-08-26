@@ -14,19 +14,21 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
   ErrorCode,
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
-
-import { MCPAdapter } from "../adapters/mcp-adapter.js";
-import { CodeAnalyzer } from "../core/unified-analyzer";
-import { createCodeAnalyzer } from "../core/index";
-import { createDefaultCoreConfig } from "../adapters/utils.js";
+// IMPORTANT: Avoid importing heavy core modules at top-level.
+// Use type-only import to prevent runtime side effects.
+import type { CodeAnalyzer } from "../core/unified-analyzer";
 
 export class FastMCPServer {
   private server: Server;
   private coreAnalyzer?: CodeAnalyzer;
-  private mcpAdapter?: MCPAdapter;
+  private mcpAdapter?: any;
   private initPromise?: Promise<void>;
   private initialized = false;
 
@@ -46,6 +48,7 @@ export class FastMCPServer {
     );
 
     this.setupHandlers();
+    this.setupStdioCleanup();
   }
 
   private setupHandlers(): void {
@@ -165,25 +168,78 @@ export class FastMCPServer {
 
     // Handle tool calls - initialize on demand
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      // Ensure initialization before handling tool call
-      await this.ensureInitialized();
-
-      if (!this.mcpAdapter) {
-        throw new McpError(ErrorCode.InternalError, "Server initialization failed");
-      }
-
       const { name, arguments: args } = request.params;
       
       try {
-        const result = await this.mcpAdapter.handleToolCall(name, args || {});
+        // Ensure initialization before handling tool call with timeout
+        await Promise.race([
+          this.ensureInitialized(),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Initialization timeout")), 10000)
+          )
+        ]);
+
+        if (!this.mcpAdapter) {
+          throw new McpError(ErrorCode.InternalError, "Server initialization failed");
+        }
+        
+        // Execute tool call with timeout
+        const result = await Promise.race([
+          this.mcpAdapter.handleToolCall(name, args || {}),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Tool call timeout")), 30000)
+          )
+        ]);
+        
+        // Force stdout flush after each response
+        if (process.stdout && typeof process.stdout.flush === 'function') {
+          process.stdout.flush();
+        }
+        
         return result;
       } catch (error) {
-        console.error(`Tool call failed: ${name}`, error);
+        // Send error to stderr in stdio mode to avoid stdout pollution
+        if (process.env.STDIO_MODE) {
+          process.stderr.write(`Tool call failed: ${name} - ${error instanceof Error ? error.message : String(error)}\n`);
+        } else {
+          console.error(`Tool call failed: ${name}`, error);
+        }
+        
         throw new McpError(
           ErrorCode.InternalError, 
           `Tool ${name} failed: ${error instanceof Error ? error.message : String(error)}`
         );
       }
+    });
+
+    // Handle resource listing - return empty list since we don't expose resources yet
+    this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
+      return {
+        resources: []
+      };
+    });
+
+    // Handle resource reading - return error since we don't have resources
+    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Resource not found: ${request.params.uri}`
+      );
+    });
+
+    // Handle prompt listing - return empty list since we don't expose prompts yet  
+    this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+      return {
+        prompts: []
+      };
+    });
+
+    // Handle prompt retrieval - return error since we don't have prompts
+    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Prompt not found: ${request.params.name}`
+      );
     });
   }
 
@@ -201,16 +257,48 @@ export class FastMCPServer {
 
   private async initializeCore(): Promise<void> {
     try {
-      // Initialize core analyzer with optimized config
+      // Lazily import heavy modules to avoid startup side effects
+      const [coreIndex, adapterUtils, mcpAdapterMod] = await Promise.all([
+        import("../core/index"),
+        import("../adapters/utils"),
+        import("../adapters/mcp-adapter")
+      ]);
+
+      const { createCodeAnalyzer } = coreIndex as any;
+      const { createDefaultCoreConfig } = adapterUtils as any;
+      const { MCPAdapter } = mcpAdapterMod as any;
+
+      // Initialize core analyzer with optimized config for MCP server
       const config = createDefaultCoreConfig();
       const workspaceRoot = process.env.ONTOLOGY_WORKSPACE || process.env.WORKSPACE_ROOT || process.cwd();
       
-      // Disable cache warming and other slow startup operations
-      config.optimization = {
-        ...config.optimization,
-        cacheWarming: false,
-        preloadParsers: false
-      };
+      // Disable slow startup operations and set aggressive timeouts
+      if (config.optimization) {
+        config.optimization = {
+          ...config.optimization,
+          cacheWarming: false,
+          preloadParsers: false,
+          parallelProcessing: false, // Reduce resource usage
+          maxConcurrentRequests: 2   // Limit concurrent operations
+        };
+      }
+      
+      // Set shorter timeouts to prevent layer timeout issues (keep existing layer config)
+      if (config.layers) {
+        config.layers.layer1 = { ...config.layers.layer1, timeout: 1000 }; 
+        config.layers.layer2 = { 
+          ...config.layers.layer2, 
+          timeout: 1500,
+          // Ensure required properties are present
+          enabled: config.layers.layer2?.enabled ?? true,
+          languages: config.layers.layer2?.languages ?? ['typescript', 'javascript', 'python'],
+          maxFileSize: config.layers.layer2?.maxFileSize ?? 1024 * 1024, // 1MB default
+          parseTimeout: config.layers.layer2?.parseTimeout ?? 50
+        };   
+        config.layers.layer3 = { ...config.layers.layer3, timeout: 2000 };  
+        config.layers.layer4 = { ...config.layers.layer4, timeout: 2500 };  
+        config.layers.layer5 = { ...config.layers.layer5, timeout: 3000 };   
+      }
       
       this.coreAnalyzer = await createCodeAnalyzer({
         ...config,
@@ -228,23 +316,67 @@ export class FastMCPServer {
         console.error("Ontology MCP Server core initialized");
       }
     } catch (error) {
-      // Only log errors in debug mode or non-stdio mode
-      if (process.env.DEBUG || !process.env.STDIO_MODE) {
+      // Always send initialization errors to stderr in stdio mode
+      if (process.env.STDIO_MODE) {
+        process.stderr.write(`Failed to initialize core: ${error instanceof Error ? error.message : String(error)}\n`);
+      } else {
         console.error("Failed to initialize core:", error);
       }
+      
+      // Don't throw during initialization - mark as not initialized and handle gracefully
+      this.initialized = false;
       throw error;
     }
   }
 
+  private setupStdioCleanup(): void {
+    // Redirect console.log to stderr in stdio mode to prevent stdout pollution
+    if (process.env.STDIO_MODE) {
+      const originalLog = console.log;
+      const originalWarn = console.warn;
+      const originalInfo = console.info;
+      
+      console.log = (...args: any[]) => {
+        if (process.env.DEBUG) {
+          process.stderr.write(`[LOG] ${args.join(' ')}\n`);
+        }
+      };
+      
+      console.warn = (...args: any[]) => {
+        if (process.env.DEBUG) {
+          process.stderr.write(`[WARN] ${args.join(' ')}\n`);
+        }
+      };
+      
+      console.info = (...args: any[]) => {
+        if (process.env.DEBUG) {
+          process.stderr.write(`[INFO] ${args.join(' ')}\n`);
+        }
+      };
+    }
+  }
+
   async run(): Promise<void> {
-    // Set up transport without initializing core
-    const transport = new StdioServerTransport();
-    
-    // Connect and listen immediately
-    await this.server.connect(transport);
-    // Only log in debug mode, never in stdio mode to prevent protocol pollution
-    if (process.env.DEBUG && !process.env.STDIO_MODE) {
-      console.error("Ontology Fast MCP Server running on stdio");
+    try {
+      // Set up transport without initializing core
+      const transport = new StdioServerTransport();
+      
+      // Connect and listen immediately
+      await this.server.connect(transport);
+      
+      // Force stdout flush to ensure proper MCP protocol communication
+      if (process.stdout && typeof process.stdout.flush === 'function') {
+        process.stdout.flush();
+      }
+      
+      // Only log in debug mode, never in stdio mode to prevent protocol pollution
+      if (process.env.DEBUG && !process.env.STDIO_MODE) {
+        console.error("Ontology Fast MCP Server running on stdio");
+      }
+    } catch (error) {
+      // Ensure errors go to stderr in stdio mode
+      process.stderr.write(`Failed to start MCP server: ${error instanceof Error ? error.message : String(error)}\n`);
+      throw error;
     }
   }
 
@@ -264,17 +396,56 @@ const server = new FastMCPServer();
 
 // Handle shutdown gracefully
 process.on('SIGINT', async () => {
-  await server.shutdown();
+  try {
+    await server.shutdown();
+  } catch (error) {
+    if (process.env.STDIO_MODE) {
+      process.stderr.write(`Shutdown error: ${error instanceof Error ? error.message : String(error)}\n`);
+    } else {
+      console.error("Shutdown error:", error);
+    }
+  }
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  await server.shutdown();
+  try {
+    await server.shutdown();
+  } catch (error) {
+    if (process.env.STDIO_MODE) {
+      process.stderr.write(`Shutdown error: ${error instanceof Error ? error.message : String(error)}\n`);
+    } else {
+      console.error("Shutdown error:", error);
+    }
+  }
   process.exit(0);
+});
+
+// Handle unhandled errors gracefully
+process.on('uncaughtException', (error) => {
+  if (process.env.STDIO_MODE) {
+    process.stderr.write(`Uncaught exception: ${error.message}\n`);
+  } else {
+    console.error('Uncaught exception:', error);
+  }
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  if (process.env.STDIO_MODE) {
+    process.stderr.write(`Unhandled rejection: ${reason}\n`);
+  } else {
+    console.error('Unhandled rejection at:', promise, 'reason:', reason);
+  }
+  process.exit(1);
 });
 
 // Start server immediately - no heavy initialization
 server.run().catch((error) => {
-  console.error("Failed to start MCP server:", error);
+  if (process.env.STDIO_MODE) {
+    process.stderr.write(`Failed to start MCP server: ${error instanceof Error ? error.message : String(error)}\n`);
+  } else {
+    console.error("Failed to start MCP server:", error);
+  }
   process.exit(1);
 });
