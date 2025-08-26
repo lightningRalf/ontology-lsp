@@ -326,6 +326,7 @@ export interface TreeSitterConfig {
     timeout: number;
     languages: string[];
     maxFileSize: string;
+    projectPath?: string; // Optional path to detect languages from
 }
 
 export interface OntologyConfig {

@@ -153,9 +153,54 @@ stats:
 
 # === BUILD COMMANDS ===
 
-# Build the LSP server
+# Build all server components
 build:
-    {{bun}} build ./src/server.ts --target=bun --outdir=dist --format=esm
+    @echo "🔨 Building server components..."
+    {{bun}} build src/servers/lsp.ts --target=bun --outdir=dist/lsp --format=esm \
+        --external tree-sitter --external tree-sitter-typescript \
+        --external tree-sitter-javascript --external tree-sitter-python
+    {{bun}} build src/servers/http.ts --target=bun --outdir=dist/api --format=esm \
+        --external tree-sitter --external tree-sitter-typescript \
+        --external tree-sitter-javascript --external tree-sitter-python
+    {{bun}} build src/servers/mcp-sse.ts --target=bun --outdir=dist/mcp --format=esm \
+        --external tree-sitter --external tree-sitter-typescript \
+        --external tree-sitter-javascript --external tree-sitter-python
+    {{bun}} build src/servers/cli.ts --target=bun --outdir=dist/cli --format=esm \
+        --external tree-sitter --external tree-sitter-typescript \
+        --external tree-sitter-javascript --external tree-sitter-python
+    @echo "✅ Build complete"
+
+# === CLI COMMANDS ===
+
+# Run the CLI with proper module resolution
+cli *args:
+    @cd {{workspace}} && {{bun}} run src/servers/cli.ts {{args}}
+
+# Find symbol definitions with fuzzy matching
+find identifier:
+    @just cli find {{identifier}}
+
+# Find all references to a symbol
+references identifier:
+    @just cli references {{identifier}}
+
+# Rename a symbol with intelligent propagation
+rename old new:
+    @just cli rename {{old}} {{new}}
+
+# Show system statistics and health
+cli-stats:
+    @just cli stats
+
+# Initialize ontology LSP via CLI
+cli-init:
+    @just cli init
+
+# Analyze codebase for refactoring opportunities
+analyze-refactor path="src":
+    @echo "🔍 Analyzing {{path}} for refactoring opportunities..."
+    @just cli find "*" --path {{path}} --verbose || true
+    @just cli stats --verbose
 
 # Build the VS Code extension
 build-extension:

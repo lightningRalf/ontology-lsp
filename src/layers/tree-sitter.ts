@@ -5,23 +5,123 @@ import { TreeSitterConfig } from '../types/core';
 import { OntologyEngine } from '../ontology/ontology-engine';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { execSync } from 'child_process';
 
-// Language imports - only load what we need
+// Language imports - lazy loaded based on actual need
 let TypeScript: any = null;
 let JavaScript: any = null; 
 let Python: any = null;
+let loadedLanguages = new Set<string>();
 
-try {
-    TypeScript = require('tree-sitter-typescript').typescript;
-    JavaScript = require('tree-sitter-typescript').javascript;
-} catch (e) {
-    console.warn('Failed to load TypeScript/JavaScript parsers:', e);
+// File type detection - run ONCE at startup
+function detectProjectLanguages(projectPath: string = '.'): Set<string> {
+    try {
+        // Use fast file type detection with fd or find
+        // Exclude node_modules and other common directories
+        const result = execSync(
+            `find ${projectPath} -type f \\( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" -o -name "*.py" \\) -not -path "*/node_modules/*" -not -path "*/dist/*" -not -path "*/.git/*" | head -100`,
+            { encoding: 'utf8', timeout: 1000 }
+        );
+        
+        const languages = new Set<string>();
+        const lines = result.split('\n').filter(Boolean);
+        
+        for (const line of lines) {
+            if (line.endsWith('.ts') || line.endsWith('.tsx')) languages.add('typescript');
+            if (line.endsWith('.js') || line.endsWith('.jsx')) languages.add('javascript');
+            if (line.endsWith('.py')) languages.add('python');
+        }
+        
+        // If we're in a TypeScript project but only found JS, still include TypeScript
+        if (languages.has('javascript') && !languages.has('typescript')) {
+            // Check if there's a tsconfig.json
+            try {
+                require.resolve(path.join(projectPath, 'tsconfig.json'));
+                languages.add('typescript');
+            } catch {
+                // No tsconfig, keep as is
+            }
+        }
+        
+        return languages;
+    } catch (e) {
+        // Default to TypeScript/JavaScript for safety
+        return new Set(['typescript', 'javascript']);
+    }
 }
 
-try {
-    Python = require('tree-sitter-python');
-} catch (e) {
-    console.warn('Failed to load Python parser:', e);
+// Find the correct path for native modules
+function findModulePath(moduleName: string): string {
+    // Try multiple possible locations
+    const possiblePaths = [
+        // Direct require (works in development)
+        moduleName,
+        // Relative to project root
+        path.join(process.cwd(), 'node_modules', moduleName),
+        // Relative to dist directory
+        path.join(process.cwd(), '..', 'node_modules', moduleName),
+        path.join(process.cwd(), '..', '..', 'node_modules', moduleName),
+        // Global node_modules
+        path.join(require.resolve('tree-sitter'), '..', '..', moduleName),
+    ];
+    
+    for (const tryPath of possiblePaths) {
+        try {
+            require.resolve(tryPath);
+            return tryPath;
+        } catch {
+            // Continue to next path
+        }
+    }
+    
+    throw new Error(`Cannot find module ${moduleName} in any expected location`);
+}
+
+// Lazy load parsers only when needed
+function loadLanguageParser(language: string): any {
+    if (loadedLanguages.has(language)) {
+        switch (language) {
+            case 'typescript': return TypeScript;
+            case 'javascript': return JavaScript;
+            case 'python': return Python;
+        }
+    }
+    
+    try {
+        switch (language) {
+            case 'typescript':
+                if (!TypeScript) {
+                    const modulePath = findModulePath('tree-sitter-typescript');
+                    const tsModule = require(modulePath);
+                    TypeScript = tsModule.typescript;
+                    loadedLanguages.add('typescript');
+                    console.log(`✓ Loaded TypeScript parser from ${modulePath}`);
+                }
+                return TypeScript;
+            case 'javascript':
+                if (!JavaScript) {
+                    const modulePath = findModulePath('tree-sitter-typescript');
+                    const tsModule = require(modulePath);
+                    JavaScript = tsModule.javascript || tsModule.tsx; // Some versions use tsx for JSX
+                    loadedLanguages.add('javascript');
+                    console.log(`✓ Loaded JavaScript parser from ${modulePath}`);
+                }
+                return JavaScript;
+            case 'python':
+                if (!Python) {
+                    const modulePath = findModulePath('tree-sitter-python');
+                    Python = require(modulePath);
+                    loadedLanguages.add('python');
+                    console.log(`✓ Loaded Python parser from ${modulePath}`);
+                }
+                return Python;
+            default:
+                return null;
+        }
+    } catch (e) {
+        console.warn(`Failed to load ${language} parser:`, e.message);
+        return null;
+    }
 }
 
 export interface TreeSitterResult {
@@ -58,36 +158,48 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
     private ontologyEngine?: OntologyEngine;
     
     constructor(private config: TreeSitterConfig, ontologyEngine?: OntologyEngine) {
+        // Detect actual languages in the project
+        const detectedLanguages = detectProjectLanguages(config.projectPath || '.');
+        
+        // Only configure languages that are actually present
+        this.config.languages = this.config.languages.filter(lang => 
+            detectedLanguages.has(lang)
+        );
+        
+        if (this.config.languages.length === 0) {
+            // Default to TypeScript/JavaScript if no languages detected
+            this.config.languages = ['typescript', 'javascript'];
+        }
+        
+        console.log(`TreeSitter: Detected languages: ${Array.from(detectedLanguages).join(', ')}`);
+        console.log(`TreeSitter: Loading parsers for: ${this.config.languages.join(', ')}`);
+        
         this.setupParsers();
         this.setupQueries();
         this.ontologyEngine = ontologyEngine;
     }
     
     private setupParsers(): void {
-        const languages: { [key: string]: any } = {};
-        
-        // Only add languages that are available and loaded
-        if (this.config.languages.includes('typescript') && TypeScript) {
-            languages['typescript'] = TypeScript;
-        }
-        
-        if (this.config.languages.includes('javascript') && JavaScript) {
-            languages['javascript'] = JavaScript;
-        }
-        
-        if (this.config.languages.includes('python') && Python) {
-            languages['python'] = Python;
-        }
-        
-        for (const [name, language] of Object.entries(languages)) {
-            try {
-                const parser = new Parser();
-                parser.setLanguage(language);
-                this.parsers.set(name, parser);
-                console.log(`Initialized ${name} parser`);
-            } catch (e) {
-                console.warn(`Failed to initialize ${name} parser:`, e);
+        // Only load parsers for configured languages
+        for (const langName of this.config.languages) {
+            const language = loadLanguageParser(langName);
+            
+            if (language) {
+                try {
+                    const parser = new Parser();
+                    parser.setLanguage(language);
+                    this.parsers.set(langName, parser);
+                    console.log(`✓ Initialized ${langName} parser`);
+                } catch (e) {
+                    console.warn(`✗ Failed to initialize ${langName} parser:`, e);
+                }
+            } else {
+                console.warn(`✗ No parser available for ${langName}`);
             }
+        }
+        
+        if (this.parsers.size === 0) {
+            console.warn('⚠ No parsers initialized! Tree-sitter layer will be disabled.');
         }
     }
     
