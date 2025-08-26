@@ -60,6 +60,8 @@ Thumbs.db
 .ontology/
 # VS Code test binaries
 vscode-client/.vscode-test/
+# VS Code extension build outputs
+vscode-client/out/
 
 # Temporary/experimental directories
 bun-mcp-sse-transport/
