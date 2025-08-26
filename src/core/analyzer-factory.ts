@@ -278,7 +278,7 @@ export class AnalyzerFactory {
       glob: {
         defaultTimeout: fullConfig.layers.layer1.timeout,
         maxFiles: 1000,
-        ignorePatterns: ['node_modules/**', '.git/**']
+        ignorePatterns: ['node_modules/**','dist/**','.git/**','coverage/**']
       },
       ls: {
         defaultTimeout: fullConfig.layers.layer1.timeout,

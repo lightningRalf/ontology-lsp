@@ -129,7 +129,7 @@ const Glob = async (params: ClaudeGlobParams): Promise<ClaudeGlobResult> => {
             pattern: params.pattern,
             path: params.path,
             sortByModified: true, // Enhanced feature
-            ignorePatterns: ['node_modules/**', '.git/**', '**/*.tmp']
+            ignorePatterns: ['node_modules/**','dist/**','.git/**','coverage/**','**/*.tmp']
         };
         
         const result = await searchTools.glob.search(enhancedParams);
@@ -300,7 +300,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             // 1. Exact match (highest confidence)
             {
                 pattern: `\\b${escapedId}\\b`,
-                timeout: 500,
+                timeout: 1000,
                 maxResults: 20,
                 confidence: 1.0,
                 name: 'exact'

@@ -673,6 +673,19 @@ export class DatabaseService {
       
       // Execute schema SQL
       db.exec(SCHEMA_SQL);
+
+      // Lightweight migrations for backward compatibility
+      try {
+        // Ensure patterns.examples column exists (older DBs may miss it)
+        const patternCols = db.prepare("PRAGMA table_info('patterns')").all() as Array<{ name: string }>;
+        const hasExamples = Array.isArray(patternCols) && patternCols.some(c => (c as any).name === 'examples');
+        if (!hasExamples) {
+          db.exec("ALTER TABLE patterns ADD COLUMN examples TEXT");
+        }
+      } catch (migErr) {
+        // Non-fatal: log and continue; future schema runs may fix it
+        console.warn('DatabaseService: schema compatibility check failed:', migErr);
+      }
       
       // Re-enable foreign keys after schema creation
       if (this.config.enableForeignKeys !== false) {
