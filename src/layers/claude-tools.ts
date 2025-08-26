@@ -289,41 +289,79 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
      * Fast-path async search that prioritizes exact matches for performance
      */
     private async searchWithAsyncGrepFastPath(query: SearchQuery, matches: EnhancedMatches): Promise<void> {
-        // Start with just exact match strategy for fast response
-        const exactMatchOptions = {
-            pattern: `\\b${this.escapeRegex(query.identifier)}\\b`,
-            path: query.searchPath,
-            maxResults: 20, // Limit results for speed
-            timeout: 1000,  // 1 second timeout
-            caseInsensitive: false,
-            fileType: this.getFileTypeForGrep(query.fileTypes)
-        };
-
-        try {
-            const results = await asyncSearchTools.search(exactMatchOptions);
-            if (results.length > 0) {
-                // Convert and add exact matches
-                const convertedMatches: Match[] = results.map(r => ({
-                    file: r.file,
-                    line: r.line || 1,
-                    column: r.column || 0,
-                    text: r.text,
-                    length: r.text.length,
-                    confidence: r.confidence, 
-                    source: 'exact' as any
-                }));
-                
-                matches.exact.push(...convertedMatches);
-                convertedMatches.forEach(match => matches.files.add(match.file));
-                return; // Early return on success
+        const escapedId = this.escapeRegex(query.identifier);
+        
+        // Progressive search strategies: exact -> prefix/suffix -> fuzzy
+        const strategies = [
+            // 1. Exact match (highest confidence)
+            {
+                pattern: `\\b${escapedId}\\b`,
+                timeout: 500,
+                maxResults: 20,
+                confidence: 1.0,
+                name: 'exact'
+            },
+            // 2. Prefix match (e.g., AsyncEnhanced* catches AsyncEnhancedGrep)
+            {
+                pattern: `\\b${escapedId}\\w*`,
+                timeout: 400,
+                maxResults: 15,
+                confidence: 0.95,
+                name: 'prefix'
+            },
+            // 3. Suffix match (e.g., *AsyncEnhanced catches getAsyncEnhanced)
+            {
+                pattern: `\\w*${escapedId}\\b`,
+                timeout: 400,
+                maxResults: 15,
+                confidence: 0.93,
+                name: 'suffix'
             }
-        } catch (error) {
-            console.warn('Fast-path exact match failed:', error);
+        ];
+
+        // Try strategies in order, stop on first success
+        for (const strategy of strategies) {
+            const searchOptions = {
+                pattern: strategy.pattern,
+                path: query.searchPath,
+                maxResults: strategy.maxResults,
+                timeout: strategy.timeout,
+                caseInsensitive: false,
+                fileType: this.getFileTypeForGrep(query.fileTypes)
+            };
+
+            try {
+                const results = await asyncSearchTools.search(searchOptions);
+                if (results.length > 0) {
+                    // Convert and add matches with strategy confidence
+                    const convertedMatches: Match[] = results.map(r => ({
+                        file: r.file,
+                        line: r.line || 1,
+                        column: r.column || 0,
+                        text: r.text,
+                        length: r.text.length,
+                        confidence: r.confidence * strategy.confidence, 
+                        source: 'exact' as any
+                    }));
+                    
+                    matches.exact.push(...convertedMatches);
+                    convertedMatches.forEach(match => matches.files.add(match.file));
+                    
+                    // Log success for debugging
+                    if (process.env.DEBUG) {
+                        console.error(`Fast-path ${strategy.name} found ${results.length} matches`);
+                    }
+                    return; // Early return on success
+                }
+            } catch (error) {
+                console.warn(`Fast-path ${strategy.name} match failed:`, error);
+            }
         }
 
-        // If exact match failed, try case-insensitive as fallback
+        // If all strategies failed, try case-insensitive as final fallback
         const fallbackOptions = {
-            ...exactMatchOptions,
+            pattern: `\\b${escapedId}\\w*|\\w*${escapedId}\\b`,  // Prefix OR suffix
+            path: query.searchPath,
             timeout: 600,
             caseInsensitive: true,
             maxResults: 10
@@ -353,15 +391,17 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
      * Full async streaming search method with multiple strategies
      */
     private async searchWithAsyncGrep(query: SearchQuery, matches: EnhancedMatches): Promise<void> {
+        const escapedId = this.escapeRegex(query.identifier);
+        
         // Use multiple search strategies with async streaming for better coverage
         const searchStrategies = [
             {
                 name: 'exact_match',
                 options: {
-                    pattern: `\\b${this.escapeRegex(query.identifier)}\\b`,
+                    pattern: `\\b${escapedId}\\b`,
                     path: query.searchPath,
                     maxResults: 50,
-                    timeout: 800, // Reduced from 10000ms to 800ms
+                    timeout: 800,
                     caseInsensitive: false,
                     fileType: this.getFileTypeForGrep(query.fileTypes)
                 },
@@ -369,25 +409,51 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 matchType: 'exact'
             },
             {
-                name: 'case_insensitive',
+                name: 'prefix_match',
                 options: {
-                    pattern: `\\b${this.escapeRegex(query.identifier)}\\b`,
+                    pattern: `\\b${escapedId}\\w*`,
                     path: query.searchPath,
                     maxResults: 30,
-                    timeout: 600, // Reduced from 8000ms to 600ms
+                    timeout: 600,
+                    caseInsensitive: false,
+                    fileType: this.getFileTypeForGrep(query.fileTypes)
+                },
+                confidence: 0.95,
+                matchType: 'exact'
+            },
+            {
+                name: 'suffix_match',
+                options: {
+                    pattern: `\\w*${escapedId}\\b`,
+                    path: query.searchPath,
+                    maxResults: 30,
+                    timeout: 600,
+                    caseInsensitive: false,
+                    fileType: this.getFileTypeForGrep(query.fileTypes)
+                },
+                confidence: 0.93,
+                matchType: 'exact'
+            },
+            {
+                name: 'case_insensitive_prefix_suffix',
+                options: {
+                    pattern: `\\b${escapedId}\\w*|\\w*${escapedId}\\b`,
+                    path: query.searchPath,
+                    maxResults: 20,
+                    timeout: 500,
                     caseInsensitive: true,
                     fileType: this.getFileTypeForGrep(query.fileTypes)
                 },
-                confidence: 0.9,
-                matchType: 'exact'
+                confidence: 0.85,
+                matchType: 'fuzzy'
             },
             {
                 name: 'fuzzy_token',
                 options: {
                     pattern: this.tokenize(query.identifier).join('.*'),
                     path: query.searchPath,
-                    maxResults: 20,
-                    timeout: 400, // Reduced from 6000ms to 400ms
+                    maxResults: 15,
+                    timeout: 400,
                     caseInsensitive: true,
                     fileType: this.getFileTypeForGrep(query.fileTypes)
                 },

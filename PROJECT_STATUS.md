@@ -30,7 +30,7 @@ The unified core architecture is fully implemented and operational with all crit
 - All 5 layers operational and optimized:
   - Layer 1 (Fast Search): 0.20ms response time (99.75% under target) 🚀
   - Layer 2 (AST Analysis): 1.8ms response time (96.4% under target) 🚀
-  - Layer 3 (Semantic Graph): 1.4ms response time (86% under target)
+  - Layer 3 (Semantic Graph): 1.4ms response time (86% under target) ⚠️ **STUB IMPLEMENTATION**
   - Layer 4 (Pattern Mining): 2.7ms response time (73% under target)
   - Layer 5 (Knowledge Propagation): 1.2ms response time (94% under target)
 
@@ -102,7 +102,20 @@ ontology-lsp/
 - 7002: LSP Server (TCP/stdio)
 - 8081: Monitoring Dashboard
 
-## 📅 Latest Updates (2025-08-25)
+## 📅 Latest Updates (2025-08-26)
+
+### Layer 3 Ontology Implementation Discovery 🔍
+- **Issue Found**: Layer 3 (Semantic Graph) returns hardcoded stub responses
+  - Returns "file://unknown" for all conceptual searches
+  - Hardcoded line numbers (12:5-12:20) regardless of actual location
+  - No actual OntologyEngine database queries
+  - Affects MCP find_definition accuracy despite tool being functional
+- **Impact**: 
+  - MCP tool works but gives incorrect file locations
+  - Confidence scores (0.7) are meaningless on stub data
+  - Cache gets poisoned with invalid "file://unknown" entries
+- **Root Cause**: `src/core/unified-analyzer.ts:1076-1083` contains placeholder implementation
+- **Solution Required**: Implement actual ontology database lookups in Layer 3
 
 ### Performance Regression Fixes Completed ✅
 - **Layer 1 Search Performance**: Optimized from 273ms → 0.20ms (99.93% improvement) 🚀
@@ -133,6 +146,7 @@ ontology-lsp/
 - **Process Management**: Robust port management and cleanup preventing deployment failures
 - **Production Deployment**: Verified all services, health checks, and build artifacts
 - **MCP STDIO Protocol**: Fixed console output pollution breaking stdio communication (2025-08-26)
+- **MCP Tool Discovery**: find_definition tool now functional via MCP protocol (2025-08-26)
 
 ## 🎬 System Status
 

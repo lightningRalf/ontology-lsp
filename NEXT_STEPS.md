@@ -6,8 +6,33 @@
 
 ## 🚀 Next Development Priorities
 
-### 1. Execute Production Deployment ✅ DEPLOYMENT-READY
-**Status**: All preparation complete, ready for execution
+### 0. CRITICAL: Implement Layer 3 Ontology Engine 🚨
+**Status**: Stub implementation discovered - returns "file://unknown" for all queries
+
+**Problem**: Layer 3 (Semantic Graph) is completely stubbed out
+- Currently returns hardcoded responses with fake line numbers (12:5-12:20)
+- All conceptual searches return "file://unknown" instead of actual file paths
+- No actual database queries or ontology lookups happening
+- Cache gets poisoned with invalid entries
+
+**Implementation Required**:
+```typescript
+// src/core/unified-analyzer.ts:1071-1085
+// Replace stub with actual OntologyEngine calls:
+- Query concepts from SQLite database
+- Resolve actual file paths from indexed symbols
+- Return real line/column positions from stored AST data
+- Implement proper confidence scoring based on match quality
+```
+
+**Impact when fixed**:
+- MCP find_definition will return correct file paths
+- Cross-file navigation will work properly
+- Semantic understanding will be based on actual code relationships
+- Cache will store valid, reusable results
+
+### 2. Execute Production Deployment ✅ DEPLOYMENT-READY
+**Status**: All preparation complete, ready for execution (after Layer 3 fix)
 
 **Requirements**: Docker/Kubernetes permissions to complete deployment
 **Documentation**: See `PRODUCTION_DEPLOYMENT_NEXT_STEPS.md` for complete instructions
@@ -20,21 +45,22 @@
 - **Load Testing**: Validate production performance under load
 
 **Verification Complete**: ✅ Builds, ✅ Health Endpoints, ✅ Performance, ✅ Docker Config
+**Pending**: Layer 3 ontology implementation for accurate semantic search
 
-### 2. Performance Optimization
+### 3. Performance Optimization
 - **Startup Time**: Reduce cold start latency (currently ~2s)
 - **Large Codebase**: Optimize for projects with 100K+ files
 - **Concurrent Users**: Support 100+ simultaneous connections
 - **Memory Usage**: Further optimize from current 607MB baseline
 
-### 3. Complete Plugin System Implementation
+### 4. Complete Plugin System Implementation
 - **Plugin Marketplace**: Build web UI and registry service
 - **Example Plugins**: Create additional plugins beyond the template
 - **CLI Tools**: Build plugin development CLI
 - **Testing**: Integration test plugin system with core
 - **Documentation**: Create plugin developer guide
 
-### 4. Advanced Features
+### 5. Advanced Features
 - **AI Model Integration**: Connect to local LLMs for enhanced suggestions
 - **Multi-Language Support**: Extend beyond TypeScript/JavaScript (Python, Go, Rust)
 - **Incremental Analysis**: Implement file-watching with incremental updates
