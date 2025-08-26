@@ -1,8 +1,36 @@
 # Ontology LSP Commands
 
-# Default recipe - show available commands
+# Default recipe - show available commands with categories
 default:
-    @just --list
+    @echo "🚀 Ontology LSP - Available Commands"
+    @echo "===================================="
+    @echo ""
+    @echo "📦 MCP (Model Context Protocol) Commands:"
+    @echo "  just build-mcp      - Build MCP fast server for Claude"
+    @echo "  just rebuild-mcp    - Rebuild MCP after fixes"
+    @echo "  just watch-mcp      - Watch and auto-rebuild MCP server"
+    @echo ""
+    @echo "🔧 Build Commands:"
+    @echo "  just build          - Build all servers (including MCP)"
+    @echo "  just clean-build    - Clean and rebuild everything"
+    @echo ""
+    @echo "🎯 Server Management:"
+    @echo "  just start          - Start all servers"
+    @echo "  just stop           - Stop all servers"
+    @echo "  just restart        - Restart all servers"
+    @echo "  just dev            - Development mode with auto-reload"
+    @echo "  just status         - Check server status"
+    @echo "  just health         - Health check for all servers"
+    @echo ""
+    @echo "📊 Monitoring:"
+    @echo "  just logs           - Tail server logs"
+    @echo "  just stats          - Show system statistics"
+    @echo ""
+    @echo "🔍 CLI Tools:"
+    @echo "  just find <symbol>  - Find symbol definitions"
+    @echo "  just references <symbol> - Find all references"
+    @echo ""
+    @echo "Run 'just --list' for complete command list"
 
 # Path to Bun runtime
 bun := env_var_or_default("BUN_PATH", "~/.bun/bin/bun")
@@ -171,10 +199,38 @@ build:
     {{bun}} build src/servers/mcp-sse.ts --target=bun --outdir=dist/mcp --format=esm \
         --external tree-sitter --external tree-sitter-typescript \
         --external tree-sitter-javascript --external tree-sitter-python
+    {{bun}} build src/servers/mcp-fast.ts --target=bun --outfile=dist/mcp-fast/mcp-fast.js --format=esm \
+        --external tree-sitter --external tree-sitter-typescript \
+        --external tree-sitter-javascript --external tree-sitter-python
     {{bun}} build src/servers/cli.ts --target=bun --outdir=dist/cli --format=esm \
         --external tree-sitter --external tree-sitter-typescript \
         --external tree-sitter-javascript --external tree-sitter-python
     @echo "✅ Build complete"
+
+# Build only the MCP fast server (optimized for Claude integration)
+build-mcp:
+    @echo "🚀 Building MCP fast server..."
+    {{bun}} build src/servers/mcp-fast.ts --target=bun --outfile=dist/mcp-fast/mcp-fast.js --format=esm \
+        --minify --sourcemap
+    @echo "✅ MCP fast server built at dist/mcp-fast/mcp-fast.js"
+
+# Clean and rebuild all servers
+clean-build:
+    @echo "🧹 Cleaning dist directory..."
+    @rm -rf dist/
+    @mkdir -p dist/
+    @just build
+    @echo "✨ Clean build complete"
+
+# Watch and rebuild MCP server on changes
+watch-mcp:
+    @echo "👀 Watching MCP server for changes..."
+    @{{bun}} build src/servers/mcp-fast.ts --target=bun --outfile=dist/mcp-fast/mcp-fast.js --format=esm \
+        --watch --minify --sourcemap
+
+# Rebuild MCP server after fixing issues
+rebuild-mcp: build-mcp
+    @echo "🔄 MCP server rebuilt - restart any connected Claude sessions"
 
 # === CLI COMMANDS ===
 
@@ -342,6 +398,12 @@ dev: stop-quiet
     @mkdir -p .ontology/pids .ontology/logs
     @echo "Checking port availability..."
     @just check-ports-available
+    
+    # Ensure MCP fast server is built
+    @if [ ! -f dist/mcp-fast/mcp-fast.js ]; then \
+        echo "📦 Building MCP fast server..."; \
+        just build-mcp; \
+    fi
     
     # Load yesterday's patterns and warm cache
     @echo "📊 Loading patterns and warming cache..."
