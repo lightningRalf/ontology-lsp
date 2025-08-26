@@ -123,6 +123,32 @@ class NativeTools {
     }
   }
 
+  static async silverSearcher(pattern: string, options: any = {}) {
+    const { path: searchPath = ".", outputMode = "files_with_matches" } = options
+    
+    try {
+      const args = [
+        ...(options.caseInsensitive ? ["--ignore-case"] : []),
+        ...(outputMode === "files_with_matches" ? ["--files-with-matches"] : []),
+        ...(options.type ? [`--${options.type}`] : []),
+        "--nocolor",
+        "--nogroup",
+        pattern,
+        searchPath
+      ]
+      
+      const result = execSync(`ag ${args.join(" ")}`, { 
+        encoding: "utf8",
+        timeout: 10000,
+        cwd: process.cwd()
+      }).split("\n").filter(Boolean)
+      
+      return outputMode === "files_with_matches" ? result : result.length
+    } catch (error) {
+      return []
+    }
+  }
+
   static async glob(pattern: string, options: any = {}) {
     const { path: searchPath = "." } = options
     const fullPattern = path.join(searchPath, pattern)
@@ -446,6 +472,13 @@ describe("Tool Performance Benchmarks", () => {
         "Simple pattern",
         () => NativeTools.grep(pattern, options)
       )
+
+      // Silver Searcher
+      await benchmarkRunner.runBenchmark(
+        "Silver Searcher",
+        "Simple pattern",
+        () => NativeTools.silverSearcher(pattern, options)
+      )
     })
 
     test("Complex regex pattern", async () => {
@@ -468,6 +501,12 @@ describe("Tool Performance Benchmarks", () => {
         "Native ripgrep",
         "Complex regex",
         () => NativeTools.grep(pattern, options)
+      )
+
+      await benchmarkRunner.runBenchmark(
+        "Silver Searcher",
+        "Complex regex",
+        () => NativeTools.silverSearcher(pattern, options)
       )
     })
 
@@ -492,6 +531,12 @@ describe("Tool Performance Benchmarks", () => {
         "Case insensitive",
         () => NativeTools.grep(pattern, options)
       )
+
+      await benchmarkRunner.runBenchmark(
+        "Silver Searcher",
+        "Case insensitive",
+        () => NativeTools.silverSearcher(pattern, options)
+      )
     })
 
     test("Type-specific search", async () => {
@@ -514,6 +559,13 @@ describe("Tool Performance Benchmarks", () => {
         "Native ripgrep",
         "Type specific",
         () => NativeTools.grep(pattern, options)
+      )
+
+      // Note: ag uses different file type flags
+      await benchmarkRunner.runBenchmark(
+        "Silver Searcher",
+        "Type specific",
+        () => NativeTools.silverSearcher(pattern, { ...options, type: "js" }) // ag groups JS/TS together
       )
     })
 
@@ -737,6 +789,10 @@ describe("Tool Performance Benchmarks", () => {
         {
           name: "Native ripgrep",
           test: () => NativeTools.grep(pattern, { path: testDir || "." })
+        },
+        {
+          name: "Silver Searcher",
+          test: () => NativeTools.silverSearcher(pattern, { path: testDir || "." })
         }
       ]
 
