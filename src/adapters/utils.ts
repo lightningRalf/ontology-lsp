@@ -460,7 +460,7 @@ export function createDefaultCoreConfig(): CoreConfig {
           includeDotfiles: false
         },
         optimization: {
-          bloomFilter: true,  // Re-enabled - fixed logic to populate after search, not before
+          bloomFilter: false,  // DISABLED - bloom filter is preventing legitimate searches
           frequencyCache: true,
           parallelSearch: true
         },

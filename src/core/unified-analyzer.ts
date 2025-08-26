@@ -1085,9 +1085,9 @@ export class CodeAnalyzer {
     try {
       // Convert existing definitions to EnhancedMatches format for TreeSitter
       const enhancedMatches = {
-        exact: existing.filter(d => d.source === 'exact').map(this.definitionToMatch),
-        fuzzy: existing.filter(d => d.source === 'fuzzy').map(this.definitionToMatch),
-        conceptual: existing.filter(d => d.source === 'conceptual').map(this.definitionToMatch),
+        exact: existing.filter(d => d.source === 'exact').map(d => this.definitionToMatch(d)),
+        fuzzy: existing.filter(d => d.source === 'fuzzy').map(d => this.definitionToMatch(d)),
+        conceptual: existing.filter(d => d.source === 'conceptual').map(d => this.definitionToMatch(d)),
         files: candidateFiles || new Set(existing.map(d => this.fileUriToPath(d.uri))),
         searchTime: 0
       };
