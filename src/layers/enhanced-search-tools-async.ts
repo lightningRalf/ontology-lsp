@@ -283,7 +283,7 @@ export class AsyncEnhancedGrep {
         try {
             this.processPool = new RipgrepProcessPool(this.config.maxProcesses);
             this.cache = new SmartSearchCache(this.config.cacheSize, this.config.cacheTTL);
-            console.log('AsyncEnhancedGrep initialized successfully with config:', this.config);
+            console.error('AsyncEnhancedGrep initialized successfully with config:', this.config);
         } catch (error) {
             console.error('AsyncEnhancedGrep initialization failed:', error);
             throw error;

@@ -78,7 +78,7 @@ export class OntologyEngine extends EventEmitter {
             }
         }
         
-        console.log(`Loaded ${concepts.length} concepts from storage`);
+        console.error(`Loaded ${concepts.length} concepts from storage`);
     }
     
     async findConcept(identifier: string, options?: { inferIfMissing?: boolean }): Promise<Concept | null> {

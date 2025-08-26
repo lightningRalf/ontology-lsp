@@ -74,7 +74,7 @@ export class PatternLearner extends EventEmitter {
             this.patterns.set(pattern.id, pattern);
         }
         
-        console.log(`Loaded ${patterns.length} patterns from storage`);
+        console.error(`Loaded ${patterns.length} patterns from storage`);
     }
     
     async learnFromRename(

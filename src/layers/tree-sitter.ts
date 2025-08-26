@@ -95,7 +95,7 @@ function loadLanguageParser(language: string): any {
                     const tsModule = require(modulePath);
                     TypeScript = tsModule.typescript;
                     loadedLanguages.add('typescript');
-                    console.log(`✓ Loaded TypeScript parser from ${modulePath}`);
+                    console.error(`✓ Loaded TypeScript parser from ${modulePath}`);
                 }
                 return TypeScript;
             case 'javascript':
@@ -104,7 +104,7 @@ function loadLanguageParser(language: string): any {
                     const tsModule = require(modulePath);
                     JavaScript = tsModule.javascript || tsModule.tsx; // Some versions use tsx for JSX
                     loadedLanguages.add('javascript');
-                    console.log(`✓ Loaded JavaScript parser from ${modulePath}`);
+                    console.error(`✓ Loaded JavaScript parser from ${modulePath}`);
                 }
                 return JavaScript;
             case 'python':
@@ -112,7 +112,7 @@ function loadLanguageParser(language: string): any {
                     const modulePath = findModulePath('tree-sitter-python');
                     Python = require(modulePath);
                     loadedLanguages.add('python');
-                    console.log(`✓ Loaded Python parser from ${modulePath}`);
+                    console.error(`✓ Loaded Python parser from ${modulePath}`);
                 }
                 return Python;
             default:
@@ -171,8 +171,8 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
             this.config.languages = ['typescript', 'javascript'];
         }
         
-        console.log(`TreeSitter: Detected languages: ${Array.from(detectedLanguages).join(', ')}`);
-        console.log(`TreeSitter: Loading parsers for: ${this.config.languages.join(', ')}`);
+        console.error(`TreeSitter: Detected languages: ${Array.from(detectedLanguages).join(', ')}`);
+        console.error(`TreeSitter: Loading parsers for: ${this.config.languages.join(', ')}`);
         
         this.setupParsers();
         this.setupQueries();
@@ -189,7 +189,7 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
                     const parser = new Parser();
                     parser.setLanguage(language);
                     this.parsers.set(langName, parser);
-                    console.log(`✓ Initialized ${langName} parser`);
+                    console.error(`✓ Initialized ${langName} parser`);
                 } catch (e) {
                     console.warn(`✗ Failed to initialize ${langName} parser:`, e);
                 }

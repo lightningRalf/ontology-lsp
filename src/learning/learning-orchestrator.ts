@@ -1079,7 +1079,7 @@ export class LearningOrchestrator {
 
   private setupScheduledPipeline(pipelineId: string, schedule: string): void {
     // In a real implementation, this would use node-cron or similar
-    console.log(`Would setup cron job for pipeline ${pipelineId} with schedule: ${schedule}`);
+    console.error(`Would setup cron job for pipeline ${pipelineId} with schedule: ${schedule}`);
   }
 
   private updatePerformanceMetrics(timeMs: number, success: boolean): void {
@@ -1144,17 +1144,17 @@ export class LearningOrchestrator {
 
   private async savePipelineToDatabase(pipeline: LearningPipeline): Promise<void> {
     // Implementation would save pipeline configuration to database
-    console.log(`Would save pipeline ${pipeline.id} to database`);
+    console.error(`Would save pipeline ${pipeline.id} to database`);
   }
 
   private async savePipelineStats(pipeline: LearningPipeline): Promise<void> {
     // Implementation would update pipeline statistics in database
-    console.log(`Would update stats for pipeline ${pipeline.id}`);
+    console.error(`Would update stats for pipeline ${pipeline.id}`);
   }
 
   private async loadPipelinesFromDatabase(): Promise<void> {
     // Implementation would load additional pipelines from database
-    console.log('Would load additional pipelines from database');
+    console.error('Would load additional pipelines from database');
   }
 
   /**
