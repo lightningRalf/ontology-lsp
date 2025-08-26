@@ -207,12 +207,12 @@ build:
         --external tree-sitter-javascript --external tree-sitter-python
     @echo "✅ Build complete"
 
-# Build only the MCP fast server (optimized for Claude integration)
+# Build only the MCP fast server (no minification to preserve symbol names for find_definition)
 build-mcp:
     @echo "🚀 Building MCP fast server..."
     @mkdir -p dist/mcp-fast
     {{bun}} build src/servers/mcp-fast.ts --target=bun --outdir=dist/mcp-fast --format=esm \
-        --minify --sourcemap
+        --sourcemap
     @echo "✅ MCP fast server built at dist/mcp-fast/mcp-fast.js"
 
 # Clean and rebuild all servers
@@ -223,11 +223,11 @@ clean-build:
     @just build
     @echo "✨ Clean build complete"
 
-# Watch and rebuild MCP server on changes
+# Watch and rebuild MCP server on changes (no minification to preserve symbol names)
 watch-mcp:
     @echo "👀 Watching MCP server for changes..."
-    @{{bun}} build src/servers/mcp-fast.ts --target=bun --outfile=dist/mcp-fast/mcp-fast.js --format=esm \
-        --watch --minify --sourcemap
+    @{{bun}} build src/servers/mcp-fast.ts --target=bun --outdir=dist/mcp-fast --format=esm \
+        --watch --sourcemap
 
 # Rebuild MCP server after fixing issues
 rebuild-mcp: build-mcp
