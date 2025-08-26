@@ -1,16 +1,11 @@
 {
   "mcpServers": {
     "ontology-lsp": {
-      "command": "bun",
-      "args": ["run", "/home/lightningralf/programming/ontology-lsp/dist/mcp/mcp.js"],
+      "command": "/home/lightningralf/programming/ontology-lsp/mcp-wrapper.sh",
+      "args": [],
       "type": "stdio",
       "description": "Ontology-enhanced LSP with 5-layer architecture",
-      "env": {
-        "NODE_ENV": "development",
-        "LOG_LEVEL": "debug",
-        "ONTOLOGY_DB_PATH": "/home/lightningralf/programming/ontology-lsp/.ontology/ontology.db",
-        "ONTOLOGY_WORKSPACE": "/home/lightningralf/programming/ontology-lsp"
-      }
+      "env": {}
     }
   }
 }
