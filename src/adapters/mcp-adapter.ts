@@ -150,8 +150,39 @@ export class MCPAdapter {
       normalizePosition(args.position) : 
       createPosition(0, 0);
 
+    // If no file provided, search for the symbol across the workspace first
+    let uri = args.file ? normalizeUri(args.file) : null;
+    
+    if (!uri) {
+      // Use workspace-wide search to find the symbol
+      // This will trigger Layer 1's search capabilities
+      const workspaceRequest = buildFindDefinitionRequest({
+        uri: '', // Empty URI triggers workspace search
+        position,
+        identifier: args.symbol,
+        maxResults: this.config.maxResults,
+        includeDeclaration: true
+      });
+      
+      const result = await this.coreAnalyzer.findDefinition(workspaceRequest);
+      
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            definitions: result.data.map(def => definitionToMcpResponse(def)),
+            performance: result.performance,
+            requestId: result.requestId,
+            count: result.data.length
+          }, null, 2)
+        }],
+        isError: false
+      };
+    }
+
+    // Normal path when file is provided
     const request = buildFindDefinitionRequest({
-      uri: normalizeUri(args.file || 'file://unknown'),
+      uri,
       position,
       identifier: args.symbol,
       maxResults: this.config.maxResults,

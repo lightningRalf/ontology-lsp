@@ -63,18 +63,24 @@ restart: stop start
 # Check health
 health:
     @echo "🧪 Checking server health..."
-    @curl -s http://localhost:7000/health >/dev/null 2>&1 && echo "✅ HTTP API (7000): HEALTHY" || echo "❌ HTTP API (7000): NOT RESPONDING"
-    @curl -s http://localhost:7001/health >/dev/null 2>&1 && echo "✅ MCP SSE (7001): HEALTHY" || echo "❌ MCP SSE (7001): NOT RESPONDING"
+    @curl -s --max-time 1 http://localhost:7000/health >/dev/null 2>&1 && echo "✅ HTTP API (7000): HEALTHY" || echo "❌ HTTP API (7000): NOT RESPONDING"
+    @curl -s --max-time 1 http://localhost:7001/health >/dev/null 2>&1 && echo "✅ MCP SSE (7001): HEALTHY" || echo "❌ MCP SSE (7001): NOT RESPONDING"
 
 # Show server status with port information
 status:
     @echo "📊 Server Status"
     @echo "=================="
-    @curl -s http://localhost:7002 >/dev/null 2>&1 && echo "✅ LSP Server: Running on port 7002" || echo "❌ LSP Server: Not responding on port 7002"
-    @curl -s http://localhost:7000/health >/dev/null 2>&1 && echo "✅ HTTP API: Running on port 7000" || echo "❌ HTTP API: Not responding on port 7000"  
-    @curl -s http://localhost:7001/health >/dev/null 2>&1 && echo "✅ MCP SSE: Running on port 7001" || echo "❌ MCP SSE: Not responding on port 7001"
     @echo ""
-    @echo "🌐 Port Status:"
+    @echo "🔌 Background Services:"
+    @curl -s --max-time 1 http://localhost:7000/health >/dev/null 2>&1 && echo "  ✅ HTTP API Server: Running on port 7000" || echo "  ❌ HTTP API Server: Not responding on port 7000"  
+    @curl -s --max-time 1 http://localhost:7001/health >/dev/null 2>&1 && echo "  ✅ MCP SSE Server: Running on port 7001" || echo "  ❌ MCP SSE Server: Not responding on port 7001"
+    @curl -s --max-time 1 http://localhost:7002 >/dev/null 2>&1 && echo "  ✅ LSP TCP Server: Running on port 7002" || echo "  ❌ LSP TCP Server: Not responding on port 7002"
+    @echo ""
+    @echo "📝 On-Demand Services (stdio):"
+    @test -f src/servers/mcp.ts && echo "  ✅ MCP STDIO Server: Available (launches on-demand)" || echo "  ❌ MCP STDIO Server: Not found"
+    @test -f src/servers/lsp.ts && echo "  ✅ LSP STDIO Server: Available (launches on-demand)" || echo "  ❌ LSP STDIO Server: Not found"
+    @echo ""
+    @echo "🌐 Port Usage Details:"
     @just check-ports-status
 
 # Show logs

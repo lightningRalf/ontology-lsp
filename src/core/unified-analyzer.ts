@@ -1324,7 +1324,15 @@ export class CodeAnalyzer {
   
   private normalizeUriForCaching(uri: string): string {
     // Normalize URI to ensure consistent cache keys across different URI formats
-    if (!uri) return 'file://unknown';
+    if (!uri || uri === '') {
+      // Empty URI means workspace-wide search - use a special marker
+      return 'workspace://global';
+    }
+    
+    // Never allow file://unknown
+    if (uri === 'file://unknown') {
+      return 'workspace://global';
+    }
     
     // Convert to consistent file:// format
     if (uri.startsWith('file://')) {
@@ -1603,11 +1611,6 @@ export class CodeAnalyzer {
 
   // Utility methods for layer integration
 
-  private extractDirectoryFromUri(uri: string): string {
-    const path = this.fileUriToPath(uri);
-    return path.substring(0, path.lastIndexOf('/')) || '.';
-  }
-
   private getFileTypesFromUri(uri: string): string[] {
     const ext = uri.split('.').pop()?.toLowerCase();
     switch (ext) {
@@ -1691,13 +1694,26 @@ export class CodeAnalyzer {
   }
   
   private extractDirectoryFromUri(uri: string): string {
+    // Handle empty URI or workspace-wide search
+    if (!uri || uri === '' || uri === 'workspace://global') {
+      return process.cwd(); // Search entire workspace
+    }
+    
+    // Never process file://unknown
+    if (uri === 'file://unknown') {
+      return process.cwd(); // Search entire workspace
+    }
+    
     try {
       const url = new URL(uri);
       const filePath = url.pathname;
       const dir = path.dirname(filePath);
       return dir === '.' ? process.cwd() : dir;
     } catch {
-      return process.cwd();
+      // If URI parsing fails, assume it's a path and extract directory
+      const filePath = this.fileUriToPath(uri);
+      const dir = path.dirname(filePath);
+      return dir === '.' ? process.cwd() : dir;
     }
   }
   
