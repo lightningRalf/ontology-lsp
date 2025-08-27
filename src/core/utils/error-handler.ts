@@ -224,6 +224,14 @@ export class ErrorHandler {
     originalError?: Error
   ): McpError {
     const mcpError = new McpError(code, message);
+    // Align with tests: expose the raw message on the Error.message field
+    // SDK prefixes messages (e.g., "MCP error -32602: ..."); tests expect the plain message
+    try {
+      (mcpError as any).rawMessage = message;
+      (mcpError as any).message = message;
+    } catch {
+      // Fallback – if message is readonly in some environments, keep SDK default
+    }
     
     // Add context to error data
     (mcpError as any).data = {
@@ -296,9 +304,13 @@ export class ErrorHandler {
 
   private shouldNotRetry(error: Error): boolean {
     // Don't retry on validation errors or client errors
-    if (error.message.includes('Missing required') || 
-        error.message.includes('Invalid') ||
-        error.message.includes('must be')) {
+    const msg = (error.message || '').toLowerCase();
+    if (msg.includes('missing required') ||
+        msg.includes('invalid') ||
+        msg.includes('must be') ||
+        msg.includes('unknown tool') ||
+        msg.includes('cannot be empty') ||
+        msg.includes('arguments must be')) {
       return true;
     }
 

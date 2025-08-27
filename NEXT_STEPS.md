@@ -3,28 +3,8 @@
 > **Purpose**: Forward-looking action items ONLY. No history, no completed items.
 > For completed work, see PROJECT_STATUS.md
 
-## ✅ MAJOR MILESTONES COMPLETED (2025-08-26)
-
-### Hybrid Intelligence Implementation (3 Phases) ✅
-- **Phase 1**: Fixed definition request processing - 98/98 core tests passing
-- **Phase 2**: Smart categorization system - 40/40 categorization tests + 26/26 escalation tests  
-- **Phase 3**: Layer 2 optimization with candidate filtering - 10-50x performance improvement
-
-### Layer 3 Ontology Engine ✅
-- Real database integration replacing stub implementation
-- Actual file path resolution with confidence scoring
-- No more fake "file://unknown" responses
-
-### Bloom Filter Optimization ✅
-- Fixed to populate AFTER search, not before
-- No longer blocks first-time searches
-- Improved negative cache performance
-
-### Core System Status ✅
-- **All 5 layers operational** with real implementations
-- **173 comprehensive tests** passing across all components
-- **Production deployment ready** with verified builds and health checks
-- **Performance targets met** for all layers (<100ms for 95% requests)
+<!-- Completed milestones are intentionally omitted from NEXT_STEPS.
+See PROJECT_STATUS.md for achievements and historical context. -->
 
 
 ## 🚀 Next Development Priorities (Updated 2025-08-27)
@@ -33,7 +13,7 @@
 **Status**: All preparation complete, ready for immediate execution
 
 **Requirements**: Docker/Kubernetes permissions to complete deployment
-**Documentation**: See `PRODUCTION_DEPLOYMENT_NEXT_STEPS.md` for complete instructions
+**Documentation**: See `DEPLOYMENT_GUIDE.md` for complete instructions
 
 **Immediate Actions**:
 - **Container Registry**: Push images to GitHub Container Registry or Docker Hub
@@ -80,6 +60,41 @@
 - **HTTP**: Add `/api/v1/explore` query parameters for print limits and additional filters
 - **MCP**: Ensure `explore_codebase` supports limit parameters and returns compact JSON by default
 
+### 6. Security Hardening (New)
+- **AuthN/Z**: Add token-based auth for HTTP endpoints; scope tokens per adapter
+- **Secrets**: Move all credentials to `env` + GitHub Actions secrets; document rotation
+- **Rate Limiting**: Per-IP and per-route quotas; 429 responses with Retry-After
+- **Input Validation**: Harden schema validation on all adapters; reject unknown fields
+- **Threat Model**: Document attack surface; add SSRF and path traversal guards
+
+### 7. Cache & Data Layer (New)
+- **Valkey (Redis-compatible)**: Implement `ValkeyCache` in `CacheService` with reconnect/backoff
+- **Hybrid Strategy**: Memory+Valkey tiered write-through; configurable TTL per keyspace
+- **Degradation**: Wire `UseCachedResult` strategy in error handler for read paths
+- **Warmers**: Add startup prewarm for hot identifiers; configurable via config
+- **Cache Metrics**: Export hit/miss and eviction metrics to monitoring dashboard
+
+### 8. Error Handling Alignment
+- (Complete) Message format normalized across adapters
+- (Follow-up) Document adapter error shapes + examples in docs
+
+### 9. Test Suite Stabilization
+- **Perf Benchmarks**: Tune Layer 1 budget/timeouts in perf tests or mock FS for determinism
+- **Budgets**: Lock performance budgets; guardrail on >20% regressions
+- **Fixtures**: Add synthetic large-tree fixture for race tests (deterministic)
+
+### 10. Release & CI/CD (New)
+- **Semantic Versioning**: Adopt conventional commits + automated release notes
+- **Artifact Signing**: Sign Docker images and VSIX; publish provenance (SLSA Level 1)
+- **Matrix CI**: Add OS matrix (Linux, macOS) with Bun versions
+- **Security Gates**: Fail PRs on high severity vulns from `security.yml`
+
+### 11. Docs & DX (New)
+- **CLI Help**: Expand `--help` with realistic examples; add `--json` samples
+- **Playground**: Add small repo fixtures under `examples/` with guided tasks
+- **Troubleshooting**: Extend `docs/TROUBLESHOOTING.md` with common adapter errors
+- **OpenAPI**: Freeze and version the HTTP schemas; publish under `/openapi.json`
+
 ## 📊 Technical Debt to Address
 
 ### Testing Improvements
@@ -87,8 +102,28 @@
 - **E2E Real Codebase Tests**: Expand beyond current 6 scenarios
 - **Performance Regression Suite**: Automated performance tracking
 - **Chaos Engineering**: Add resilience testing (network failures, high load)
- - **Layer 1 Race/Cancellation**: Add deterministic tests with a synthetic large tree fixture
- - **Budget Enforcement**: Assert end‑to‑end that LayerManager cutoffs are respected under load
+- **Layer 1 Race/Cancellation**: Add deterministic tests with a synthetic large tree fixture
+- **Budget Enforcement**: Assert end‑to‑end that LayerManager cutoffs are respected under load
+ - **Broken Links**: Remove or fix internal doc references in NEXT_STEPS/README (done for deployment guide)
+
+## 🧭 Where to Start in a New Context
+
+- Read PROJECT_STATUS.md (top sections) to see the current state.
+- Review `test-output.txt` for the latest full-suite logs.
+- Validate the suite:
+  - `bun test --bail=1`
+  - If a performance benchmark flakes locally, temporarily relax Layer 1 timeout or use the deterministic fixture.
+- Verify Layer 1/CLI
+  - `timeout 20s ./ontology-lsp find <Symbol> -n 50 -l 20 --json`
+  - `timeout 20s ./ontology-lsp references <Symbol> -n 50 -l 20 --json`
+  - `timeout 20s ./ontology-lsp explore <Symbol> -n 100 -l 10 --json`
+
+## 🔧 Useful Commands
+
+- Full suite, stop at first failure: `bun test --bail=1`
+- Focus layer1/error tests: `bun test test/layer1-*.test.ts test/error-handling.test.ts`
+- Generate JUnit report: `bun test --reporter=junit --reporter-outfile=report.xml`
+- Build CLI: `bun run build:cli`
 
 ### Code Quality
 - **JSDoc Documentation**: Add comprehensive inline documentation

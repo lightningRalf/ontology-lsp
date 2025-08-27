@@ -367,6 +367,8 @@ export class HTTPAdapter {
         body: responseBody
       };
     } catch (error) {
+      // Temporary visibility for test stabilization
+      console.error('[HTTP Adapter] Completions failed:', error instanceof Error ? error.message : String(error));
       return this.createErrorResponse(400, 'Bad Request', error);
     }
   }
@@ -774,6 +776,19 @@ export class HTTPAdapter {
       response,
       timestamp: Date.now()
     });
+  }
+
+  /**
+   * Retrieve cached response if present and fresh
+   */
+  private getFromResponseCache(key: string): string | null {
+    const cached = this.responseCache.get(key);
+    if (!cached) return null;
+    if (Date.now() - cached.timestamp > HTTPAdapter.RESPONSE_CACHE_TTL) {
+      this.responseCache.delete(key);
+      return null;
+    }
+    return cached.response;
   }
 
 

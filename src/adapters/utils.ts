@@ -390,7 +390,7 @@ export function handleAdapterError(error: any, protocol: 'lsp' | 'mcp' | 'http' 
     case 'lsp':
       return { code: -32603, message: adapterError.message, data: adapterError.details };
     case 'mcp':
-      return { error: adapterError.code, message: adapterError.message };
+      return { error: { code: adapterError.code, message: adapterError.message }, message: adapterError.message };
     case 'http':
       return { error: true, code: adapterError.code, message: adapterError.message, details: adapterError.details };
     case 'cli':
