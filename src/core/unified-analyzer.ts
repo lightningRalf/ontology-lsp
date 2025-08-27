@@ -130,7 +130,7 @@ export class CodeAnalyzer {
       const asyncOptions: AsyncSearchOptions = {
         pattern: `\\b${this.escapeRegex(request.identifier)}\\b`,
         path: this.extractDirectoryFromUri(request.uri),
-        maxResults: 50,
+        maxResults: request.maxResults ?? 50,
         timeout: asyncTimeout,
         caseInsensitive: false,
         fileType: this.getFileTypeFromUri(request.uri),
@@ -254,7 +254,7 @@ export class CodeAnalyzer {
       const asyncOptions: AsyncSearchOptions = {
         pattern: `\\b${this.escapeRegex(request.identifier)}\\b`,
         path: request.includeDeclaration ? undefined : this.extractDirectoryFromUri(request.uri),
-        maxResults: 200,
+        maxResults: request.maxResults ?? 200,
         timeout: 20000,
         caseInsensitive: false,
         fileType: this.getFileTypeFromUri(request.uri)

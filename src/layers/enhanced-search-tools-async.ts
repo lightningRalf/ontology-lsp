@@ -604,6 +604,39 @@ export class AsyncEnhancedGrep {
     }
 
     /**
+     * Cancellable content search built on searchStream that aggregates results until cancelled or stream ends.
+     */
+    searchCancellable(options: AsyncSearchOptions): { promise: Promise<StreamingGrepResult[]>; cancel: () => void } {
+        const stream = this.searchStream(options);
+        const results: StreamingGrepResult[] = [];
+        let done = false;
+        const promise = new Promise<StreamingGrepResult[]>((resolve) => {
+            stream.on('data', (res) => {
+                if (done) return;
+                results.push(res);
+                if (options.maxResults && results.length >= options.maxResults) {
+                    done = true;
+                    stream.cancel();
+                    resolve(results);
+                }
+            });
+            stream.on('end', () => {
+                if (!done) {
+                    done = true;
+                    resolve(results);
+                }
+            });
+            stream.on('error', () => {
+                if (!done) {
+                    done = true;
+                    resolve(results);
+                }
+            });
+        });
+        return { promise, cancel: () => stream.cancel() };
+    }
+
+    /**
      * Parallel search across multiple directories
      */
     async searchParallel(
@@ -636,6 +669,60 @@ export class AsyncEnhancedGrep {
         }
 
         return results;
+    }
+
+    /**
+     * Cancellable file listing built on ripgrep --files, similar to listFiles() but exposes a cancel API.
+     */
+    listFilesCancellable(options: FileListOptions): { promise: Promise<string[]>; cancel: () => void } {
+        const args: string[] = [];
+        args.push('--files');
+        if (typeof options.maxDepth === 'number') args.push('--max-depth', String(options.maxDepth));
+        if (options.includeHidden) args.push('--hidden');
+        const excludes = options.excludes || [];
+        for (const ex of excludes) {
+            const pattern = ex.endsWith('/**') ? ex : `${ex.replace(/\/$/, '')}/**`;
+            args.push('--glob', `!${pattern}`);
+        }
+        const includes = options.includes || [];
+        for (const inc of includes) args.push('--glob', inc);
+        args.push(options.path || '.');
+
+        let proc: ChildProcess | null = null;
+        let timeout: NodeJS.Timeout | null = null;
+        const files: string[] = [];
+
+        const promise = (async () => {
+            proc = await this.processPool.execute('rg', args);
+            if (options.timeout && options.timeout > 0) {
+                timeout = setTimeout(() => { try { proc?.kill('SIGTERM'); } catch {} }, options.timeout);
+            }
+            return new Promise<string[]>((resolve) => {
+                proc!.stdout?.on('data', (data: Buffer) => {
+                    const lines = data.toString('utf8').split(/\r?\n/).filter(Boolean);
+                    for (const line of lines) {
+                        files.push(line);
+                    }
+                    if (options.maxFiles && files.length >= options.maxFiles) {
+                        try { proc?.kill('SIGTERM'); } catch {}
+                    }
+                });
+                proc!.on('close', () => {
+                    if (timeout) clearTimeout(timeout);
+                    resolve(options.maxFiles && files.length > options.maxFiles ? files.slice(0, options.maxFiles) : files);
+                });
+                proc!.on('error', () => {
+                    if (timeout) clearTimeout(timeout);
+                    resolve([]);
+                });
+            });
+        })();
+
+        const cancel = () => {
+            try { proc?.kill('SIGTERM'); } catch {}
+            if (timeout) clearTimeout(timeout);
+        };
+        return { promise, cancel };
     }
 
     /**

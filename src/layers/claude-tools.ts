@@ -230,22 +230,19 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
         };
         
         try {
-            // Primary: Use async streaming search with fast-path optimization
+            // Primary: Race content grep vs file discovery under a single budget; combine if both return quickly
             try {
-                await this.searchWithAsyncGrepFastPath(query, matches);
-                // If async search succeeds and finds results, we can skip other tools for exact matches
+                await this.searchRaceGrepAndFiles(query, matches);
                 if (matches.exact.length > 0) {
                     matches.searchTime = Date.now() - startTime;
-                    matches.confidence = 1.0; // High confidence for exact matches
-                    
+                    matches.confidence = 1.0;
                     this.updateCache(cacheKey, matches);
                     this.updateStatistics(query, matches);
                     this.updatePerformanceMetrics(Date.now() - startTime);
-                    
                     return matches;
                 }
-            } catch (asyncError) {
-                console.warn('Async enhanced grep failed, falling back to sync tools:', asyncError);
+            } catch (raceError) {
+                console.warn('Race (grep vs file discovery) failed, falling back:', raceError);
             }
             
             // Fallback: Run all search strategies in parallel with enhanced tools
@@ -287,6 +284,134 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 error as Error
             );
         }
+    }
+
+    /**
+     * Race content grep vs file discovery using a single global budget, then combine.
+     */
+    private async searchRaceGrepAndFiles(query: SearchQuery, matches: EnhancedMatches): Promise<void> {
+        const start = Date.now();
+        const globalBudgetMs = Math.min(1200, this.config.grep.defaultTimeout * 0.8);
+
+        // Build cancellable content fast-path (streaming for early exit)
+        const contentCtrl = this.startContentFastPathCancellable(query);
+        // Build cancellable file discovery
+        const filesCtrl = this.startFileDiscoveryCancellable(query);
+
+        const budgetPromise = new Promise<'budget'>((resolve) => {
+            const left = Math.max(0, globalBudgetMs - (Date.now() - start));
+            setTimeout(() => resolve('budget'), left);
+        });
+
+        const first = await Promise.race([
+            contentCtrl.promise.then(() => 'content' as const),
+            filesCtrl.promise.then(() => 'files' as const),
+            budgetPromise
+        ]);
+
+        if (first === 'content') this.mergeMatches(matches, contentCtrl.matches);
+        if (first === 'files') this.mergeMatches(matches, filesCtrl.matches);
+
+        // Cancel the loser or on budget expiry
+        if (first === 'content') filesCtrl.cancel();
+        if (first === 'files') contentCtrl.cancel();
+        if (first === 'budget') { contentCtrl.cancel(); filesCtrl.cancel(); }
+
+        // Try to merge the other if it happened to finish within a short grace period
+        const remaining = globalBudgetMs - (Date.now() - start);
+        if (remaining > 120) {
+            try {
+                const other = await Promise.race([
+                    first === 'content' ? filesCtrl.promise.then(() => 'files' as const) : contentCtrl.promise.then(() => 'content' as const),
+                    new Promise<'timeout'>(resolve => setTimeout(() => resolve('timeout'), remaining))
+                ]);
+                if (other === 'content') this.mergeMatches(matches, contentCtrl.matches);
+                if (other === 'files') this.mergeMatches(matches, filesCtrl.matches);
+            } catch {}
+        }
+    }
+
+    private mergeMatches(target: EnhancedMatches, src: EnhancedMatches): void {
+        if (!src) return;
+        target.exact.push(...src.exact);
+        target.fuzzy.push(...src.fuzzy);
+        target.conceptual.push(...src.conceptual);
+        src.files.forEach(f => target.files.add(f));
+    }
+
+    private startContentFastPathCancellable(query: SearchQuery): { promise: Promise<void>; cancel: () => void; matches: EnhancedMatches } {
+        const matches: EnhancedMatches = { exact: [], fuzzy: [], conceptual: [], files: new Set(), searchTime: 0, toolsUsed: [], confidence: 0 };
+        const escapedId = this.escapeRegex(query.identifier);
+        const strategies = [
+            { name: 'exact', pattern: `\\b${escapedId}\\b`, timeout: 700, maxResults: 20, confidence: 1.0 },
+            { name: 'prefix', pattern: `\\b${escapedId}\\w*`, timeout: 280, maxResults: 15, confidence: 0.95 },
+            { name: 'suffix', pattern: `\\w*${escapedId}\\b`, timeout: 280, maxResults: 15, confidence: 0.93 }
+        ];
+
+        const controllers = strategies.map(s => asyncSearchTools.searchCancellable({
+            pattern: s.pattern,
+            path: query.searchPath,
+            maxResults: s.maxResults,
+            timeout: s.timeout,
+            caseInsensitive: false,
+            fileType: this.getFileTypeForGrep(query.fileTypes),
+            excludePaths: this.getExcludeDirs()
+        }));
+
+        const promise = new Promise<void>(async (resolve) => {
+            // Collect first non-empty and cancel others
+            for (const ctrl of controllers) {
+                ctrl.promise.then(res => {
+                    if (res && res.length > 0 && matches.exact.length === 0) {
+                        const converted: Match[] = res.map(r => {
+                            const cat = this.categorizeMatch(r.text, query.identifier);
+                            return { file: r.file, line: r.line || 1, column: r.column || 0, text: r.text, length: r.text.length, confidence: r.confidence, source: 'exact' as any, category: cat.category, categoryConfidence: cat.confidence };
+                        });
+                        matches.exact.push(...converted);
+                        converted.forEach(m => matches.files.add(m.file));
+                        // Cancel others
+                        controllers.forEach(c => c.cancel());
+                        resolve();
+                    }
+                }).catch(() => {});
+            }
+            // Also resolve when all complete with empty results
+            Promise.allSettled(controllers.map(c => c.promise)).then(() => resolve());
+        });
+
+        const cancel = () => controllers.forEach(c => c.cancel());
+        return { promise, cancel, matches };
+    }
+
+    private startFileDiscoveryCancellable(query: SearchQuery): { promise: Promise<void>; cancel: () => void; matches: EnhancedMatches } {
+        const temp: EnhancedMatches = { exact: [], fuzzy: [], conceptual: [], files: new Set(), searchTime: 0, toolsUsed: [], confidence: 0 };
+        const patterns = this.generateGlobPatterns(query).slice(0, 6);
+        const excludes = this.getExcludeDirs();
+        ['out','build','tmp','temp','.vscode-test','target','venv','.venv'].forEach(e => { if (!excludes.includes(e)) excludes.push(e); });
+
+        const ctrls = patterns.map(p => asyncSearchTools.listFilesCancellable({
+            includes: [p],
+            excludes,
+            path: query.searchPath || '.',
+            maxDepth: 6,
+            timeout: 300,
+            includeHidden: false,
+            maxFiles: 1000
+        }));
+
+        const promise = new Promise<void>((resolve) => {
+            Promise.allSettled(ctrls.map(c => c.promise)).then((settled) => {
+                for (const s of settled) {
+                    if (s.status === 'fulfilled' && Array.isArray(s.value)) {
+                        s.value.forEach(f => temp.files.add(f));
+                    }
+                }
+                resolve();
+            });
+        });
+
+        const cancel = () => ctrls.forEach(c => c.cancel());
+        return { promise, cancel, matches: temp };
     }
 
     /**

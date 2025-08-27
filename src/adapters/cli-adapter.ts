@@ -52,7 +52,7 @@ export class CLIAdapter {
   /**
    * Handle find command
    */
-  async handleFind(identifier: string, options: { file?: string; maxResults?: number }): Promise<string> {
+  async handleFind(identifier: string, options: { file?: string; maxResults?: number; json?: boolean; limit?: number; verbose?: boolean }): Promise<string> {
     try {
       const request = buildFindDefinitionRequest({
         uri: normalizeUri(options.file || process.cwd()),
@@ -63,9 +63,25 @@ export class CLIAdapter {
       });
 
       const result = await this.coreAnalyzer.findDefinition(request);
-      
-      // For consistency tests, return structured data instead of formatted string
-      return result.data;
+      const items = result.data.slice(0, options.limit ?? this.config.maxResults);
+      if (options.json) {
+        return JSON.stringify({
+          count: result.data.length,
+          shown: items.length,
+          items,
+          performance: result.performance,
+          requestId: result.requestId
+        }, null, 2);
+      }
+      if (!options.verbose) {
+        const lines = [
+          this.formatHeader(`Found ${result.data.length} definitions (showing ${items.length})`)
+        ];
+        for (const d of items) lines.push(`  ${formatDefinitionForCli(d)}`);
+        return lines.join('\n');
+      }
+      // Verbose: list all (capped by limit)
+      return items.map(formatDefinitionForCli).join('\n');
       
     } catch (error) {
       return this.formatError(`Find failed: ${handleAdapterError(error, 'cli')}`);
@@ -75,7 +91,7 @@ export class CLIAdapter {
   /**
    * Handle references command
    */
-  async handleReferences(identifier: string, options: { includeDeclaration?: boolean; maxResults?: number }): Promise<string> {
+  async handleReferences(identifier: string, options: { includeDeclaration?: boolean; maxResults?: number; json?: boolean; limit?: number; verbose?: boolean }): Promise<string> {
     try {
       const request = buildFindReferencesRequest({
         uri: normalizeUri(process.cwd()),
@@ -86,9 +102,24 @@ export class CLIAdapter {
       });
 
       const result = await this.coreAnalyzer.findReferences(request);
-      
-      // For consistency tests, return structured data instead of formatted string
-      return result.data;
+      const items = result.data.slice(0, options.limit ?? this.config.maxResults);
+      if (options.json) {
+        return JSON.stringify({
+          count: result.data.length,
+          shown: items.length,
+          items,
+          performance: result.performance,
+          requestId: result.requestId
+        }, null, 2);
+      }
+      if (!options.verbose) {
+        const lines = [
+          this.formatHeader(`Found ${result.data.length} references (showing ${items.length})`)
+        ];
+        for (const r of items) lines.push(`  ${formatReferenceForCli(r)}`);
+        return lines.join('\n');
+      }
+      return items.map(formatReferenceForCli).join('\n');
       
     } catch (error) {
       return this.formatError(`References search failed: ${handleAdapterError(error, 'cli')}`);
@@ -178,7 +209,7 @@ export class CLIAdapter {
   /**
    * Handle explore command: parallel definitions+references aggregation
    */
-  async handleExplore(identifier: string, options: { file?: string; maxResults?: number; includeDeclaration?: boolean }): Promise<string> {
+  async handleExplore(identifier: string, options: { file?: string; maxResults?: number; includeDeclaration?: boolean; json?: boolean; limit?: number; verbose?: boolean }): Promise<string> {
     try {
       const uri = normalizeUri(options.file || process.cwd());
       const result = await (this.coreAnalyzer as any).exploreCodebase({
@@ -188,21 +219,34 @@ export class CLIAdapter {
         maxResults: options.maxResults || this.config.maxResults
       });
 
+      const defLimit = options.limit ?? 10;
+      const refLimit = options.limit ?? 10;
+      const defs = result.definitions.slice(0, defLimit);
+      const refs = result.references.slice(0, refLimit);
+      if (options.json) {
+        return JSON.stringify({
+          symbol: result.symbol,
+          contextUri: result.contextUri,
+          definitions: defs,
+          references: refs,
+          counts: { definitions: result.definitions.length, references: result.references.length },
+          performance: result.performance,
+          timestamp: result.timestamp
+        }, null, 2);
+      }
       const lines: string[] = [];
       lines.push(this.formatHeader(`Explore: '${identifier}'`));
       lines.push(`Context: ${uri}`);
       lines.push('');
-      lines.push(this.formatHeader('Definitions:'));
-      result.definitions.slice(0, 10).forEach(def => {
+      lines.push(this.formatHeader(`Definitions (showing ${defs.length} of ${result.definitions.length}):`));
+      defs.forEach(def => {
         lines.push(`  ${def.uri}:${def.range.start.line + 1}:${def.range.start.character + 1} [${def.kind}] (${Math.round(def.confidence * 100)}%)`);
       });
-      if (result.definitions.length > 10) lines.push(`  ... and ${result.definitions.length - 10} more`);
       lines.push('');
-      lines.push(this.formatHeader('References:'));
-      result.references.slice(0, 10).forEach(ref => {
+      lines.push(this.formatHeader(`References (showing ${refs.length} of ${result.references.length}):`));
+      refs.forEach(ref => {
         lines.push(`  ${ref.uri}:${ref.range.start.line + 1}:${ref.range.start.character + 1} [${ref.kind}] (${Math.round(ref.confidence * 100)}%)`);
       });
-      if (result.references.length > 10) lines.push(`  ... and ${result.references.length - 10} more`);
       lines.push('');
       lines.push(this.formatHeader('Performance:'));
       lines.push(`  total: ${result.performance.total}ms`);
@@ -210,7 +254,6 @@ export class CLIAdapter {
       if (result.performance.references) lines.push(`  references: ${result.performance.references.total}ms`);
       lines.push('');
       lines.push(`Timestamp: ${new Date(result.timestamp).toISOString()}`);
-
       return lines.join('\n');
 
     } catch (error) {

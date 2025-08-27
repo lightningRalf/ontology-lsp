@@ -39,14 +39,19 @@ class CLI {
       .command('find <identifier>')
       .description('Find symbol definitions with fuzzy matching')
       .option('-f, --file <path>', 'Specific file context')
-      .option('-n, --max-results <count>', 'Maximum results to show', '50')
+      .option('-n, --max-results <count>', 'Maximum results to search', '50')
+      .option('-l, --limit <count>', 'Maximum results to print', '20')
+      .option('-j, --json', 'Output JSON')
       .option('--no-color', 'Disable colored output')
       .option('-v, --verbose', 'Verbose output with performance info')
       .action(async (identifier, options) => {
         await this.ensureInitialized(options);
         const result = await this.cliAdapter.handleFind(identifier, {
           file: options.file,
-          maxResults: parseInt(options.maxResults)
+          maxResults: parseInt(options.maxResults),
+          limit: parseInt(options.limit),
+          json: !!options.json,
+          verbose: !!options.verbose
         });
         console.log(result);
       });
@@ -56,14 +61,19 @@ class CLI {
       .command('references <identifier>')
       .description('Find all references to a symbol')
       .option('-d, --include-declaration', 'Include symbol declaration in results')
-      .option('-n, --max-results <count>', 'Maximum results to show', '50')
+      .option('-n, --max-results <count>', 'Maximum results to search', '50')
+      .option('-l, --limit <count>', 'Maximum results to print', '20')
+      .option('-j, --json', 'Output JSON')
       .option('--no-color', 'Disable colored output')
       .option('-v, --verbose', 'Verbose output with performance info')
       .action(async (identifier, options) => {
         await this.ensureInitialized(options);
         const result = await this.cliAdapter.handleReferences(identifier, {
           includeDeclaration: options.includeDeclaration,
-          maxResults: parseInt(options.maxResults)
+          maxResults: parseInt(options.maxResults),
+          limit: parseInt(options.limit),
+          json: !!options.json,
+          verbose: !!options.verbose
         });
         console.log(result);
       });
@@ -100,15 +110,20 @@ class CLI {
       .command('explore <identifier>')
       .description('Explore codebase: definitions and references in parallel')
       .option('-f, --file <path>', 'Optional file or directory context')
-      .option('-n, --max-results <count>', 'Maximum results to show', '100')
+      .option('-n, --max-results <count>', 'Maximum results to search', '100')
+      .option('-l, --limit <count>', 'Maximum results to print per section', '10')
       .option('-d, --include-declaration', 'Include declaration in references')
+      .option('-j, --json', 'Output JSON')
       .option('--no-color', 'Disable colored output')
       .action(async (identifier, options) => {
         await this.ensureInitialized(options);
         const result = await this.cliAdapter.handleExplore(identifier, {
           file: options.file,
           maxResults: parseInt(options.maxResults),
-          includeDeclaration: !!options.includeDeclaration
+          includeDeclaration: !!options.includeDeclaration,
+          limit: parseInt(options.limit),
+          json: !!options.json,
+          verbose: !!options.verbose
         });
         console.log(result);
       });
