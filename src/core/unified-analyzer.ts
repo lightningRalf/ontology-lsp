@@ -124,11 +124,14 @@ export class CodeAnalyzer {
     
     try {
       // Use AsyncEnhancedGrep as primary search method
+      // Use a short timeout derived from layer1 config to avoid long blocking
+      const layer1Timeout = (this.config.layers?.layer1 as any)?.timeout ?? 200;
+      const asyncTimeout = Math.min(15000, layer1Timeout * 4); // ~800ms default
       const asyncOptions: AsyncSearchOptions = {
         pattern: `\\b${this.escapeRegex(request.identifier)}\\b`,
         path: this.extractDirectoryFromUri(request.uri),
         maxResults: 50,
-        timeout: 15000,
+        timeout: asyncTimeout,
         caseInsensitive: false,
         fileType: this.getFileTypeFromUri(request.uri),
         excludePaths: ['node_modules', 'dist', '.git', 'coverage']
@@ -485,6 +488,16 @@ export class CodeAnalyzer {
     };
 
     try {
+      // Fast-path: use async search first with tight budget; escalate only if empty
+      try {
+        const asyncResult = await this.findDefinitionAsync(request);
+        if (asyncResult.data && asyncResult.data.length > 0) {
+          return asyncResult;
+        }
+      } catch (e) {
+        // Ignore async fast-path errors and continue to layered approach
+      }
+
       // Check cache first
       const cacheKey = this.generateCacheKey('definition', request);
       const cached = await this.sharedServices.cache.get<Definition[]>(cacheKey);
@@ -2009,23 +2022,34 @@ export class CodeAnalyzer {
     if (!uri || uri === '' || uri === 'workspace://global') {
       return process.cwd(); // Search entire workspace
     }
-    
+
     // Never process file://unknown
     if (uri === 'file://unknown') {
       return process.cwd(); // Search entire workspace
     }
-    
+
+    // Normalize to file path
+    let filePath: string;
     try {
       const url = new URL(uri);
-      const filePath = url.pathname;
-      const dir = path.dirname(filePath);
-      return dir === '.' ? process.cwd() : dir;
+      filePath = url.pathname;
     } catch {
-      // If URI parsing fails, assume it's a path and extract directory
-      const filePath = this.fileUriToPath(uri);
-      const dir = path.dirname(filePath);
-      return dir === '.' ? process.cwd() : dir;
+      filePath = this.fileUriToPath(uri);
     }
+
+    // If the URI points to a directory, return it as-is instead of its parent
+    try {
+      const fs = require('fs');
+      const stat = fs.statSync(filePath);
+      if (stat.isDirectory()) {
+        return filePath;
+      }
+    } catch {
+      // If stat fails (e.g., path doesn't exist), fall through to dirname
+    }
+
+    const dir = path.dirname(filePath);
+    return dir === '.' ? process.cwd() : dir;
   }
   
   private getFileTypeFromUri(uri: string): string | undefined {

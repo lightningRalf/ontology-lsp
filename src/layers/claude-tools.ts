@@ -294,93 +294,59 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
      */
     private async searchWithAsyncGrepFastPath(query: SearchQuery, matches: EnhancedMatches): Promise<void> {
         const escapedId = this.escapeRegex(query.identifier);
-        
-        // Progressive search strategies: exact -> prefix/suffix -> fuzzy
+        const start = Date.now();
+        const globalBudgetMs = 1400; // Slightly under LayerManager's 1600ms cutoff
+
+        // Define concurrent strategies with shortened timeouts
         const strategies = [
-            // 1. Exact match (highest confidence)
             {
+                name: 'exact',
                 pattern: `\\b${escapedId}\\b`,
-                timeout: 1000,
+                timeout: 700,       // 600–800ms
                 maxResults: 20,
-                confidence: 1.0,
-                name: 'exact'
+                confidence: 1.0
             },
-            // 2. Prefix match (e.g., AsyncEnhanced* catches AsyncEnhancedGrep)
             {
+                name: 'prefix',
                 pattern: `\\b${escapedId}\\w*`,
-                timeout: 400,
+                timeout: 280,       // 250–300ms
                 maxResults: 15,
-                confidence: 0.95,
-                name: 'prefix'
+                confidence: 0.95
             },
-            // 3. Suffix match (e.g., *AsyncEnhanced catches getAsyncEnhanced)
             {
+                name: 'suffix',
                 pattern: `\\w*${escapedId}\\b`,
-                timeout: 400,
+                timeout: 280,       // 250–300ms
                 maxResults: 15,
-                confidence: 0.93,
-                name: 'suffix'
+                confidence: 0.93
             }
         ];
 
-        // Try strategies in order, stop on first success
-        for (const strategy of strategies) {
+        // Build concurrent search promises that resolve only on non-empty results
+        const searchPromises = strategies.map((s) => (async () => {
             const searchOptions = {
-                pattern: strategy.pattern,
+                pattern: s.pattern,
                 path: query.searchPath,
-                maxResults: strategy.maxResults,
-                timeout: strategy.timeout,
+                maxResults: s.maxResults,
+                timeout: s.timeout,
                 caseInsensitive: false,
                 fileType: this.getFileTypeForGrep(query.fileTypes),
                 excludePaths: this.getExcludeDirs()
             };
+            const results = await asyncSearchTools.search(searchOptions);
+            if (results.length === 0) throw new Error('no-results');
+            return { s, results };
+        })());
 
-            try {
-                const results = await asyncSearchTools.search(searchOptions);
-                if (results.length > 0) {
-                    // Convert and add matches with strategy confidence and categorization
-                    const convertedMatches: Match[] = results.map(r => {
-                        const categorization = this.categorizeMatch(r.text, query.identifier);
-                        return {
-                            file: r.file,
-                            line: r.line || 1,
-                            column: r.column || 0,
-                            text: r.text,
-                            length: r.text.length,
-                            confidence: r.confidence * strategy.confidence,
-                            source: 'exact' as any,
-                            category: categorization.category,
-                            categoryConfidence: categorization.confidence
-                        };
-                    });
-                    
-                    matches.exact.push(...convertedMatches);
-                    convertedMatches.forEach(match => matches.files.add(match.file));
-                    
-                    // Log success for debugging
-                    if (process.env.DEBUG) {
-                        console.error(`Fast-path ${strategy.name} found ${results.length} matches`);
-                    }
-                    return; // Early return on success
-                }
-            } catch (error) {
-                console.warn(`Fast-path ${strategy.name} match failed:`, error);
-            }
-        }
-
-        // If all strategies failed, try case-insensitive as final fallback
-        const fallbackOptions = {
-            pattern: `\\b${escapedId}\\w*|\\w*${escapedId}\\b`,  // Prefix OR suffix
-            path: query.searchPath,
-            timeout: 600,
-            caseInsensitive: true,
-            maxResults: 10,
-            excludePaths: this.getExcludeDirs()
-        };
+        // Add a global budget timer to bound the fast-path
+        const budgetPromise = new Promise<never>((_, reject) => {
+            const remaining = Math.max(0, globalBudgetMs - (Date.now() - start));
+            setTimeout(() => reject(new Error('fast-path-budget-exceeded')), remaining);
+        });
 
         try {
-            const results = await asyncSearchTools.search(fallbackOptions);
-            const convertedMatches: Match[] = results.map(r => {
+            const { s, results } = await Promise.any([...searchPromises, budgetPromise]);
+            const converted: Match[] = results.map(r => {
                 const categorization = this.categorizeMatch(r.text, query.identifier);
                 return {
                     file: r.file,
@@ -388,18 +354,58 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     column: r.column || 0,
                     text: r.text,
                     length: r.text.length,
-                    confidence: r.confidence * 0.9, // Slightly lower confidence
+                    confidence: r.confidence * s.confidence,
                     source: 'exact' as any,
                     category: categorization.category,
                     categoryConfidence: categorization.confidence
                 };
             });
-            
-            matches.exact.push(...convertedMatches);
-            convertedMatches.forEach(match => matches.files.add(match.file));
-        } catch (error) {
-            console.warn('Fast-path fallback failed:', error);
-            throw error; // Re-throw to trigger sync fallback
+            matches.exact.push(...converted);
+            converted.forEach(m => matches.files.add(m.file));
+            if (process.env.DEBUG) {
+                console.error(`Fast-path ${s.name} found ${converted.length} matches in ${Date.now() - start}ms`);
+            }
+            return;
+        } catch (raceError) {
+            // Either all returned empty or budget exceeded – try a short fallback if budget allows
+            const elapsed = Date.now() - start;
+            const budgetLeft = globalBudgetMs - elapsed;
+            if (budgetLeft < 120) {
+                // Too little time left; abandon fast-path to respect LayerManager cutoff
+                return;
+            }
+
+            const fallbackOptions = {
+                pattern: `\\b${escapedId}\\w*|\\w*${escapedId}\\b`,
+                path: query.searchPath,
+                timeout: Math.min(350, budgetLeft - 50), // 300–400ms within remaining budget
+                caseInsensitive: true,
+                maxResults: 10,
+                excludePaths: this.getExcludeDirs()
+            };
+            try {
+                const results = await asyncSearchTools.search(fallbackOptions);
+                if (results.length === 0) return;
+                const converted: Match[] = results.map(r => {
+                    const categorization = this.categorizeMatch(r.text, query.identifier);
+                    return {
+                        file: r.file,
+                        line: r.line || 1,
+                        column: r.column || 0,
+                        text: r.text,
+                        length: r.text.length,
+                        confidence: r.confidence * 0.9,
+                        source: 'exact' as any,
+                        category: categorization.category,
+                        categoryConfidence: categorization.confidence
+                    };
+                });
+                matches.exact.push(...converted);
+                converted.forEach(m => matches.files.add(m.file));
+            } catch (fallbackErr) {
+                // Swallow fallback errors; the caller may proceed with other strategies
+                if (process.env.DEBUG) console.warn('Fast-path fallback failed:', fallbackErr);
+            }
         }
     }
 
