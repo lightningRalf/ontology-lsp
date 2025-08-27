@@ -27,7 +27,7 @@
 - **Performance targets met** for all layers (<100ms for 95% requests)
 
 
-## 🚀 Next Development Priorities
+## 🚀 Next Development Priorities (Updated 2025-08-27)
 
 ### 1. Execute Production Deployment ✅ DEPLOYMENT-READY  
 **Status**: All preparation complete, ready for immediate execution
@@ -52,6 +52,16 @@
 - **Memory Usage**: Further optimize from current 607MB baseline
 - **Cache Warming**: Implement intelligent pre-loading strategies
 
+### 2.1 Layer 1 Tuning (New)
+- **Confidence Gating**: Early‑return only when fast‑path yields 'likely‑definition' (improve precision)
+- **Config Toggles**: Expose race budget, per‑pattern timeouts, depth and file caps in config
+- **Race Merge Policy**: Optional merge of content + file discovery results when both finish within budget
+
+### 2.2 Output and UX (New)
+- **Summary Mode**: Add an explicit `--summary` flag (we default to concise; flag makes it explicit)
+- **Deterministic Limits**: Enforce print caps consistently across commands
+- **Machine‑Readable**: Ensure `--json` outputs stable schemas for CI ingestion
+
 ### 3. Complete Plugin System Implementation
 - **Plugin Marketplace**: Build web UI and registry service
 - **Example Plugins**: Create additional plugins beyond the template
@@ -65,6 +75,11 @@
 - **Incremental Analysis**: Implement file-watching with incremental updates
 - **Distributed Architecture**: Enable multi-node deployment for large teams
 
+### 5. Adapters Parity (New)
+- **LSP**: Expose `explore` as an `executeCommand` with JSON payload
+- **HTTP**: Add `/api/v1/explore` query parameters for print limits and additional filters
+- **MCP**: Ensure `explore_codebase` supports limit parameters and returns compact JSON by default
+
 ## 📊 Technical Debt to Address
 
 ### Testing Improvements
@@ -72,6 +87,8 @@
 - **E2E Real Codebase Tests**: Expand beyond current 6 scenarios
 - **Performance Regression Suite**: Automated performance tracking
 - **Chaos Engineering**: Add resilience testing (network failures, high load)
+ - **Layer 1 Race/Cancellation**: Add deterministic tests with a synthetic large tree fixture
+ - **Budget Enforcement**: Assert end‑to‑end that LayerManager cutoffs are respected under load
 
 ### Code Quality
 - **JSDoc Documentation**: Add comprehensive inline documentation

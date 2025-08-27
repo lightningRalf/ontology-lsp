@@ -105,7 +105,36 @@ ontology-lsp/
 - 7002: LSP Server (TCP/stdio)
 - 8081: Monitoring Dashboard
 
-## 📅 Latest Updates (2025-08-26)
+## 📅 Latest Updates (2025-08-27)
+
+### ⚡ Layer 1 Race + Cancellation (Performance + Reliability)
+- Content fast-path and filename discovery now race under a single Layer 1 budget
+- True cancellation: losing ripgrep processes are terminated (both content and file discovery)
+- Predictable latency: bounded by a global budget that respects LayerManager’s cutoff
+
+### 🔎 File Discovery Reworked (Glob → Ripgrep)
+- Replaced expensive workspace globs with `rg --files` (respects .gitignore)
+- Added depth/time/file caps and extended ignores (out, build, tmp, .vscode-test, venv, target)
+- Removed mtime sorting I/O storm; discovery is now cheap and bounded
+
+### 🧭 Async‑First Find + Scope Fixes
+- `findDefinition` uses async fast‑path first; layered escalation only when needed
+- Directory URI resolution fixed (no more searching parent directories)
+- Propagate `maxResults` to async search; reduced default async timeouts
+
+### 🖥️ CLI UX Improvements
+- New `--json` and `--limit` flags for `find`, `references`, and `explore`
+- Concise summary output by default; detailed lists gated behind `--verbose`
+
+### ✅ Targeted Tests
+- Added cancellation tests for content search and file listing
+- Added budget behavior test for typical definition search
+
+### ✅ Validation
+- No more glob timeouts logged in references path
+- `find` returns promptly via async fast‑path; `explore` aggregates in ~10–50ms on local runs
+
+## 📅 Previous Updates (2025-08-26)
 
 ### ✅ Layer 1 Configuration Issue RESOLVED
 - **Issue**: Layer 1 was not finding source files, only test files

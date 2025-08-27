@@ -5,10 +5,7 @@
 
 import { describe, test, expect, beforeAll } from 'bun:test';
 import { MCPAdapter } from '../src/adapters/mcp-adapter';
-import { CodeAnalyzer } from '../src/core/unified-analyzer';
-import { LayerManager } from '../src/core/layer-manager';
-import { SharedServices } from '../src/core/services/shared-services';
-import { EventBusService as EventBus } from '../src/core/services/event-bus-service';
+import { AnalyzerFactory } from '../src/core/analyzer-factory';
 import { AsyncEnhancedGrep } from '../src/layers/enhanced-search-tools-async';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -40,38 +37,9 @@ describe('File URI Resolution - Red Tests', () => {
       const grep = new AsyncEnhancedGrep();`
     );
 
-    // Initialize dependencies
-    const eventBus = new EventBus();
-    const layerManager = new LayerManager(eventBus);
-    const sharedServices = new SharedServices({
-      cache: {
-        maxSize: 100,
-        ttl: 60000
-      },
-      fileSystem: {
-        watchForChanges: false
-      },
-      logging: {
-        level: 'error'
-      }
-    }, eventBus);
-    
-    // Initialize analyzer with proper dependencies
-    analyzer = new CodeAnalyzer(
-      layerManager,
-      sharedServices,
-      {
-        workspaceRoot: testDir,
-        cacheEnabled: false,
-        maxConcurrentRequests: 10,
-        requestTimeout: 30000,
-        performanceTracking: true
-      },
-      eventBus
-    );
-    
-    // Initialize the analyzer
-    await analyzer.initialize();
+    // Initialize analyzer via factory with workspace root
+    const created = await AnalyzerFactory.createWorkspaceAnalyzer(testDir, undefined);
+    analyzer = created.analyzer;
     
     mcpAdapter = new MCPAdapter(analyzer);
   });
@@ -83,13 +51,13 @@ describe('File URI Resolution - Red Tests', () => {
         symbol: 'AsyncEnhancedGrep'
         // Note: no 'file' parameter provided
       });
-
-      // Should find the definition
-      expect(result.definitions).toBeDefined();
-      expect(result.definitions.length).toBeGreaterThan(0);
+      // Adapter returns text content; parse
+      const payload = JSON.parse(result.content?.[0]?.text || '{}');
+      expect(payload.definitions).toBeDefined();
+      expect(payload.definitions.length).toBeGreaterThan(0);
       
       // Should have the actual file URI, not 'file://unknown'
-      const definition = result.definitions[0];
+      const definition = payload.definitions[0];
       expect(definition.uri).not.toBe('file://unknown');
       expect(definition.uri).toContain('async-grep.ts');
       expect(definition.uri).toMatch(/^file:\/\//);
@@ -99,10 +67,9 @@ describe('File URI Resolution - Red Tests', () => {
       const result = await mcpAdapter.handleToolCall('find_definition', {
         symbol: 'NonExistentSymbol'
       });
-
-      // Should return empty results, not file://unknown
-      expect(result.definitions).toEqual([]);
-      expect(result.error).toBeUndefined();
+      const payload = JSON.parse(result.content?.[0]?.text || '{}');
+      expect(payload.definitions || []).toEqual([]);
+      expect(result.isError).toBe(false);
     });
 
     test('should use provided file context when available', async () => {
@@ -110,13 +77,12 @@ describe('File URI Resolution - Red Tests', () => {
         symbol: 'AsyncEnhancedGrep',
         file: path.join(testDir, 'user.ts')
       });
-
-      // Should still find the definition
-      expect(result.definitions).toBeDefined();
-      expect(result.definitions.length).toBeGreaterThan(0);
+      const payload = JSON.parse(result.content?.[0]?.text || '{}');
+      expect(payload.definitions).toBeDefined();
+      expect(payload.definitions.length).toBeGreaterThan(0);
       
       // Should have correct file URI
-      const definition = result.definitions[0];
+      const definition = payload.definitions[0];
       expect(definition.uri).toContain('async-grep.ts');
     });
   });
@@ -129,11 +95,10 @@ describe('File URI Resolution - Red Tests', () => {
         identifier: 'SomeSymbol'
       };
 
-      const result = await analyzer.findDefinition(request);
+      const result = await analyzer.findDefinition(request as any);
       
-      // Should not return results with file://unknown
-      if (result.definitions && result.definitions.length > 0) {
-        result.definitions.forEach(def => {
+      if (result.data && result.data.length > 0) {
+        result.data.forEach(def => {
           expect(def.uri).not.toBe('file://unknown');
         });
       }

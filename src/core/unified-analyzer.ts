@@ -76,6 +76,11 @@ export class CodeAnalyzer {
     });
   }
 
+  // Helper to construct CoreError consistently for async fast paths
+  private createError(message: string, code: string, layer?: string, requestId?: string): CoreError {
+    return new CoreError(message, code, layer, requestId);
+  }
+
   async initialize(): Promise<void> {
     if (this.initialized) {
       return;
@@ -126,7 +131,7 @@ export class CodeAnalyzer {
       // Use AsyncEnhancedGrep as primary search method
       // Use a short timeout derived from layer1 config to avoid long blocking
       const layer1Timeout = (this.config.layers?.layer1 as any)?.timeout ?? 200;
-      const asyncTimeout = Math.min(15000, layer1Timeout * 4); // ~800ms default
+      const asyncTimeout = Math.max(3000, Math.min(15000, layer1Timeout * 4));
       const asyncOptions: AsyncSearchOptions = {
         pattern: `\\b${this.escapeRegex(request.identifier)}\\b`,
         path: this.extractDirectoryFromUri(request.uri),
@@ -2020,12 +2025,12 @@ export class CodeAnalyzer {
   private extractDirectoryFromUri(uri: string): string {
     // Handle empty URI or workspace-wide search
     if (!uri || uri === '' || uri === 'workspace://global') {
-      return process.cwd(); // Search entire workspace
+      return (this.config as any)?.workspaceRoot || process.cwd(); // Search workspace root if available
     }
 
     // Never process file://unknown
     if (uri === 'file://unknown') {
-      return process.cwd(); // Search entire workspace
+      return (this.config as any)?.workspaceRoot || process.cwd();
     }
 
     // Normalize to file path

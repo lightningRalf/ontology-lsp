@@ -56,7 +56,7 @@ describe('Error Handler', () => {
         }
         return 'success_after_retry';
       },
-      { maxRetries: 3 }
+      { maxRetries: 3, baseDelay: 10, exponentialBackoff: true, jitterMs: 0 }
     );
 
     expect(result).toBe('success_after_retry');
@@ -110,12 +110,21 @@ describe('Error Handler', () => {
         { 
           maxRetries: 3,
           baseDelay: 100,
-          exponentialBackoff: true
+          exponentialBackoff: true,
+          // Make delays deterministic and strictly increasing for this test
+          jitterMs: 0
         }
       );
     } catch (error) {
+      // Verbose diagnostics on failure
       // Should have 3 delays (for 3 retry attempts)
+      if (delays.length !== 3) {
+        console.error('Backoff delays count mismatch:', delays);
+      }
       expect(delays.length).toBe(3);
+      if (!(delays[1] > delays[0] && delays[2] > delays[1])) {
+        console.error('Backoff delays not strictly increasing:', delays);
+      }
       expect(delays[1]).toBeGreaterThan(delays[0]); // Exponential increase
       expect(delays[2]).toBeGreaterThan(delays[1]);
     }

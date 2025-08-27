@@ -252,10 +252,15 @@ export class AnalyzerFactory {
     sharedServices: SharedServices;
   }> {
     // Merge with default config
-    const fullConfig = {
-      ...AnalyzerFactory.createDefaultConfig(),
-      ...config
-    } as CoreConfig;
+    const base = AnalyzerFactory.createDefaultConfig();
+    const fullConfig: CoreConfig = {
+      ...base,
+      ...config,
+      layers: { ...base.layers, ...(config?.layers || {}) } as any,
+      performance: { ...base.performance, ...(config as any)?.performance } as any,
+      cache: { ...base.cache, ...(config as any)?.cache } as any,
+      monitoring: { ...base.monitoring, ...(config as any)?.monitoring } as any
+    };
     
     // Create event bus
     const eventBus = new DefaultEventBus();
@@ -349,7 +354,7 @@ export class AnalyzerFactory {
     layerManager: LayerManager;
     sharedServices: SharedServices;
   }> {
-    const workspaceConfig = {
+    const workspaceConfig: any = {
       ...config,
       layers: {
         ...config?.layers,
@@ -357,10 +362,12 @@ export class AnalyzerFactory {
           ...config?.layers?.layer3,
           dbPath: `${workspacePath}/.ontology/ontology.db`
         }
-      }
+      },
+      // Provide workspaceRoot to downstream analyzer config for correct path resolution
+      workspaceRoot: workspacePath
     };
     
-    return AnalyzerFactory.createAnalyzer(workspaceConfig);
+    return AnalyzerFactory.createAnalyzer(workspaceConfig as Partial<CoreConfig>);
   }
   
   /**

@@ -180,16 +180,26 @@ export class CacheService {
   private memoryCheckInterval = 30000; // 30 seconds
 
   constructor(config: CacheConfig, eventBus: EventBus) {
-    this.config = config;
+    // Normalize potentially partial configs passed by tests or older callers
+    const normalized: CacheConfig = {
+      strategy: (config as any)?.strategy ?? 'memory',
+      memory: {
+        maxSize: (config as any)?.memory?.maxSize ?? 100 * 1024 * 1024, // 100MB default
+        ttl: (config as any)?.memory?.ttl ?? 300 // 5 minutes
+      },
+      redis: (config as any)?.redis
+    };
+
+    this.config = normalized;
     this.eventBus = eventBus;
     
     this.memoryCache = new MemoryCache(
-      Math.floor(config.memory.maxSize / 1024), // Convert bytes to approximate entries
-      config.memory.ttl
+      Math.floor(normalized.memory.maxSize / 1024), // Convert bytes to approximate entries
+      normalized.memory.ttl
     );
 
-    if (config.strategy === 'redis' || config.strategy === 'hybrid') {
-      if (config.redis) {
+    if (normalized.strategy === 'redis' || normalized.strategy === 'hybrid') {
+      if (normalized.redis) {
         this.redisCache = new RedisCache();
       } else {
         console.warn('Redis cache requested but no Redis configuration provided');

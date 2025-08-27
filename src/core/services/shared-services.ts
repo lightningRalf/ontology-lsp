@@ -329,8 +329,8 @@ export class SharedServices {
 
   private resolveDatabasePath(config: CoreConfig): string {
     // Default database path based on layer 3 config or fallback
-    if (config.layers.layer3 && typeof config.layers.layer3 === 'object' && 'dbPath' in config.layers.layer3) {
-      return config.layers.layer3.dbPath as string;
+    if (config?.layers?.layer3 && typeof (config as any).layers.layer3 === 'object' && 'dbPath' in (config as any).layers.layer3) {
+      return ((config as any).layers.layer3.dbPath as string) ?? path.join(process.cwd(), '.ontology', 'ontology.db');
     }
     
     // Fallback to default location
@@ -360,13 +360,13 @@ export class SharedServices {
     });
     
     // Health monitoring
-    if (this.config.monitoring.enabled) {
+    if (this.config?.monitoring?.enabled) {
       setInterval(() => {
         this.eventBus.emit('shared-services:health-check', {
           healthy: this.isHealthy(),
           timestamp: Date.now()
         });
-      }, this.config.performance.healthCheckInterval || 30000); // Every 30 seconds
+      }, (this.config as any)?.performance?.healthCheckInterval || 30000); // Every 30 seconds
     }
   }
 }

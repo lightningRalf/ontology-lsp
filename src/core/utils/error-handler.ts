@@ -23,6 +23,7 @@ export interface RecoveryOptions {
   maxDelay: number;
   exponentialBackoff: boolean;
   circuitBreakerThreshold: number; // failures before opening circuit
+  jitterMs: number; // random jitter amplitude in ms
 }
 
 export class ErrorHandler {
@@ -38,7 +39,8 @@ export class ErrorHandler {
     baseDelay: 1000,
     maxDelay: 30000,
     exponentialBackoff: true,
-    circuitBreakerThreshold: 5
+    circuitBreakerThreshold: 5,
+    jitterMs: 1000
   };
 
   constructor(private options: Partial<RecoveryOptions> = {}) {
@@ -248,8 +250,8 @@ export class ErrorHandler {
     const sanitized = { ...obj };
 
     for (const field of sensitiveFields) {
-      if (sensitized[field]) {
-        sensitized[field] = '[REDACTED]';
+      if (sanitized[field]) {
+        (sanitized as any)[field] = '[REDACTED]';
       }
     }
 
@@ -333,7 +335,7 @@ export class ErrorHandler {
     }
 
     const exponentialDelay = options.baseDelay * Math.pow(2, attempt - 1);
-    const jitteredDelay = exponentialDelay + (Math.random() * 1000); // Add jitter
+    const jitteredDelay = exponentialDelay + (options.jitterMs > 0 ? (Math.random() * options.jitterMs) : 0);
     
     return Math.min(jitteredDelay, options.maxDelay);
   }
