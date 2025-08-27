@@ -568,6 +568,7 @@ export class AsyncEnhancedGrep {
         // Performance optimizations
         args.push('--no-heading');        // No file headers
         args.push('--line-number');       // Include line numbers
+        args.push('--column');            // Include column numbers for precise ranges
         args.push('--no-ignore-parent');  // Don't search parent .gitignore
         
         // Smart exclusions (configured, not hardcoded)
@@ -619,11 +620,19 @@ export class AsyncEnhancedGrep {
 
         const file = parts[0];
         const lineNum = parseInt(parts[1], 10);
-        const text = parts.slice(2).join(':').trim();
+        let columnNum: number | undefined;
+        let text: string;
+        if (!isNaN(parseInt(parts[2], 10))) {
+            columnNum = parseInt(parts[2], 10);
+            text = parts.slice(3).join(':').trim();
+        } else {
+            text = parts.slice(2).join(':').trim();
+        }
 
         return {
             file,
             line: isNaN(lineNum) ? undefined : lineNum,
+            column: isNaN(Number(columnNum)) ? undefined : columnNum,
             text,
             match: options.pattern,
             confidence: 1.0

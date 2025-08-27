@@ -331,7 +331,8 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 maxResults: strategy.maxResults,
                 timeout: strategy.timeout,
                 caseInsensitive: false,
-                fileType: this.getFileTypeForGrep(query.fileTypes)
+                fileType: this.getFileTypeForGrep(query.fileTypes),
+                excludePaths: this.getExcludeDirs()
             };
 
             try {
@@ -373,7 +374,8 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             path: query.searchPath,
             timeout: 600,
             caseInsensitive: true,
-            maxResults: 10
+            maxResults: 10,
+            excludePaths: this.getExcludeDirs()
         };
 
         try {
@@ -417,7 +419,8 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     maxResults: 50,
                     timeout: 800,
                     caseInsensitive: false,
-                    fileType: this.getFileTypeForGrep(query.fileTypes)
+                    fileType: this.getFileTypeForGrep(query.fileTypes),
+                    excludePaths: this.getExcludeDirs()
                 },
                 confidence: 1.0,
                 matchType: 'exact'
@@ -430,7 +433,8 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     maxResults: 30,
                     timeout: 600,
                     caseInsensitive: false,
-                    fileType: this.getFileTypeForGrep(query.fileTypes)
+                    fileType: this.getFileTypeForGrep(query.fileTypes),
+                    excludePaths: this.getExcludeDirs()
                 },
                 confidence: 0.95,
                 matchType: 'exact'
@@ -443,7 +447,8 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     maxResults: 30,
                     timeout: 600,
                     caseInsensitive: false,
-                    fileType: this.getFileTypeForGrep(query.fileTypes)
+                    fileType: this.getFileTypeForGrep(query.fileTypes),
+                    excludePaths: this.getExcludeDirs()
                 },
                 confidence: 0.93,
                 matchType: 'exact'
@@ -456,7 +461,8 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     maxResults: 20,
                     timeout: 500,
                     caseInsensitive: true,
-                    fileType: this.getFileTypeForGrep(query.fileTypes)
+                    fileType: this.getFileTypeForGrep(query.fileTypes),
+                    excludePaths: this.getExcludeDirs()
                 },
                 confidence: 0.85,
                 matchType: 'fuzzy'
@@ -469,7 +475,8 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     maxResults: 15,
                     timeout: 400,
                     caseInsensitive: true,
-                    fileType: this.getFileTypeForGrep(query.fileTypes)
+                    fileType: this.getFileTypeForGrep(query.fileTypes),
+                    excludePaths: this.getExcludeDirs()
                 },
                 confidence: 0.7,
                 matchType: 'fuzzy'
@@ -741,7 +748,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
         for (const pattern of patterns) {
             try {
                 const files = await this.executeWithTimeout(
-                    () => Glob({ pattern, path: query.searchPath }),
+                    () => searchTools.glob.search({ pattern, path: query.searchPath, sortByModified: true, ignorePatterns: this.config.glob.ignorePatterns }).then(r => r.files),
                     this.config.glob.defaultTimeout
                 );
                 
@@ -781,8 +788,12 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 console.warn(`LS analysis failed for directory: ${dir}`, error);
             }
         }
+
+    private getExcludeDirs(): string[] {
+        const patterns = this.config?.glob?.ignorePatterns || [];
+        return patterns.map(p => p.replace('/**','').replace('**','').replace('!','')).filter(Boolean);
     }
-    
+
     private generateGrepStrategies(query: SearchQuery): GrepSearchStrategy[] {
         const strategies: GrepSearchStrategy[] = [];
         
