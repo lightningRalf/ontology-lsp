@@ -788,7 +788,9 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 console.warn(`LS analysis failed for directory: ${dir}`, error);
             }
         }
-
+        
+    }
+    
     private getExcludeDirs(): string[] {
         const patterns = this.config?.glob?.ignorePatterns || [];
         return patterns.map(p => p.replace('/**','').replace('**','').replace('!','')).filter(Boolean);

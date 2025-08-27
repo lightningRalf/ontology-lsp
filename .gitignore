@@ -68,3 +68,16 @@ bun-mcp-sse-transport/
 mcp-language-server/
 .claude-trace/
 
+# Local knowledge base / notes
+.obsidian/
+
+# Demo video outputs (keep .gitkeep)
+docs/videos/*
+!docs/videos/.gitkeep
+
+# Temp artifacts
+temp/
+
+# Bundler outputs (do not commit huge maps/bundles)
+src/servers/mcp-fast.js
+src/servers/*.map

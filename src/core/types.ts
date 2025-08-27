@@ -237,6 +237,30 @@ export type PrepareRenameResult = AnalysisResult<{
 export type RenameResult = AnalysisResult<WorkspaceEdit>;
 export type CompletionResult = AnalysisResult<Completion[]>;
 
+// Aggregate exploration request/result types
+export interface ExploreRequest {
+  uri: string; // workspace or file context
+  identifier: string;
+  includeDeclaration?: boolean;
+  maxResults?: number;
+}
+
+export interface ExploreResultPerformance {
+  definitions?: LayerPerformance;
+  references?: LayerPerformance;
+  total: number;
+}
+
+export interface ExploreResult {
+  symbol: string;
+  contextUri: string;
+  definitions: Definition[];
+  references: Reference[];
+  performance: ExploreResultPerformance;
+  diagnostics?: Record<string, any>;
+  timestamp: number;
+}
+
 // Layer interfaces
 export interface Layer {
   name: string;

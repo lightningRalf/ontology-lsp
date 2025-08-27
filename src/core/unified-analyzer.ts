@@ -27,7 +27,9 @@ import {
   CoreConfig,
   CoreError,
   InvalidRequestError,
-  EventBus
+  EventBus,
+  ExploreRequest,
+  ExploreResult
 } from './types.js';
 
 import { LayerManager } from './layer-manager.js';
@@ -171,7 +173,52 @@ export class CodeAnalyzer {
       );
     }
   }
-  
+
+  /**
+   * Explore codebase: run multiple analyses in parallel and aggregate results
+   */
+  async exploreCodebase(request: ExploreRequest): Promise<ExploreResult> {
+    const start = Date.now();
+    const ctxUri = request.uri || this.pathToFileUri(process.cwd());
+    
+    const defReq: FindDefinitionRequest = {
+      uri: ctxUri,
+      position: { line: 0, character: 0 },
+      identifier: request.identifier,
+      includeDeclaration: request.includeDeclaration ?? true,
+      maxResults: request.maxResults ?? 100
+    };
+    const refReq: FindReferencesRequest = {
+      uri: ctxUri,
+      position: { line: 0, character: 0 },
+      identifier: request.identifier,
+      includeDeclaration: request.includeDeclaration ?? false,
+      maxResults: Math.min(request.maxResults ?? 100, 500)
+    };
+
+    const [defs, refs, diags] = await Promise.allSettled([
+      this.findDefinitionAsync(defReq),
+      this.findReferencesAsync(refReq),
+      Promise.resolve(this.getDiagnostics())
+    ]);
+
+    const result: ExploreResult = {
+      symbol: request.identifier,
+      contextUri: ctxUri,
+      definitions: defs.status === 'fulfilled' ? defs.value.data : [],
+      references: refs.status === 'fulfilled' ? refs.value.data : [],
+      performance: {
+        definitions: defs.status === 'fulfilled' ? defs.value.performance : undefined,
+        references: refs.status === 'fulfilled' ? refs.value.performance : undefined,
+        total: Date.now() - start
+      },
+      diagnostics: diags.status === 'fulfilled' ? diags.value : undefined,
+      timestamp: Date.now()
+    };
+
+    return result;
+  }
+
   /**
    * Streaming search that returns results as they arrive via SearchStream
    */

@@ -95,6 +95,24 @@ class CLI {
         console.log(result);
       });
 
+    // Explore command (aggregate defs+refs in parallel)
+    this.program
+      .command('explore <identifier>')
+      .description('Explore codebase: definitions and references in parallel')
+      .option('-f, --file <path>', 'Optional file or directory context')
+      .option('-n, --max-results <count>', 'Maximum results to show', '100')
+      .option('-d, --include-declaration', 'Include declaration in references')
+      .option('--no-color', 'Disable colored output')
+      .action(async (identifier, options) => {
+        await this.ensureInitialized(options);
+        const result = await this.cliAdapter.handleExplore(identifier, {
+          file: options.file,
+          maxResults: parseInt(options.maxResults),
+          includeDeclaration: !!options.includeDeclaration
+        });
+        console.log(result);
+      });
+
     // Init command (optional - for setting up workspace)
     this.program
       .command('init')

@@ -134,6 +134,8 @@ export class HTTPAdapter {
           return method === 'POST' ? this.handleFindDefinition(request) : this.methodNotAllowed();
         case '/references':
           return method === 'POST' ? this.handleFindReferences(request) : this.methodNotAllowed();
+        case '/explore':
+          return method === 'POST' ? this.handleExplore(request) : this.methodNotAllowed();
         case '/rename':
           return method === 'POST' ? this.handleRename(request) : this.methodNotAllowed();
         case '/completions':
@@ -363,6 +365,32 @@ export class HTTPAdapter {
         status: 200,
         headers: { 'X-Cache': result.cacheHit ? 'CORE-HIT' : 'MISS' },
         body: responseBody
+      };
+    } catch (error) {
+      return this.createErrorResponse(400, 'Bad Request', error);
+    }
+  }
+
+  /**
+   * Handle POST /api/v1/explore - Aggregate definitions+references in parallel
+   */
+  private async handleExplore(request: HTTPRequest): Promise<HTTPResponse> {
+    try {
+      const body = strictJsonParse(request.body || '{}');
+      validateRequired(body, ['identifier']);
+
+      const uri = normalizeUri(body.file || body.uri || 'file://workspace');
+      const result = await (this.coreAnalyzer as any).exploreCodebase({
+        uri,
+        identifier: body.identifier,
+        includeDeclaration: body.includeDeclaration ?? true,
+        maxResults: body.maxResults || this.config.maxResults
+      });
+
+      return {
+        status: 200,
+        headers: {},
+        body: JSON.stringify({ success: true, data: result })
       };
     } catch (error) {
       return this.createErrorResponse(400, 'Bad Request', error);

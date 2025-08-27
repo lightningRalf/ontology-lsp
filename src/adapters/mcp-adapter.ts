@@ -77,6 +77,20 @@ export class MCPAdapter {
         }
       },
       {
+        name: 'explore_codebase',
+        description: 'Explore codebase by running multiple analyses in parallel (definitions, references, stats)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            symbol: { type: 'string', description: 'Symbol name to explore' },
+            file: { type: 'string', description: 'Optional file or directory context' },
+            maxResults: { type: 'number', default: 100 },
+            includeDeclaration: { type: 'boolean', default: true }
+          },
+          required: ['symbol']
+        }
+      },
+      {
         name: 'find_references',
         description: 'Find all references to a symbol across the codebase',
         inputSchema: {
@@ -135,7 +149,7 @@ export class MCPAdapter {
       });
 
       // Validate tool name
-      const validTools = ['find_definition', 'find_references', 'rename_symbol', 'generate_tests'];
+      const validTools = ['find_definition', 'find_references', 'rename_symbol', 'generate_tests', 'explore_codebase'];
       if (!validTools.includes(name)) {
         throw createValidationError(`Unknown tool: ${name}. Valid tools: ${validTools.join(', ')}`, context);
       }
@@ -155,6 +169,9 @@ export class MCPAdapter {
           break;
         case 'generate_tests':
           result = await this.handleGenerateTests(arguments_, context);
+          break;
+        case 'explore_codebase':
+          result = await this.handleExploreCodebase(arguments_, context);
           break;
       }
 
@@ -324,6 +341,63 @@ export class MCPAdapter {
           coverage: args.coverage || 'comprehensive',
           status: 'not_implemented'
         }, null, 2)
+      }],
+      isError: false
+    };
+  }
+
+  /**
+   * Handle explore_codebase tool call by fanning out multiple analyses in parallel
+   */
+  private async handleExploreCodebase(args: Record<string, any>, context: ErrorContext) {
+    this.validateArgs(args, ['symbol'], context);
+
+    const maxResults = typeof args.maxResults === 'number' ? args.maxResults : this.config.maxResults;
+    const includeDeclaration = args.includeDeclaration ?? true;
+
+    const uri = args.file ? normalizeUri(args.file) : normalizeUri('file://workspace');
+    const position = createPosition(0, 0);
+
+    const defReq = buildFindDefinitionRequest({
+      uri,
+      position,
+      identifier: args.symbol,
+      maxResults,
+      includeDeclaration
+    });
+
+    const refReq = buildFindReferencesRequest({
+      uri,
+      position,
+      identifier: args.symbol,
+      maxResults: Math.min(maxResults ?? 100, 500),
+      includeDeclaration: includeDeclaration ?? false
+    });
+
+    // Execute in parallel
+    // Delegate to core analyzer per VISION.md (thin adapter)
+    const coreResult = await (this.coreAnalyzer as any).exploreCodebase({
+      uri,
+      identifier: args.symbol,
+      includeDeclaration,
+      maxResults
+    });
+
+    // Map definitions/references for MCP output while preserving performance/diagnostics
+    const mapped = {
+      symbol: coreResult.symbol,
+      contextUri: coreResult.contextUri,
+      definitions: coreResult.definitions.map(def => definitionToMcpResponse(def)),
+      references: coreResult.references.map(ref => referenceToMcpResponse(ref)),
+      performance: coreResult.performance,
+      diagnostics: coreResult.diagnostics,
+      timestamp: coreResult.timestamp
+    };
+
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify(mapped, null, 2)
       }],
       isError: false
     };

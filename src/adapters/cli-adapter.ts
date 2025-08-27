@@ -175,6 +175,49 @@ export class CLIAdapter {
     }
   }
 
+  /**
+   * Handle explore command: parallel definitions+references aggregation
+   */
+  async handleExplore(identifier: string, options: { file?: string; maxResults?: number; includeDeclaration?: boolean }): Promise<string> {
+    try {
+      const uri = normalizeUri(options.file || process.cwd());
+      const result = await (this.coreAnalyzer as any).exploreCodebase({
+        uri,
+        identifier,
+        includeDeclaration: options.includeDeclaration ?? true,
+        maxResults: options.maxResults || this.config.maxResults
+      });
+
+      const lines: string[] = [];
+      lines.push(this.formatHeader(`Explore: '${identifier}'`));
+      lines.push(`Context: ${uri}`);
+      lines.push('');
+      lines.push(this.formatHeader('Definitions:'));
+      result.definitions.slice(0, 10).forEach(def => {
+        lines.push(`  ${def.uri}:${def.range.start.line + 1}:${def.range.start.character + 1} [${def.kind}] (${Math.round(def.confidence * 100)}%)`);
+      });
+      if (result.definitions.length > 10) lines.push(`  ... and ${result.definitions.length - 10} more`);
+      lines.push('');
+      lines.push(this.formatHeader('References:'));
+      result.references.slice(0, 10).forEach(ref => {
+        lines.push(`  ${ref.uri}:${ref.range.start.line + 1}:${ref.range.start.character + 1} [${ref.kind}] (${Math.round(ref.confidence * 100)}%)`);
+      });
+      if (result.references.length > 10) lines.push(`  ... and ${result.references.length - 10} more`);
+      lines.push('');
+      lines.push(this.formatHeader('Performance:'));
+      lines.push(`  total: ${result.performance.total}ms`);
+      if (result.performance.definitions) lines.push(`  definitions: ${result.performance.definitions.total}ms`);
+      if (result.performance.references) lines.push(`  references: ${result.performance.references.total}ms`);
+      lines.push('');
+      lines.push(`Timestamp: ${new Date(result.timestamp).toISOString()}`);
+
+      return lines.join('\n');
+
+    } catch (error) {
+      return this.formatError(`Explore failed: ${handleAdapterError(error, 'cli')}`);
+    }
+  }
+
   // ===== FORMATTING METHODS =====
 
   private formatHeader(text: string): string {
