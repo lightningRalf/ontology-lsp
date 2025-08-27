@@ -750,23 +750,44 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
     
     private async searchWithGlob(query: SearchQuery, matches: EnhancedMatches): Promise<void> {
         const patterns = this.generateGlobPatterns(query);
-        
-        for (const pattern of patterns) {
+
+        // Budget-aware filename discovery (replace glob with ripgrep --files)
+        const start = Date.now();
+        const globalBudgetMs = Math.min(900, this.config.grep.defaultTimeout); // keep well under Layer 1 budget
+        const perPatternTimeout = 300; // 250–300ms per include pattern
+
+        // Build extended excludes
+        const excludes = this.getExcludeDirs();
+        excludes.push('out', 'build', 'tmp', 'temp', '.vscode-test', 'target', 'venv', '.venv');
+
+        const discovered = new Set<string>();
+        for (const pattern of patterns.slice(0, 6)) { // cap patterns
+            const elapsed = Date.now() - start;
+            const left = globalBudgetMs - elapsed;
+            if (left <= 100) break;
             try {
-                const files = await this.executeWithTimeout(
-                    () => searchTools.glob.search({ pattern, path: query.searchPath, sortByModified: true, ignorePatterns: this.config.glob.ignorePatterns }).then(r => r.files),
-                    this.config.glob.defaultTimeout
-                );
-                
-                files.forEach(file => matches.files.add(file));
-                
-                // Search within these files for the identifier
-                await this.searchFilesForIdentifier(files, query, matches);
-                
-            } catch (error) {
-                // Continue with next pattern
-                console.warn(`Glob pattern failed: ${pattern}`, error);
+                const files = await asyncSearchTools.listFiles({
+                    includes: [pattern],
+                    excludes,
+                    path: query.searchPath || '.',
+                    maxDepth: 6,
+                    timeout: Math.min(perPatternTimeout, left - 50),
+                    includeHidden: false,
+                    maxFiles: 1000
+                });
+                for (const f of files) discovered.add(f);
+            } catch (err) {
+                // Swallow and continue
+                if (process.env.DEBUG) console.warn(`File discovery failed for ${pattern}:`, err);
             }
+        }
+
+        const files = Array.from(discovered);
+        files.forEach(file => matches.files.add(file));
+
+        if (files.length > 0) {
+            // Search within these files for the identifier (content grep)
+            await this.searchFilesForIdentifier(files, query, matches);
         }
     }
     
@@ -799,7 +820,12 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
     
     private getExcludeDirs(): string[] {
         const patterns = this.config?.glob?.ignorePatterns || [];
-        return patterns.map(p => p.replace('/**','').replace('**','').replace('!','')).filter(Boolean);
+        const base = patterns.map(p => p.replace('/**','').replace('**','').replace('!','')).filter(Boolean);
+        // Always avoid common heavy dirs if present
+        for (const extra of ['node_modules', 'dist', '.git', 'coverage']) {
+            if (!base.includes(extra)) base.push(extra);
+        }
+        return base;
     }
 
     private generateGrepStrategies(query: SearchQuery): GrepSearchStrategy[] {

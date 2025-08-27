@@ -55,6 +55,16 @@ export interface AsyncSearchOptions {
     includeHidden?: boolean;
 }
 
+export interface FileListOptions {
+    includes?: string[]; // filename globs (ripgrep -g), e.g., **/*Foo*.ts
+    excludes?: string[]; // directories or globs to exclude (ripgrep -g !...)
+    path?: string;       // root directory
+    maxDepth?: number;   // ripgrep --max-depth
+    timeout?: number;    // milliseconds
+    includeHidden?: boolean; // ripgrep --hidden
+    maxFiles?: number;   // cap number of files returned
+}
+
 /**
  * Process Pool for parallel ripgrep execution
  */
@@ -312,6 +322,78 @@ export class AsyncEnhancedGrep {
         this.cache.set(options, results);
         
         return results;
+    }
+
+    /**
+     * List files by filename patterns using ripgrep's file-mode (--files) with includes/excludes.
+     * This respects .gitignore by default and supports timeouts via process kill.
+     */
+    async listFiles(options: FileListOptions): Promise<string[]> {
+        const args: string[] = [];
+        args.push('--files');
+
+        // Performance: limit depth if provided
+        if (typeof options.maxDepth === 'number') {
+            args.push('--max-depth', String(options.maxDepth));
+        }
+
+        // Hidden files
+        if (options.includeHidden) {
+            args.push('--hidden');
+        }
+
+        // Excludes (as ripgrep globs)
+        const excludes = options.excludes || [];
+        for (const ex of excludes) {
+            // Normalize: accept either 'dir' or 'dir/**'
+            const pattern = ex.endsWith('/**') ? ex : `${ex.replace(/\/$/, '')}/**`;
+            args.push('--glob', `!${pattern}`);
+        }
+
+        // Includes as glob patterns
+        const includes = options.includes || [];
+        for (const inc of includes) {
+            args.push('--glob', inc);
+        }
+
+        // Path to search (defaults to cwd)
+        args.push(options.path || '.');
+
+        const files: string[] = [];
+        const proc = await this.processPool.execute('rg', args);
+
+        // Timeout handling
+        let timeout: NodeJS.Timeout | null = null;
+        if (options.timeout && options.timeout > 0) {
+            timeout = setTimeout(() => {
+                try { proc.kill('SIGTERM'); } catch {}
+            }, options.timeout);
+        }
+
+        return new Promise((resolve) => {
+            proc.stdout?.on('data', (data: Buffer) => {
+                const lines = data.toString('utf8').split(/\r?\n/).filter(Boolean);
+                for (const line of lines) {
+                    files.push(line);
+                }
+                // Cap results if requested
+                if (options.maxFiles && files.length >= options.maxFiles) {
+                    try { proc.kill('SIGTERM'); } catch {}
+                }
+            });
+            proc.on('close', () => {
+                if (timeout) clearTimeout(timeout);
+                if (options.maxFiles && files.length > options.maxFiles) {
+                    resolve(files.slice(0, options.maxFiles));
+                } else {
+                    resolve(files);
+                }
+            });
+            proc.on('error', () => {
+                if (timeout) clearTimeout(timeout);
+                resolve([]);
+            });
+        });
     }
 
     /**
