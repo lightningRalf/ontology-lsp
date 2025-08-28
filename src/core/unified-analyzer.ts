@@ -145,8 +145,8 @@ export class CodeAnalyzer {
                 maxResults: request.maxResults ?? 50,
                 timeout: asyncTimeout,
                 caseInsensitive: true,
-                fileType: this.getFileTypeFromUri(request.uri),
-                excludePaths: ['node_modules', 'dist', '.git', 'coverage', '.e2e-test-workspace', 'logs', 'out', 'build'],
+                fileType: this.getFileTypeFromUri(request.uri) || 'typescript',
+                excludePaths: ['node_modules', 'dist', '.git', 'coverage', '.e2e-test-workspace', 'logs', 'out', 'build', 'tests', '__tests__', 'examples', 'vscode-client', 'test-output-*'],
             };
 
             const streamingResults = await this.asyncSearchTools.search(asyncOptions);
@@ -330,8 +330,8 @@ export class CodeAnalyzer {
                 maxResults: request.maxResults ?? 200,
                 timeout: asyncTimeout,
                 caseInsensitive: true,
-                fileType: this.getFileTypeFromUri(request.uri),
-                excludePaths: ['node_modules', 'dist', '.git', 'coverage', '.e2e-test-workspace', 'logs', 'out', 'build'],
+                fileType: this.getFileTypeFromUri(request.uri) || 'typescript',
+                excludePaths: ['node_modules', 'dist', '.git', 'coverage', '.e2e-test-workspace', 'logs', 'out', 'build', 'tests', '__tests__', 'examples', 'vscode-client', 'test-output-*'],
             };
 
             const streamingResults = await this.asyncSearchTools.search(asyncOptions);

@@ -751,7 +751,13 @@ export class AsyncEnhancedGrep {
         
         const excludes = options.excludePaths || defaultExcludes;
         for (const exclude of excludes) {
-            args.push('--glob', `!${exclude}/**`);
+            // If the exclude contains glob chars or a dot, treat as raw pattern; otherwise as directory
+            const isGlob = /[*?\[\]{}]|\./.test(exclude);
+            if (isGlob) {
+                args.push('--glob', `!${exclude}`);
+            } else {
+                args.push('--glob', `!${exclude.replace(/\/$/, '')}/**`);
+            }
         }
 
         // Search depth limit
@@ -776,6 +782,11 @@ export class AsyncEnhancedGrep {
 
         // Pattern (already escaped if needed)
         args.push(options.pattern);
+
+        // Limit total matches if requested (ripgrep -m)
+        if (typeof options.maxResults === 'number' && options.maxResults > 0) {
+            args.push('-m', String(options.maxResults));
+        }
 
         // Path (default to current directory)
         args.push(options.path || '.');
