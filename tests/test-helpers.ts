@@ -49,8 +49,8 @@ export const testPaths = {
   fixtures: () => getProjectPath('tests', 'fixtures'),
   testWorkspace: () => getProjectPath('.test-workspace'),
   
-  // Server executables
-  serverJs: () => getProjectPath('dist', 'server.js'),
+  // Server executables (built via build:lsp)
+  serverJs: () => getProjectPath('dist', 'lsp', 'lsp.js'),
   serverNew: () => getProjectPath('src', 'server-new.ts'),
   
   // Config files

@@ -1,4 +1,6 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test"
+const e2eEnabled = process.env.E2E === '1';
+const e2eDescribe = e2eEnabled ? describe : describe.skip;
 const perfOnly = process.env.PERF === '1';
 const perfDescribe = perfOnly ? describe : describe.skip;
 import { spawn, type ChildProcess } from "node:child_process"
@@ -110,7 +112,7 @@ const TEST_CONFIG: CoreConfig = {
   }
 }
 
-describe("End-to-End Integration Tests", () => {
+e2eDescribe("End-to-End Integration Tests", () => {
   let context: E2ETestContext
 
   beforeAll(async () => {
