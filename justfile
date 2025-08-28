@@ -105,7 +105,7 @@ status:
     @curl -s --max-time 1 http://localhost:7002 >/dev/null 2>&1 && echo "  ✅ LSP TCP Server: Running on port 7002" || echo "  ❌ LSP TCP Server: Not responding on port 7002"
     @echo ""
     @echo "📝 On-Demand Services (stdio):"
-    @test -f src/servers/mcp.ts && echo "  ✅ MCP STDIO Server: Available (launches on-demand)" || echo "  ❌ MCP STDIO Server: Not found"
+    @test -f dist/mcp/mcp.js && echo "  ✅ MCP STDIO Server (dist): Available" || echo "  ❌ MCP STDIO Server (dist): Not found. Run 'bun run build:mcp-stdio'"
     @test -f src/servers/lsp.ts && echo "  ✅ LSP STDIO Server: Available (launches on-demand)" || echo "  ❌ LSP STDIO Server: Not found"
     @echo ""
     @echo "🌐 Port Usage Details:"
@@ -678,7 +678,7 @@ mcp-tools:
 # Test MCP stdio server directly
 test-mcp-stdio:
     @echo "🧪 Testing MCP STDIO Server..."
-    @(echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}},"id":1}'; sleep 0.5; echo '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":2}'; sleep 0.5) | timeout 2s {{bun}} run src/servers/mcp.ts 2>/dev/null | grep -o '"method":\|"result":\|"tools":\|"name":' | head -5 || echo "✅ MCP stdio server appears to be working (timeout expected)"
+    @(echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}},"id":1}'; sleep 0.5; echo '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":2}'; sleep 0.5) | timeout 2s {{bun}} run dist/mcp/mcp.js 2>/dev/null | grep -o '"method":\|"result":\|"tools":\|"name":' | head -5 || echo "✅ MCP stdio server appears to be working (timeout expected)"
 
 # Test enhanced MCP server with error handling
 test-mcp-enhanced:
