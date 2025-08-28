@@ -81,3 +81,12 @@ temp/
 # Bundler outputs (do not commit huge maps/bundles)
 src/servers/mcp-fast.js
 src/servers/*.map
+
+# Test artifacts and logs
+test-output.txt
+*.out
+
+# SQLite transient files from tests
+*.db
+*.db-wal
+*.db-shm
