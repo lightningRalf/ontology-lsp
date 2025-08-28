@@ -14,7 +14,7 @@ curl -fsSL https://bun.sh/install | bash
 
 # Or start manually:
 bun run src/api/http-server.ts &  # LSP API Server on port 7000
-cd ontology-lsp && bun run src/servers/mcp-http.ts &  # MCP Server (Streamable HTTP) on port 7001
+cd ontology-lsp && bun run dist/mcp-http/mcp-http.js &  # MCP Server (Streamable HTTP) on port 7001
 ```
 
 3. **Add to Claude Desktop configuration**:
@@ -28,7 +28,7 @@ Copy the following to your Claude Desktop config file:
   "mcpServers": {
     "ontology": {
       "command": "bun",
-      "args": ["run", "/path/to/ontology-lsp/src/servers/mcp-http.ts"],
+      "args": ["run", "/path/to/ontology-lsp/dist/mcp-http/mcp-http.js"],
       "env": {
         "MCP_HTTP_HOST": "localhost",
         "MCP_HTTP_PORT": "7001",
