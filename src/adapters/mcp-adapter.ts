@@ -65,6 +65,7 @@ export class MCPAdapter {
                     properties: {
                         symbol: { type: 'string', description: 'Symbol name to find (supports fuzzy matching)' },
                         file: { type: 'string', description: 'Current file context' },
+                        precise: { type: 'boolean', description: 'Run a quick AST validation pass' },
                         position: {
                             type: 'object',
                             properties: {
@@ -87,6 +88,7 @@ export class MCPAdapter {
                         file: { type: 'string', description: 'Optional file or directory context' },
                         maxResults: { type: 'number', default: 100 },
                         includeDeclaration: { type: 'boolean', default: true },
+                        precise: { type: 'boolean', description: 'Run a quick AST validation pass' },
                     },
                     required: ['symbol'],
                 },
@@ -103,6 +105,7 @@ export class MCPAdapter {
                             default: false,
                             description: 'Include the declaration in results',
                         },
+                        precise: { type: 'boolean', description: 'Run a quick AST validation pass' },
                         scope: {
                             type: 'string',
                             enum: ['workspace', 'file', 'function'],
@@ -243,6 +246,7 @@ export class MCPAdapter {
                 identifier: args.symbol,
                 maxResults: this.config.maxResults,
                 includeDeclaration: true,
+                precise: !!args.precise,
             });
 
             try {
@@ -583,6 +587,7 @@ export class MCPAdapter {
             identifier: args.symbol,
             maxResults: this.config.maxResults,
             includeDeclaration: args.includeDeclaration ?? false,
+            precise: !!args.precise,
         });
 
         const result = await (this.coreAnalyzer as any).findReferencesAsync(request);
@@ -720,6 +725,7 @@ export class MCPAdapter {
             identifier: args.symbol,
             includeDeclaration,
             maxResults,
+            precise: !!args.precise,
         });
 
         // Map definitions/references for MCP output while preserving performance/diagnostics

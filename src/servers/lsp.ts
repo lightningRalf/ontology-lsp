@@ -193,3 +193,50 @@ export const server = new LSPServer();
 if (import.meta.main) {
     server.start().catch(console.error);
 }
+        // Custom precise references request
+        const PreciseReferencesRequest = new RequestType<
+            { uri: string; position?: { line: number; character: number }; symbol?: string; maxResults?: number; includeDeclaration?: boolean },
+            { locations: Location[]; count: number },
+            void
+        >('ontology/preciseReferences');
+
+        this.connection.onRequest(PreciseReferencesRequest, async (params) => {
+            if (!this.initialized) throw new Error('Server not initialized');
+            const uri = params.uri;
+            const position = params.position || { line: 0, character: 0 };
+            const identifier = params.symbol || this.lspAdapter.extractIdentifierAtPosition(uri, position);
+            const req = buildFindReferencesRequest({
+                uri,
+                position,
+                identifier,
+                maxResults: params.maxResults ?? this.lspAdapter['config'].maxResults,
+                includeDeclaration: params.includeDeclaration ?? false,
+                precise: true,
+            } as any);
+            const result = await (this.coreAnalyzer as any).findReferencesAsync(req);
+            return { locations: result.data.map((r:any)=> referenceToLspLocation(r)), count: result.data.length };
+        });
+
+        // Custom precise definition request
+        const PreciseDefinitionRequest = new RequestType<
+            { uri: string; position?: { line: number; character: number }; symbol?: string; maxResults?: number },
+            { locations: Location[]; count: number },
+            void
+        >('ontology/preciseDefinition');
+
+        this.connection.onRequest(PreciseDefinitionRequest, async (params) => {
+            if (!this.initialized) throw new Error('Server not initialized');
+            const uri = params.uri;
+            const position = params.position || { line: 0, character: 0 };
+            const identifier = params.symbol || this.lspAdapter.extractIdentifierAtPosition(uri, position);
+            const req = buildFindDefinitionRequest({
+                uri,
+                position,
+                identifier,
+                maxResults: params.maxResults ?? this.lspAdapter['config'].maxResults,
+                includeDeclaration: true,
+                precise: true,
+            } as any);
+            const result = await (this.coreAnalyzer as any).findDefinitionAsync(req);
+            return { locations: result.data.map((d:any)=> definitionToLspLocation(d)), count: result.data.length };
+        });

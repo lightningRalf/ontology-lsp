@@ -4,6 +4,8 @@
  */
 
 import type { Position, Range, URI } from 'vscode-languageserver';
+import * as nodePath from 'path';
+import { pathToFileURL, fileURLToPath } from 'url';
 import type {
     Completion,
     CompletionRequest,
@@ -23,10 +25,17 @@ import type {
  * Convert file paths to standard URIs
  */
 export function pathToUri(filePath: string): string {
-    if (filePath.startsWith('file://')) {
-        return filePath;
+    try {
+        // Resolve relative paths to absolute first
+        const abs = nodePath.isAbsolute(filePath) ? filePath : nodePath.resolve(process.cwd(), filePath);
+        return pathToFileURL(abs).href;
+    } catch {
+        // Fallback to naive conversion
+        if (filePath.startsWith('file://')) return filePath;
+        const abs = nodePath.isAbsolute(filePath) ? filePath : nodePath.resolve(process.cwd(), filePath);
+        const norm = abs.replace(/\\/g, '/');
+        return `file://${norm}`;
     }
-    return `file://${filePath.replace(/\\/g, '/')}`;
 }
 
 /**
@@ -34,9 +43,16 @@ export function pathToUri(filePath: string): string {
  */
 export function uriToPath(uri: string): string {
     if (uri.startsWith('file://')) {
-        return uri.substring(7).replace(/\//g, process.platform === 'win32' ? '\\' : '/');
+        try {
+            return fileURLToPath(uri);
+        } catch {
+            // Fallback best-effort stripping
+            const body = uri.replace(/^file:\/\//, '');
+            return nodePath.isAbsolute(body) ? body : nodePath.resolve('/', body);
+        }
     }
-    return uri;
+    // Treat plain strings as file paths; resolve to absolute
+    return nodePath.isAbsolute(uri) ? uri : nodePath.resolve(process.cwd(), uri);
 }
 
 /**
@@ -120,6 +136,7 @@ export function buildFindDefinitionRequest(params: {
     identifier?: string;
     maxResults?: number;
     includeDeclaration?: boolean;
+    precise?: boolean;
 }): FindDefinitionRequest {
     return {
         uri: normalizeUri(params.uri),
@@ -127,6 +144,7 @@ export function buildFindDefinitionRequest(params: {
         identifier: params.identifier || '',
         maxResults: params.maxResults,
         includeDeclaration: params.includeDeclaration ?? true,
+        precise: params.precise,
     };
 }
 
@@ -139,6 +157,7 @@ export function buildFindReferencesRequest(params: {
     identifier?: string;
     maxResults?: number;
     includeDeclaration?: boolean;
+    precise?: boolean;
 }): FindReferencesRequest {
     return {
         uri: normalizeUri(params.uri),
@@ -146,6 +165,7 @@ export function buildFindReferencesRequest(params: {
         identifier: params.identifier || '',
         maxResults: params.maxResults,
         includeDeclaration: params.includeDeclaration ?? false,
+        precise: params.precise,
     };
 }
 
@@ -261,6 +281,7 @@ export function definitionToApiResponse(definition: Definition) {
         kind: definition.kind,
         source: definition.source,
         confidence: definition.confidence,
+        astValidated: !!((definition as any).metadata?.astValidated || (definition as any).astValidated),
     };
 }
 
@@ -276,6 +297,7 @@ export function referenceToApiResponse(reference: Reference) {
         },
         kind: reference.kind,
         confidence: reference.confidence,
+        astValidated: !!((reference as any).metadata?.astValidated || (reference as any).astValidated),
     };
 }
 
@@ -318,20 +340,46 @@ export function referenceToMcpResponse(reference: Reference) {
  * Format Definition for CLI output
  */
 export function formatDefinitionForCli(definition: Definition): string {
-    const path = uriToPath(definition.uri);
+    const absPath = uriToPath(definition.uri);
+    const rel = safeRelative(absPath);
     const pos = `${definition.range.start.line + 1}:${definition.range.start.character + 1}`;
     const confidence = Math.round(definition.confidence * 100);
-    return `${path}:${pos} [${definition.kind}] (${confidence}% confidence)`;
+    const token = (definition as any).name || (definition as any).identifier || '';
+    const tokenPart = token ? ` ${token}` : '';
+    const ast = (definition as any).metadata?.astValidated || (definition as any).astValidated ? 'AST✓ ' : '';
+    return `${rel}:${pos} [${definition.kind}]${tokenPart} (${ast}${confidence}% confidence)`;
 }
 
 /**
  * Format Reference for CLI output
  */
 export function formatReferenceForCli(reference: Reference): string {
-    const path = uriToPath(reference.uri);
+    const absPath = uriToPath(reference.uri);
+    const rel = safeRelative(absPath);
     const pos = `${reference.range.start.line + 1}:${reference.range.start.character + 1}`;
     const confidence = Math.round(reference.confidence * 100);
-    return `${path}:${pos} [${reference.kind}] (${confidence}% confidence)`;
+    const token = (reference as any).name || '';
+    const tokenPart = token ? ` ${token}` : '';
+    const ast = (reference as any).metadata?.astValidated || (reference as any).astValidated ? 'AST✓ ' : '';
+    return `${rel}:${pos} [${reference.kind}]${tokenPart} (${ast}${confidence}% confidence)`;
+}
+
+// ===== PATH HELPERS =====
+function safeRelative(absPath: string): string {
+    try {
+        const cwd = process.cwd().replace(/\\/g, '/');
+        const normAbs = absPath.replace(/\\/g, '/');
+        if (normAbs.startsWith(cwd)) {
+            const rel = nodePath.posix.relative(cwd, normAbs);
+            return rel || '.';
+        }
+        // If not under cwd, return basename + parent hint for readability
+        const base = nodePath.basename(normAbs);
+        const parent = nodePath.basename(nodePath.dirname(normAbs));
+        return `${parent}/${base}`;
+    } catch {
+        return absPath;
+    }
 }
 
 /**

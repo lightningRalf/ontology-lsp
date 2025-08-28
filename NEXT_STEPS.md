@@ -254,3 +254,39 @@ bun test tests/categorization.test.ts --verbose
 - **Commands**: `just --list` for all available commands
 - **Diagnostics**: `just diagnostics` for system health
 - **Support**: GitHub Issues for bug reports
+
+---
+
+## 🎯 New Items (CLI + AST Behavior) — 2025‑08‑28
+
+### A. AST References Coverage
+- Broaden TS/JS queries to capture more reference shapes:
+  - Optional chaining calls (`obj?.method()`), nested member calls, namespaced imports (`ns.func()`), aliasing
+  - Destructured imports/bindings used as calls
+- Emit identifier/property nodes for all above for precise AST validation of refs.
+
+### B. Confidence Scoring Refinement
+- Expose scoring weights in config (`performance.scoring.{l1,astDef,astRef}`) for tuning.
+- Tests: assert relative ordering (AST > L1; exact > prefix; word‑boundary > substring).
+- Consider penalizing matches in comments/strings when parser context is known.
+
+### C. Kind Inference Improvements
+- Prefer AST node kinds to distinguish `function` vs `property` (class fields vs methods, arrow‑function vars).
+- Use L1 inference only as fallback when AST is unavailable.
+
+### D. Config + Budgets
+- Persist `layer2.budgetMs` at 100–150ms in precise/ast‑only modes (currently bumped at runtime).
+- Expose dedupe strategy: `preferAst | merge | astOnly`.
+
+### E. CLI UX
+- Document `--ast-only` and `ref` alias in README/CLI help with examples.
+- Add `--ast` synonym for discoverability.
+
+### F. Optional: WASM Fallback Path
+- If native bindings are unreliable on some hosts, add `web-tree-sitter` fallback behind a `preferWasm` flag and local `.wasm` grammars.
+
+### G. Optional: Node Run Target
+- Provide `just cli-node ...` to run the CLI with Node for environments preferring Node’s native module path.
+
+### H. Telemetry
+- Emit counters for escalation rate, dedupe kept/dropped, and average confidence per mode; add debug toggle for dedupe decisions.

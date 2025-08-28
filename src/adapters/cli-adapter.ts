@@ -55,7 +55,7 @@ export class CLIAdapter {
      */
     async handleFind(
         identifier: string,
-        options: { file?: string; maxResults?: number; json?: boolean; limit?: number; verbose?: boolean; summary?: boolean }
+        options: { file?: string; maxResults?: number; json?: boolean; limit?: number; verbose?: boolean; summary?: boolean; precise?: boolean; astOnly?: boolean }
     ): Promise<any> {
         try {
             const request = buildFindDefinitionRequest({
@@ -64,7 +64,9 @@ export class CLIAdapter {
                 identifier,
                 maxResults: options.maxResults || this.config.maxResults,
                 includeDeclaration: true,
+                precise: options.precise,
             });
+            (request as any).astOnly = !!(options.astOnly || options.precise);
 
             // Prefer async fast-path to avoid LayerManager gating timeouts
             const result = await (this.coreAnalyzer as any).findDefinitionAsync(request);
@@ -114,6 +116,8 @@ export class CLIAdapter {
             limit?: number;
             verbose?: boolean;
             summary?: boolean;
+            precise?: boolean;
+            astOnly?: boolean;
         }
     ): Promise<any> {
         try {
@@ -123,7 +127,9 @@ export class CLIAdapter {
                 identifier,
                 maxResults: options.maxResults || this.config.maxResults,
                 includeDeclaration: options.includeDeclaration ?? false,
+                precise: options.precise,
             });
+            (request as any).astOnly = !!(options.astOnly || options.precise);
 
             // Prefer async fast-path for references as well
             const result = await (this.coreAnalyzer as any).findReferencesAsync(request);
@@ -250,6 +256,7 @@ export class CLIAdapter {
             limit?: number;
             verbose?: boolean;
             summary?: boolean;
+            precise?: boolean;
         }
     ): Promise<string> {
         try {
@@ -259,6 +266,7 @@ export class CLIAdapter {
                 identifier,
                 includeDeclaration: options.includeDeclaration ?? true,
                 maxResults: options.maxResults || this.config.maxResults,
+                precise: options.precise,
             });
 
             const defLimit = options.limit ?? this.config.printLimit ?? 10;

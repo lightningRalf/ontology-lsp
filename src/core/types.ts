@@ -171,6 +171,7 @@ export interface FindDefinitionRequest {
     includeReferences?: boolean;
     maxResults?: number;
     fuzzyMatching?: boolean;
+    precise?: boolean; // request a budgeted AST validation pass
 }
 
 export interface FindReferencesRequest {
@@ -181,6 +182,7 @@ export interface FindReferencesRequest {
     maxResults?: number;
     fuzzyMatching?: boolean;
     includeTests?: boolean;
+    precise?: boolean; // request a budgeted AST validation pass
 }
 
 export interface PrepareRenameRequest {
@@ -243,6 +245,7 @@ export interface ExploreRequest {
     identifier: string;
     includeDeclaration?: boolean;
     maxResults?: number;
+    precise?: boolean; // forward to both definitions and references
 }
 
 export interface ExploreResultPerformance {

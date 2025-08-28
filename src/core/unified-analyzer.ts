@@ -149,17 +149,27 @@ export class CodeAnalyzer {
                 excludePaths: ['node_modules', 'dist', '.git', 'coverage', '.e2e-test-workspace', 'logs', 'out', 'build', 'tests', '__tests__', 'examples', 'vscode-client', 'test-output-*'],
             };
 
-            const streamingResults = await this.asyncSearchTools.search(asyncOptions);
+            const streamingResultsAll = await this.asyncSearchTools.search(asyncOptions);
+            const streamingResults = streamingResultsAll.slice(0, request.maxResults ?? 200);
 
             // Convert streaming results to Definition objects with full token expansion
             const definitions: Definition[] = [];
             const seenDef = new Set<string>();
             for (const result of streamingResults) {
-                const exp = this.expandToken(result.text || '', (result.column ?? 1) - 1);
+                // Normalize column to 0-based; if missing, derive from line text
+                let col = (result.column ?? 0);
+                if (result.column !== undefined) {
+                    col = Math.max(0, result.column - 1);
+                } else if (result.text) {
+                    const idx = result.text.toLowerCase().indexOf((request.identifier || '').toLowerCase());
+                    col = idx >= 0 ? idx : 0;
+                }
+                const exp = this.expandToken(result.text || '', col, request.identifier);
                 const uri = this.pathToFileUri(result.file);
                 const key = `${uri}:${(result.line || 1) - 1}:${exp.start}`;
                 if (seenDef.has(key)) continue;
                 seenDef.add(key);
+                const confL1 = this.scoreL1(result.text || '', result.file, request.identifier);
                 definitions.push({
                     uri,
                     range: {
@@ -169,7 +179,7 @@ export class CodeAnalyzer {
                     kind: this.inferDefinitionKind(result.text),
                     name: exp.token || request.identifier,
                     source: 'exact' as const,
-                    confidence: result.confidence,
+                    confidence: confL1,
                     layer: 'async-layer1',
                 });
             }
@@ -178,19 +188,47 @@ export class CodeAnalyzer {
             let layer2Time = 0;
             let finalDefs: Definition[] = definitions;
 
+            // 80/20: Prefix filter for short seeds to reduce noise early
+            if ((request.identifier || '').length > 0 && (request.identifier || '').length < 6) {
+                const pref = (request.identifier || '').toLowerCase();
+                const prefFiltered = definitions.filter((d) => ((d as any).name || '').toLowerCase().startsWith(pref));
+                if (prefFiltered.length > 0 && prefFiltered.length <= definitions.length) {
+                    finalDefs = prefFiltered;
+                }
+            }
+
+            // Narrow to dominant token if ambiguous or precise is requested
+            const tokenCounts = new Map<string, number>();
+            for (const d of finalDefs) {
+                const t = (d as any).name || '';
+                if (!t) continue;
+                tokenCounts.set(t, (tokenCounts.get(t) || 0) + 1);
+            }
+            const distinctTokens = [...tokenCounts.keys()].filter(Boolean).length;
+            const ambiguous = definitions.length > 50 || distinctTokens > 3;
+            const preciseRequested = (request as any)?.precise === true;
+            if (preciseRequested || ambiguous) {
+                const top = [...tokenCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+                if (top) {
+                    finalDefs = finalDefs.filter((d) => ((d as any).name || '') === top);
+                }
+            }
+
             // Smart Escalation v2 (configurable, deterministic)
             const policy = this.config.performance?.escalation?.policy ?? 'auto';
+            const astOnly = !!(request as any)?.astOnly;
             if (policy !== 'never') {
                 const shouldEscalate =
-                    policy === 'always' || this.shouldEscalateDefinitionsAuto(definitions, request.identifier);
+                    policy === 'always' || preciseRequested || this.shouldEscalateDefinitionsAuto(definitions, request.identifier);
                 if (shouldEscalate) {
-                    const budget = this.config.performance?.escalation?.layer2?.budgetMs ?? 75;
+                    const base = this.config.performance?.escalation?.layer2?.budgetMs ?? 75;
+                    const budget = (astOnly || preciseRequested) ? Math.max(100, base) : base;
                     const candidateFiles = new Set(definitions.map((d) => this.fileUriToPath(d.uri)));
                     const escStart = Date.now();
                     try {
                         const escalatePromise = this.executeLayer2Analysis(
                             request,
-                            definitions,
+                            finalDefs,
                             candidateFiles
                         );
                         const timeoutPromise = new Promise<Definition[]>((resolve) =>
@@ -200,32 +238,58 @@ export class CodeAnalyzer {
                         layer2Time = Date.now() - escStart;
 
                         if (layer2Defs && layer2Defs.length > 0) {
-                            // Merge, de-duplicate by uri:line:char
-                            const seen = new Set<string>();
-                            const keyOf = (d: Definition) =>
-                                `${d.uri}:${d.range.start.line}:${d.range.start.character}`;
-                            const merged: Definition[] = [];
-                            for (const d of definitions) {
-                                const k = keyOf(d);
-                                if (!seen.has(k)) {
-                                    seen.add(k);
-                                    merged.push(d);
-                                }
-                            }
+                            // Mark AST validated and merge by location (prefer AST)
+                            const keyOf = (d: Definition) => `${d.uri}:${d.range.start.line}:${d.range.start.character}`;
+                            const map = new Map<string, Definition>();
+                            for (const d of finalDefs) map.set(keyOf(d), d);
                             for (const d of layer2Defs) {
                                 const k = keyOf(d);
-                                if (!seen.has(k)) {
-                                    seen.add(k);
-                                    merged.push(d);
+                                const existing = map.get(k);
+                                if (existing) {
+                                    (existing as any).metadata = { ...(existing as any).metadata, astValidated: true };
+                                    (existing as any).astValidated = true;
+                                } else {
+                                    (d as any).metadata = { ...(d as any).metadata, astValidated: true };
+                                    (d as any).astValidated = true;
+                                    map.set(k, d);
                                 }
                             }
-                            finalDefs = merged;
+                            finalDefs = Array.from(map.values());
                         }
                     } catch {
                         // Ignore escalation errors for stability
                         layer2Time = Date.now() - escStart;
                     }
                 }
+            }
+
+            // Apply AST-only or prefer-AST dedupe
+            if (astOnly || preciseRequested) {
+                finalDefs = finalDefs.filter((d) => (d as any).astValidated || (d as any).metadata?.astValidated);
+            } else {
+                const groups = new Map<string, Definition[]>();
+                for (const d of finalDefs) {
+                    const key = `${d.uri}:${d.range.start.line}:${(((d as any).name || '') as string).toLowerCase()}`;
+                    const arr = groups.get(key) || [];
+                    arr.push(d);
+                    groups.set(key, arr);
+                }
+                const preferred: Definition[] = [];
+                for (const arr of groups.values()) {
+                    arr.sort((a, b) => {
+                        const aAst = ((a as any).astValidated || (a as any).metadata?.astValidated) ? 1 : 0;
+                        const bAst = ((b as any).astValidated || (b as any).metadata?.astValidated) ? 1 : 0;
+                        if (bAst !== aAst) return bAst - aAst; // AST first
+                        return (b.confidence || 0) - (a.confidence || 0);
+                    });
+                    preferred.push(arr[0]);
+                }
+                finalDefs = preferred;
+            }
+            // Fallback: if AST-only requested and nothing remains, keep the best L1 item
+            if ((astOnly || preciseRequested) && finalDefs.length === 0 && definitions.length > 0) {
+                const best = [...definitions].sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0];
+                finalDefs = [best];
             }
 
             const performance: LayerPerformance = {
@@ -265,6 +329,7 @@ export class CodeAnalyzer {
             identifier: request.identifier,
             includeDeclaration: request.includeDeclaration ?? true,
             maxResults: request.maxResults ?? 100,
+            precise: (request as any).precise,
         };
         const refReq: FindReferencesRequest = {
             uri: ctxUri,
@@ -272,6 +337,7 @@ export class CodeAnalyzer {
             identifier: request.identifier,
             includeDeclaration: request.includeDeclaration ?? false,
             maxResults: Math.min(request.maxResults ?? 100, 500),
+            precise: (request as any).precise,
         };
 
         const [defs, refs, diags] = await Promise.allSettled([
@@ -343,16 +409,25 @@ export class CodeAnalyzer {
                 excludePaths: ['node_modules', 'dist', '.git', 'coverage', '.e2e-test-workspace', 'logs', 'out', 'build', 'tests', '__tests__', 'examples', 'vscode-client', 'test-output-*'],
             };
 
-            const streamingResults = await this.asyncSearchTools.search(asyncOptions);
+            const streamingResultsAll = await this.asyncSearchTools.search(asyncOptions);
+            const streamingResults = streamingResultsAll.slice(0, request.maxResults ?? 200);
 
             // Convert to Reference objects and de-duplicate by location
             const seen = new Set<string>();
             const references: Reference[] = [];
             for (const result of streamingResults) {
-                const key = `${result.file}:${result.line ?? 0}:${result.column ?? 0}`;
+                let col = (result.column ?? 0);
+                if (result.column !== undefined) {
+                    col = Math.max(0, result.column - 1);
+                } else if (result.text) {
+                    const idx = result.text.toLowerCase().indexOf((request.identifier || '').toLowerCase());
+                    col = idx >= 0 ? idx : 0;
+                }
+                const key = `${result.file}:${result.line ?? 0}:${col}`;
                 if (seen.has(key)) continue;
                 seen.add(key);
-                const exp = this.expandToken(result.text || '', (result.column ?? 1) - 1);
+                const exp = this.expandToken(result.text || '', col, request.identifier);
+                const confL1 = this.scoreL1(result.text || '', result.file, request.identifier);
                 references.push({
                     uri: this.pathToFileUri(result.file),
                     range: {
@@ -362,7 +437,7 @@ export class CodeAnalyzer {
                     kind: this.inferReferenceKind(result.text),
                     name: exp.token || request.identifier,
                     source: 'exact' as const,
-                    confidence: result.confidence,
+                    confidence: confL1,
                     layer: 'async-layer1',
                 });
             }
@@ -371,25 +446,39 @@ export class CodeAnalyzer {
             let layer2Time = 0;
             let finalRefs: Reference[] = references;
 
+            // 80/20: Prefix filter for short seeds
+            if ((request.identifier || '').length > 0 && (request.identifier || '').length < 6) {
+                const pref = (request.identifier || '').toLowerCase();
+                const prefFiltered = references.filter((r) => ((r as any).name || '').toLowerCase().startsWith(pref));
+                if (prefFiltered.length > 0 && prefFiltered.length <= references.length) {
+                    finalRefs = prefFiltered;
+                }
+            }
+
             // Precision nudge for partial identifiers: if ambiguous, keep the dominant token only
             const distinctNames = new Map<string, number>();
-            for (const r of references) distinctNames.set(r.name || '', (distinctNames.get(r.name || '') || 0) + 1);
+            for (const r of finalRefs) distinctNames.set(r.name || '', (distinctNames.get(r.name || '') || 0) + 1);
             const distinctCount = [...distinctNames.keys()].filter(Boolean).length;
-            const totalCount = references.length;
-            if (totalCount > 50 || distinctCount > 3) {
+            const totalCount = finalRefs.length;
+            const ambiguous = totalCount > 50 || distinctCount > 3;
+            if (ambiguous) {
                 const topName = [...distinctNames.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
                 if (topName) {
                     const t0 = Date.now();
-                    finalRefs = references.filter((r) => r.name === topName);
+                    finalRefs = finalRefs.filter((r) => r.name === topName);
                     layer2Time += Date.now() - t0; // account as precision step time
                 }
             }
 
             // Minimal escalation for references: only when empty and policy allows
-            const policy = this.config.performance?.escalation?.policy ?? 'auto';
-            const shouldEscalateRefs = policy === 'always' || (policy === 'auto' && finalRefs.length === 0);
-            if (policy !== 'never' && shouldEscalateRefs) {
-                const budget = this.config.performance?.escalation?.layer2?.budgetMs ?? 75;
+            const policy2 = this.config.performance?.escalation?.policy ?? 'auto';
+            const preciseRequested2 = (request as any)?.precise === true;
+            const astOnly2 = !!(request as any)?.astOnly;
+            const shouldEscalateRefs =
+                policy2 === 'always' || preciseRequested2 || (policy2 === 'auto' && (finalRefs.length === 0 || ambiguous));
+            if (policy2 !== 'never' && shouldEscalateRefs) {
+                const base = this.config.performance?.escalation?.layer2?.budgetMs ?? 75;
+                const budget = (astOnly2 || preciseRequested2) ? Math.max(100, base) : base;
                 const escStart = Date.now();
                 try {
                     const escalatePromise = this.executeLayer2ReferenceAnalysis(request, finalRefs);
@@ -400,29 +489,55 @@ export class CodeAnalyzer {
                     layer2Time = Date.now() - escStart;
 
                     if (layer2Refs && layer2Refs.length > 0) {
-                        const seen = new Set<string>();
-                        const keyOf = (r: Reference) =>
-                            `${r.uri}:${r.range.start.line}:${r.range.start.character}`;
-                        const merged: Reference[] = [];
-                        for (const r of finalRefs) {
-                            const k = keyOf(r);
-                            if (!seen.has(k)) {
-                                seen.add(k);
-                                merged.push(r);
-                            }
-                        }
+                        const keyOf = (r: Reference) => `${r.uri}:${r.range.start.line}:${r.range.start.character}`;
+                        const map = new Map<string, Reference>();
+                        for (const r of finalRefs) map.set(keyOf(r), r);
                         for (const r of layer2Refs) {
                             const k = keyOf(r);
-                            if (!seen.has(k)) {
-                                seen.add(k);
-                                merged.push(r);
+                            const existing = map.get(k);
+                            if (existing) {
+                                (existing as any).metadata = { ...(existing as any).metadata, astValidated: true };
+                                (existing as any).astValidated = true;
+                            } else {
+                                (r as any).metadata = { ...(r as any).metadata, astValidated: true };
+                                (r as any).astValidated = true;
+                                map.set(k, r);
                             }
                         }
-                        finalRefs = merged;
+                        finalRefs = Array.from(map.values());
                     }
                 } catch {
                     layer2Time = Date.now() - escStart;
                 }
+            }
+
+            // Apply AST-only or prefer-AST dedupe
+            if (astOnly2 || preciseRequested2) {
+                finalRefs = finalRefs.filter((r) => (r as any).astValidated || (r as any).metadata?.astValidated);
+            } else {
+                const groupsR = new Map<string, Reference[]>();
+                for (const r of finalRefs) {
+                    const key = `${r.uri}:${r.range.start.line}:${(((r as any).name || '') as string).toLowerCase()}`;
+                    const arr = groupsR.get(key) || [];
+                    arr.push(r);
+                    groupsR.set(key, arr);
+                }
+                const preferredR: Reference[] = [];
+                for (const arr of groupsR.values()) {
+                    arr.sort((a, b) => {
+                        const aAst = ((a as any).astValidated || (a as any).metadata?.astValidated) ? 1 : 0;
+                        const bAst = ((b as any).astValidated || (b as any).metadata?.astValidated) ? 1 : 0;
+                        if (bAst !== aAst) return bAst - aAst;
+                        return (b.confidence || 0) - (a.confidence || 0);
+                    });
+                    preferredR.push(arr[0]);
+                }
+                finalRefs = preferredR;
+            }
+            // Fallback: if AST-only requested and nothing remains, keep the best L1 item
+            if ((astOnly2 || preciseRequested2) && finalRefs.length === 0 && references.length > 0) {
+                const bestR = [...references].sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0];
+                finalRefs = [bestR];
             }
 
             const performance: LayerPerformance = {
@@ -1037,29 +1152,36 @@ export class CodeAnalyzer {
             // Execute tree-sitter analysis
             const result = await layer.process(enhancedMatches);
 
-            // Convert TreeSitter result to Definition[]
+            // Convert TreeSitter result to Definition[] and validate strictly by symbol name
             const definitions: Definition[] = [];
+            const candidateNames = new Set<string>(
+                (
+                    existing.map((e: any) => (e.name || '').toString()).filter(Boolean).length > 0
+                        ? existing.map((e: any) => (e.name || '').toString()).filter(Boolean)
+                        : [request.identifier]
+                ).map((s: string) => s.toLowerCase())
+            );
 
-            // Process AST nodes
             if (result.nodes) {
                 for (const node of result.nodes) {
-                    // Filter nodes that match our identifier
-                    if (
-                        node.text.includes(request.identifier) ||
-                        node.metadata?.functionName === request.identifier ||
-                        node.metadata?.className === request.identifier
-                    ) {
-                        definitions.push({
-                            uri: this.pathToFileUri(this.extractFilePathFromNodeId(node.id)),
-                            range: node.range,
-                            kind: this.inferDefinitionKindFromNodeType(node.type),
-                            name: request.identifier,
-                            source: 'fuzzy' as const,
-                            confidence: 0.8,
-                            layer: 'layer2',
-                            metadata: node.metadata,
-                        });
-                    }
+                    const fn = (node.metadata?.functionName || '').toString();
+                    const cn = (node.metadata?.className || '').toString();
+                    const nodeName = fn || cn;
+                    if (!nodeName) continue;
+                    if (!candidateNames.has(nodeName.toLowerCase())) continue;
+
+                    const filePath = this.extractFilePathFromNodeId(node.id);
+                    const confAst = this.scoreAstDefinition(node, request.identifier, filePath, candidateNames.size > 1);
+                    definitions.push({
+                        uri: this.pathToFileUri(this.extractFilePathFromNodeId(node.id)),
+                        range: node.range,
+                        kind: this.inferDefinitionKindFromNodeType(node.type),
+                        name: nodeName,
+                        source: 'fuzzy' as const,
+                        confidence: confAst,
+                        layer: 'layer2',
+                        metadata: node.metadata,
+                    });
                 }
             }
 
@@ -1381,7 +1503,18 @@ export class CodeAnalyzer {
             // Build EnhancedMatches with just the candidate file set
             const enhancedMatches = {
                 exact: [],
-                fuzzy: [],
+                // Seed with identifier so identifier captures are considered relevant
+                fuzzy: [
+                    {
+                        file: '',
+                        line: 0,
+                        column: 0,
+                        text: request.identifier,
+                        length: request.identifier.length || 0,
+                        confidence: 1,
+                        source: 'exact',
+                    },
+                ],
                 conceptual: [],
                 files: candidateFiles,
                 searchTime: 0,
@@ -1390,25 +1523,54 @@ export class CodeAnalyzer {
             const result = await layer.process(enhancedMatches);
             const nodes = result?.nodes || [];
 
-            // Filter references that are backed by an AST node with the same token at that location
+            // 1) Validate existing refs by matching to identifier nodes on the same line/near column
             const validated: Reference[] = [];
             for (const ref of existing) {
                 const filePath = this.fileUriToPath(ref.uri);
                 const line = ref.range.start.line;
                 const ch = ref.range.start.character;
                 const token = ref.name || '';
-                const match = nodes.some((n: any) => {
+                const matched = nodes.find((n: any) => {
                     if (!n?.id || !n?.range) return false;
                     if (!n.id.startsWith(filePath + ':')) return false;
                     const r = n.range;
-                    const covers = r.start?.line === line && r.start?.character <= ch && r.end?.character >= ch;
-                    const sameText = typeof n.text === 'string' ? n.text === token : true;
+                    const sameLine = r.start?.line === line;
+                    const within = r.start?.character <= ch && r.end?.character >= ch;
+                    const near = Math.abs((r.start?.character ?? 0) - ch) <= 3;
+                    const covers = sameLine && (within || near);
+                    const nName = (n.metadata?.functionName || n.text || '').toString();
+                    const sameText = nName === token;
                     return covers && sameText;
                 });
-                if (match) validated.push(ref);
+                if (matched) {
+                    const score = this.scoreAstReference(token, request.identifier, matched, filePath, ch);
+                    const updated: Reference = { ...ref, confidence: Math.max(ref.confidence || 0, score) };
+                    (updated as any).astValidated = true;
+                    validated.push(updated);
+                }
             }
 
-            return validated;
+            // 2) Add AST-derived references directly from call identifier nodes
+            const astDerived: Reference[] = [];
+            const want = (request.identifier || '').toLowerCase();
+            for (const n of nodes) {
+                const nName = (n.metadata?.functionName || n.text || '').toString();
+                if (!nName) continue;
+                if (nName.toLowerCase() !== want) continue;
+                const filePath = this.extractFilePathFromNodeId(n.id);
+                const score = this.scoreAstReference(nName, request.identifier, n, filePath, n.range.start.character);
+                astDerived.push({
+                    uri: this.pathToFileUri(this.extractFilePathFromNodeId(n.id)),
+                    range: n.range,
+                    kind: 'call',
+                    name: nName,
+                    source: 'fuzzy',
+                    confidence: score,
+                    layer: 'layer2',
+                });
+            }
+
+            return [...validated, ...astDerived];
         } catch (error) {
             console.warn('Layer 2 reference validation failed:', error);
             return [];
@@ -2058,17 +2220,93 @@ export class CodeAnalyzer {
         return 'read';
     }
 
+    // === Confidence scoring helpers ===
+    private clamp01(x: number): number { return Math.max(0, Math.min(1, x)); }
+
+    private scoreL1(lineText: string, filePath: string, identifier: string): number {
+        const text = lineText || '';
+        const id = identifier || '';
+        if (!id) return 0.6;
+        const lc = text.toLowerCase();
+        const idlc = id.toLowerCase();
+        const wordRe = new RegExp(`\\b${this.escapeRegex(id)}\\b`);
+        let score = wordRe.test(text) ? 0.75 : (lc.includes(idlc) ? 0.6 : 0.5);
+        if (text.includes(id)) score += 0.05; // case-sensitive occurrence
+        if ((filePath || '').toLowerCase().includes(idlc)) score += 0.05;
+        return this.clamp01(score);
+    }
+
+    private scoreAstDefinition(node: any, identifier: string, filePath: string, ambiguous: boolean): number {
+        const idlc = (identifier || '').toLowerCase();
+        const name = (node?.metadata?.functionName || node?.metadata?.className || '').toString();
+        const namelc = name.toLowerCase();
+        let score = 0.80;
+        if (idlc && namelc === idlc) score += 0.10;
+        const type = (node?.type || '').toString();
+        if (type === 'function_declaration' || type === 'method_definition' || type === 'class_declaration') score += 0.05;
+        if ((filePath || '').toLowerCase().includes(idlc)) score += 0.03;
+        if (ambiguous) score -= 0.05;
+        return this.clamp01(score);
+    }
+
+    private scoreAstReference(token: string, identifier: string, node: any, filePath: string, column: number): number {
+        const idlc = (identifier || '').toLowerCase();
+        const tok = (token || '').toString();
+        const toklc = tok.toLowerCase();
+        let score = 0.70;
+        if (idlc && toklc === idlc) score += 0.10; else if (toklc.startsWith(idlc)) score += 0.03;
+        const type = (node?.type || '').toString();
+        if (type.includes('call') || type.includes('identifier')) score += 0.05;
+        const startCh = node?.range?.start?.character ?? column;
+        const off = Math.abs(startCh - column);
+        if (off > 2) score -= 0.05;
+        return this.clamp01(score);
+    }
+
     /**
      * Expand token around a given column to full word boundaries (alphanumeric or underscore)
      */
-    private expandToken(lineText: string, column: number): { start: number; end: number; token: string } {
+    private expandToken(lineText: string, column: number, seed?: string): { start: number; end: number; token: string } {
         if (!lineText) return { start: Math.max(0, column), end: Math.max(0, column), token: '' };
+        const isWord = (ch: string) => /[A-Za-z0-9_]/.test(ch);
+
+        // 1) Initial expansion around the provided column
         let start = Math.max(0, column);
         let end = Math.min(lineText.length, column);
-        const isWord = (ch: string) => /[A-Za-z0-9_]/.test(ch);
         while (start > 0 && isWord(lineText[start - 1])) start--;
         while (end < lineText.length && isWord(lineText[end])) end++;
-        const token = lineText.slice(start, end);
+        let token = lineText.slice(start, end);
+
+        // 2) If we have a seed (query) and the expanded token doesn't meaningfully include it,
+        //    search for the nearest word containing the seed and prefer that.
+        if (seed && seed.length > 0) {
+            const seedLower = seed.toLowerCase();
+            const tokenLower = token.toLowerCase();
+            if (!tokenLower.includes(seedLower) || token.length < seed.length) {
+                // Scan all word tokens on the line
+                const re = /[A-Za-z0-9_]+/g;
+                let best: { s: number; e: number; t: string; dist: number } | null = null;
+                let m: RegExpExecArray | null;
+                while ((m = re.exec(lineText)) !== null) {
+                    const s = m.index;
+                    const e = s + m[0].length;
+                    const t = m[0];
+                    if (t.toLowerCase().includes(seedLower)) {
+                        // distance from column to this token (0 if within)
+                        const dist = column < s ? s - column : column > e ? column - e : 0;
+                        if (!best || dist < best.dist || (dist === best.dist && t.length > best.t.length)) {
+                            best = { s, e, t, dist };
+                        }
+                    }
+                }
+                if (best) {
+                    start = best.s;
+                    end = best.e;
+                    token = best.t;
+                }
+            }
+        }
+
         return { start, end, token };
     }
 

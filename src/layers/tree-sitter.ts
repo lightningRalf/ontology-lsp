@@ -112,9 +112,9 @@ function loadLanguageParser(language: string): any {
                 return TypeScript;
             case 'javascript':
                 if (!JavaScript) {
-                    const modulePath = findModulePath('tree-sitter-typescript');
-                    const tsModule = require(modulePath);
-                    JavaScript = tsModule.javascript || tsModule.tsx; // Some versions use tsx for JSX
+                    const modulePath = findModulePath('tree-sitter-javascript');
+                    const jsModule = require(modulePath);
+                    JavaScript = jsModule; // node binding exports the language directly
                     loadedLanguages.add('javascript');
                     if (process.env.DEBUG && !process.env.SILENT_MODE) {
                         console.error(`✓ Loaded JavaScript parser from ${modulePath}`);
@@ -313,16 +313,113 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
             `,
         };
 
-        // Setup queries for TypeScript/JavaScript
-        const tsQueryMap = new Map<string, Query>();
-        for (const [name, queryString] of Object.entries(tsQueries)) {
-            if (TypeScript) {
-                tsQueryMap.set(name, new Query(TypeScript, queryString));
-            }
-        }
+        // JavaScript queries (no type_identifier or implements_clause)
+        const jsQueries = {
+            identifiers: `
+                (identifier) @id
+                (property_identifier) @prop
+            `,
 
-        this.queries.set('typescript', tsQueryMap);
-        this.queries.set('javascript', tsQueryMap);
+            functions: `
+                (function_declaration
+                    name: (identifier) @func.name
+                    parameters: (formal_parameters) @func.params
+                    body: (statement_block) @func.body)
+                
+                (arrow_function
+                    parameters: (formal_parameters) @arrow.params
+                    body: (_) @arrow.body)
+                
+                (method_definition
+                    name: (property_identifier) @method.name
+                    parameters: (formal_parameters) @method.params
+                    body: (statement_block) @method.body)
+            `,
+
+            classes: `
+                (class_declaration
+                    name: (identifier) @class.name
+                    (class_heritage
+                        (extends_clause
+                            (identifier) @class.extends))?
+                    body: (class_body) @class.body)
+            `,
+
+            imports: `
+                (import_statement
+                    source: (string) @import.source
+                    (import_clause
+                        (named_imports
+                            (import_specifier
+                                name: (identifier) @import.name
+                                alias: (identifier)? @import.alias)*)?
+                        (namespace_import
+                            (identifier) @import.namespace)?
+                        (identifier)? @import.default)?)
+            `,
+
+            exports: `
+                (export_statement
+                    (function_declaration
+                        name: (identifier) @export.func)?
+                    (class_declaration
+                        name: (identifier) @export.class)?
+                    (variable_declaration
+                        (variable_declarator
+                            name: (identifier) @export.var))?
+                    declaration: (_)? @export.decl)
+            `,
+
+            calls: `
+                (call_expression
+                    function: (identifier) @call.func
+                    arguments: (arguments) @call.args)
+                
+                (call_expression
+                    function: (member_expression
+                        object: (identifier) @call.object
+                        property: (property_identifier) @call.method)
+                    arguments: (arguments) @call.args)
+            `,
+
+            references: `
+                (member_expression
+                    object: (identifier) @ref.object
+                    property: (property_identifier) @ref.property)
+                
+                (assignment_expression
+                    left: (identifier) @assign.target
+                    right: (_) @assign.value)
+            `,
+        };
+
+        // Setup queries per language to avoid language/query mismatches
+        if (TypeScript) {
+            const tsQueryMap = new Map<string, Query>();
+            for (const [name, queryString] of Object.entries(tsQueries)) {
+                try {
+                    tsQueryMap.set(name, new Query(TypeScript, queryString));
+                } catch (e: any) {
+                    if (!process.env.SILENT_MODE) {
+                        console.warn(`Tree-sitter: failed to compile TS query '${name}':`, e?.message || e);
+                    }
+                }
+            }
+            this.queries.set('typescript', tsQueryMap);
+        }
+        if (JavaScript) {
+            const jsQueryMap = new Map<string, Query>();
+            for (const [name, queryString] of Object.entries(jsQueries)) {
+                try {
+                    jsQueryMap.set(name, new Query(JavaScript, queryString));
+                } catch (e: any) {
+                    if (!process.env.SILENT_MODE) {
+                        console.warn(`Tree-sitter: failed to compile JS query '${name}':`, e?.message || e);
+                    }
+                }
+            }
+            this.queries.set('javascript', jsQueryMap);
+        }
 
         // Python queries
         const pythonQueries = {
@@ -452,9 +549,10 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
                 return null;
             }
 
-            // Parse file
+            // Parse file (set bufferSize explicitly to avoid native binding 'Invalid argument' on large inputs)
             const content = await fs.readFile(filePath, 'utf-8');
-            const tree = parser.parse(content);
+            const BUFFER_SIZE = Math.max(1 << 20, 262144); // at least 1MB
+            const tree = (parser as any).parse(content, undefined, { bufferSize: BUFFER_SIZE });
 
             // Cache result
             this.cache.set(filePath, {
@@ -464,7 +562,9 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
 
             return { tree, language };
         } catch (error) {
-            console.warn(`Failed to parse file: ${filePath}`, error);
+            if (!process.env.SILENT_MODE) {
+                console.warn(`Failed to parse file: ${filePath}`, error);
+            }
             return null;
         }
     }
@@ -545,54 +645,45 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
 
     private async processFunctions(captures: any[], filePath: string, result: TreeSitterResult): Promise<void> {
         for (const capture of captures) {
-            const node = capture.node;
+            // Only use name captures to align ranges with identifier positions
+            if (!capture?.name || !/(func\.name|method\.name|arrow\.name)$/.test(capture.name)) {
+                continue;
+            }
+            const node = capture.node; // identifier node
             const astNode = this.createASTNode(node, filePath);
 
-            // Extract function-specific metadata
-            const functionName = this.findChildByType(node, 'identifier')?.text;
-            const parameters = this.extractParameters(node);
-            const returnType = this.extractReturnType(node);
+            // Function name is the captured identifier text
+            const functionName = node.text;
+            // Parameters/returnType not available from name node; skip heavy traversal here
 
-            // Safely spread metadata with null check
             const existingMetadata = astNode.metadata || {};
             astNode.metadata = {
                 ...existingMetadata,
                 functionName,
-                parameters,
-                returnType,
             };
 
-            // Enrich with concept information if available
             await this.enrichNodeWithConcept(astNode);
-
             result.nodes.push(astNode);
         }
     }
 
     private async processClasses(captures: any[], filePath: string, result: TreeSitterResult): Promise<void> {
         for (const capture of captures) {
-            const node = capture.node;
+            // Only use class name captures to align ranges
+            if (!capture?.name || !/class\.name$/.test(capture.name)) {
+                continue;
+            }
+            const node = capture.node; // identifier or type_identifier node
             const astNode = this.createASTNode(node, filePath);
 
-            // Extract class-specific metadata
-            const className =
-                this.findChildByType(node, 'type_identifier')?.text || this.findChildByType(node, 'identifier')?.text;
-
-            const extendsClass = this.extractExtendsClause(node);
-            const implementsInterfaces = this.extractImplementsClause(node);
-
-            // Safely spread metadata with null check
+            const className = node.text;
             const existingMetadata = astNode.metadata || {};
             astNode.metadata = {
                 ...existingMetadata,
                 className,
-                extends: extendsClass,
-                implements: implementsInterfaces,
             };
 
-            // Enrich with concept information if available
             await this.enrichNodeWithConcept(astNode);
-
             result.nodes.push(astNode);
         }
     }
@@ -629,23 +720,30 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
     }
 
     private processRelationships(calls: any[], references: any[], filePath: string, result: TreeSitterResult): void {
-        // Process function calls
+        // Process function calls (use capture names directly; also record identifier nodes for validation)
         for (const capture of calls) {
             const node = capture.node;
-            const callInfo = this.extractCallInfo(node);
-
-            if (callInfo) {
-                result.relationships.push({
-                    from: filePath,
-                    to: callInfo.target,
-                    type: 'calls',
-                    confidence: 0.9,
-                    location: `${filePath}:${node.startPosition.row + 1}`,
-                });
+            const cap = capture.name || '';
+            if (cap.endsWith('call.func') || cap.endsWith('call.method')) {
+                const target = node.text;
+                if (target) {
+                    result.relationships.push({
+                        from: filePath,
+                        to: target,
+                        type: 'calls',
+                        confidence: 0.9,
+                        location: `${filePath}:${node.startPosition.row + 1}`,
+                    });
+                    // Also push an AST node for the identifier itself to help reference validation
+                    const astNode = this.createASTNode(node, filePath);
+                    // Mark minimal metadata
+                    astNode.metadata = { ...(astNode.metadata || {}), functionName: target } as any;
+                    result.nodes.push(astNode);
+                }
             }
         }
 
-        // Process references
+        // Process references (member expressions)
         for (const capture of references) {
             const node = capture.node;
             const refInfo = this.extractReferenceInfo(node);
@@ -658,6 +756,13 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
                     confidence: 0.8,
                     location: `${filePath}:${node.startPosition.row + 1}`,
                 });
+                // Push identifier/property nodes as AST nodes for validation when applicable
+                const cap = capture.name || '';
+                if (cap.endsWith('ref.object') || cap.endsWith('ref.property')) {
+                    const idNode = this.createASTNode(node, filePath);
+                    idNode.metadata = { ...(idNode.metadata || {}) } as any;
+                    result.nodes.push(idNode);
+                }
             }
         }
     }

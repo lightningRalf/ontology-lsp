@@ -187,6 +187,7 @@ export class HTTPAdapter {
                 identifier: body.identifier,
                 maxResults: body.maxResults || this.config.maxResults,
                 includeDeclaration: body.includeDeclaration ?? true,
+                precise: !!body.precise,
             });
 
             const result = await this.coreAnalyzer.findDefinition(coreRequest);
@@ -243,6 +244,7 @@ export class HTTPAdapter {
                 identifier: body.identifier,
                 maxResults: body.maxResults || this.config.maxResults,
                 includeDeclaration: body.includeDeclaration ?? false,
+                precise: !!body.precise,
             });
 
             const result = await this.coreAnalyzer.findReferences(coreRequest);
@@ -699,6 +701,7 @@ export class HTTPAdapter {
                                             position: { $ref: '#/components/schemas/Position' },
                                             maxResults: { type: 'integer' },
                                             includeDeclaration: { type: 'boolean' },
+                                            precise: { type: 'boolean', description: 'Run a quick AST validation pass' },
                                         },
                                     },
                                 },
@@ -747,6 +750,7 @@ export class HTTPAdapter {
                                             position: { $ref: '#/components/schemas/Position' },
                                             maxResults: { type: 'integer' },
                                             includeDeclaration: { type: 'boolean' },
+                                            precise: { type: 'boolean', description: 'Run a quick AST validation pass' },
                                         },
                                     },
                                 },
@@ -867,6 +871,7 @@ export class HTTPAdapter {
                                             file: { type: 'string' },
                                             uri: { type: 'string' },
                                             includeDeclaration: { type: 'boolean' },
+                                            precise: { type: 'boolean', description: 'Run a quick AST validation pass' },
                                             maxResults: { type: 'integer' },
                                         },
                                     },

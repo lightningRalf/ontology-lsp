@@ -131,6 +131,19 @@ ontology-lsp/
 - Bloom Filter Fix: 5/5 passing
 - File URI Resolution: 9/9 passing
 
+### CLI + AST Behavior Improvements (2025‑08‑28)
+- Native Tree‑sitter under Bun stabilized (explicit parse buffer, correct JS grammar).
+- Per‑language TS/JS query maps; failed query compilation handled gracefully in CLI mode.
+- New AST modes:
+  - Prefer‑AST (default): deduplicate per location and prefer AST‑validated hits.
+  - AST‑only (`--precise` or `--ast-only`): return only AST‑validated results; fallback to top L1 if empty.
+- Short‑seed precision: prefix filter for identifiers < 6 chars (e.g., `parseF` → keep `parseFile`, drop `parseFloat`).
+- Confidence scoring implemented:
+  - L1 scores based on word‑boundary/case/path hints (0.5–0.85).
+  - AST definition/reference scores with small bonuses for exact name, node type, path hints (≈0.80–0.95 for defs; ≈0.75–0.90 for refs).
+- References coverage improved: capture call identifiers and member refs as nodes to enable AST validation of call sites.
+- CLI UX: added `references` alias `ref`.
+
 ### Notable Failures and Likely Root Causes
 - [Fixed] Unified Core invalid request handling: `CodeAnalyzer.validateRequest` now rejects when both identifier and uri are empty.
 - Performance suite: frequent `Layer layer1 timed out` and LS analysis 200ms timeouts; p95 above targets. Action: tune Layer 1 budgets/timeouts or use deterministic fixture in CI; mark perf expectations environment-aware.

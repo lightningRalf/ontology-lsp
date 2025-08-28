@@ -38,11 +38,14 @@ class CLI {
         // Find command
         this.program
             .command('find <identifier>')
+            .aliases(['def', 'definitions'])
             .description('Find symbol definitions with fuzzy matching')
             .option('-f, --file <path>', 'Specific file context')
             .option('-n, --max-results <count>', 'Maximum results to search', '50')
             .option('-l, --limit <count>', 'Maximum results to print', '20')
             .option('-s, --summary', 'Show summary output only')
+            .option('--precise', 'Run a quick AST validation pass')
+            .option('--ast-only', 'Only return AST-validated results')
             .option('-j, --json', 'Output JSON')
             .option('--no-color', 'Disable colored output')
             .option('-v, --verbose', 'Verbose output with performance info')
@@ -53,21 +56,28 @@ class CLI {
                     maxResults: parseInt(options.maxResults),
                     limit: parseInt(options.limit),
                     summary: !!options.summary,
+                    precise: !!options.precise,
+                    astOnly: !!options.astOnly,
                     json: !!options.json,
                     verbose: !!options.verbose,
                 });
                 console.log(result);
+                await this.shutdown();
+                process.exit(0);
             });
 
         // References command
         this.program
             .command('references <identifier>')
+            .aliases(['ref'])
             .description('Find all references to a symbol')
             .option('-f, --file <path>', 'Specific file or directory context')
             .option('-d, --include-declaration', 'Include symbol declaration in results')
             .option('-n, --max-results <count>', 'Maximum results to search', '50')
             .option('-l, --limit <count>', 'Maximum results to print', '20')
             .option('-s, --summary', 'Show summary output only')
+            .option('--precise', 'Run a quick AST validation pass')
+            .option('--ast-only', 'Only return AST-validated results')
             .option('-j, --json', 'Output JSON')
             .option('--no-color', 'Disable colored output')
             .option('-v, --verbose', 'Verbose output with performance info')
@@ -79,10 +89,14 @@ class CLI {
                     maxResults: parseInt(options.maxResults),
                     limit: parseInt(options.limit),
                     summary: !!options.summary,
+                    precise: !!options.precise,
+                    astOnly: !!options.astOnly,
                     json: !!options.json,
                     verbose: !!options.verbose,
                 });
                 console.log(result);
+                await this.shutdown();
+                process.exit(0);
             });
 
         // Rename command
@@ -98,6 +112,8 @@ class CLI {
                     dryRun: options.dryRun !== false,
                 });
                 console.log(result);
+                await this.shutdown();
+                process.exit(0);
             });
 
         // Stats command
@@ -110,6 +126,8 @@ class CLI {
                 await this.ensureInitialized(options);
                 const result = await this.cliAdapter.handleStats();
                 console.log(result);
+                await this.shutdown();
+                process.exit(0);
             });
 
         // Explore command (aggregate defs+refs in parallel)
@@ -121,6 +139,7 @@ class CLI {
             .option('-l, --limit <count>', 'Maximum results to print per section', '10')
             .option('-d, --include-declaration', 'Include declaration in references')
             .option('-s, --summary', 'Show summary output only')
+            .option('--precise', 'Run a quick AST validation pass')
             .option('-j, --json', 'Output JSON')
             .option('--no-color', 'Disable colored output')
             .action(async (identifier, options) => {
@@ -131,10 +150,13 @@ class CLI {
                     includeDeclaration: !!options.includeDeclaration,
                     limit: parseInt(options.limit),
                     summary: !!options.summary,
+                    precise: !!options.precise,
                     json: !!options.json,
                     verbose: !!options.verbose,
                 });
                 console.log(result);
+                await this.shutdown();
+                process.exit(0);
             });
 
         // Init command (optional - for setting up workspace)
