@@ -46,6 +46,38 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 - **Biome, not ESLint**: Remove stray ESLint directives in tests; use Biome comments if suppression is needed (or avoid suppression entirely). Validate via `bun run lint`.
 - **No stdout from LSP**: Keep LSP server logs on stderr to avoid stdio protocol contamination (done). Confirm Biome allows console in tests or adjust via Biome ignore comments if necessary.
 
+### 2.4 Smart Escalation v2 (New)
+- **Policy (Configurable)**: Add `core.performance.escalation.policy` = `auto | always | never` (default: `auto`).
+- **Gating Rules**:
+  - Trigger escalation when Layer 1 is empty or ambiguous:
+    - No `likely-definition` category OR max confidence < threshold (e.g., 0.75) OR >N files without filename match.
+    - Identifier/file mismatch (top hit base filename does not include identifier).
+  - For references, escalate when count < minRefs AND top contexts are mixed/uncertain.
+- **Budgets & Caps**:
+  - Time: `layer2.escalationBudgetMs` (50–100ms), `layer3.escalationBudgetMs` (≤50ms).
+  - Scope: `layer2.maxCandidateFiles` (e.g., ≤10), derived from L1 candidates (filename and content signals).
+  - Cancellation: hard stop AST/DB work on budget expiry; return partials.
+- **Async‑First Integration**:
+  - Keep `findDefinitionAsync/findReferencesAsync` as primary; if gates trip and time remains, call `escalateDefinitions()`/`escalateReferences()` helpers.
+  - Return merged results with provenance and confidence; preserve ordering by priority (definition > interface > variable) and file name match.
+- **Determinism**:
+  - Make thresholds and caps deterministic in CI (override via `CI=1` to fixed budgets).
+  - Ensure identical cache keys with/without escalation; include only stable inputs in keys.
+- **Instrumentation**:
+  - Emit `escalation:decision` events with reasons, budgets, and counts.
+  - Metrics: escalation rate, average AST files parsed, added precision, time spent per layer.
+- **Config Surface**:
+  - `performance.escalation`: `{ policy, l1ConfidenceThreshold, l1AmbiguityMaxFiles, layer2: { budgetMs, maxCandidateFiles }, layer3: { budgetMs } }`.
+  - Env overrides for CI/local: `ESCALATION_POLICY`, `ESCALATION_L2_BUDGET_MS`, etc.
+- **Testing Plan**:
+  - Unit: gating logic (hit/miss cases, thresholds); candidate selection from L1 output; budget enforcement and cancellation.
+  - Integration: real repo fixture with ambiguous symbols (class/function same name); verify precision increases with bounded cost.
+  - Cross‑Adapter: def/ref consistency preserved with/without escalation; ensure MCP/LSP/HTTP/CLI parity.
+  - Performance: cap regression (e.g., L2 escalation stays <X ms; files parsed ≤ cap).
+- **Rollout**:
+  - Default `auto` with conservative thresholds; allow `never` to disable in constrained envs.
+  - Document knobs and provide sample configs (dev/ci/prod profiles).
+
 ### 3. Complete Plugin System Implementation
 - **Plugin Marketplace**: Build web UI and registry service
 - **Example Plugins**: Create additional plugins beyond the template
