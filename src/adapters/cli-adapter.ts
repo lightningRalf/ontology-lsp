@@ -88,10 +88,7 @@ export class CLIAdapter {
                 const top = items[0] ? `Top: ${formatDefinitionForCli(items[0])}` : 'Top: (none)';
                 return [header, top].join('\n');
             }
-            // Programmatic usage (tests): return structured data when options provided
-            if (options && (options.maxResults !== undefined || options.file !== undefined)) {
-                return items;
-            }
+            // Always return formatted output unless --json or --summary is used
             if (!options.verbose) {
                 const lines = [this.formatHeader(`Found ${result.data.length} definitions (showing ${items.length})`)];
                 for (const d of items) lines.push(`  ${formatDefinitionForCli(d)}`);
@@ -110,6 +107,7 @@ export class CLIAdapter {
     async handleReferences(
         identifier: string,
         options: {
+            file?: string;
             includeDeclaration?: boolean;
             maxResults?: number;
             json?: boolean;
@@ -120,7 +118,7 @@ export class CLIAdapter {
     ): Promise<any> {
         try {
             const request = buildFindReferencesRequest({
-                uri: normalizeUri('file://workspace'),
+                uri: normalizeUri(options.file || 'file://workspace'),
                 position: createPosition(0, 0),
                 identifier,
                 maxResults: options.maxResults || this.config.maxResults,
@@ -144,10 +142,7 @@ export class CLIAdapter {
                     2
                 );
             }
-            // Programmatic usage (tests): return structured data when options provided
-            if (options && (options.maxResults !== undefined || options.includeDeclaration !== undefined)) {
-                return items;
-            }
+            // Always return formatted output unless --json or --summary is used
             if (options.summary) {
                 const header = this.formatHeader(`Found ${result.data.length} references (showing ${items.length})`);
                 const top = items[0] ? `Top: ${formatReferenceForCli(items[0])}` : 'Top: (none)';

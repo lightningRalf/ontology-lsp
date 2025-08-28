@@ -322,8 +322,8 @@ export class CodeAnalyzer {
 
         try {
             const l1Base = (this.config as any)?.layers?.layer1?.timeout ??
-                (this.config as any)?.layers?.layer1?.grep?.defaultTimeout ?? 200;
-            const asyncTimeout = Math.max(3000, Math.min(15000, l1Base * 4));
+                (this.config as any)?.layers?.layer1?.grep?.defaultTimeout ?? 1000;
+            const asyncTimeout = Math.max(1000, Math.min(4000, l1Base));
             const asyncOptions: AsyncSearchOptions = {
                 pattern: `${this.escapeRegex(request.identifier)}`,
                 path: this.extractDirectoryFromUri(request.uri),
@@ -336,19 +336,26 @@ export class CodeAnalyzer {
 
             const streamingResults = await this.asyncSearchTools.search(asyncOptions);
 
-            // Convert to Reference objects
-            const references: Reference[] = streamingResults.map((result) => ({
-                uri: this.pathToFileUri(result.file),
-                range: {
-                    start: { line: (result.line || 1) - 1, character: result.column || 0 },
-                    end: { line: (result.line || 1) - 1, character: (result.column || 0) + request.identifier.length },
-                },
-                kind: this.inferReferenceKind(result.text),
-                name: request.identifier,
-                source: 'exact' as const,
-                confidence: result.confidence,
-                layer: 'async-layer1',
-            }));
+            // Convert to Reference objects and de-duplicate by location
+            const seen = new Set<string>();
+            const references: Reference[] = [];
+            for (const result of streamingResults) {
+                const key = `${result.file}:${result.line ?? 0}:${result.column ?? 0}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                references.push({
+                    uri: this.pathToFileUri(result.file),
+                    range: {
+                        start: { line: (result.line || 1) - 1, character: result.column || 0 },
+                        end: { line: (result.line || 1) - 1, character: (result.column || 0) + request.identifier.length },
+                    },
+                    kind: this.inferReferenceKind(result.text),
+                    name: request.identifier,
+                    source: 'exact' as const,
+                    confidence: result.confidence,
+                    layer: 'async-layer1',
+                });
+            }
 
             let layer1Time = Date.now() - startTime;
             let layer2Time = 0;

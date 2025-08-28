@@ -59,6 +59,7 @@ class CLI {
         this.program
             .command('references <identifier>')
             .description('Find all references to a symbol')
+            .option('-f, --file <path>', 'Specific file or directory context')
             .option('-d, --include-declaration', 'Include symbol declaration in results')
             .option('-n, --max-results <count>', 'Maximum results to search', '50')
             .option('-l, --limit <count>', 'Maximum results to print', '20')
@@ -69,6 +70,7 @@ class CLI {
             .action(async (identifier, options) => {
                 await this.ensureInitialized(options);
                 const result = await this.cliAdapter.handleReferences(identifier, {
+                    file: options.file,
                     includeDeclaration: options.includeDeclaration,
                     maxResults: parseInt(options.maxResults),
                     limit: parseInt(options.limit),

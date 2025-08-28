@@ -493,8 +493,10 @@ export class AsyncEnhancedGrep {
                 if (options.timeout) {
                     timeout = setTimeout(() => {
                         if (process) {
-                            process.kill('SIGTERM');
-                            emitter.emit('error', new Error(`Search timeout after ${options.timeout}ms`));
+                            try { process.kill('SIGTERM'); } catch {}
+                            // Graceful end with partial results on timeout
+                            rl.close();
+                            emitter.emit('end');
                         }
                     }, options.timeout);
                 }
