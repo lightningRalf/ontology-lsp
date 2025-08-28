@@ -9,13 +9,13 @@
  * 5. Enabling parallel searches
  */
 
-import { spawn, ChildProcess } from 'child_process';
-import { EventEmitter } from 'events';
-import * as fs from 'fs/promises';
-import * as fsSync from 'fs';
-import * as path from 'path';
-import { createReadStream } from 'fs';
-import { createInterface } from 'readline';
+import { type ChildProcess, spawn } from 'node:child_process';
+import { EventEmitter } from 'node:events';
+import * as fsSync from 'node:fs';
+import { createReadStream } from 'node:fs';
+import type * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import { createInterface } from 'node:readline';
 
 // Types
 export interface StreamingGrepResult {
@@ -402,7 +402,7 @@ export class AsyncEnhancedGrep {
     searchStream(options: AsyncSearchOptions): SearchStream {
         const emitter = new EventEmitter() as SearchStream;
         const startTime = Date.now();
-        let filesSearched = 0;
+        const filesSearched = 0;
         let matchesFound = 0;
         let cancelled = false;
         let process: ChildProcess | null = null;
@@ -432,7 +432,7 @@ export class AsyncEnhancedGrep {
                 if (cached) {
                     // Emit cached results with proper timing delays to simulate streaming
                     let delay = 0;
-                    let timeouts: NodeJS.Timeout[] = [];
+                    const timeouts: NodeJS.Timeout[] = [];
                     
                     for (let i = 0; i < cached.length; i++) {
                         if (cancelled) break;
@@ -594,6 +594,12 @@ export class AsyncEnhancedGrep {
                     emitter.emit('end');
                 });
 
+                // Ensure end event is emitted even when rg produces no stdout
+                process.on('close', () => {
+                    if (timeout) clearTimeout(timeout);
+                    emitter.emit('end');
+                });
+
             } catch (error) {
                 emitter.emit('error', error as Error);
                 emitter.emit('end');
@@ -731,10 +737,7 @@ export class AsyncEnhancedGrep {
     private buildRipgrepArgs(options: AsyncSearchOptions): string[] {
         const args: string[] = [];
 
-        // Pattern (already escaped if needed)
-        args.push(options.pattern);
-
-        // Performance optimizations
+        // Performance optimizations (flags before pattern)
         args.push('--no-heading');        // No file headers
         args.push('--line-number');       // Include line numbers
         args.push('--column');            // Include column numbers for precise ranges
@@ -770,7 +773,10 @@ export class AsyncEnhancedGrep {
         // Options
         if (options.caseInsensitive) args.push('-i');
         if (options.includeHidden) args.push('--hidden');
-        
+
+        // Pattern (already escaped if needed)
+        args.push(options.pattern);
+
         // Path (default to current directory)
         args.push(options.path || '.');
 
