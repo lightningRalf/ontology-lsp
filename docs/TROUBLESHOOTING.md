@@ -431,7 +431,7 @@ TEST_ENV=debug bun test tests/performance.test.ts
    cat claude-desktop-config.json
    
    # Test MCP server
-   bun run src/servers/mcp.ts
+   bun run dist/mcp/mcp.js
    ```
 
 2. **Check MCP HTTP Connection:**
