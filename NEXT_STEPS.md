@@ -86,7 +86,7 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 - **Perf Benchmarks**: Tune Layer 1 budget/timeouts in perf tests or mock FS for determinism
 - **Budgets**: Lock performance budgets; guardrail on >20% regressions
 - **Fixtures**: Add synthetic large-tree fixture for race tests (deterministic)
- - **Consistency Alignment**: Align MCP vs Core definition result normalization. Investigate `src/adapters/mcp-adapter.ts` vs `CodeAnalyzer.findDefinition`. Repro: `bun test tests/consistency.test.ts --timeout 180000`.
+- **Cross‑Protocol Consistency**: Monitor in CI; ensure MCP/LSP/HTTP/CLI parity remains stable under deterministic budgets. Repro: `bun test tests/consistency.test.ts --timeout 180000`.
  - **Enhanced Search Caps**: Enforce result cap in async aggregator or adjust test threshold to configured cap. Repro: `bun test tests/enhanced-search-async.test.ts` (fails large result set efficiency).
   - **Layer 1 Timeouts**: Increase LS directory analysis timeout and Layer 1 budget in perf suite or gate by env. Repro: `bun test tests/performance.test.ts --timeout 300000`.
 
@@ -96,6 +96,14 @@ See PROJECT_STATUS.md for achievements and historical context. -->
   - Restore stricter test assertions that verify a real `result` payload structure.
 - **E2E Gating**: Entire E2E suite is gated behind `E2E=1` to avoid environment flakiness. Run with `bun run test:e2e` when local repos/services are available.
 - **Perf Gating**: Perf/benchmarks are gated behind `PERF=1`. Use `bun run test:perf` to execute them.
+
+### 9.2 Async‑First Cascade (Complete)
+- Core `findDefinition` / `findReferences` now delegate to async fast‑path only (legacy cascade removed from hot path).
+- Removed LayerManager gating timeouts; budgets/cancellation enforced by async search.
+- CLI + adapters benefit automatically; CLI explicitly uses async methods.
+- Follow‑ups:
+  - Optionally delete unreachable legacy cascade blocks in `unified-analyzer.ts` once suites remain green.
+  - Centralize async budgets under config (e.g., `layers.layer1.grep.defaultTimeout` + a global cap).
 
 #### Failing Tests (non-performance snapshot)
 Timestamp: 2025-08-28T05:29:31Z
