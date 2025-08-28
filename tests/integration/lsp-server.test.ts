@@ -141,9 +141,6 @@ async function sendRequest(proc: ChildProcess, request: any, timeoutMs = 5000): 
                 try {
                     const parsed = JSON.parse(jsonStr);
                     if (parsed && parsed.id === request.id) {
-                        // Debug: show exact payload for investigation
-                        // eslint-disable-next-line no-console
-                        console.error('LSP response', JSON.stringify(parsed));
                         cleanup();
                         resolve(parsed);
                         return;
