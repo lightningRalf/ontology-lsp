@@ -7,6 +7,8 @@
  */
 
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
+const perfOnly = process.env.PERF === '1';
+const perfDescribe = perfOnly ? describe : describe.skip;
 import { CodeAnalyzer } from "../src/core/unified-analyzer.js";
 import { LayerManager } from "../src/core/layer-manager.js";
 import { SharedServices } from "../src/core/services/index.js";
@@ -1076,7 +1078,7 @@ describe("Cross-Protocol Consistency", () => {
     });
   });
 
-  describe("Performance Consistency", () => {
+  perfDescribe("Performance Consistency", () => {
     test("should maintain consistent performance characteristics across protocols", async () => {
       const iterations = 20;
       const performanceMetrics: Record<string, number[]> = {

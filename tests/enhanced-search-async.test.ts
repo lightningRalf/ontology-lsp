@@ -6,6 +6,8 @@
  */
 
 import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
+const perfOnly = process.env.PERF === '1';
+const perfDescribe = perfOnly ? describe : describe.skip;
 import { 
     AsyncEnhancedGrep, 
     SearchStream,
@@ -243,7 +245,7 @@ describe('Async Enhanced Search Performance', () => {
         });
     });
 
-    describe('Performance Benchmarks', () => {
+    perfDescribe('Performance Benchmarks', () => {
         test('Layer 1 performance should meet 50ms target', async () => {
             const iterations = 20;
             const times: number[] = [];

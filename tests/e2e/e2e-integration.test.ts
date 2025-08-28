@@ -1,4 +1,6 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test"
+const perfOnly = process.env.PERF === '1';
+const perfDescribe = perfOnly ? describe : describe.skip;
 import { spawn, type ChildProcess } from "node:child_process"
 import { promises as fs } from "node:fs"
 import { join, resolve } from "node:path"
@@ -393,7 +395,7 @@ describe("End-to-End Integration Tests", () => {
     }, 120000) // 2 minutes for edge case testing
   })
 
-  describe("Performance Benchmarking with Real Codebases", () => {
+  perfDescribe("Performance Benchmarking with Real Codebases", () => {
     test("should run comprehensive performance benchmarks", async () => {
       const benchmarkReports: BenchmarkReport[] = []
 
@@ -535,7 +537,7 @@ describe("End-to-End Integration Tests", () => {
     }, 300000) // 5 minutes for scaling analysis
   })
 
-  describe("Advanced Memory Management and Validation", () => {
+  perfDescribe("Advanced Memory Management and Validation", () => {
     test("should perform comprehensive memory validation", async () => {
       const memoryReports: MemoryValidationReport[] = []
       

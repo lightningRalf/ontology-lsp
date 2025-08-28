@@ -30,6 +30,8 @@
     "start:mcp": "bun run src/servers/mcp.ts",
     "dev": "bun run src/servers/lsp.ts",
     "test": "bun test",
+    "test:nonperf": "bun test",
+    "test:perf": "PERF=1 bun test tests/performance tests/benchmarks",
     "test:mcp": "bun test test/adapters/mcp.test.ts",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",

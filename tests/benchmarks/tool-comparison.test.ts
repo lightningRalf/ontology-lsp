@@ -10,6 +10,8 @@
  */
 
 import { describe, test, beforeAll, afterAll } from "bun:test"
+const perfOnly = process.env.PERF === '1';
+const perfDescribe = perfOnly ? describe : describe.skip;
 import { performance } from "perf_hooks"
 import { execSync } from "child_process"
 import * as fs from "fs/promises"
@@ -420,7 +422,7 @@ export class LargeClass {
 }
 
 // Main benchmark suite
-describe("Tool Performance Benchmarks", () => {
+perfDescribe("Tool Performance Benchmarks", () => {
   let benchmarkRunner: BenchmarkRunner
   let claudeTools: ClaudeToolResults
   let enhancedGrep: EnhancedGrep
