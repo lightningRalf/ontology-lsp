@@ -84,7 +84,35 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 - **Fixtures**: Add synthetic large-tree fixture for race tests (deterministic)
  - **Consistency Alignment**: Align MCP vs Core definition result normalization. Investigate `src/adapters/mcp-adapter.ts` vs `CodeAnalyzer.findDefinition`. Repro: `bun test tests/consistency.test.ts --timeout 180000`.
  - **Enhanced Search Caps**: Enforce result cap in async aggregator or adjust test threshold to configured cap. Repro: `bun test tests/enhanced-search-async.test.ts` (fails large result set efficiency).
- - **Layer 1 Timeouts**: Increase LS directory analysis timeout and Layer 1 budget in perf suite or gate by env. Repro: `bun test tests/performance.test.ts --timeout 300000`.
+  - **Layer 1 Timeouts**: Increase LS directory analysis timeout and Layer 1 budget in perf suite or gate by env. Repro: `bun test tests/performance.test.ts --timeout 300000`.
+
+#### Failing Tests (non-performance snapshot)
+Timestamp: 2025-08-28T04:48:18Z
+
+- `tests/benchmarks/tool-comparison.test.ts:572`: Cached vs uncached performance
+- `tests/benchmarks/tool-comparison.test.ts:513`: Case-insensitive search
+- `tests/benchmarks/tool-comparison.test.ts:616`: Complex pattern matching
+- `tests/benchmarks/tool-comparison.test.ts:484`: Complex regex pattern
+- `tests/benchmarks/tool-comparison.test.ts:772`: Memory efficiency comparison
+- `tests/integration/lsp-server.test.ts:103`: Server handles concept graph request
+- `tests/integration/lsp-server.test.ts:89`: Server handles custom ontology requests
+- `tests/integration/lsp-server.test.ts:74`: Server handles definition request
+- `tests/integration/lsp-server.test.ts:59`: Server handles hover request
+- `tests/integration/lsp-server.test.ts:42`: Server responds to initialize request
+- `tests/e2e/e2e-integration.test.ts:704`: should demonstrate comprehensive learning effectiveness
+- `tests/e2e/e2e-integration.test.ts:841`: should demonstrate pattern learning persistence and evolution
+- `tests/e2e/e2e-integration.test.ts:464`: should demonstrate performance scaling across repository sizes
+- `tests/e2e/e2e-integration.test.ts:293`: should handle edge cases consistently across protocols
+- `tests/enhanced-search-async.test.ts:272`: should handle large result sets efficiently
+- `tests/consistency.test.ts:854`: should maintain cache coherence across protocol boundaries
+- `tests/consistency.test.ts:1080`: should maintain consistent performance characteristics across protocols
+- `tests/learning-system.test.ts:257`: should orchestrate comprehensive learning from diverse input
+- `tests/e2e/e2e-integration.test.ts:539`: should perform comprehensive memory validation
+- `tests/consistency.test.ts:240`: should return consistent definition results across all protocols
+- `tests/e2e/e2e-integration.test.ts:211`: should validate comprehensive protocol consistency
+- `tests/benchmarks/tool-comparison.test.ts:593`: Simple pattern matching
+- `tests/benchmarks/tool-comparison.test.ts:451`: Simple pattern search
+- `tests/benchmarks/tool-comparison.test.ts:542`: Type-specific search
 
 ### 10. Release & CI/CD (New)
 - **Semantic Versioning**: Adopt conventional commits + automated release notes
