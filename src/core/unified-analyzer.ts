@@ -146,7 +146,7 @@ export class CodeAnalyzer {
                 timeout: asyncTimeout,
                 caseInsensitive: true,
                 fileType: this.getFileTypeFromUri(request.uri),
-                excludePaths: ['node_modules', 'dist', '.git', 'coverage'],
+                excludePaths: ['node_modules', 'dist', '.git', 'coverage', '.e2e-test-workspace', 'logs', 'out', 'build'],
             };
 
             const streamingResults = await this.asyncSearchTools.search(asyncOptions);
@@ -331,6 +331,7 @@ export class CodeAnalyzer {
                 timeout: asyncTimeout,
                 caseInsensitive: true,
                 fileType: this.getFileTypeFromUri(request.uri),
+                excludePaths: ['node_modules', 'dist', '.git', 'coverage', '.e2e-test-workspace', 'logs', 'out', 'build'],
             };
 
             const streamingResults = await this.asyncSearchTools.search(asyncOptions);
