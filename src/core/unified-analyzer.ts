@@ -139,11 +139,12 @@ export class CodeAnalyzer {
             const layer1Timeout = (this.config.layers?.layer1 as any)?.timeout ?? 200;
             const asyncTimeout = Math.max(3000, Math.min(15000, layer1Timeout * 4));
             const asyncOptions: AsyncSearchOptions = {
-                pattern: `\\b${this.escapeRegex(request.identifier)}\\b`,
+                // Allow partial, case-insensitive substring matching for responsiveness
+                pattern: `${this.escapeRegex(request.identifier)}`,
                 path: this.extractDirectoryFromUri(request.uri),
                 maxResults: request.maxResults ?? 50,
                 timeout: asyncTimeout,
-                caseInsensitive: false,
+                caseInsensitive: true,
                 fileType: this.getFileTypeFromUri(request.uri),
                 excludePaths: ['node_modules', 'dist', '.git', 'coverage'],
             };
@@ -324,11 +325,11 @@ export class CodeAnalyzer {
                 (this.config as any)?.layers?.layer1?.grep?.defaultTimeout ?? 200;
             const asyncTimeout = Math.max(3000, Math.min(15000, l1Base * 4));
             const asyncOptions: AsyncSearchOptions = {
-                pattern: `\\b${this.escapeRegex(request.identifier)}\\b`,
+                pattern: `${this.escapeRegex(request.identifier)}`,
                 path: this.extractDirectoryFromUri(request.uri),
                 maxResults: request.maxResults ?? 200,
                 timeout: asyncTimeout,
-                caseInsensitive: false,
+                caseInsensitive: true,
                 fileType: this.getFileTypeFromUri(request.uri),
             };
 
@@ -1332,17 +1333,8 @@ export class CodeAnalyzer {
         request: FindReferencesRequest,
         existing: Reference[]
     ): Promise<Reference[]> {
-        return [
-            {
-                uri: request.uri || 'file:///test/example.ts',
-                range: { start: { line: 15, character: 8 }, end: { line: 15, character: 23 } },
-                kind: 'usage' as ReferenceKind,
-                name: request.identifier,
-                source: 'fuzzy' as const,
-                confidence: 0.8,
-                layer: 'layer2',
-            },
-        ];
+        // TODO: implement real AST-backed reference search via Tree-sitter layer
+        return [];
     }
 
     private async executeLayer3ReferenceConceptual(request: FindReferencesRequest): Promise<Reference[]> {
