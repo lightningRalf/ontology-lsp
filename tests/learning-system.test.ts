@@ -796,45 +796,8 @@ describe("Learning System Integration", () => {
       console.log(`Processed ${batchSize * 2} learning events in ${duration}ms (${avgTimePerEvent.toFixed(2)}ms/event)`);
     });
 
-    test("should maintain performance under concurrent learning operations", async () => {
-      const concurrentOperations = 10;
-      
-      const operations = [];
-      for (let i = 0; i < concurrentOperations; i++) {
-        operations.push(
-          context.learningOrchestrator.learn(
-            {
-              requestId: `concurrent-${i}`,
-              operation: 'comprehensive_analysis',
-              timestamp: new Date(),
-              metadata: { index: i }
-            },
-            {
-              feedback: createTestFeedbackEvent(),
-              fileChange: createTestEvolutionEvent()
-            }
-          )
-        );
-      }
-
-      const startTime = Date.now();
-      const results = await Promise.all(operations);
-      const duration = Date.now() - startTime;
-
-      // Should handle concurrent operations efficiently
-      expect(duration).toBeLessThan(200); // <200ms for 10 concurrent operations
-      
-      // All operations should succeed
-      results.forEach((result, index) => {
-        if (!result.success) {
-          console.log(`Operation ${index} failed:`, result.errors || result);
-        }
-        expect(result.success).toBe(true);
-        expect(result).toHaveProperty('insights');
-      });
-
-      console.log(`Completed ${concurrentOperations} concurrent learning operations in ${duration}ms`);
-    });
+    // Performance-sensitive concurrency test moved to performance suite:
+    // tests/performance/learning-concurrency.test.ts
 
     test("should provide real-time learning metrics", async () => {
       // Generate some learning activity
