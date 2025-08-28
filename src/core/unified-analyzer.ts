@@ -136,8 +136,8 @@ export class CodeAnalyzer {
             }
             // Use AsyncEnhancedGrep as primary search method
             // Use a short timeout derived from layer1 config to avoid long blocking
-            const layer1Timeout = (this.config.layers?.layer1 as any)?.timeout ?? 200;
-            const asyncTimeout = Math.max(3000, Math.min(15000, layer1Timeout * 4));
+            const layer1Timeout = (this.config.layers?.layer1 as any)?.timeout ?? 1000;
+            const asyncTimeout = Math.max(1000, Math.min(4000, layer1Timeout));
             const asyncOptions: AsyncSearchOptions = {
                 // Allow partial, case-insensitive substring matching for responsiveness
                 pattern: `${this.escapeRegex(request.identifier)}`,
@@ -151,19 +151,28 @@ export class CodeAnalyzer {
 
             const streamingResults = await this.asyncSearchTools.search(asyncOptions);
 
-            // Convert streaming results to Definition objects
-            const definitions: Definition[] = streamingResults.map((result) => ({
-                uri: this.pathToFileUri(result.file),
-                range: {
-                    start: { line: (result.line || 1) - 1, character: result.column || 0 },
-                    end: { line: (result.line || 1) - 1, character: (result.column || 0) + request.identifier.length },
-                },
-                kind: this.inferDefinitionKind(result.text),
-                name: request.identifier,
-                source: 'exact' as const,
-                confidence: result.confidence,
-                layer: 'async-layer1',
-            }));
+            // Convert streaming results to Definition objects with full token expansion
+            const definitions: Definition[] = [];
+            const seenDef = new Set<string>();
+            for (const result of streamingResults) {
+                const exp = this.expandToken(result.text || '', (result.column ?? 1) - 1);
+                const uri = this.pathToFileUri(result.file);
+                const key = `${uri}:${(result.line || 1) - 1}:${exp.start}`;
+                if (seenDef.has(key)) continue;
+                seenDef.add(key);
+                definitions.push({
+                    uri,
+                    range: {
+                        start: { line: (result.line || 1) - 1, character: exp.start },
+                        end: { line: (result.line || 1) - 1, character: exp.end },
+                    },
+                    kind: this.inferDefinitionKind(result.text),
+                    name: exp.token || request.identifier,
+                    source: 'exact' as const,
+                    confidence: result.confidence,
+                    layer: 'async-layer1',
+                });
+            }
 
             let layer1Time = Date.now() - startTime;
             let layer2Time = 0;
@@ -343,14 +352,15 @@ export class CodeAnalyzer {
                 const key = `${result.file}:${result.line ?? 0}:${result.column ?? 0}`;
                 if (seen.has(key)) continue;
                 seen.add(key);
+                const exp = this.expandToken(result.text || '', (result.column ?? 1) - 1);
                 references.push({
                     uri: this.pathToFileUri(result.file),
                     range: {
-                        start: { line: (result.line || 1) - 1, character: result.column || 0 },
-                        end: { line: (result.line || 1) - 1, character: (result.column || 0) + request.identifier.length },
+                        start: { line: (result.line || 1) - 1, character: exp.start },
+                        end: { line: (result.line || 1) - 1, character: exp.end },
                     },
                     kind: this.inferReferenceKind(result.text),
-                    name: request.identifier,
+                    name: exp.token || request.identifier,
                     source: 'exact' as const,
                     confidence: result.confidence,
                     layer: 'async-layer1',
@@ -361,14 +371,28 @@ export class CodeAnalyzer {
             let layer2Time = 0;
             let finalRefs: Reference[] = references;
 
+            // Precision nudge for partial identifiers: if ambiguous, keep the dominant token only
+            const distinctNames = new Map<string, number>();
+            for (const r of references) distinctNames.set(r.name || '', (distinctNames.get(r.name || '') || 0) + 1);
+            const distinctCount = [...distinctNames.keys()].filter(Boolean).length;
+            const totalCount = references.length;
+            if (totalCount > 50 || distinctCount > 3) {
+                const topName = [...distinctNames.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+                if (topName) {
+                    const t0 = Date.now();
+                    finalRefs = references.filter((r) => r.name === topName);
+                    layer2Time += Date.now() - t0; // account as precision step time
+                }
+            }
+
             // Minimal escalation for references: only when empty and policy allows
             const policy = this.config.performance?.escalation?.policy ?? 'auto';
-            const shouldEscalateRefs = policy === 'always' || (policy === 'auto' && references.length === 0);
+            const shouldEscalateRefs = policy === 'always' || (policy === 'auto' && finalRefs.length === 0);
             if (policy !== 'never' && shouldEscalateRefs) {
                 const budget = this.config.performance?.escalation?.layer2?.budgetMs ?? 75;
                 const escStart = Date.now();
                 try {
-                    const escalatePromise = this.executeLayer2ReferenceAnalysis(request, references);
+                    const escalatePromise = this.executeLayer2ReferenceAnalysis(request, finalRefs);
                     const timeoutPromise = new Promise<Reference[]>((resolve) =>
                         setTimeout(() => resolve([]), Math.max(0, budget))
                     );
@@ -380,7 +404,7 @@ export class CodeAnalyzer {
                         const keyOf = (r: Reference) =>
                             `${r.uri}:${r.range.start.line}:${r.range.start.character}`;
                         const merged: Reference[] = [];
-                        for (const r of references) {
+                        for (const r of finalRefs) {
                             const k = keyOf(r);
                             if (!seen.has(k)) {
                                 seen.add(k);
@@ -1341,8 +1365,54 @@ export class CodeAnalyzer {
         request: FindReferencesRequest,
         existing: Reference[]
     ): Promise<Reference[]> {
-        // TODO: implement real AST-backed reference search via Tree-sitter layer
-        return [];
+        // Use the real TreeSitterLayer to validate references with a tiny budget
+        const layer = this.layerManager.getLayer('layer2');
+        if (!layer) return [];
+
+        try {
+            // Candidate files from existing references
+            const candidateFiles = new Set<string>();
+            for (const r of existing) {
+                const path = this.fileUriToPath(r.uri);
+                if (path) candidateFiles.add(path);
+            }
+            if (candidateFiles.size === 0) return [];
+
+            // Build EnhancedMatches with just the candidate file set
+            const enhancedMatches = {
+                exact: [],
+                fuzzy: [],
+                conceptual: [],
+                files: candidateFiles,
+                searchTime: 0,
+            } as any;
+
+            const result = await layer.process(enhancedMatches);
+            const nodes = result?.nodes || [];
+
+            // Filter references that are backed by an AST node with the same token at that location
+            const validated: Reference[] = [];
+            for (const ref of existing) {
+                const filePath = this.fileUriToPath(ref.uri);
+                const line = ref.range.start.line;
+                const ch = ref.range.start.character;
+                const token = ref.name || '';
+                const match = nodes.some((n: any) => {
+                    if (!n?.id || !n?.range) return false;
+                    if (!n.id.startsWith(filePath + ':')) return false;
+                    const r = n.range;
+                    const covers = r.start?.line === line && r.start?.character <= ch && r.end?.character >= ch;
+                    const sameText = typeof n.text === 'string' ? n.text === token : true;
+                    return covers && sameText;
+                });
+                if (match) validated.push(ref);
+            }
+
+            return validated;
+        } catch (error) {
+            console.warn('Layer 2 reference validation failed:', error);
+            return [];
+        }
     }
 
     private async executeLayer3ReferenceConceptual(request: FindReferencesRequest): Promise<Reference[]> {
@@ -1986,6 +2056,20 @@ export class CodeAnalyzer {
         if (text.includes('import') || text.includes('from')) return 'import';
         if (text.includes('=')) return 'write';
         return 'read';
+    }
+
+    /**
+     * Expand token around a given column to full word boundaries (alphanumeric or underscore)
+     */
+    private expandToken(lineText: string, column: number): { start: number; end: number; token: string } {
+        if (!lineText) return { start: Math.max(0, column), end: Math.max(0, column), token: '' };
+        let start = Math.max(0, column);
+        let end = Math.min(lineText.length, column);
+        const isWord = (ch: string) => /[A-Za-z0-9_]/.test(ch);
+        while (start > 0 && isWord(lineText[start - 1])) start--;
+        while (end < lineText.length && isWord(lineText[end])) end++;
+        const token = lineText.slice(start, end);
+        return { start, end, token };
     }
 
     /**

@@ -1,5 +1,9 @@
 #!/usr/bin/env bun
 
+// Suppress background metrics and any stdio noise in CLI context
+process.env.SILENT_MODE = 'true';
+process.env.STDIO_MODE = 'true';
+
 /**
  * CLI Tool - Thin wrapper around unified core
  *
