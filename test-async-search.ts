@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { AsyncEnhancedGrep } from './src/layers/enhanced-search-tools-async.js';
-import * as path from 'path';
+import * as path from 'node:path';
 
 async function testAsyncSearch() {
   console.log("🔍 Testing AsyncEnhancedGrep directly");

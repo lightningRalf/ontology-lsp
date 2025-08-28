@@ -164,20 +164,74 @@ export class CodeAnalyzer {
                 layer: 'async-layer1',
             }));
 
+            let layer1Time = Date.now() - startTime;
+            let layer2Time = 0;
+            let finalDefs: Definition[] = definitions;
+
+            // Smart Escalation v2 (configurable, deterministic)
+            const policy = this.config.performance?.escalation?.policy ?? 'auto';
+            if (policy !== 'never') {
+                const shouldEscalate =
+                    policy === 'always' || this.shouldEscalateDefinitionsAuto(definitions, request.identifier);
+                if (shouldEscalate) {
+                    const budget = this.config.performance?.escalation?.layer2?.budgetMs ?? 75;
+                    const candidateFiles = new Set(definitions.map((d) => this.fileUriToPath(d.uri)));
+                    const escStart = Date.now();
+                    try {
+                        const escalatePromise = this.executeLayer2Analysis(
+                            request,
+                            definitions,
+                            candidateFiles
+                        );
+                        const timeoutPromise = new Promise<Definition[]>((resolve) =>
+                            setTimeout(() => resolve([]), Math.max(0, budget))
+                        );
+                        const layer2Defs = await Promise.race([escalatePromise, timeoutPromise]);
+                        layer2Time = Date.now() - escStart;
+
+                        if (layer2Defs && layer2Defs.length > 0) {
+                            // Merge, de-duplicate by uri:line:char
+                            const seen = new Set<string>();
+                            const keyOf = (d: Definition) =>
+                                `${d.uri}:${d.range.start.line}:${d.range.start.character}`;
+                            const merged: Definition[] = [];
+                            for (const d of definitions) {
+                                const k = keyOf(d);
+                                if (!seen.has(k)) {
+                                    seen.add(k);
+                                    merged.push(d);
+                                }
+                            }
+                            for (const d of layer2Defs) {
+                                const k = keyOf(d);
+                                if (!seen.has(k)) {
+                                    seen.add(k);
+                                    merged.push(d);
+                                }
+                            }
+                            finalDefs = merged;
+                        }
+                    } catch {
+                        // Ignore escalation errors for stability
+                        layer2Time = Date.now() - escStart;
+                    }
+                }
+            }
+
             const performance: LayerPerformance = {
-                layer1: Date.now() - startTime,
-                layer2: 0,
+                layer1: layer1Time,
+                layer2: layer2Time,
                 layer3: 0,
                 layer4: 0,
                 layer5: 0,
-                total: Date.now() - startTime,
+                total: layer1Time + layer2Time,
             };
 
             // Cache results
-            const ttl = this.calculateOptimalCacheTtl(definitions, 'mixed');
-            await this.sharedServices.cache.set(cacheKey, definitions, ttl);
+            const ttl = this.calculateOptimalCacheTtl(finalDefs, 'mixed');
+            await this.sharedServices.cache.set(cacheKey, finalDefs, ttl);
 
-            return { data: definitions, performance, requestId, cacheHit: false, timestamp: Date.now() };
+            return { data: finalDefs, performance, requestId, cacheHit: false, timestamp: Date.now() };
         } catch (error) {
             throw this.createError(
                 `Async find definition failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -294,21 +348,65 @@ export class CodeAnalyzer {
                 layer: 'async-layer1',
             }));
 
+            let layer1Time = Date.now() - startTime;
+            let layer2Time = 0;
+            let finalRefs: Reference[] = references;
+
+            // Minimal escalation for references: only when empty and policy allows
+            const policy = this.config.performance?.escalation?.policy ?? 'auto';
+            const shouldEscalateRefs = policy === 'always' || (policy === 'auto' && references.length === 0);
+            if (policy !== 'never' && shouldEscalateRefs) {
+                const budget = this.config.performance?.escalation?.layer2?.budgetMs ?? 75;
+                const escStart = Date.now();
+                try {
+                    const escalatePromise = this.executeLayer2ReferenceAnalysis(request, references);
+                    const timeoutPromise = new Promise<Reference[]>((resolve) =>
+                        setTimeout(() => resolve([]), Math.max(0, budget))
+                    );
+                    const layer2Refs = await Promise.race([escalatePromise, timeoutPromise]);
+                    layer2Time = Date.now() - escStart;
+
+                    if (layer2Refs && layer2Refs.length > 0) {
+                        const seen = new Set<string>();
+                        const keyOf = (r: Reference) =>
+                            `${r.uri}:${r.range.start.line}:${r.range.start.character}`;
+                        const merged: Reference[] = [];
+                        for (const r of references) {
+                            const k = keyOf(r);
+                            if (!seen.has(k)) {
+                                seen.add(k);
+                                merged.push(r);
+                            }
+                        }
+                        for (const r of layer2Refs) {
+                            const k = keyOf(r);
+                            if (!seen.has(k)) {
+                                seen.add(k);
+                                merged.push(r);
+                            }
+                        }
+                        finalRefs = merged;
+                    }
+                } catch {
+                    layer2Time = Date.now() - escStart;
+                }
+            }
+
             const performance: LayerPerformance = {
-                layer1: Date.now() - startTime,
-                layer2: 0,
+                layer1: layer1Time,
+                layer2: layer2Time,
                 layer3: 0,
                 layer4: 0,
                 layer5: 0,
-                total: Date.now() - startTime,
+                total: layer1Time + layer2Time,
             };
 
             // Cache results
             const cacheKey = this.generateCacheKey('references', request);
-            const ttl = this.calculateOptimalCacheTtl(references, 'mixed');
-            await this.sharedServices.cache.set(cacheKey, references, ttl);
+            const ttl = this.calculateOptimalCacheTtl(finalRefs, 'mixed');
+            await this.sharedServices.cache.set(cacheKey, finalRefs, ttl);
 
-            return { data: references, performance, requestId, cacheHit: false, timestamp: Date.now() };
+            return { data: finalRefs, performance, requestId, cacheHit: false, timestamp: Date.now() };
         } catch (error) {
             throw this.createError(
                 `Async find references failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -317,6 +415,42 @@ export class CodeAnalyzer {
                 requestId
             );
         }
+    }
+
+    /**
+     * Auto gating for definitions based on Layer 1 signals
+     */
+    private shouldEscalateDefinitionsAuto(defs: Definition[], identifier: string): boolean {
+        if (defs.length === 0) return true;
+
+        const cfg = this.config.performance?.escalation;
+        const threshold = cfg?.l1ConfidenceThreshold ?? 0.75;
+        const maxFiles = cfg?.l1AmbiguityMaxFiles ?? 5;
+        const requireNameMatch = cfg?.l1RequireFilenameMatch ?? false;
+
+        // Top confidence below threshold => escalate
+        const topConfidence = Math.max(...defs.map((d) => d.confidence ?? 0));
+        if (topConfidence < threshold) return true;
+
+        // Too many distinct files suggests ambiguity
+        const distinctFiles = new Set(defs.map((d) => this.fileUriToPath(d.uri))).size;
+        if (distinctFiles > maxFiles) return true;
+
+        // Optional: require filename to include identifier
+        if (requireNameMatch) {
+            const anyMatch = defs.some((d) => {
+                try {
+                    const fp = this.fileUriToPath(d.uri);
+                    const base = path.basename(fp).toLowerCase();
+                    return base.includes(identifier.toLowerCase());
+                } catch {
+                    return false;
+                }
+            });
+            if (!anyMatch) return true;
+        }
+
+        return false;
     }
 
     /**

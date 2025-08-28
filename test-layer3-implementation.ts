@@ -10,8 +10,8 @@ import { LayerManager } from './src/core/layer-manager.js';
 import { SharedServices } from './src/core/services/shared-services.js';
 import { EventBusService } from './src/core/services/event-bus-service.js';
 import { CoreConfig, FindDefinitionRequest } from './src/core/types.js';
-import * as path from 'path';
-import * as fs from 'fs';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 
 async function testLayer3Implementation() {
   const testDbPath = path.join(process.cwd(), '.test-ontology', 'test-layer3.db');

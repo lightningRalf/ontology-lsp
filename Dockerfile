@@ -72,8 +72,8 @@ RUN echo "Building LSP Server..." && \
         --external tree-sitter-javascript \
         --external tree-sitter-python && \
     \
-    echo "Building MCP SSE Server..." && \
-    bun build src/servers/mcp-sse.ts --target=bun --outdir=dist/mcp --minify --sourcemap \
+    echo "Building MCP HTTP Server..." && \
+    bun build src/servers/mcp-http.ts --target=bun --outdir=dist/mcp-http --minify --sourcemap \
         --external tree-sitter \
         --external tree-sitter-typescript \
         --external tree-sitter-javascript \
@@ -159,7 +159,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 ENV NODE_ENV=production \
     LOG_LEVEL=info \
     HTTP_API_PORT=7000 \
-    MCP_SSE_PORT=7001 \
+    MCP_HTTP_PORT=7001 \
     LSP_SERVER_PORT=7002 \
     CACHE_TTL=3600 \
     DATABASE_PATH=/app/data/ontology.db \
@@ -190,9 +190,9 @@ echo "Starting HTTP API Server (port 7000)..."
 bun run dist/api/http.js --port=7000 > logs/http-api.log 2>&1 &
 echo $! > .ontology/pids/http-api.pid
 
-echo "Starting MCP SSE Server (port 7001)..."
-bun run dist/mcp/mcp-sse.js --port=7001 > logs/mcp-sse.log 2>&1 &
-echo $! > .ontology/pids/mcp-sse.pid
+echo "Starting MCP HTTP Server (port 7001)..."
+bun run dist/mcp-http/mcp-http.js --port=7001 > logs/mcp-http.log 2>&1 &
+echo $! > .ontology/pids/mcp-http.pid
 
 # Wait for services to start
 sleep 5
@@ -200,7 +200,7 @@ sleep 5
 echo "✅ All services started successfully!"
 echo "📊 Health endpoints:"
 echo "   - HTTP API: http://localhost:7000/health"
-echo "   - MCP SSE:  http://localhost:7001/health"
+echo "   - MCP HTTP: http://localhost:7001/health"
 echo "   - LSP:      TCP:7002"
 
 # Keep container running and monitor processes

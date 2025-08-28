@@ -37,7 +37,7 @@ Each adapter handles only its protocol concerns:
 | **LSP Adapter** | **MCP Adapter** | **HTTP Adapter** | **CLI Adapter** |
 |-----------------|-----------------|------------------|-----------------|
 | LSP message format | MCP tool calls | REST endpoints | Command parsing |
-| Text sync | SSE transport | JSON responses | Pretty output |
+| Text sync | Streamable HTTP transport | JSON responses | Pretty output |
 | Capabilities | Tool registration | CORS handling | Terminal colors |
 | Error codes | Parameter validation | OpenAPI spec | Progress indicators |
 

@@ -104,10 +104,10 @@ export class CodeAnalyzer implements ICodeAnalyzer {
 }
 ```
 
-### 2. MCP Adapter (adapters/mcp/index.ts)
+### 2. MCP Adapter (Streamable HTTP)
 
 ```typescript
-// adapters/mcp/index.ts
+// src/servers/mcp-http.ts
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CodeAnalyzer } from "../../core/analyzer"

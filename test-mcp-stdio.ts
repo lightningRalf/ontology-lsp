@@ -3,8 +3,8 @@
  * Test MCP stdio connection using Bun
  */
 
-import { spawn } from 'child_process';
-import { createInterface } from 'readline';
+import { spawn } from 'node:child_process';
+import { createInterface } from 'node:readline';
 
 // Spawn the MCP server
 const mcpServer = spawn('/home/lightningralf/.bun/bin/bun', [

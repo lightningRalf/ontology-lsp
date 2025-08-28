@@ -1,27 +1,40 @@
 // Claude Tools Layer - Integration with enhanced search tools (independent of Claude CLI)
 // Updated to use async streaming architecture for better performance
-import { 
-    Layer, SearchQuery, EnhancedMatches, Match, SearchContext, MatchCategory 
-} from '../types/core';
-import { 
-    ClaudeGrepParams, ClaudeGlobParams, ClaudeLSParams,
-    ClaudeGrepResult, ClaudeGlobResult, ClaudeLSResult,
-    GrepSearchStrategy, SearchVariant, HybridSearchResult,
-    ClaudeToolError, ClaudeToolsLayerConfig
-} from '../types/claude-tools';
+
 import * as path from 'path';
-import { 
-    AsyncEnhancedGrep, 
-    StreamingGrepResult, 
-    AsyncSearchOptions,
-    SearchStream 
-} from './enhanced-search-tools-async';
-import { 
-    EnhancedSearchTools, 
-    EnhancedGrepParams,
-    EnhancedGlobParams, 
-    EnhancedLSParams 
+import {
+    type ClaudeGlobParams,
+    type ClaudeGlobResult,
+    type ClaudeGrepParams,
+    type ClaudeGrepResult,
+    type ClaudeLSParams,
+    type ClaudeLSResult,
+    ClaudeToolError,
+    type ClaudeToolsLayerConfig,
+    type GrepSearchStrategy,
+    HybridSearchResult,
+    type SearchVariant,
+} from '../types/claude-tools';
+import {
+    type EnhancedMatches,
+    type Layer,
+    type Match,
+    type MatchCategory,
+    SearchContext,
+    type SearchQuery,
+} from '../types/core';
+import {
+    type EnhancedGlobParams,
+    type EnhancedGrepParams,
+    type EnhancedLSParams,
+    EnhancedSearchTools,
 } from './enhanced-search-tools';
+import {
+    AsyncEnhancedGrep,
+    type AsyncSearchOptions,
+    type SearchStream,
+    type StreamingGrepResult,
+} from './enhanced-search-tools-async';
 
 // Create enhanced search tools instance with optimized config (legacy sync)
 const searchTools = new EnhancedSearchTools({
@@ -30,27 +43,27 @@ const searchTools = new EnhancedSearchTools({
         useRipgrep: true,
         fallbackToNodeGrep: true,
         timeout: 10000, // 10 seconds
-        maxFileSize: 10 * 1024 * 1024 // 10MB
+        maxFileSize: 10 * 1024 * 1024, // 10MB
     },
     glob: {
         enableCache: true,
         timeout: 5000, // 5 seconds
         maxFiles: 5000,
-        respectGitignore: true
+        respectGitignore: true,
     },
     ls: {
         enableCache: true,
         timeout: 3000, // 3 seconds
-        maxEntries: 1000
-    }
+        maxEntries: 1000,
+    },
 });
 
 // Create async search tools instance with performance optimizations
 const asyncSearchTools = new AsyncEnhancedGrep({
-    maxProcesses: 4,        // 4x parallel search
-    cacheSize: 1000,        // Large cache for frequent queries  
-    cacheTTL: 60000,        // 1 minute cache TTL
-    defaultTimeout: 2000    // 2 second timeout for production performance
+    maxProcesses: 4, // 4x parallel search
+    cacheSize: 1000, // Large cache for frequent queries
+    cacheTTL: 60000, // 1 minute cache TTL
+    defaultTimeout: 2000, // 2 second timeout for production performance
 });
 
 // Wrapper functions to maintain compatibility with existing code
@@ -65,29 +78,28 @@ const Grep = async (params: ClaudeGrepParams): Promise<ClaudeGrepResult[] | stri
             timeout: 1500, // 1.5 seconds for production performance
             caseInsensitive: params['-i'],
             fileType: params.type,
-            excludePaths: ['node_modules', 'dist', '.git', 'coverage']
+            excludePaths: ['node_modules', 'dist', '.git', 'coverage'],
         };
-        
+
         const streamingResults = await asyncSearchTools.search(asyncParams);
-        
+
         // Convert StreamingGrepResult[] to ClaudeGrepResult[]
-        const claudeResults: ClaudeGrepResult[] = streamingResults.map(result => ({
+        const claudeResults: ClaudeGrepResult[] = streamingResults.map((result) => ({
             file: result.file,
             line: result.line,
             column: result.column,
             text: result.text,
             match: result.match,
-            context: undefined // Context not directly available in streaming format
+            context: undefined, // Context not directly available in streaming format
         }));
 
         // Return async results (empty results are valid, not a failure)
         return claudeResults;
         // This fallback code should only be reached if async search throws an exception
         // Empty results are not a failure - they indicate no matches were found
-
     } catch (error) {
         console.warn('Async search failed, falling back to sync search:', error);
-        
+
         try {
             // Fallback: Use legacy sync search only when async fails with an error
             const enhancedParams: EnhancedGrepParams = {
@@ -101,21 +113,20 @@ const Grep = async (params: ClaudeGrepParams): Promise<ClaudeGrepResult[] | stri
                 contextAfter: params['-A'],
                 contextAround: params['-C'],
                 multiline: params.multiline,
-                headLimit: params.head_limit
+                headLimit: params.head_limit,
             };
-            
+
             const syncResults = await searchTools.grep.search(enhancedParams);
-            
+
             // Convert to Claude-compatible format
-            return syncResults.map(result => ({
+            return syncResults.map((result) => ({
                 file: result.file,
                 line: result.line,
                 column: result.column,
                 text: result.text,
                 match: result.match,
-                context: result.context
+                context: result.context,
             }));
-            
         } catch (syncError) {
             console.warn('Both async and sync enhanced grep failed, returning empty results:', syncError);
             return [];
@@ -129,9 +140,9 @@ const Glob = async (params: ClaudeGlobParams): Promise<ClaudeGlobResult> => {
             pattern: params.pattern,
             path: params.path,
             sortByModified: true, // Enhanced feature
-            ignorePatterns: ['node_modules/**','dist/**','.git/**','coverage/**','**/*.tmp']
+            ignorePatterns: ['node_modules/**', 'dist/**', '.git/**', 'coverage/**', '**/*.tmp'],
         };
-        
+
         const result = await searchTools.glob.search(enhancedParams);
         return result.files;
     } catch (error) {
@@ -146,18 +157,18 @@ const LS = async (params: ClaudeLSParams): Promise<ClaudeLSResult> => {
             path: params.path,
             ignorePatterns: params.ignore,
             includeMetadata: true, // Enhanced feature
-            sortBy: 'name'
+            sortBy: 'name',
         };
-        
+
         const result = await searchTools.ls.list(enhancedParams);
-        
+
         // Convert to Claude-compatible format
-        return result.entries.map(entry => ({
+        return result.entries.map((entry) => ({
             name: entry.name,
             path: entry.path,
             type: entry.type,
             size: entry.size,
-            modified: entry.modified
+            modified: entry.modified,
         }));
     } catch (error) {
         console.warn('Enhanced LS failed, returning empty results:', error);
@@ -168,7 +179,7 @@ const LS = async (params: ClaudeLSParams): Promise<ClaudeLSResult> => {
 export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
     name = 'ClaudeToolsLayer';
     timeout = 200; // 200ms timeout for production performance with realistic I/O
-    
+
     private cache = new Map<string, { result: EnhancedMatches; timestamp: number }>();
     private bloomFilter = new Set<string>();
     private frequencyMap = new Map<string, number>();
@@ -176,23 +187,23 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
         searches: 0,
         cacheHits: 0,
         errors: 0,
-        avgResponseTime: 0
+        avgResponseTime: 0,
     };
-    
+
     private getErrorMessage(error: unknown): string {
         if (error instanceof Error) {
             return error.message;
         }
         return String(error);
     }
-    
+
     constructor(private config: ClaudeToolsLayerConfig) {}
-    
+
     async process(query: SearchQuery): Promise<EnhancedMatches> {
         const startTime = Date.now();
         const cacheKey = this.getCacheKey(query);
         this.performanceMetrics.searches++;
-        
+
         // Check cache first - fast path
         const cached = this.getFromCache(cacheKey);
         if (cached) {
@@ -201,11 +212,11 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             cached.searchTime = Date.now() - startTime;
             return cached;
         }
-        
+
         // Check bloom filter for negative results (only for queries we've searched before)
         // Note: Don't early return on empty bloom filter - that prevents first-time searches
-        const bloomFilterHit = this.config.optimization.bloomFilter && 
-                              this.bloomFilter.has(query.identifier + ':negative');
+        const bloomFilterHit =
+            this.config.optimization.bloomFilter && this.bloomFilter.has(query.identifier + ':negative');
         if (bloomFilterHit) {
             // We've searched for this before and found nothing
             return {
@@ -215,10 +226,10 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 files: new Set(),
                 searchTime: Date.now() - startTime,
                 toolsUsed: ['bloomFilter'],
-                confidence: 0.0
+                confidence: 0.0,
             };
         }
-        
+
         const matches: EnhancedMatches = {
             exact: [],
             fuzzy: [],
@@ -226,9 +237,9 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             files: new Set<string>(),
             searchTime: 0,
             toolsUsed: ['async-enhanced-grep', 'enhanced-glob', 'enhanced-ls'],
-            confidence: 0.0
+            confidence: 0.0,
         };
-        
+
         try {
             // Primary: Race content grep vs file discovery under a single budget; combine if both return quickly
             try {
@@ -244,14 +255,14 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             } catch (raceError) {
                 console.warn('Race (grep vs file discovery) failed, falling back:', raceError);
             }
-            
+
             // Fallback: Run all search strategies in parallel with enhanced tools
             const searchResults = await Promise.allSettled([
                 this.searchWithGrep(query, matches),
                 this.searchWithGlob(query, matches),
-                this.analyzeWithLS(query, matches)
+                this.analyzeWithLS(query, matches),
             ]);
-            
+
             // Log any search failures for debugging
             searchResults.forEach((result, index) => {
                 if (result.status === 'rejected') {
@@ -259,22 +270,23 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     console.warn(`Enhanced ${toolName} search failed:`, result.reason);
                 }
             });
-            
+
             matches.searchTime = Date.now() - startTime;
-            
+
             // Calculate overall confidence based on results
             const totalMatches = matches.exact.length + matches.fuzzy.length + matches.conceptual.length;
-            matches.confidence = totalMatches > 0 ? 
-                (matches.exact.length * 1.0 + matches.fuzzy.length * 0.8 + matches.conceptual.length * 0.6) / totalMatches :
-                0.0;
-            
+            matches.confidence =
+                totalMatches > 0
+                    ? (matches.exact.length * 1.0 + matches.fuzzy.length * 0.8 + matches.conceptual.length * 0.6) /
+                      totalMatches
+                    : 0.0;
+
             // Update caches and statistics
             this.updateCache(cacheKey, matches);
             this.updateStatistics(query, matches);
             this.updatePerformanceMetrics(Date.now() - startTime);
-            
+
             return matches;
-            
         } catch (error) {
             this.performanceMetrics.errors++;
             throw new ClaudeToolError(
@@ -306,7 +318,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
         const first = await Promise.race([
             contentCtrl.promise.then(() => 'content' as const),
             filesCtrl.promise.then(() => 'files' as const),
-            budgetPromise
+            budgetPromise,
         ]);
 
         if (first === 'content') this.mergeMatches(matches, contentCtrl.matches);
@@ -315,15 +327,20 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
         // Cancel the loser or on budget expiry
         if (first === 'content') filesCtrl.cancel();
         if (first === 'files') contentCtrl.cancel();
-        if (first === 'budget') { contentCtrl.cancel(); filesCtrl.cancel(); }
+        if (first === 'budget') {
+            contentCtrl.cancel();
+            filesCtrl.cancel();
+        }
 
         // Try to merge the other if it happened to finish within a short grace period
         const remaining = globalBudgetMs - (Date.now() - start);
         if (remaining > 120) {
             try {
                 const other = await Promise.race([
-                    first === 'content' ? filesCtrl.promise.then(() => 'files' as const) : contentCtrl.promise.then(() => 'content' as const),
-                    new Promise<'timeout'>(resolve => setTimeout(() => resolve('timeout'), remaining))
+                    first === 'content'
+                        ? filesCtrl.promise.then(() => 'files' as const)
+                        : contentCtrl.promise.then(() => 'content' as const),
+                    new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), remaining)),
                 ]);
                 if (other === 'content') this.mergeMatches(matches, contentCtrl.matches);
                 if (other === 'files') this.mergeMatches(matches, filesCtrl.matches);
@@ -336,20 +353,32 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
         target.exact.push(...src.exact);
         target.fuzzy.push(...src.fuzzy);
         target.conceptual.push(...src.conceptual);
-        src.files.forEach(f => target.files.add(f));
+        src.files.forEach((f) => target.files.add(f));
     }
 
-    private startContentFastPathCancellable(query: SearchQuery): { promise: Promise<void>; cancel: () => void; matches: EnhancedMatches } {
-        const matches: EnhancedMatches = { exact: [], fuzzy: [], conceptual: [], files: new Set(), searchTime: 0, toolsUsed: [], confidence: 0 };
+    private startContentFastPathCancellable(query: SearchQuery): {
+        promise: Promise<void>;
+        cancel: () => void;
+        matches: EnhancedMatches;
+    } {
+        const matches: EnhancedMatches = {
+            exact: [],
+            fuzzy: [],
+            conceptual: [],
+            files: new Set(),
+            searchTime: 0,
+            toolsUsed: [],
+            confidence: 0,
+        };
         const escapedId = this.escapeRegex(query.identifier);
         const strategies = [
             { name: 'exact', pattern: `\\b${escapedId}\\b`, timeout: 700, maxResults: 20, confidence: 1.0 },
             { name: 'prefix', pattern: `\\b${escapedId}\\w*`, timeout: 280, maxResults: 15, confidence: 0.95 },
-            { name: 'suffix', pattern: `\\w*${escapedId}\\b`, timeout: 280, maxResults: 15, confidence: 0.93 }
+            { name: 'suffix', pattern: `\\w*${escapedId}\\b`, timeout: 280, maxResults: 15, confidence: 0.93 },
         ];
 
         // Keep strategy info with each controller for correct classification
-        const controllers = strategies.map(s => ({
+        const controllers = strategies.map((s) => ({
             s,
             ctrl: asyncSearchTools.searchCancellable({
                 pattern: s.pattern,
@@ -358,68 +387,96 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 timeout: s.timeout,
                 caseInsensitive: false,
                 fileType: this.getFileTypeForGrep(query.fileTypes),
-                excludePaths: this.getExcludeDirs()
-            })
+                excludePaths: this.getExcludeDirs(),
+            }),
         }));
 
         const promise = new Promise<void>(async (resolve) => {
             // Collect first non-empty and cancel others
             for (const { s, ctrl } of controllers) {
-                ctrl.promise.then(res => {
-                    if (res && res.length > 0 && matches.exact.length === 0 && matches.fuzzy.length === 0) {
-                        const converted: Match[] = res.map(r => {
-                            const cat = this.categorizeMatch(r.text, query.identifier);
-                            return { file: r.file, line: r.line || 1, column: r.column || 0, text: r.text, length: r.text.length, confidence: r.confidence, source: s.name as any, category: cat.category, categoryConfidence: cat.confidence };
-                        });
-                        // Classify: only 'exact' strategy contributes to exact; others to fuzzy
-                        if (s.name === 'exact') {
-                            matches.exact.push(...converted);
-                        } else {
-                            matches.fuzzy.push(...converted);
+                ctrl.promise
+                    .then((res) => {
+                        if (res && res.length > 0 && matches.exact.length === 0 && matches.fuzzy.length === 0) {
+                            const converted: Match[] = res.map((r) => {
+                                const cat = this.categorizeMatch(r.text, query.identifier);
+                                return {
+                                    file: r.file,
+                                    line: r.line || 1,
+                                    column: r.column || 0,
+                                    text: r.text,
+                                    length: r.text.length,
+                                    confidence: r.confidence,
+                                    source: s.name as any,
+                                    category: cat.category,
+                                    categoryConfidence: cat.confidence,
+                                };
+                            });
+                            // Classify: only 'exact' strategy contributes to exact; others to fuzzy
+                            if (s.name === 'exact') {
+                                matches.exact.push(...converted);
+                            } else {
+                                matches.fuzzy.push(...converted);
+                            }
+                            converted.forEach((m) => matches.files.add(m.file));
+                            // Cancel others
+                            controllers.forEach((c) => c.ctrl.cancel());
+                            resolve();
                         }
-                        converted.forEach(m => matches.files.add(m.file));
-                        // Cancel others
-                        controllers.forEach(c => c.ctrl.cancel());
-                        resolve();
-                    }
-                }).catch(() => {});
+                    })
+                    .catch(() => {});
             }
             // Also resolve when all complete with empty results
-            Promise.allSettled(controllers.map(c => c.ctrl.promise)).then(() => resolve());
+            Promise.allSettled(controllers.map((c) => c.ctrl.promise)).then(() => resolve());
         });
 
-        const cancel = () => controllers.forEach(c => c.ctrl.cancel());
+        const cancel = () => controllers.forEach((c) => c.ctrl.cancel());
         return { promise, cancel, matches };
     }
 
-    private startFileDiscoveryCancellable(query: SearchQuery): { promise: Promise<void>; cancel: () => void; matches: EnhancedMatches } {
-        const temp: EnhancedMatches = { exact: [], fuzzy: [], conceptual: [], files: new Set(), searchTime: 0, toolsUsed: [], confidence: 0 };
+    private startFileDiscoveryCancellable(query: SearchQuery): {
+        promise: Promise<void>;
+        cancel: () => void;
+        matches: EnhancedMatches;
+    } {
+        const temp: EnhancedMatches = {
+            exact: [],
+            fuzzy: [],
+            conceptual: [],
+            files: new Set(),
+            searchTime: 0,
+            toolsUsed: [],
+            confidence: 0,
+        };
         const patterns = this.generateGlobPatterns(query).slice(0, 6);
         const excludes = this.getExcludeDirs();
-        ['out','build','tmp','temp','.vscode-test','target','venv','.venv'].forEach(e => { if (!excludes.includes(e)) excludes.push(e); });
+        ['out', 'build', 'tmp', 'temp', '.vscode-test', 'target', 'venv', '.venv'].forEach((e) => {
+            if (!excludes.includes(e)) excludes.push(e);
+        });
 
-        const ctrls = patterns.map(p => asyncSearchTools.listFilesCancellable({
-            includes: [p],
-            excludes,
-            path: query.searchPath || '.',
-            maxDepth: 6,
-            timeout: 300,
-            includeHidden: false,
-            maxFiles: 1000
-        }));
+        const ctrls = patterns.map((p) =>
+            asyncSearchTools.listFilesCancellable({
+                includes: [p],
+                excludes,
+                path: query.searchPath || '.',
+                maxDepth: 6,
+                timeout: 300,
+                includeHidden: false,
+                maxFiles: 1000,
+            })
+        );
 
         const promise = new Promise<void>((resolve) => {
-            Promise.allSettled(ctrls.map(c => c.promise)).then((settled) => {
+            Promise.allSettled(ctrls.map((c) => c.promise)).then((settled) => {
                 for (const s of settled) {
                     if (s.status === 'fulfilled' && Array.isArray(s.value)) {
-                        s.value.forEach(f => temp.files.add(f));
+                        s.value.forEach((f) => temp.files.add(f));
                     }
                 }
                 resolve();
             });
         });
 
-        const cancel = () => ctrls.forEach(c => c.cancel());
+        const cancel = () => ctrls.forEach((c) => c.cancel());
         return { promise, cancel, matches: temp };
     }
 
@@ -436,41 +493,43 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             {
                 name: 'exact',
                 pattern: `\\b${escapedId}\\b`,
-                timeout: 700,       // 600–800ms
+                timeout: 700, // 600–800ms
                 maxResults: 20,
-                confidence: 1.0
+                confidence: 1.0,
             },
             {
                 name: 'prefix',
                 pattern: `\\b${escapedId}\\w*`,
-                timeout: 280,       // 250–300ms
+                timeout: 280, // 250–300ms
                 maxResults: 15,
-                confidence: 0.95
+                confidence: 0.95,
             },
             {
                 name: 'suffix',
                 pattern: `\\w*${escapedId}\\b`,
-                timeout: 280,       // 250–300ms
+                timeout: 280, // 250–300ms
                 maxResults: 15,
-                confidence: 0.93
-            }
+                confidence: 0.93,
+            },
         ];
 
         // Build concurrent search promises that resolve only on non-empty results
-        const searchPromises = strategies.map((s) => (async () => {
-            const searchOptions = {
-                pattern: s.pattern,
-                path: query.searchPath,
-                maxResults: s.maxResults,
-                timeout: s.timeout,
-                caseInsensitive: false,
-                fileType: this.getFileTypeForGrep(query.fileTypes),
-                excludePaths: this.getExcludeDirs()
-            };
-            const results = await asyncSearchTools.search(searchOptions);
-            if (results.length === 0) throw new Error('no-results');
-            return { s, results };
-        })());
+        const searchPromises = strategies.map((s) =>
+            (async () => {
+                const searchOptions = {
+                    pattern: s.pattern,
+                    path: query.searchPath,
+                    maxResults: s.maxResults,
+                    timeout: s.timeout,
+                    caseInsensitive: false,
+                    fileType: this.getFileTypeForGrep(query.fileTypes),
+                    excludePaths: this.getExcludeDirs(),
+                };
+                const results = await asyncSearchTools.search(searchOptions);
+                if (results.length === 0) throw new Error('no-results');
+                return { s, results };
+            })()
+        );
 
         // Add a global budget timer to bound the fast-path
         const budgetPromise = new Promise<never>((_, reject) => {
@@ -480,7 +539,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
 
         try {
             const { s, results } = await Promise.any([...searchPromises, budgetPromise]);
-            const converted: Match[] = results.map(r => {
+            const converted: Match[] = results.map((r) => {
                 const categorization = this.categorizeMatch(r.text, query.identifier);
                 return {
                     file: r.file,
@@ -491,11 +550,11 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     confidence: r.confidence * s.confidence,
                     source: 'exact' as any,
                     category: categorization.category,
-                    categoryConfidence: categorization.confidence
+                    categoryConfidence: categorization.confidence,
                 };
             });
             matches.exact.push(...converted);
-            converted.forEach(m => matches.files.add(m.file));
+            converted.forEach((m) => matches.files.add(m.file));
             if (process.env.DEBUG) {
                 console.error(`Fast-path ${s.name} found ${converted.length} matches in ${Date.now() - start}ms`);
             }
@@ -515,12 +574,12 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 timeout: Math.min(350, budgetLeft - 50), // 300–400ms within remaining budget
                 caseInsensitive: true,
                 maxResults: 10,
-                excludePaths: this.getExcludeDirs()
+                excludePaths: this.getExcludeDirs(),
             };
             try {
                 const results = await asyncSearchTools.search(fallbackOptions);
                 if (results.length === 0) return;
-                const converted: Match[] = results.map(r => {
+                const converted: Match[] = results.map((r) => {
                     const categorization = this.categorizeMatch(r.text, query.identifier);
                     return {
                         file: r.file,
@@ -531,11 +590,11 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                         confidence: r.confidence * 0.9,
                         source: 'exact' as any,
                         category: categorization.category,
-                        categoryConfidence: categorization.confidence
+                        categoryConfidence: categorization.confidence,
                     };
                 });
                 matches.exact.push(...converted);
-                converted.forEach(m => matches.files.add(m.file));
+                converted.forEach((m) => matches.files.add(m.file));
             } catch (fallbackErr) {
                 // Swallow fallback errors; the caller may proceed with other strategies
                 if (process.env.DEBUG) console.warn('Fast-path fallback failed:', fallbackErr);
@@ -548,7 +607,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
      */
     private async searchWithAsyncGrep(query: SearchQuery, matches: EnhancedMatches): Promise<void> {
         const escapedId = this.escapeRegex(query.identifier);
-        
+
         // Use multiple search strategies with async streaming for better coverage
         const searchStrategies = [
             {
@@ -560,10 +619,10 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     timeout: 800,
                     caseInsensitive: false,
                     fileType: this.getFileTypeForGrep(query.fileTypes),
-                    excludePaths: this.getExcludeDirs()
+                    excludePaths: this.getExcludeDirs(),
                 },
                 confidence: 1.0,
-                matchType: 'exact'
+                matchType: 'exact',
             },
             {
                 name: 'prefix_match',
@@ -574,10 +633,10 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     timeout: 600,
                     caseInsensitive: false,
                     fileType: this.getFileTypeForGrep(query.fileTypes),
-                    excludePaths: this.getExcludeDirs()
+                    excludePaths: this.getExcludeDirs(),
                 },
                 confidence: 0.95,
-                matchType: 'exact'
+                matchType: 'exact',
             },
             {
                 name: 'suffix_match',
@@ -588,10 +647,10 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     timeout: 600,
                     caseInsensitive: false,
                     fileType: this.getFileTypeForGrep(query.fileTypes),
-                    excludePaths: this.getExcludeDirs()
+                    excludePaths: this.getExcludeDirs(),
                 },
                 confidence: 0.93,
-                matchType: 'exact'
+                matchType: 'exact',
             },
             {
                 name: 'case_insensitive_prefix_suffix',
@@ -602,10 +661,10 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     timeout: 500,
                     caseInsensitive: true,
                     fileType: this.getFileTypeForGrep(query.fileTypes),
-                    excludePaths: this.getExcludeDirs()
+                    excludePaths: this.getExcludeDirs(),
                 },
                 confidence: 0.85,
-                matchType: 'fuzzy'
+                matchType: 'fuzzy',
             },
             {
                 name: 'fuzzy_token',
@@ -616,15 +675,15 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     timeout: 400,
                     caseInsensitive: true,
                     fileType: this.getFileTypeForGrep(query.fileTypes),
-                    excludePaths: this.getExcludeDirs()
+                    excludePaths: this.getExcludeDirs(),
                 },
                 confidence: 0.7,
-                matchType: 'fuzzy'
-            }
+                matchType: 'fuzzy',
+            },
         ];
 
         // Execute strategies with concurrency limit for better performance
-        const strategyPromises = searchStrategies.map(async strategy => {
+        const strategyPromises = searchStrategies.map(async (strategy) => {
             try {
                 const results = await asyncSearchTools.search(strategy.options);
                 // Early termination if we have enough exact matches
@@ -632,13 +691,13 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     return {
                         strategy,
                         results: results.slice(0, 30), // Limit results for performance
-                        success: true
+                        success: true,
                     };
                 }
                 return {
                     strategy,
                     results: results.slice(0, 20), // Limit results for performance
-                    success: true
+                    success: true,
                 };
             } catch (error) {
                 console.warn(`Async strategy ${strategy.name} failed:`, error);
@@ -646,7 +705,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     strategy,
                     results: [],
                     success: false,
-                    error
+                    error,
                 };
             }
         });
@@ -658,9 +717,9 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
         for (const result of strategyResults) {
             if (result.status === 'fulfilled' && result.value.success) {
                 const { strategy, results } = result.value;
-                
+
                 // Convert StreamingGrepResult to Match and categorize
-                const convertedMatches: Match[] = results.map(r => {
+                const convertedMatches: Match[] = results.map((r) => {
                     const categorization = this.categorizeMatch(r.text, query.identifier);
                     return {
                         file: r.file,
@@ -671,7 +730,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                         confidence: r.confidence * strategy.confidence, // Combined confidence
                         source: strategy.matchType as any,
                         category: categorization.category,
-                        categoryConfidence: categorization.confidence
+                        categoryConfidence: categorization.confidence,
                     };
                 });
 
@@ -690,7 +749,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 }
 
                 // Add files to the set
-                convertedMatches.forEach(match => matches.files.add(match.file));
+                convertedMatches.forEach((match) => matches.files.add(match.file));
             }
         }
 
@@ -698,7 +757,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
         matches.exact = this.deduplicateMatches(matches.exact);
         matches.fuzzy = this.deduplicateMatches(matches.fuzzy);
         matches.conceptual = this.deduplicateMatches(matches.conceptual);
-        
+
         // Sort matches by category priority within each category
         matches.exact = this.sortMatchesByPriority(matches.exact);
         matches.fuzzy = this.sortMatchesByPriority(matches.fuzzy);
@@ -707,7 +766,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
 
     private deduplicateMatches(matches: Match[]): Match[] {
         const seen = new Set<string>();
-        return matches.filter(match => {
+        return matches.filter((match) => {
             const key = `${match.file}:${match.line}:${match.column}`;
             if (seen.has(key)) {
                 return false;
@@ -721,98 +780,105 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
      * Categorizes a match based on the line content to distinguish between
      * definitions, imports, usage, and other occurrences
      */
-    private categorizeMatch(text: string, identifier: string): { category: MatchCategory, confidence: number } {
+    private categorizeMatch(text: string, identifier: string): { category: MatchCategory; confidence: number } {
         const line = text.trim();
         const escapedIdentifier = this.escapeRegex(identifier);
-        
+
         // Import patterns (check BEFORE definition patterns to catch require statements)
-        
+
         // CommonJS require statements - check early to catch require patterns
         if (line.includes('require(') && (line.includes('const ') || line.includes('let ') || line.includes('var '))) {
             return { category: 'likely-import', confidence: 0.85 };
         }
-        
+
         // ES6 imports
         if (line.match(/^import/)) {
             // Named imports
             if (line.match(new RegExp(`\\{[^}]*${escapedIdentifier}[^}]*\\}`))) {
-                return { category: 'likely-import', confidence: 0.90 };
+                return { category: 'likely-import', confidence: 0.9 };
             }
             // Default imports
             if (line.match(new RegExp(`import\\s+${escapedIdentifier}\\s+from`))) {
-                return { category: 'likely-import', confidence: 0.90 };
+                return { category: 'likely-import', confidence: 0.9 };
             }
             // Generic import match
             return { category: 'likely-import', confidence: 0.85 };
         }
-        
+
         // Definition patterns (after imports)
-        
+
         // TypeScript/JavaScript class definitions
         if (line.match(new RegExp(`^export\\s+(class|interface|type|enum)\\s+${escapedIdentifier}\\b`))) {
             return { category: 'likely-definition', confidence: 0.95 };
         }
-        
+
         // Function/variable declarations (but exclude require statements)
-        if (line.match(new RegExp(`^(export\\s+)?(const|let|var|function)\\s+${escapedIdentifier}\\b`)) && !line.includes('require(')) {
+        if (
+            line.match(new RegExp(`^(export\\s+)?(const|let|var|function)\\s+${escapedIdentifier}\\b`)) &&
+            !line.includes('require(')
+        ) {
             return { category: 'likely-definition', confidence: 0.85 };
         }
-        
+
         // Method definitions in classes
         if (line.match(new RegExp(`^\\s*(public|private|protected|async)?\\s*${escapedIdentifier}\\s*\\(`))) {
-            return { category: 'likely-definition', confidence: 0.80 };
+            return { category: 'likely-definition', confidence: 0.8 };
         }
-        
+
         // Arrow function definitions
         if (line.match(new RegExp(`^(export\\s+)?(const|let|var)\\s+${escapedIdentifier}\\s*=\\s*(async\\s+)?\\(`))) {
             return { category: 'likely-definition', confidence: 0.85 };
         }
-        
-        
+
         // Usage patterns (third priority)
-        
+
         // Constructor usage
         if (line.match(new RegExp(`new\\s+${escapedIdentifier}\\(`))) {
-            return { category: 'likely-usage', confidence: 0.80 };
+            return { category: 'likely-usage', confidence: 0.8 };
         }
-        
+
         // Method calls (higher confidence than function calls)
         if (line.match(new RegExp(`\\.${escapedIdentifier}\\(`))) {
             return { category: 'likely-usage', confidence: 0.75 };
         }
-        
+
         // Function calls
         if (line.match(new RegExp(`\\b${escapedIdentifier}\\(`))) {
-            return { category: 'likely-usage', confidence: 0.70 };
+            return { category: 'likely-usage', confidence: 0.7 };
         }
-        
+
         // Property assignment (e.g., obj.prop = value) - this is usage, not definition
         if (line.match(new RegExp(`\\.${escapedIdentifier}\\s*=`))) {
             return { category: 'likely-usage', confidence: 0.65 };
         }
-        
+
         // Variable assignment patterns (direct assignment is definition)
         if (line.match(new RegExp(`^\\s*${escapedIdentifier}\\s*[=:]`))) {
-            return { category: 'likely-definition', confidence: 0.60 };
+            return { category: 'likely-definition', confidence: 0.6 };
         }
-        
+
         // Property access (without assignment)
         if (line.match(new RegExp(`\\.${escapedIdentifier}\\b`)) && !line.includes('=')) {
             return { category: 'likely-usage', confidence: 0.65 };
         }
-        
+
         // Check for comments and strings (lower priority patterns)
-        if (line.match(/^\s*\/\//) || line.match(/^\s*\/\*/) || 
-            line.includes(`'${identifier}'`) || line.includes(`"${identifier}"`) ||
-            line.includes(`\`${identifier}\``) || line.match(/console\.(log|error|warn|info)/)) {
+        if (
+            line.match(/^\s*\/\//) ||
+            line.match(/^\s*\/\*/) ||
+            line.includes(`'${identifier}'`) ||
+            line.includes(`"${identifier}"`) ||
+            line.includes(`\`${identifier}\``) ||
+            line.match(/console\.(log|error|warn|info)/)
+        ) {
             return { category: 'unknown', confidence: 0.5 };
         }
-        
+
         // Generic usage in expressions
         if (line.match(new RegExp(`\\b${escapedIdentifier}\\b`))) {
-            return { category: 'likely-usage', confidence: 0.60 };
+            return { category: 'likely-usage', confidence: 0.6 };
         }
-        
+
         // Default case - unknown pattern
         return { category: 'unknown', confidence: 0.5 };
     }
@@ -830,7 +896,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             caseInsensitive: !query.caseSensitive,
             fileType: this.getFileTypeForGrep(query.fileTypes),
             streaming: true,
-            parallel: true
+            parallel: true,
         };
 
         return asyncSearchTools.searchStream(searchOptions);
@@ -846,19 +912,17 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
     ): Promise<Map<string, StreamingGrepResult[]>> {
         return asyncSearchTools.searchParallel(patterns, directories, options);
     }
-    
+
     private async searchWithGrep(query: SearchQuery, matches: EnhancedMatches): Promise<void> {
         const strategies = this.generateGrepStrategies(query);
-        
+
         // Execute strategies in parallel
-        const results = await Promise.allSettled(
-            strategies.map(strategy => this.executeGrepStrategy(strategy))
-        );
-        
+        const results = await Promise.allSettled(strategies.map((strategy) => this.executeGrepStrategy(strategy)));
+
         for (let i = 0; i < results.length; i++) {
             const result = results[i];
             const strategy = strategies[i];
-            
+
             if (result.status === 'fulfilled' && result.value.success) {
                 const grepMatches = this.parseGrepResults(
                     result.value.matches,
@@ -866,7 +930,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     strategy.name,
                     query.identifier
                 );
-                
+
                 // Categorize matches based on strategy
                 if (strategy.name.includes('exact')) {
                     matches.exact.push(...grepMatches);
@@ -875,13 +939,13 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 } else {
                     matches.conceptual.push(...grepMatches);
                 }
-                
+
                 // Add files to the set
-                grepMatches.forEach(match => matches.files.add(match.file));
+                grepMatches.forEach((match) => matches.files.add(match.file));
             }
         }
     }
-    
+
     private async searchWithGlob(query: SearchQuery, matches: EnhancedMatches): Promise<void> {
         const patterns = this.generateGlobPatterns(query);
 
@@ -895,7 +959,8 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
         excludes.push('out', 'build', 'tmp', 'temp', '.vscode-test', 'target', 'venv', '.venv');
 
         const discovered = new Set<string>();
-        for (const pattern of patterns.slice(0, 6)) { // cap patterns
+        for (const pattern of patterns.slice(0, 6)) {
+            // cap patterns
             const elapsed = Date.now() - start;
             const left = globalBudgetMs - elapsed;
             if (left <= 100) break;
@@ -907,7 +972,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     maxDepth: 6,
                     timeout: Math.min(perPatternTimeout, left - 50),
                     includeHidden: false,
-                    maxFiles: 1000
+                    maxFiles: 1000,
                 });
                 for (const f of files) discovered.add(f);
             } catch (err) {
@@ -917,44 +982,43 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
         }
 
         const files = Array.from(discovered);
-        files.forEach(file => matches.files.add(file));
+        files.forEach((file) => matches.files.add(file));
 
         if (files.length > 0) {
             // Search within these files for the identifier (content grep)
             await this.searchFilesForIdentifier(files, query, matches);
         }
     }
-    
+
     private async analyzeWithLS(query: SearchQuery, matches: EnhancedMatches): Promise<void> {
         const relevantDirs = await this.findRelevantDirectories(query, matches);
-        
+
         for (const dir of relevantDirs) {
             try {
                 const entries = await this.executeWithTimeout(
-                    () => LS({ 
-                        path: dir, 
-                        ignore: this.config.ls.includeDotfiles ? [] : this.config.glob.ignorePatterns 
-                    }),
+                    () =>
+                        LS({
+                            path: dir,
+                            ignore: this.config.ls.includeDotfiles ? [] : this.config.glob.ignorePatterns,
+                        }),
                     this.config.ls.defaultTimeout
                 );
-                
+
                 // Find co-located files
                 const colocated = this.findColocatedFiles(entries, query);
-                colocated.forEach(file => matches.files.add(file));
-                
+                colocated.forEach((file) => matches.files.add(file));
+
                 // Search co-located files
                 await this.searchFilesForIdentifier(colocated, query, matches);
-                
             } catch (error) {
                 console.warn(`LS analysis failed for directory: ${dir}`, error);
             }
         }
-        
     }
-    
+
     private getExcludeDirs(): string[] {
         const patterns = this.config?.glob?.ignorePatterns || [];
-        const base = patterns.map(p => p.replace('/**','').replace('**','').replace('!','')).filter(Boolean);
+        const base = patterns.map((p) => p.replace('/**', '').replace('**', '').replace('!', '')).filter(Boolean);
         // Always avoid common heavy dirs if present
         for (const extra of ['node_modules', 'dist', '.git', 'coverage']) {
             if (!base.includes(extra)) base.push(extra);
@@ -964,7 +1028,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
 
     private generateGrepStrategies(query: SearchQuery): GrepSearchStrategy[] {
         const strategies: GrepSearchStrategy[] = [];
-        
+
         // Exact match strategy
         strategies.push({
             name: 'exact_match',
@@ -975,11 +1039,11 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 '-n': true,
                 '-C': this.config.grep.contextLines,
                 type: this.getFileTypeForGrep(query.fileTypes),
-                head_limit: this.config.grep.maxResults
+                head_limit: this.config.grep.maxResults,
             },
-            confidence: 1.0
+            confidence: 1.0,
         });
-        
+
         // Case insensitive strategy
         strategies.push({
             name: 'case_insensitive',
@@ -990,11 +1054,11 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 '-i': true,
                 '-n': true,
                 type: this.getFileTypeForGrep(query.fileTypes),
-                head_limit: this.config.grep.maxResults
+                head_limit: this.config.grep.maxResults,
             },
-            confidence: 0.9
+            confidence: 0.9,
         });
-        
+
         // Fuzzy token matching
         const tokens = this.tokenize(query.identifier);
         if (tokens.length > 1) {
@@ -1007,12 +1071,12 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     '-i': true,
                     '-n': true,
                     type: this.getFileTypeForGrep(query.fileTypes),
-                    head_limit: Math.floor(this.config.grep.maxResults / 2)
+                    head_limit: Math.floor(this.config.grep.maxResults / 2),
                 },
-                confidence: 0.7
+                confidence: 0.7,
             });
         }
-        
+
         // Semantic variants
         const variants = this.generateSemanticVariants(query.identifier);
         for (const variant of variants) {
@@ -1024,52 +1088,51 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     output_mode: 'files_with_matches',
                     '-i': true,
                     type: this.getFileTypeForGrep(query.fileTypes),
-                    head_limit: 50
+                    head_limit: 50,
                 },
-                confidence: variant.confidence
+                confidence: variant.confidence,
             });
         }
-        
+
         return strategies;
     }
-    
+
     private async executeGrepStrategy(strategy: GrepSearchStrategy) {
         try {
             const results = await this.executeWithTimeout(
                 () => Grep(strategy.params),
                 strategy.timeout || this.config.grep.defaultTimeout
             );
-            
+
             return {
                 strategy,
-                matches: Array.isArray(results) ? results as ClaudeGrepResult[] : [],
+                matches: Array.isArray(results) ? (results as ClaudeGrepResult[]) : [],
                 searchTime: Date.now(),
-                success: true
+                success: true,
             };
-            
         } catch (error) {
             return {
                 strategy,
                 matches: [],
                 searchTime: Date.now(),
                 success: false,
-                error: this.getErrorMessage(error)
+                error: this.getErrorMessage(error),
             };
         }
     }
-    
+
     private generateGlobPatterns(query: SearchQuery): string[] {
         const patterns: string[] = [];
         const identifier = query.identifier;
         const tokens = this.tokenize(identifier);
-        
+
         // File name patterns
         patterns.push(
             `**/*${identifier}*.{ts,tsx,js,jsx,py,java,go,rs}`,
             `**/${identifier}.{ts,tsx,js,jsx,py,java,go,rs}`,
             `**/${identifier}/**/*.{ts,tsx,js,jsx,py,java,go,rs}`
         );
-        
+
         // Common directory patterns
         if (tokens.length > 0) {
             const mainToken = tokens[tokens.length - 1].toLowerCase();
@@ -1081,7 +1144,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 `**/${mainToken}/**/*.{ts,tsx,js,jsx,py}`
             );
         }
-        
+
         // Test file patterns
         if (query.includeTests) {
             patterns.push(
@@ -1090,26 +1153,23 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 `**/__tests__/**/*${identifier}*.{ts,js}`
             );
         }
-        
+
         return patterns;
     }
-    
-    private async findRelevantDirectories(
-        query: SearchQuery, 
-        matches: EnhancedMatches
-    ): Promise<string[]> {
+
+    private async findRelevantDirectories(query: SearchQuery, matches: EnhancedMatches): Promise<string[]> {
         const dirs = new Set<string>();
-        
+
         // Add directories from existing matches
         for (const match of [...matches.exact, ...matches.fuzzy, ...matches.conceptual]) {
             dirs.add(path.dirname(match.file));
         }
-        
+
         // Add directories from files
         for (const file of matches.files) {
             dirs.add(path.dirname(file));
         }
-        
+
         // Add common project directories
         const commonDirs = [
             'src',
@@ -1119,9 +1179,9 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             'src/models',
             'src/controllers',
             'lib',
-            'app'
+            'app',
         ];
-        
+
         for (const dir of commonDirs) {
             try {
                 await LS({ path: dir });
@@ -1130,63 +1190,68 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 // Directory doesn't exist, skip
             }
         }
-        
+
         return Array.from(dirs);
     }
-    
+
     private findColocatedFiles(entries: ClaudeLSResult, query: SearchQuery): string[] {
         const colocated: string[] = [];
         const tokens = this.tokenize(query.identifier);
-        
+
         for (const entry of entries) {
             if (entry.type === 'file') {
                 const fileName = path.basename(entry.name, path.extname(entry.name));
                 const fileTokens = this.tokenize(fileName);
-                
+
                 // Check token overlap
                 const overlap = this.calculateTokenOverlap(tokens, fileTokens);
                 if (overlap > 0.3) {
                     colocated.push(entry.path);
                 }
-                
+
                 // Check common naming patterns
                 if (this.matchesNamingPattern(query.identifier, fileName)) {
                     colocated.push(entry.path);
                 }
             }
         }
-        
+
         return colocated;
     }
-    
+
     private async searchFilesForIdentifier(
         files: string[],
         query: SearchQuery,
         matches: EnhancedMatches
     ): Promise<void> {
-        const searchPromises = files.slice(0, 20).map(async file => { // Limit to 20 files for performance
+        const searchPromises = files.slice(0, 20).map(async (file) => {
+            // Limit to 20 files for performance
             try {
                 const results = await Grep({
                     pattern: query.identifier,
                     path: file,
                     output_mode: 'content',
                     '-i': !query.caseSensitive,
-                    '-n': true
+                    '-n': true,
                 });
-                
+
                 if (Array.isArray(results)) {
-                    const fileMatches = this.parseGrepResults(results as ClaudeGrepResult[], 0.6, 'file_search', query.identifier);
+                    const fileMatches = this.parseGrepResults(
+                        results as ClaudeGrepResult[],
+                        0.6,
+                        'file_search',
+                        query.identifier
+                    );
                     matches.conceptual.push(...fileMatches);
                 }
-                
             } catch (error) {
                 // File search failed, continue
             }
         });
-        
+
         await Promise.allSettled(searchPromises);
     }
-    
+
     private parseGrepResults(
         results: ClaudeGrepResult[],
         baseConfidence: number,
@@ -1194,7 +1259,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
         identifier: string
     ): Match[] {
         const matches: Match[] = [];
-        
+
         for (const result of results) {
             if (result.file && result.line && result.text) {
                 const categorization = this.categorizeMatch(result.text, identifier);
@@ -1208,27 +1273,27 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     source: source as any,
                     category: categorization.category,
                     categoryConfidence: categorization.confidence,
-                    context: result.context ? 
-                        [...(result.context.before || []), ...(result.context.after || [])].join('\n') :
-                        undefined
+                    context: result.context
+                        ? [...(result.context.before || []), ...(result.context.after || [])].join('\n')
+                        : undefined,
                 });
             }
         }
-        
+
         return matches;
     }
-    
+
     private generateSemanticVariants(identifier: string): SearchVariant[] {
         const variants: SearchVariant[] = [];
-        
+
         // Common verb synonyms
         const synonyms = {
             get: ['fetch', 'retrieve', 'load', 'obtain', 'find'],
             set: ['update', 'modify', 'change', 'assign', 'put'],
             create: ['make', 'build', 'generate', 'produce', 'new'],
-            delete: ['remove', 'destroy', 'eliminate', 'clear']
+            delete: ['remove', 'destroy', 'eliminate', 'clear'],
         };
-        
+
         // Apply synonyms
         for (const [verb, alternatives] of Object.entries(synonyms)) {
             if (identifier.toLowerCase().startsWith(verb)) {
@@ -1237,127 +1302,131 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                     variants.push({
                         pattern: `\\b${variant}\\b`,
                         confidence: 0.8,
-                        strategy: 'semantic'
+                        strategy: 'semantic',
                     });
                 }
             }
         }
-        
+
         // Case variations
         variants.push(
             {
                 pattern: this.toSnakeCase(identifier),
                 confidence: 0.7,
-                strategy: 'pattern'
+                strategy: 'pattern',
             },
             {
                 pattern: this.toPascalCase(identifier),
                 confidence: 0.7,
-                strategy: 'pattern'
+                strategy: 'pattern',
             },
             {
                 pattern: this.toKebabCase(identifier),
                 confidence: 0.6,
-                strategy: 'pattern'
+                strategy: 'pattern',
             }
         );
-        
+
         // Plural/singular variants
         if (identifier.endsWith('s')) {
             variants.push({
                 pattern: identifier.slice(0, -1),
                 confidence: 0.8,
-                strategy: 'pattern'
+                strategy: 'pattern',
             });
         } else {
             variants.push({
                 pattern: identifier + 's',
                 confidence: 0.8,
-                strategy: 'pattern'
+                strategy: 'pattern',
             });
         }
-        
+
         return variants;
     }
-    
+
     // Utility methods
     private tokenize(identifier: string): string[] {
         return identifier
             .split(/(?=[A-Z])|_|-/)
-            .map(s => s.toLowerCase())
-            .filter(s => s.length > 0);
+            .map((s) => s.toLowerCase())
+            .filter((s) => s.length > 0);
     }
-    
+
     private calculateTokenOverlap(tokens1: string[], tokens2: string[]): number {
         const set1 = new Set(tokens1);
         const set2 = new Set(tokens2);
-        const intersection = new Set([...set1].filter(x => set2.has(x)));
+        const intersection = new Set([...set1].filter((x) => set2.has(x)));
         const union = new Set([...set1, ...set2]);
-        
+
         return intersection.size / union.size;
     }
-    
+
     private matchesNamingPattern(identifier: string, fileName: string): boolean {
         const identTokens = this.tokenize(identifier);
         const fileTokens = this.tokenize(fileName);
-        
+
         // Check if file contains main concepts from identifier
-        return identTokens.some(token => 
-            fileTokens.some(fileToken => 
-                fileToken.includes(token) || token.includes(fileToken)
-            )
+        return identTokens.some((token) =>
+            fileTokens.some((fileToken) => fileToken.includes(token) || token.includes(fileToken))
         );
     }
-    
+
     private escapeRegex(str: string): string {
         return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
-    
+
     private getFileTypeForGrep(fileTypes?: string[]): string {
         if (!fileTypes || fileTypes.length === 0) {
             return 'ts'; // Default to TypeScript
         }
         return fileTypes[0];
     }
-    
+
     private toSnakeCase(str: string): string {
-        return str.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
+        return str
+            .replace(/([A-Z])/g, '_$1')
+            .toLowerCase()
+            .replace(/^_/, '');
     }
-    
+
     private toPascalCase(str: string): string {
         return str.charAt(0).toUpperCase() + str.slice(1);
     }
-    
+
     private toKebabCase(str: string): string {
-        return str.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '');
+        return str
+            .replace(/([A-Z])/g, '-$1')
+            .toLowerCase()
+            .replace(/^-/, '');
     }
-    
+
     private getCacheKey(query: SearchQuery): string {
         return `${query.identifier}:${query.searchPath || ''}:${query.fileTypes?.join(',') || ''}`;
     }
-    
+
     private getFromCache(key: string): EnhancedMatches | null {
         if (!this.config.caching.enabled) return null;
-        
+
         const cached = this.cache.get(key);
         if (!cached) return null;
-        
+
         const age = Date.now() - cached.timestamp;
         if (age > this.config.caching.ttl * 1000) {
             this.cache.delete(key);
             return null;
         }
-        
+
         return cached.result;
     }
-    
+
     private updateCache(key: string, result: EnhancedMatches): void {
         if (!this.config.caching.enabled) return;
         // Do not cache negative results when bloomFilter is enabled; prefer bloom negative fast-path
         if (this.config.optimization?.bloomFilter && result.exact.length === 0) {
             return;
         }
-        
+
         if (this.cache.size >= this.config.caching.maxEntries) {
             // Remove oldest entry
             const firstKey = this.cache.keys().next().value;
@@ -1365,18 +1434,18 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 this.cache.delete(firstKey);
             }
         }
-        
+
         this.cache.set(key, {
             result,
-            timestamp: Date.now()
+            timestamp: Date.now(),
         });
     }
-    
+
     private updateStatistics(query: SearchQuery, matches: EnhancedMatches): void {
         // Update frequency map
         const freq = this.frequencyMap.get(query.identifier) || 0;
         this.frequencyMap.set(query.identifier, freq + 1);
-        
+
         // Update bloom filter with both positive and negative results
         if (this.config.optimization.bloomFilter) {
             // Treat only true exact hits as positive; fuzzy/conceptual can be noisy
@@ -1387,34 +1456,32 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             }
         }
     }
-    
-    private async executeWithTimeout<T>(
-        fn: () => Promise<T>,
-        timeout: number
-    ): Promise<T> {
+
+    private async executeWithTimeout<T>(fn: () => Promise<T>, timeout: number): Promise<T> {
         return new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
                 reject(new Error(`Operation timed out after ${timeout}ms`));
             }, timeout);
-            
+
             fn().then(
-                result => {
+                (result) => {
                     clearTimeout(timer);
                     resolve(result);
                 },
-                error => {
+                (error) => {
                     clearTimeout(timer);
                     reject(error);
                 }
             );
         });
     }
-    
+
     private updatePerformanceMetrics(responseTime: number): void {
-        const totalTime = this.performanceMetrics.avgResponseTime * (this.performanceMetrics.searches - 1) + responseTime;
+        const totalTime =
+            this.performanceMetrics.avgResponseTime * (this.performanceMetrics.searches - 1) + responseTime;
         this.performanceMetrics.avgResponseTime = totalTime / this.performanceMetrics.searches;
     }
-    
+
     // Get performance metrics and tool health
     getMetrics() {
         return {
@@ -1424,23 +1491,23 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 // Async tools metrics would be added here when available
                 enabled: true,
                 processPoolSize: 4,
-                cacheSize: asyncSearchTools ? 1000 : 0
+                cacheSize: asyncSearchTools ? 1000 : 0,
             },
             cacheStats: {
                 size: this.cache.size,
                 bloomFilterSize: this.bloomFilter.size,
-                frequencyMapSize: this.frequencyMap.size
-            }
+                frequencyMapSize: this.frequencyMap.size,
+            },
         };
     }
-    
+
     // Health check for enhanced search tools
     async healthCheck(): Promise<boolean> {
         try {
             const syncHealth = await searchTools.healthCheck();
             // For async tools, we can check if they're initialized and responsive
             const asyncHealthy = asyncSearchTools !== null;
-            
+
             return (syncHealth.grep && syncHealth.glob && syncHealth.ls) || asyncHealthy;
         } catch {
             return false;

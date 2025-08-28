@@ -50,7 +50,7 @@ src/
 └── servers/               # ALL server entry points (organized)
     ├── lsp.ts            # LSP server
     ├── mcp.ts            # MCP server (stdio)
-    ├── mcp-sse.ts        # MCP SSE server
+    ├── mcp-http.ts       # MCP HTTP (Streamable) server
     ├── http.ts           # HTTP API server
     └── cli.ts            # CLI tool
 

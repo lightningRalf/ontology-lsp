@@ -14,11 +14,11 @@ The main configuration is defined in `mcp-ontology-server/src/config/server-conf
 |---------|-------------|---------------------|---------|
 | **Production** | | | |
 | HTTP API Server | 7000 | `HTTP_API_PORT` | Main REST API for ontology operations |
-| MCP SSE Server | 7001 | `MCP_SSE_PORT` | MCP protocol over Server-Sent Events |
+| MCP HTTP Server | 7001 | `MCP_HTTP_PORT` | MCP protocol over Streamable HTTP |
 | LSP Server | 7002 (or stdio) | `LSP_SERVER_PORT` | Language Server Protocol (TCP or stdio mode) |
 | **Test Instances** | | | |
 | Test HTTP API | 7010 | - | Test instance of HTTP API server |
-| Test MCP SSE | 7011 | - | Test instance of MCP server |
+| Test MCP HTTP | 7011 | - | Test instance of MCP server |
 | Test LSP | 7012 | - | Test instance of LSP server |
 | **Test Targets** | | | |
 | Test Target API | 7020 | `TEST_API_PORT` | Isolated server for tests to connect to |
@@ -36,7 +36,7 @@ Settings are loaded in this priority order:
 
 ### Server Configuration
 - `HTTP_API_PORT` - HTTP API server port (default: 7000)
-- `MCP_SSE_PORT` - MCP SSE server port (default: 7001)
+- `MCP_HTTP_PORT` - MCP HTTP server port (default: 7001)
 - `LSP_SERVER_PORT` - LSP server port for TCP mode (default: 7002)
 - `LSP_HOST` - Server host (default: localhost)
 
@@ -60,7 +60,7 @@ Settings are loaded in this priority order:
 
 ```bash
 # Using environment variables
-HTTP_API_PORT=8000 MCP_SSE_PORT=8001 bun run start
+HTTP_API_PORT=8000 MCP_HTTP_PORT=8001 bun run start
 
 # Using .env file
 cp .env.sample .env
@@ -92,7 +92,7 @@ console.log(`API server: ${config.host}:${config.ports.httpAPI}`)
 
 // Get service URL
 const apiUrl = getServiceUrl('httpAPI')
-const mcpUrl = getServiceUrl('mcpSSE')
+const mcpUrl = getServiceUrl('mcpHTTP')
 ```
 
 ## Configuration Validation
@@ -147,7 +147,7 @@ lsof -i :7001
 
 3. Use different ports:
 ```bash
-HTTP_API_PORT=8000 MCP_SSE_PORT=8001 bun run start
+HTTP_API_PORT=8000 MCP_HTTP_PORT=8001 bun run start
 ```
 
 ### Configuration Not Loading

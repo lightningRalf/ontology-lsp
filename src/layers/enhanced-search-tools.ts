@@ -1,19 +1,19 @@
 // Enhanced Search Tools - Independent implementations of Grep, Glob, and LS
 // These tools provide advanced functionality without relying on Claude CLI
 // Now with smart caching that handles file changes intelligently
-import * as fs from 'fs/promises';
-import * as fsSync from 'fs';
-import * as path from 'path';
-import { execSync } from 'child_process';
-import { glob as fastGlob } from 'glob';
-import { createReadStream } from 'fs';
-import { createInterface } from 'readline';
-import { promisify } from 'util';
-import { pipeline } from 'stream/promises';
-import { SmartCache, createSmartCache, SmartCacheConfig } from './smart-cache.js';
 
+import { execSync } from 'child_process';
 // Import Dirent from fs for TypeScript compatibility
 import type { Dirent } from 'fs';
+import * as fsSync from 'fs';
+import { createReadStream } from 'fs';
+import * as fs from 'fs/promises';
+import { glob as fastGlob } from 'glob';
+import * as path from 'path';
+import { createInterface } from 'readline';
+import { pipeline } from 'stream/promises';
+import { promisify } from 'util';
+import { createSmartCache, type SmartCache, type SmartCacheConfig } from './smart-cache.js';
 
 // Types for enhanced search tools
 export interface EnhancedGrepParams {
@@ -163,36 +163,39 @@ class SmartCacheAdapter<T> implements LegacySearchCache<T> {
         }
 
         this.stats.misses++;
-        
+
         // Try to get from smart cache asynchronously in the background
-        this.smartCache.get(key).then(result => {
-            if (result) {
-                // Store in sync cache for next access
-                this.syncCache.set(key, {
-                    data: result,
-                    timestamp: Date.now(),
-                    ttl: 300000 // 5 minutes default
-                });
-            }
-        }).catch(() => {
-            // Ignore async errors in sync context
-        });
+        this.smartCache
+            .get(key)
+            .then((result) => {
+                if (result) {
+                    // Store in sync cache for next access
+                    this.syncCache.set(key, {
+                        data: result,
+                        timestamp: Date.now(),
+                        ttl: 300000, // 5 minutes default
+                    });
+                }
+            })
+            .catch(() => {
+                // Ignore async errors in sync context
+            });
 
         return null;
     }
 
     set(key: string, data: T, ttl?: number): void {
         const actualTtl = ttl || 300000; // 5 minutes default
-        
+
         // Set in sync cache immediately
         this.syncCache.set(key, {
             data,
             timestamp: Date.now(),
-            ttl: actualTtl
+            ttl: actualTtl,
         });
 
         // Also set in smart cache asynchronously
-        this.smartCache.set(key, data, { ttl: actualTtl }).catch(error => {
+        this.smartCache.set(key, data, { ttl: actualTtl }).catch((error) => {
             console.warn('SmartCache set failed:', error);
         });
     }
@@ -200,8 +203,8 @@ class SmartCacheAdapter<T> implements LegacySearchCache<T> {
     clear(): void {
         this.syncCache.clear();
         this.stats = { hits: 0, misses: 0, evictions: 0 };
-        
-        this.smartCache.clear().catch(error => {
+
+        this.smartCache.clear().catch((error) => {
             console.warn('SmartCache clear failed:', error);
         });
     }
@@ -214,7 +217,7 @@ class SmartCacheAdapter<T> implements LegacySearchCache<T> {
         const total = this.stats.hits + this.stats.misses;
         return {
             ...this.stats,
-            hitRate: total > 0 ? this.stats.hits / total : 0
+            hitRate: total > 0 ? this.stats.hits / total : 0,
         };
     }
 }
@@ -228,12 +231,10 @@ export class EnhancedGrep {
         totalTime: 0,
         averageTime: 0,
         cacheHits: 0,
-        errors: 0
+        errors: 0,
     };
 
-    constructor(
-        config: Partial<EnhancedToolsConfig> = {}
-    ) {
+    constructor(config: Partial<EnhancedToolsConfig> = {}) {
         // Merge with defaults
         this.config = {
             enableSmartCache: true,
@@ -243,9 +244,9 @@ export class EnhancedGrep {
             maxConcurrentFiles: 10,
             useRipgrep: true,
             fallbackToNodeGrep: true,
-            ...config // User config overrides defaults
+            ...config, // User config overrides defaults
         };
-        
+
         if (this.config.enableSmartCache) {
             this.smartCache = createSmartCache<EnhancedGrepResult[]>(this.config.cacheConfig);
             this.cache = new SmartCacheAdapter(this.smartCache);
@@ -267,47 +268,47 @@ export class EnhancedGrep {
                     stats.misses++;
                     return null;
                 }
-                
+
                 // Check if expired
                 if (Date.now() - entry.timestamp > TTL) {
                     cache.delete(key);
                     stats.misses++;
                     return null;
                 }
-                
+
                 stats.hits++;
                 return entry.data;
             },
-            
+
             set(key: string, data: EnhancedGrepResult[], ttl?: number): void {
                 cache.set(key, {
                     data,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
                 });
-                
+
                 // Limit cache size to prevent memory issues
                 if (cache.size > 1000) {
                     const firstKey = cache.keys().next().value;
                     if (firstKey) cache.delete(firstKey);
                 }
             },
-            
+
             clear(): void {
                 cache.clear();
             },
-            
+
             size(): number {
                 return cache.size;
             },
-            
+
             getStats(): { hits: number; misses: number; hitRate: number; evictions?: number } {
                 const total = stats.hits + stats.misses;
                 return {
                     ...stats,
                     hitRate: total > 0 ? stats.hits / total : 0,
-                    evictions: 0 // Legacy cache doesn't track evictions
+                    evictions: 0, // Legacy cache doesn't track evictions
                 };
-            }
+            },
         };
     }
 
@@ -318,7 +319,7 @@ export class EnhancedGrep {
         try {
             // Generate cache key
             const cacheKey = this.generateCacheKey(params);
-            
+
             // Check cache
             if (this.config.enableCache) {
                 const cached = this.cache.get(cacheKey);
@@ -330,7 +331,7 @@ export class EnhancedGrep {
 
             // Determine search strategy
             const results = await this.executeSearch(params);
-            
+
             // Cache results
             if (this.config.enableCache && results.length > 0) {
                 this.cache.set(cacheKey, results);
@@ -338,7 +339,6 @@ export class EnhancedGrep {
 
             this.updateMetrics(Date.now() - startTime);
             return results;
-
         } catch (error) {
             this.metrics.errors++;
             this.updateMetrics(Date.now() - startTime);
@@ -365,12 +365,12 @@ export class EnhancedGrep {
     private async searchWithRipgrep(params: EnhancedGrepParams): Promise<EnhancedGrepResult[]> {
         const args = this.buildRipgrepArgs(params);
         const command = `rg ${args.join(' ')}`;
-        
+
         try {
             const output = execSync(command, {
                 encoding: 'utf8',
                 maxBuffer: 50 * 1024 * 1024, // 50MB
-                timeout: params.timeout || 5000 // Use param timeout if provided
+                timeout: params.timeout || 5000, // Use param timeout if provided
             });
 
             return this.parseRipgrepOutput(output, params);
@@ -382,12 +382,12 @@ export class EnhancedGrep {
 
     private buildRipgrepArgs(params: EnhancedGrepParams): string[] {
         const args = [];
-        
+
         // Basic pattern and options
         args.push(`"${this.escapeShellArg(params.pattern)}"`);
-        
+
         // CRITICAL: Add default exclusions and respect .gitignore
-        args.push('--no-ignore-parent');  // Don't search parent .gitignore files
+        args.push('--no-ignore-parent'); // Don't search parent .gitignore files
         args.push('--glob');
         args.push('"!node_modules/**"');
         args.push('--glob');
@@ -401,17 +401,17 @@ export class EnhancedGrep {
         args.push('--glob');
         args.push('"!package-lock.json"');
         args.push('--max-depth');
-        args.push('5');  // Limit search depth
-        
+        args.push('5'); // Limit search depth
+
         if (params.caseInsensitive) args.push('-i');
         if (params.lineNumbers) args.push('-n');
         if (params.multiline) args.push('-U', '--multiline-dotall');
-        
+
         // Context
         if (params.contextBefore) args.push(`-B ${params.contextBefore}`);
         if (params.contextAfter) args.push(`-A ${params.contextAfter}`);
         if (params.contextAround) args.push(`-C ${params.contextAround}`);
-        
+
         // Output format
         if (params.outputMode === 'files_with_matches') {
             args.push('-l');
@@ -419,27 +419,27 @@ export class EnhancedGrep {
             args.push('-c');
         }
         // Note: We don't use --json for compatibility with older ripgrep versions
-        
+
         // File type filtering - map common types to ripgrep types
         if (params.type) {
             // Map common type names to ripgrep types
             const typeMap: Record<string, string> = {
-                'javascript': 'js',
-                'typescript': 'ts',
-                'python': 'py',
-                'rust': 'rust',
-                'go': 'go',
-                'java': 'java'
+                javascript: 'js',
+                typescript: 'ts',
+                python: 'py',
+                rust: 'rust',
+                go: 'go',
+                java: 'java',
             };
             const rgType = typeMap[params.type.toLowerCase()] || params.type;
             args.push(`--type ${rgType}`);
         }
-        
+
         // Path
         if (params.path) {
             args.push(`"${this.escapeShellArg(params.path)}"`);
         }
-        
+
         // Limits - only add if explicitly requested
         if (params.headLimit) {
             args.push(`-m ${params.headLimit}`);
@@ -466,7 +466,7 @@ export class EnhancedGrep {
                         column: json.data.submatches?.[0]?.start,
                         text: json.data.lines.text.trim(),
                         match: json.data.submatches?.[0]?.match?.text,
-                        confidence: 1.0
+                        confidence: 1.0,
                     });
                 }
             } catch {
@@ -482,18 +482,16 @@ export class EnhancedGrep {
     private async searchWithNode(params: EnhancedGrepParams): Promise<EnhancedGrepResult[]> {
         const searchPath = params.path || process.cwd();
         const results: EnhancedGrepResult[] = [];
-        
+
         // Get files to search
         const files = await this.getFilesToSearch(searchPath, params);
-        
+
         // Search files concurrently with limit
         const chunks = this.chunkArray(files, this.config.maxConcurrentFiles);
-        
+
         for (const chunk of chunks) {
-            const chunkResults = await Promise.allSettled(
-                chunk.map(file => this.searchFile(file, params))
-            );
-            
+            const chunkResults = await Promise.allSettled(chunk.map((file) => this.searchFile(file, params)));
+
             for (const result of chunkResults) {
                 if (result.status === 'fulfilled' && result.value.length > 0) {
                     results.push(...result.value);
@@ -507,63 +505,63 @@ export class EnhancedGrep {
     private async getFilesToSearch(searchPath: string, params: EnhancedGrepParams): Promise<string[]> {
         const files: string[] = [];
         const stat = await fs.stat(searchPath);
-        
+
         if (stat.isFile()) {
             return [searchPath];
         }
-        
+
         if (stat.isDirectory()) {
             const entries = await fs.readdir(searchPath, { withFileTypes: true });
-            
+
             for (const entry of entries) {
                 if (entry.name.startsWith('.') && !params.path?.includes(entry.name)) {
                     continue; // Skip hidden files unless explicitly included in path
                 }
-                
+
                 const fullPath = path.join(searchPath, entry.name);
-                
+
                 if (entry.isFile()) {
                     // Check file type filter
                     if (params.type && !this.matchesFileType(fullPath, params.type)) {
                         continue;
                     }
-                    
+
                     // Check file size
                     const stats = await fs.stat(fullPath);
-                    const maxFileSize = params.maxFileSize || this.config.maxFileSize || (50 * 1024 * 1024); // 50MB default
+                    const maxFileSize = params.maxFileSize || this.config.maxFileSize || 50 * 1024 * 1024; // 50MB default
                     if (stats.size > maxFileSize) {
                         continue;
                     }
-                    
+
                     files.push(fullPath);
                 }
             }
         }
-        
+
         return files;
     }
 
     private async searchFile(filePath: string, params: EnhancedGrepParams): Promise<EnhancedGrepResult[]> {
         const results: EnhancedGrepResult[] = [];
-        
+
         try {
-            const fileStream = createReadStream(filePath, { 
-                encoding: params.encoding as BufferEncoding || 'utf8' 
+            const fileStream = createReadStream(filePath, {
+                encoding: (params.encoding as BufferEncoding) || 'utf8',
             });
             const rl = createInterface({ input: fileStream });
-            
+
             let lineNumber = 0;
-            let contextBuffer: string[] = [];
+            const contextBuffer: string[] = [];
             const contextSize = params.contextBefore || params.contextAround || 0;
-            
+
             for await (const line of rl) {
                 lineNumber++;
                 contextBuffer.push(line);
-                
+
                 if (contextBuffer.length > contextSize) {
                     contextBuffer.shift();
                 }
-                
+
                 // Apply pattern matching
                 if (this.matchesPattern(line, params.pattern, params.caseInsensitive)) {
                     const match: EnhancedGrepResult = {
@@ -571,30 +569,29 @@ export class EnhancedGrep {
                         line: lineNumber,
                         text: line.trim(),
                         match: this.extractMatch(line, params.pattern, params.caseInsensitive),
-                        confidence: 0.9
+                        confidence: 0.9,
                     };
-                    
+
                     // Add context if requested
                     if (contextSize > 0) {
                         match.context = {
                             before: contextBuffer.slice(0, -1), // All but current line
-                            after: [] // We don't have future lines yet
+                            after: [], // We don't have future lines yet
                         };
                     }
-                    
+
                     results.push(match);
-                    
+
                     // Check head limit
                     if (params.headLimit && results.length >= params.headLimit) {
                         break;
                     }
                 }
             }
-            
         } catch (error) {
             // Skip files that can't be read
         }
-        
+
         return results;
     }
 
@@ -625,16 +622,16 @@ export class EnhancedGrep {
     private matchesFileType(filePath: string, type: string): boolean {
         const ext = path.extname(filePath).toLowerCase();
         const typeMap: Record<string, string[]> = {
-            'ts': ['.ts', '.tsx'],
-            'js': ['.js', '.jsx'],
-            'py': ['.py', '.pyw'],
-            'java': ['.java'],
-            'go': ['.go'],
-            'rs': ['.rs'],
-            'cpp': ['.cpp', '.cc', '.cxx', '.c++'],
-            'c': ['.c', '.h']
+            ts: ['.ts', '.tsx'],
+            js: ['.js', '.jsx'],
+            py: ['.py', '.pyw'],
+            java: ['.java'],
+            go: ['.go'],
+            rs: ['.rs'],
+            cpp: ['.cpp', '.cc', '.cxx', '.c++'],
+            c: ['.c', '.h'],
         };
-        
+
         return typeMap[type]?.includes(ext) || false;
     }
 
@@ -646,7 +643,7 @@ export class EnhancedGrep {
                 file: parts[0],
                 line: parseInt(parts[1]) || undefined,
                 text: parts.slice(2).join(':').trim(),
-                confidence: 0.8
+                confidence: 0.8,
             };
         }
         return null;
@@ -714,7 +711,7 @@ export class EnhancedGlob {
         totalTime: 0,
         averageTime: 0,
         cacheHits: 0,
-        errors: 0
+        errors: 0,
     };
 
     constructor(
@@ -736,9 +733,9 @@ export class EnhancedGlob {
             maxFiles: 10000,
             respectGitignore: true,
             followSymlinks: false,
-            ...config // User config overrides defaults
+            ...config, // User config overrides defaults
         };
-        
+
         if (this.config.enableSmartCache) {
             this.smartCache = createSmartCache<EnhancedGlobResult>(this.config.cacheConfig);
             this.cache = new SmartCacheAdapter(this.smartCache);
@@ -753,7 +750,7 @@ export class EnhancedGlob {
 
         try {
             const cacheKey = this.generateCacheKey(params);
-            
+
             if (this.config.enableCache) {
                 const cached = this.cache.get(cacheKey);
                 if (cached) {
@@ -763,14 +760,13 @@ export class EnhancedGlob {
             }
 
             const result = await this.executeGlob(params);
-            
+
             if (this.config.enableCache) {
                 this.cache.set(cacheKey, result);
             }
 
             this.updateMetrics(Date.now() - startTime);
             return result;
-
         } catch (error) {
             this.metrics.errors++;
             this.updateMetrics(Date.now() - startTime);
@@ -787,11 +783,11 @@ export class EnhancedGlob {
             dot: params.includeHidden || false,
             onlyFiles: !params.includeDirectories,
             absolute: true,
-            suppressErrors: true
+            suppressErrors: true,
         };
 
         const files = await fastGlob(params.pattern, options);
-        
+
         // Sort by modification time if requested
         if (params.sortByModified) {
             await this.sortByModificationTime(files);
@@ -805,8 +801,8 @@ export class EnhancedGlob {
                 totalFiles: files.length,
                 searchTime: 0, // Will be set by caller
                 skippedFiles: 0,
-                errors: []
-            }
+                errors: [],
+            },
         };
 
         for (const file of files) {
@@ -827,19 +823,18 @@ export class EnhancedGlob {
 
     private async sortByModificationTime(files: string[]): Promise<void> {
         const stats = await Promise.allSettled(
-            files.map(async file => ({
+            files.map(async (file) => ({
                 file,
-                mtime: (await fs.stat(file)).mtime
+                mtime: (await fs.stat(file)).mtime,
             }))
         );
 
         const validStats = stats
-            .filter((s): s is PromiseFulfilledResult<{ file: string; mtime: Date }> => 
-                s.status === 'fulfilled')
-            .map(s => s.value)
+            .filter((s): s is PromiseFulfilledResult<{ file: string; mtime: Date }> => s.status === 'fulfilled')
+            .map((s) => s.value)
             .sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
 
-        files.splice(0, files.length, ...validStats.map(s => s.file));
+        files.splice(0, files.length, ...validStats.map((s) => s.file));
     }
 
     private generateCacheKey(params: EnhancedGlobParams): string {
@@ -885,47 +880,47 @@ export class EnhancedGlob {
                     stats.misses++;
                     return null;
                 }
-                
+
                 // Check if expired
                 if (Date.now() - entry.timestamp > TTL) {
                     cache.delete(key);
                     stats.misses++;
                     return null;
                 }
-                
+
                 stats.hits++;
                 return entry.data;
             },
-            
+
             set(key: string, data: EnhancedGlobResult, ttl?: number): void {
                 cache.set(key, {
                     data,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
                 });
-                
+
                 // Limit cache size to prevent memory issues
                 if (cache.size > 1000) {
                     const firstKey = cache.keys().next().value;
                     if (firstKey) cache.delete(firstKey);
                 }
             },
-            
+
             clear(): void {
                 cache.clear();
             },
-            
+
             size(): number {
                 return cache.size;
             },
-            
+
             getStats(): { hits: number; misses: number; hitRate: number; evictions?: number } {
                 const total = stats.hits + stats.misses;
                 return {
                     ...stats,
                     hitRate: total > 0 ? stats.hits / total : 0,
-                    evictions: 0 // Legacy cache doesn't track evictions
+                    evictions: 0, // Legacy cache doesn't track evictions
                 };
-            }
+            },
         };
     }
 }
@@ -947,7 +942,7 @@ export class EnhancedLS {
         totalTime: 0,
         averageTime: 0,
         cacheHits: 0,
-        errors: 0
+        errors: 0,
     };
 
     constructor(
@@ -967,9 +962,9 @@ export class EnhancedLS {
             timeout: 30000,
             maxEntries: 5000,
             includeMimeType: false,
-            ...config // User config overrides defaults
+            ...config, // User config overrides defaults
         };
-        
+
         if (this.config.enableSmartCache) {
             this.smartCache = createSmartCache<EnhancedLSResult>(this.config.cacheConfig);
             this.cache = new SmartCacheAdapter(this.smartCache);
@@ -984,7 +979,7 @@ export class EnhancedLS {
 
         try {
             const cacheKey = this.generateCacheKey(params);
-            
+
             if (this.config.enableCache) {
                 const cached = this.cache.get(cacheKey);
                 if (cached) {
@@ -994,14 +989,13 @@ export class EnhancedLS {
             }
 
             const result = await this.executeListing(params);
-            
+
             if (this.config.enableCache) {
                 this.cache.set(cacheKey, result);
             }
 
             this.updateMetrics(Date.now() - startTime);
             return result;
-
         } catch (error) {
             this.metrics.errors++;
             this.updateMetrics(Date.now() - startTime);
@@ -1030,8 +1024,8 @@ export class EnhancedLS {
                 totalEntries: entries.length,
                 searchTime: 0, // Will be set by caller
                 errors,
-                path: params.path
-            }
+                path: params.path,
+            },
         };
     }
 
@@ -1056,13 +1050,12 @@ export class EnhancedLS {
                 }
 
                 // Check ignore patterns
-                if (params.ignorePatterns?.some(pattern => 
-                    this.matchesIgnorePattern(dirent.name, pattern))) {
+                if (params.ignorePatterns?.some((pattern) => this.matchesIgnorePattern(dirent.name, pattern))) {
                     continue;
                 }
 
                 const fullPath = path.join(dirPath, dirent.name);
-                
+
                 try {
                     const entry = await this.createLSEntry(dirent, fullPath, params);
                     entries.push(entry);
@@ -1080,16 +1073,12 @@ export class EnhancedLS {
         }
     }
 
-    private async createLSEntry(
-        dirent: Dirent,
-        fullPath: string,
-        params: EnhancedLSParams
-    ): Promise<EnhancedLSEntry> {
+    private async createLSEntry(dirent: Dirent, fullPath: string, params: EnhancedLSParams): Promise<EnhancedLSEntry> {
         const entry: EnhancedLSEntry = {
             name: dirent.name,
             path: fullPath,
             type: this.getEntryType(dirent),
-            extension: path.extname(dirent.name).toLowerCase()
+            extension: path.extname(dirent.name).toLowerCase(),
         };
 
         if (params.includeMetadata) {
@@ -1097,26 +1086,32 @@ export class EnhancedLS {
                 const stats = await fs.stat(fullPath);
                 entry.size = stats.size;
                 entry.modified = stats.mtime;
-                
+
                 // Check permissions
                 try {
                     await fs.access(fullPath, fsSync.constants.R_OK);
                     entry.isReadable = true;
-                } catch { entry.isReadable = false; }
-                
+                } catch {
+                    entry.isReadable = false;
+                }
+
                 try {
                     await fs.access(fullPath, fsSync.constants.W_OK);
                     entry.isWritable = true;
-                } catch { entry.isWritable = false; }
-                
+                } catch {
+                    entry.isWritable = false;
+                }
+
                 try {
                     await fs.access(fullPath, fsSync.constants.X_OK);
                     entry.isExecutable = true;
-                } catch { entry.isExecutable = false; }
+                } catch {
+                    entry.isExecutable = false;
+                }
 
                 // Get file mode as permissions string
                 entry.permissions = this.formatPermissions(stats.mode);
-                
+
                 // Get MIME type if requested
                 if (this.config.includeMimeType && dirent.isFile()) {
                     entry.mimeType = this.getMimeType(entry.extension || '');
@@ -1138,22 +1133,22 @@ export class EnhancedLS {
 
     private formatPermissions(mode: number): string {
         const permissions = [];
-        
+
         // Owner permissions
-        permissions.push((mode & 0o400) ? 'r' : '-');
-        permissions.push((mode & 0o200) ? 'w' : '-');
-        permissions.push((mode & 0o100) ? 'x' : '-');
-        
+        permissions.push(mode & 0o400 ? 'r' : '-');
+        permissions.push(mode & 0o200 ? 'w' : '-');
+        permissions.push(mode & 0o100 ? 'x' : '-');
+
         // Group permissions
-        permissions.push((mode & 0o040) ? 'r' : '-');
-        permissions.push((mode & 0o020) ? 'w' : '-');
-        permissions.push((mode & 0o010) ? 'x' : '-');
-        
+        permissions.push(mode & 0o040 ? 'r' : '-');
+        permissions.push(mode & 0o020 ? 'w' : '-');
+        permissions.push(mode & 0o010 ? 'x' : '-');
+
         // Other permissions
-        permissions.push((mode & 0o004) ? 'r' : '-');
-        permissions.push((mode & 0o002) ? 'w' : '-');
-        permissions.push((mode & 0o001) ? 'x' : '-');
-        
+        permissions.push(mode & 0o004 ? 'r' : '-');
+        permissions.push(mode & 0o002 ? 'w' : '-');
+        permissions.push(mode & 0o001 ? 'x' : '-');
+
         return permissions.join('');
     }
 
@@ -1173,19 +1168,16 @@ export class EnhancedLS {
             '.md': 'text/markdown',
             '.txt': 'text/plain',
             '.yaml': 'text/yaml',
-            '.yml': 'text/yaml'
+            '.yml': 'text/yaml',
         };
-        
+
         return mimeTypes[extension] || 'application/octet-stream';
     }
 
     private matchesIgnorePattern(name: string, pattern: string): boolean {
         // Simple glob pattern matching
-        const regex = pattern
-            .replace(/\./g, '\\.')
-            .replace(/\*/g, '.*')
-            .replace(/\?/g, '.');
-        
+        const regex = pattern.replace(/\./g, '\\.').replace(/\*/g, '.*').replace(/\?/g, '.');
+
         return new RegExp(`^${regex}$`).test(name);
     }
 
@@ -1196,7 +1188,7 @@ export class EnhancedLS {
     ): void {
         entries.sort((a, b) => {
             let comparison = 0;
-            
+
             switch (sortBy) {
                 case 'name':
                     comparison = a.name.localeCompare(b.name);
@@ -1208,7 +1200,7 @@ export class EnhancedLS {
                     comparison = (a.modified?.getTime() || 0) - (b.modified?.getTime() || 0);
                     break;
             }
-            
+
             return sortOrder === 'desc' ? -comparison : comparison;
         });
     }
@@ -1256,47 +1248,47 @@ export class EnhancedLS {
                     stats.misses++;
                     return null;
                 }
-                
+
                 // Check if expired
                 if (Date.now() - entry.timestamp > TTL) {
                     cache.delete(key);
                     stats.misses++;
                     return null;
                 }
-                
+
                 stats.hits++;
                 return entry.data;
             },
-            
+
             set(key: string, data: EnhancedLSResult, ttl?: number): void {
                 cache.set(key, {
                     data,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
                 });
-                
+
                 // Limit cache size to prevent memory issues
                 if (cache.size > 1000) {
                     const firstKey = cache.keys().next().value;
                     if (firstKey) cache.delete(firstKey);
                 }
             },
-            
+
             clear(): void {
                 cache.clear();
             },
-            
+
             size(): number {
                 return cache.size;
             },
-            
+
             getStats(): { hits: number; misses: number; hitRate: number; evictions?: number } {
                 const total = stats.hits + stats.misses;
                 return {
                     ...stats,
                     hitRate: total > 0 ? stats.hits / total : 0,
-                    evictions: 0 // Legacy cache doesn't track evictions
+                    evictions: 0, // Legacy cache doesn't track evictions
                 };
-            }
+            },
         };
     }
 }
@@ -1324,31 +1316,41 @@ export class EnhancedSearchTools {
             glob: this.glob.getMetrics(),
             ls: this.ls.getMetrics(),
             combined: {
-                totalSearches: this.grep.getMetrics().searchCount + 
-                             this.glob.getMetrics().searchCount + 
-                             this.ls.getMetrics().searchCount,
-                totalTime: this.grep.getMetrics().totalTime + 
-                          this.glob.getMetrics().totalTime + 
-                          this.ls.getMetrics().totalTime,
-                totalErrors: this.grep.getMetrics().errors + 
-                            this.glob.getMetrics().errors + 
-                            this.ls.getMetrics().errors
-            }
+                totalSearches:
+                    this.grep.getMetrics().searchCount +
+                    this.glob.getMetrics().searchCount +
+                    this.ls.getMetrics().searchCount,
+                totalTime:
+                    this.grep.getMetrics().totalTime +
+                    this.glob.getMetrics().totalTime +
+                    this.ls.getMetrics().totalTime,
+                totalErrors:
+                    this.grep.getMetrics().errors + this.glob.getMetrics().errors + this.ls.getMetrics().errors,
+            },
         };
     }
 
     // Health check for all tools
     async healthCheck(): Promise<{ grep: boolean; glob: boolean; ls: boolean }> {
         const checks = await Promise.allSettled([
-            this.grep.search({ pattern: 'test', path: __dirname }).then(() => true).catch(() => false),
-            this.glob.search({ pattern: '*.ts', path: __dirname }).then(() => true).catch(() => false),
-            this.ls.list({ path: __dirname }).then(() => true).catch(() => false)
+            this.grep
+                .search({ pattern: 'test', path: __dirname })
+                .then(() => true)
+                .catch(() => false),
+            this.glob
+                .search({ pattern: '*.ts', path: __dirname })
+                .then(() => true)
+                .catch(() => false),
+            this.ls
+                .list({ path: __dirname })
+                .then(() => true)
+                .catch(() => false),
         ]);
 
         return {
             grep: checks[0].status === 'fulfilled' ? checks[0].value : false,
             glob: checks[1].status === 'fulfilled' ? checks[1].value : false,
-            ls: checks[2].status === 'fulfilled' ? checks[2].value : false
+            ls: checks[2].status === 'fulfilled' ? checks[2].value : false,
         };
     }
 
@@ -1357,27 +1359,29 @@ export class EnhancedSearchTools {
         return {
             grep: this.grep.getCacheStats(),
             glob: this.glob.getCacheStats(),
-            ls: this.ls.getCacheStats()
+            ls: this.ls.getCacheStats(),
         };
     }
 
     // Get unified cache size information
     getCacheSize() {
         return {
-            grep: this.grep.smartCache ? this.grep.smartCache.getSize() : { entries: this.grep.cache.size(), memoryBytes: 0, watchers: 0 },
-            glob: this.glob.smartCache ? this.glob.smartCache.getSize() : { entries: this.glob.cache.size(), memoryBytes: 0, watchers: 0 },
-            ls: this.ls.smartCache ? this.ls.smartCache.getSize() : { entries: this.ls.cache.size(), memoryBytes: 0, watchers: 0 }
+            grep: this.grep.smartCache
+                ? this.grep.smartCache.getSize()
+                : { entries: this.grep.cache.size(), memoryBytes: 0, watchers: 0 },
+            glob: this.glob.smartCache
+                ? this.glob.smartCache.getSize()
+                : { entries: this.glob.cache.size(), memoryBytes: 0, watchers: 0 },
+            ls: this.ls.smartCache
+                ? this.ls.smartCache.getSize()
+                : { entries: this.ls.cache.size(), memoryBytes: 0, watchers: 0 },
         };
     }
 
     // Clear all caches
     async clearAllCaches(): Promise<void> {
-        await Promise.all([
-            this.grep.smartCache?.clear(),
-            this.glob.smartCache?.clear(), 
-            this.ls.smartCache?.clear()
-        ]);
-        
+        await Promise.all([this.grep.smartCache?.clear(), this.glob.smartCache?.clear(), this.ls.smartCache?.clear()]);
+
         this.grep.clearCache();
         this.glob.clearCache();
         this.ls.clearCache();
@@ -1385,11 +1389,7 @@ export class EnhancedSearchTools {
 
     // Dispose all resources
     async dispose(): Promise<void> {
-        await Promise.all([
-            this.grep.dispose(),
-            this.glob.dispose(),
-            this.ls.dispose()
-        ]);
+        await Promise.all([this.grep.dispose(), this.glob.dispose(), this.ls.dispose()]);
     }
 }
 
@@ -1403,25 +1403,25 @@ export function createEnhancedSearchTools(config?: {
     const grepConfig = {
         ...config?.grep,
         enableSmartCache: true,
-        cacheConfig: config?.globalSmartCache
+        cacheConfig: config?.globalSmartCache,
     };
-    
+
     const globConfig = {
         ...config?.glob,
         enableSmartCache: true,
-        cacheConfig: config?.globalSmartCache
+        cacheConfig: config?.globalSmartCache,
     };
-    
+
     const lsConfig = {
         ...config?.ls,
         enableSmartCache: true,
-        cacheConfig: config?.globalSmartCache
+        cacheConfig: config?.globalSmartCache,
     };
 
     return new EnhancedSearchTools({
         grep: grepConfig as any,
         glob: globConfig as any,
-        ls: lsConfig as any
+        ls: lsConfig as any,
     });
 }
 

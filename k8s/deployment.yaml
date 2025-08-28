@@ -44,7 +44,7 @@ spec:
               name: http-api
               protocol: TCP
             - containerPort: 7001
-              name: mcp-sse
+              name: mcp-http
               protocol: TCP
             - containerPort: 7002
               name: lsp-tcp
@@ -66,11 +66,11 @@ spec:
                 configMapKeyRef:
                   name: ontology-lsp-config
                   key: HTTP_API_PORT
-            - name: MCP_SSE_PORT
+            - name: MCP_HTTP_PORT
               valueFrom:
                 configMapKeyRef:
                   name: ontology-lsp-config
-                  key: MCP_SSE_PORT
+                  key: MCP_HTTP_PORT
             - name: LSP_SERVER_PORT
               valueFrom:
                 configMapKeyRef:

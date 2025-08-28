@@ -1,8 +1,8 @@
 // Pattern Storage - Manages persistence of learned patterns
 import { Database } from 'bun:sqlite';
-import { Pattern, Example, TokenPattern, PatternCategory } from '../types/core';
-import * as path from 'path';
 import * as fs from 'fs';
+import * as path from 'path';
+import type { Example, Pattern, PatternCategory, TokenPattern } from '../types/core';
 
 // Database row type interfaces
 interface PatternRow {
@@ -51,23 +51,23 @@ interface TopPerformingPatternRow {
 
 export class PatternStorage {
     private db: Database;
-    
+
     constructor(private dbPath: string) {
         // Ensure directory exists
         const dir = path.dirname(dbPath);
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
         }
-        
+
         this.db = new Database(dbPath);
         this.db.exec('PRAGMA journal_mode = WAL');
     }
-    
+
     async initialize(): Promise<void> {
         this.createTables();
         this.createIndices();
     }
-    
+
     private createTables(): void {
         this.db.exec(`
             CREATE TABLE IF NOT EXISTS patterns (
@@ -115,7 +115,7 @@ export class PatternStorage {
             );
         `);
     }
-    
+
     private createIndices(): void {
         this.db.exec(`
             CREATE INDEX IF NOT EXISTS idx_patterns_category 
@@ -142,7 +142,7 @@ export class PatternStorage {
                 ON pattern_applications(timestamp);
         `);
     }
-    
+
     async savePattern(pattern: Pattern): Promise<void> {
         const transaction = this.db.transaction(() => {
             // Insert or update pattern
@@ -151,7 +151,7 @@ export class PatternStorage {
                 (id, from_pattern, to_pattern, confidence, occurrences, category, last_applied, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             `);
-            
+
             patternStmt.run(
                 pattern.id,
                 JSON.stringify(pattern.from),
@@ -161,20 +161,20 @@ export class PatternStorage {
                 pattern.category,
                 pattern.lastApplied.toISOString()
             );
-            
+
             // Clear existing examples
             const clearExamplesStmt = this.db.prepare(`
                 DELETE FROM pattern_examples WHERE pattern_id = ?
             `);
             clearExamplesStmt.run(pattern.id);
-            
+
             // Insert examples
             const exampleStmt = this.db.prepare(`
                 INSERT INTO pattern_examples 
                 (pattern_id, old_name, new_name, confidence, context_data)
                 VALUES (?, ?, ?, ?, ?)
             `);
-            
+
             for (const example of pattern.examples) {
                 exampleStmt.run(
                     pattern.id,
@@ -185,45 +185,49 @@ export class PatternStorage {
                         file: example.context.file,
                         concept: example.context.concept?.id,
                         surroundingSymbols: example.context.surroundingSymbols,
-                        timestamp: example.context.timestamp.toISOString()
+                        timestamp: example.context.timestamp.toISOString(),
                     })
                 );
             }
-            
+
             // Initialize or update metrics
             const metricsStmt = this.db.prepare(`
                 INSERT OR IGNORE INTO pattern_metrics (pattern_id) VALUES (?)
             `);
             metricsStmt.run(pattern.id);
         });
-        
+
         transaction();
     }
-    
+
     async updatePattern(pattern: Pattern): Promise<void> {
         await this.savePattern(pattern); // Same logic for updates
     }
-    
+
     async loadPattern(patternId: string): Promise<Pattern | null> {
-        const patternRow = this.db.prepare(`
+        const patternRow = this.db
+            .prepare(`
             SELECT * FROM patterns WHERE id = ?
-        `).get(patternId);
-        
+        `)
+            .get(patternId);
+
         if (!patternRow) {
             return null;
         }
-        
+
         return this.deserializePattern(patternRow as PatternRow);
     }
-    
+
     async loadAllPatterns(): Promise<Pattern[]> {
-        const patternRows = this.db.prepare(`
+        const patternRows = this.db
+            .prepare(`
             SELECT * FROM patterns 
             ORDER BY confidence DESC, occurrences DESC
-        `).all();
-        
+        `)
+            .all();
+
         const patterns: Pattern[] = [];
-        
+
         for (const row of patternRows) {
             try {
                 const pattern = await this.deserializePattern(row as PatternRow);
@@ -234,19 +238,21 @@ export class PatternStorage {
                 console.warn(`Failed to deserialize pattern ${(row as PatternRow).id}:`, error);
             }
         }
-        
+
         return patterns;
     }
-    
+
     async loadPatternsByCategory(category: PatternCategory): Promise<Pattern[]> {
-        const patternRows = this.db.prepare(`
+        const patternRows = this.db
+            .prepare(`
             SELECT * FROM patterns 
             WHERE category = ?
             ORDER BY confidence DESC
-        `).all(category);
-        
+        `)
+            .all(category);
+
         const patterns: Pattern[] = [];
-        
+
         for (const row of patternRows) {
             try {
                 const pattern = await this.deserializePattern(row as PatternRow);
@@ -257,19 +263,19 @@ export class PatternStorage {
                 console.warn(`Failed to deserialize pattern ${(row as PatternRow).id}:`, error);
             }
         }
-        
+
         return patterns;
     }
-    
+
     async deletePattern(patternId: string): Promise<void> {
         const transaction = this.db.transaction(() => {
             // Foreign key constraints will handle cascading deletes
             this.db.prepare(`DELETE FROM patterns WHERE id = ?`).run(patternId);
         });
-        
+
         transaction();
     }
-    
+
     async recordPatternApplication(
         patternId: string,
         originalIdentifier: string,
@@ -281,26 +287,23 @@ export class PatternStorage {
             (pattern_id, original_identifier, suggested_identifier, applied)
             VALUES (?, ?, ?, ?)
         `);
-        
+
         stmt.run(patternId, originalIdentifier, suggestedIdentifier, applied);
-        
+
         // Update metrics
         await this.updatePatternMetrics(patternId, applied);
     }
-    
-    async recordPatternFeedback(
-        applicationId: number,
-        positive: boolean
-    ): Promise<void> {
+
+    async recordPatternFeedback(applicationId: number, positive: boolean): Promise<void> {
         const stmt = this.db.prepare(`
             UPDATE pattern_applications 
             SET feedback_positive = ?
             WHERE id = ?
         `);
-        
+
         stmt.run(positive, applicationId);
     }
-    
+
     async getPatternMetrics(patternId: string): Promise<{
         totalApplications: number;
         successfulApplications: number;
@@ -309,25 +312,29 @@ export class PatternStorage {
         lastSuccess?: Date;
         lastFailure?: Date;
     } | null> {
-        const metricsRow = this.db.prepare(`
+        const metricsRow = this.db
+            .prepare(`
             SELECT * FROM pattern_metrics WHERE pattern_id = ?
-        `).get(patternId) as PatternMetricsRow | undefined;
-        
+        `)
+            .get(patternId) as PatternMetricsRow | undefined;
+
         if (!metricsRow) {
             return null;
         }
-        
+
         return {
             totalApplications: metricsRow.total_applications,
             successfulApplications: metricsRow.successful_applications,
-            successRate: metricsRow.total_applications > 0 ? 
-                metricsRow.successful_applications / metricsRow.total_applications : 0,
+            successRate:
+                metricsRow.total_applications > 0
+                    ? metricsRow.successful_applications / metricsRow.total_applications
+                    : 0,
             averageConfidence: metricsRow.average_confidence,
             lastSuccess: metricsRow.last_success ? new Date(metricsRow.last_success) : undefined,
-            lastFailure: metricsRow.last_failure ? new Date(metricsRow.last_failure) : undefined
+            lastFailure: metricsRow.last_failure ? new Date(metricsRow.last_failure) : undefined,
         };
     }
-    
+
     async getGlobalStatistics(): Promise<{
         totalPatterns: number;
         totalApplications: number;
@@ -339,15 +346,18 @@ export class PatternStorage {
             totalApplications: number;
         }>;
     }> {
-        const statsRow = this.db.prepare(`
+        const statsRow = this.db
+            .prepare(`
             SELECT 
                 COUNT(*) as total_patterns,
                 AVG(CAST(successful_applications AS REAL) / NULLIF(total_applications, 0)) as avg_success_rate,
                 SUM(total_applications) as total_applications
             FROM pattern_metrics
-        `).get() as GlobalStatsRow;
-        
-        const topPerformingRows = this.db.prepare(`
+        `)
+            .get() as GlobalStatsRow;
+
+        const topPerformingRows = this.db
+            .prepare(`
             SELECT 
                 pm.pattern_id,
                 p.category,
@@ -358,21 +368,22 @@ export class PatternStorage {
             WHERE pm.total_applications >= 3
             ORDER BY success_rate DESC, pm.total_applications DESC
             LIMIT 10
-        `).all();
-        
+        `)
+            .all();
+
         return {
             totalPatterns: statsRow.total_patterns || 0,
             totalApplications: statsRow.total_applications || 0,
             averageSuccessRate: statsRow.avg_success_rate || 0,
-            topPerformingPatterns: topPerformingRows.map(row => ({
+            topPerformingPatterns: topPerformingRows.map((row) => ({
                 patternId: (row as TopPerformingPatternRow).pattern_id,
                 category: (row as TopPerformingPatternRow).category,
                 successRate: (row as TopPerformingPatternRow).success_rate || 0,
-                totalApplications: (row as TopPerformingPatternRow).total_applications
-            }))
+                totalApplications: (row as TopPerformingPatternRow).total_applications,
+            })),
         };
     }
-    
+
     private async updatePatternMetrics(patternId: string, successful: boolean): Promise<void> {
         const updateStmt = this.db.prepare(`
             UPDATE pattern_metrics 
@@ -383,14 +394,9 @@ export class PatternStorage {
                 last_failure = CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE last_failure END
             WHERE pattern_id = ?
         `);
-        
-        updateStmt.run(
-            successful ? 1 : 0,
-            successful,
-            !successful,
-            patternId
-        );
-        
+
+        updateStmt.run(successful ? 1 : 0, successful, !successful, patternId);
+
         // Update average confidence
         const avgStmt = this.db.prepare(`
             UPDATE pattern_metrics 
@@ -401,22 +407,24 @@ export class PatternStorage {
             )
             WHERE pattern_id = ?
         `);
-        
+
         avgStmt.run(patternId, patternId);
     }
-    
+
     private async deserializePattern(row: PatternRow): Promise<Pattern | null> {
         try {
             // Load examples
-            const exampleRows = this.db.prepare(`
+            const exampleRows = this.db
+                .prepare(`
                 SELECT * FROM pattern_examples WHERE pattern_id = ?
                 ORDER BY created_at DESC
-            `).all(row.id);
-            
-            const examples: Example[] = exampleRows.map(exRow => {
+            `)
+                .all(row.id);
+
+            const examples: Example[] = exampleRows.map((exRow) => {
                 const typedExRow = exRow as PatternExampleRow;
                 const contextData = JSON.parse(typedExRow.context_data || '{}');
-                
+
                 return {
                     oldName: typedExRow.old_name,
                     newName: typedExRow.new_name,
@@ -425,11 +433,11 @@ export class PatternStorage {
                         file: contextData.file || '',
                         concept: contextData.concept ? { id: contextData.concept } : undefined,
                         surroundingSymbols: contextData.surroundingSymbols || [],
-                        timestamp: new Date(contextData.timestamp || typedExRow.created_at)
-                    }
+                        timestamp: new Date(contextData.timestamp || typedExRow.created_at),
+                    },
                 } as Example;
             });
-            
+
             return {
                 id: row.id,
                 from: JSON.parse(row.from_pattern) as TokenPattern[],
@@ -438,30 +446,29 @@ export class PatternStorage {
                 occurrences: row.occurrences,
                 examples,
                 lastApplied: new Date(row.last_applied),
-                category: row.category as PatternCategory
+                category: row.category as PatternCategory,
             };
-            
         } catch (error) {
             console.error(`Failed to deserialize pattern ${row.id}:`, error);
             return null;
         }
     }
-    
+
     // Maintenance and cleanup methods
-    
+
     async cleanupOldPatterns(olderThanDays: number = 365): Promise<number> {
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
-        
+
         const deleteStmt = this.db.prepare(`
             DELETE FROM patterns 
             WHERE last_applied < ? AND occurrences < 5 AND confidence < 0.5
         `);
-        
+
         const result = deleteStmt.run(cutoffDate.toISOString());
         return result.changes;
     }
-    
+
     async optimizeDatabase(): Promise<void> {
         // Remove patterns with very low success rates
         const lowSuccessStmt = this.db.prepare(`
@@ -473,18 +480,18 @@ export class PatternStorage {
                 AND CAST(pm.successful_applications AS REAL) / pm.total_applications < 0.1
             )
         `);
-        
+
         lowSuccessStmt.run();
-        
+
         // Vacuum and analyze
         this.db.exec('VACUUM');
         this.db.exec('ANALYZE');
     }
-    
+
     async backup(backupPath: string): Promise<void> {
         await this.db.backup(backupPath);
     }
-    
+
     async close(): Promise<void> {
         this.db.close();
     }

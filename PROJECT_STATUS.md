@@ -104,7 +104,7 @@ ontology-lsp/
 
 ### Active Ports
 - 7000: HTTP API Server
-- 7001: MCP SSE Server
+- 7001: MCP HTTP Server
 - 7002: LSP Server (TCP/stdio)
 - 8081: Monitoring Dashboard
 
@@ -366,7 +366,7 @@ The Ontology-LSP system has a **production-ready core** with **HYBRID INTELLIGEN
 
 ### Deployment Verification Completed (2025-08-25)
 - ✅ **Production builds**: All services built successfully (0.57MB - 0.74MB optimized bundles)
-- ✅ **Health endpoints**: HTTP API (7000) and MCP SSE (7001) responding correctly
+- ✅ **Health endpoints**: HTTP API (7000) and MCP HTTP (7001) responding correctly
 - ✅ **Performance targets**: All 5 layers meeting or exceeding production targets
 - ✅ **Docker configuration**: Multi-stage production Dockerfile validated
 - ✅ **Process management**: Robust startup and cleanup verified

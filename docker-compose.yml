@@ -80,7 +80,7 @@ services:
       
       # Service Ports
       HTTP_API_PORT: 7000
-      MCP_SSE_PORT: 7001
+      MCP_HTTP_PORT: 7001
       LSP_SERVER_PORT: 7002
       
       # Performance & Learning
@@ -104,7 +104,7 @@ services:
       
     ports:
       - "7000:7000"  # HTTP API
-      - "7001:7001"  # MCP SSE
+      - "7001:7001"  # MCP HTTP (Streamable)
       - "7002:7002"  # LSP TCP
     volumes:
       - ./test-workspace:/app/workspace:ro

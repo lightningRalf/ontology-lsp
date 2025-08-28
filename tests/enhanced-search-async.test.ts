@@ -1,21 +1,23 @@
 /**
  * Tests for Async Enhanced Search Tools
- * 
+ *
  * These tests validate that our async implementation solves
  * all the performance issues identified in the analysis.
  */
 
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+
 const perfOnly = process.env.PERF === '1';
 const perfDescribe = perfOnly ? describe : describe.skip;
-import { 
-    AsyncEnhancedGrep, 
-    SearchStream,
+
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import {
+    AsyncEnhancedGrep,
     RipgrepProcessPool,
-    SmartSearchCache 
+    type SearchStream,
+    SmartSearchCache,
 } from '../src/layers/enhanced-search-tools-async';
-import * as fs from 'fs/promises';
-import * as path from 'path';
 
 describe('Async Enhanced Search Performance', () => {
     let grep: AsyncEnhancedGrep;
@@ -25,7 +27,7 @@ describe('Async Enhanced Search Performance', () => {
             maxProcesses: 4,
             cacheSize: 100,
             cacheTTL: 60000,
-            defaultTimeout: 5000
+            defaultTimeout: 5000,
         });
     });
 
@@ -52,13 +54,13 @@ describe('Async Enhanced Search Performance', () => {
             const searchPromise = grep.search({
                 pattern: 'function',
                 path: '.',
-                maxResults: 100
+                maxResults: 100,
             });
 
             // Do other work while search is running
             let workCompleted = 0;
             for (let i = 0; i < 100; i++) {
-                await new Promise(resolve => setImmediate(resolve));
+                await new Promise((resolve) => setImmediate(resolve));
                 workCompleted++;
             }
 
@@ -80,14 +82,14 @@ describe('Async Enhanced Search Performance', () => {
                 grep.search({ pattern: 'class', path: '.' }),
                 grep.search({ pattern: 'import', path: '.' }),
                 grep.search({ pattern: 'export', path: '.' }),
-                grep.search({ pattern: 'const', path: '.' })
+                grep.search({ pattern: 'const', path: '.' }),
             ];
 
             const results = await Promise.all(searches);
             const totalTime = Date.now() - startTime;
 
             // All searches should complete
-            results.forEach(r => {
+            results.forEach((r) => {
                 expect(r.length).toBeGreaterThan(0);
             });
 
@@ -108,7 +110,7 @@ describe('Async Enhanced Search Performance', () => {
             const stream = grep.searchStream({
                 pattern: 'TODO',
                 path: '.',
-                maxResults: 50
+                maxResults: 50,
             });
 
             await new Promise<void>((resolve, reject) => {
@@ -131,10 +133,10 @@ describe('Async Enhanced Search Performance', () => {
             // Validate streaming behavior
             expect(receivedResults.length).toBeGreaterThan(0);
             expect(progressUpdates.length).toBeGreaterThan(0);
-            
+
             // First result should arrive quickly (not waiting for all)
             expect(firstResultTime).toBeLessThan(50);
-            
+
             // Results should be spread over time (not all at once)
             const timeSpread = lastResultTime - firstResultTime;
             expect(timeSpread).toBeGreaterThan(0);
@@ -144,7 +146,7 @@ describe('Async Enhanced Search Performance', () => {
             let totalReceived = 0;
             const stream = grep.searchStream({
                 pattern: 'function', // Common pattern with many results
-                path: '.'
+                path: '.',
             });
 
             await new Promise<void>((resolve) => {
@@ -171,7 +173,7 @@ describe('Async Enhanced Search Performance', () => {
             const coldStart = Date.now();
             const coldResults = await grep.search({
                 pattern,
-                path: './src'
+                path: './src',
             });
             const coldTime = Date.now() - coldStart;
 
@@ -179,7 +181,7 @@ describe('Async Enhanced Search Performance', () => {
             const warmStart = Date.now();
             const warmResults = await grep.search({
                 pattern,
-                path: './src'
+                path: './src',
             });
             const warmTime = Date.now() - warmStart;
 
@@ -198,17 +200,17 @@ describe('Async Enhanced Search Performance', () => {
                 // First search
                 const results1 = await grep.search({
                     pattern: 'testFunction',
-                    path: '.'
+                    path: '.',
                 });
 
                 // Modify the file
-                await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
+                await new Promise((resolve) => setTimeout(resolve, 100)); // Small delay
                 await fs.appendFile(testFile, '\nfunction testFunction2() {}');
 
                 // Search again - cache should be invalidated
                 const results2 = await grep.search({
                     pattern: 'testFunction',
-                    path: '.'
+                    path: '.',
                 });
 
                 // Results should be different (file was modified)
@@ -224,17 +226,13 @@ describe('Async Enhanced Search Performance', () => {
         test('should search multiple directories in parallel', async () => {
             const startTime = Date.now();
 
-            const results = await grep.searchParallel(
-                ['function', 'class'],
-                ['./src', './tests'],
-                { maxResults: 50 }
-            );
+            const results = await grep.searchParallel(['function', 'class'], ['./src', './tests'], { maxResults: 50 });
 
             const totalTime = Date.now() - startTime;
 
             // Should have results for each pattern/directory combination
             expect(results.size).toBe(4); // 2 patterns × 2 directories
-            
+
             // Each should have some results
             for (const [key, value] of results) {
                 expect(value.length).toBeGreaterThan(0);
@@ -255,7 +253,7 @@ describe('Async Enhanced Search Performance', () => {
                 await grep.search({
                     pattern: `test${i}`, // Different pattern to avoid cache
                     path: './src',
-                    maxResults: 10
+                    maxResults: 10,
                 });
                 times.push(Date.now() - start);
             }
@@ -267,20 +265,20 @@ describe('Async Enhanced Search Performance', () => {
             console.log('Async Performance:', { mean, p95 });
 
             // Should meet performance targets
-            expect(mean).toBeLessThan(50);  // Mean under 50ms
-            expect(p95).toBeLessThan(100);   // P95 under 100ms
+            expect(mean).toBeLessThan(50); // Mean under 50ms
+            expect(p95).toBeLessThan(100); // P95 under 100ms
         });
 
         test('should handle large result sets efficiently', async () => {
             const stream = grep.searchStream({
                 pattern: 'the', // Very common word
                 path: '.',
-                maxResults: 1000
+                maxResults: 1000,
             });
 
             const startTime = Date.now();
             let resultCount = 0;
-            let memoryBefore = process.memoryUsage().heapUsed;
+            const memoryBefore = process.memoryUsage().heapUsed;
 
             await new Promise<void>((resolve, reject) => {
                 stream.on('data', () => {
@@ -306,9 +304,9 @@ describe('Async Enhanced Search Performance', () => {
         test('should handle timeout gracefully', async () => {
             try {
                 await grep.search({
-                    pattern: 'xxxxxxxxxxxxxxxxx', // Complex pattern  
-                    path: '.',  // Search current directory instead of root
-                    timeout: 1 // Extremely short timeout (1ms) to force timeout
+                    pattern: 'xxxxxxxxxxxxxxxxx', // Complex pattern
+                    path: '.', // Search current directory instead of root
+                    timeout: 1, // Extremely short timeout (1ms) to force timeout
                 });
                 expect(true).toBe(false); // Should not reach here
             } catch (error: any) {
@@ -319,7 +317,7 @@ describe('Async Enhanced Search Performance', () => {
         test('should handle invalid paths gracefully', async () => {
             const results = await grep.search({
                 pattern: 'test',
-                path: '/nonexistent/path/that/does/not/exist'
+                path: '/nonexistent/path/that/does/not/exist',
             });
 
             // Should return empty results, not crash
@@ -333,18 +331,16 @@ describe('Async Enhanced Search Performance', () => {
             for (let i = 0; i < 10; i++) {
                 const stream = grep.searchStream({
                     pattern: 'function',
-                    path: '.'
+                    path: '.',
                 });
                 streams.push(stream);
             }
 
             // Cancel them all immediately
-            streams.forEach(s => s.cancel());
+            streams.forEach((s) => s.cancel());
 
             // Wait for all to end
-            await Promise.all(
-                streams.map(s => new Promise(resolve => s.on('end', resolve)))
-            );
+            await Promise.all(streams.map((s) => new Promise((resolve) => s.on('end', resolve))));
 
             // Should not crash
             expect(true).toBe(true);
@@ -359,18 +355,20 @@ describe('Process Pool Management', () => {
 
         const executions = [];
         for (let i = 0; i < 5; i++) {
-            executions.push((async () => {
-                const process = await pool.execute('echo', ['test']);
-                
-                // Track actual process pool concurrency
-                const currentActive = pool.getActiveCount();
-                maxConcurrent = Math.max(maxConcurrent, currentActive);
-                
-                // Simulate work
-                await new Promise(resolve => setTimeout(resolve, 50));
-                
-                process.kill();
-            })());
+            executions.push(
+                (async () => {
+                    const process = await pool.execute('echo', ['test']);
+
+                    // Track actual process pool concurrency
+                    const currentActive = pool.getActiveCount();
+                    maxConcurrent = Math.max(maxConcurrent, currentActive);
+
+                    // Simulate work
+                    await new Promise((resolve) => setTimeout(resolve, 50));
+
+                    process.kill();
+                })()
+            );
         }
 
         await Promise.all(executions);
@@ -387,10 +385,7 @@ describe('Cache Intelligence', () => {
 
         // Add 10 entries
         for (let i = 0; i < 10; i++) {
-            cache.set(
-                { pattern: `pattern${i}`, path: '.' },
-                [{ file: 'test.ts', text: 'test', confidence: 1 }]
-            );
+            cache.set({ pattern: `pattern${i}`, path: '.' }, [{ file: 'test.ts', text: 'test', confidence: 1 }]);
         }
 
         // Should have evicted oldest entries
@@ -404,16 +399,13 @@ describe('Cache Intelligence', () => {
     test('should respect TTL', async () => {
         const cache = new SmartSearchCache(10, 100); // 100ms TTL
 
-        cache.set(
-            { pattern: 'ttl-test', path: '.' },
-            [{ file: 'test.ts', text: 'test', confidence: 1 }]
-        );
+        cache.set({ pattern: 'ttl-test', path: '.' }, [{ file: 'test.ts', text: 'test', confidence: 1 }]);
 
         // Should be in cache initially
         expect(cache.get({ pattern: 'ttl-test', path: '.' })).not.toBeNull();
 
         // Wait for TTL to expire
-        await new Promise(resolve => setTimeout(resolve, 150));
+        await new Promise((resolve) => setTimeout(resolve, 150));
 
         // Should be expired
         expect(cache.get({ pattern: 'ttl-test', path: '.' })).toBeNull();

@@ -1,7 +1,7 @@
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
-import { spawn, ChildProcess } from 'child_process';
-import * as path from 'path';
-import * as fs from 'fs';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { type ChildProcess, spawn } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { testPaths } from '../test-helpers';
 
 describe('LSP Server Integration Tests', () => {
@@ -12,7 +12,7 @@ describe('LSP Server Integration Tests', () => {
         // Start the LSP server
         const serverPath = testPaths.serverJs();
         serverProcess = spawn('bun', ['run', serverPath, '--stdio'], {
-            stdio: ['pipe', 'pipe', 'pipe']
+            stdio: ['pipe', 'pipe', 'pipe'],
         });
 
         // Wait for server to be ready
@@ -47,8 +47,8 @@ describe('LSP Server Integration Tests', () => {
             params: {
                 processId: null,
                 rootUri: 'file:///test',
-                capabilities: {}
-            }
+                capabilities: {},
+            },
         };
 
         const response = await sendRequest(serverProcess, initRequest);
@@ -63,8 +63,8 @@ describe('LSP Server Integration Tests', () => {
             method: 'textDocument/hover',
             params: {
                 textDocument: { uri: 'file:///test/file.ts' },
-                position: { line: 0, character: 0 }
-            }
+                position: { line: 0, character: 0 },
+            },
         };
 
         const response = await sendRequest(serverProcess, hoverRequest);
@@ -78,8 +78,8 @@ describe('LSP Server Integration Tests', () => {
             method: 'textDocument/definition',
             params: {
                 textDocument: { uri: 'file:///test/file.ts' },
-                position: { line: 0, character: 0 }
-            }
+                position: { line: 0, character: 0 },
+            },
         };
 
         const response = await sendRequest(serverProcess, defRequest);
@@ -91,7 +91,7 @@ describe('LSP Server Integration Tests', () => {
             jsonrpc: '2.0',
             id: 4,
             method: 'ontology/getStatistics',
-            params: {}
+            params: {},
         };
 
         const response = await sendRequest(serverProcess, statsRequest);
@@ -103,7 +103,7 @@ describe('LSP Server Integration Tests', () => {
             jsonrpc: '2.0',
             id: 5,
             method: 'ontology/getConceptGraph',
-            params: {}
+            params: {},
         };
 
         const response = await sendRequest(serverProcess, graphRequest);
@@ -159,7 +159,9 @@ async function sendRequest(proc: ChildProcess, request: any, timeoutMs = 5000): 
             proc.off('error', onError);
         };
 
-        const onStderr = (_: Buffer) => { /* ignore diagnostics */ };
+        const onStderr = (_: Buffer) => {
+            /* ignore diagnostics */
+        };
 
         const timer = setTimeout(() => {
             cleanup();

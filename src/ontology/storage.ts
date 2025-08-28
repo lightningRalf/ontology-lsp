@@ -1,8 +1,8 @@
 // Ontology Storage - SQLite-based persistence for concepts and relations
 import { Database } from 'bun:sqlite';
-import { Concept, Relation } from '../types/core';
-import * as path from 'path';
 import * as fs from 'fs';
+import * as path from 'path';
+import { type Concept, Relation } from '../types/core';
 
 // Database row type interfaces
 interface ConceptRow {
@@ -65,23 +65,23 @@ interface StatsRow {
 
 export class OntologyStorage {
     private db: Database;
-    
+
     constructor(private dbPath: string) {
         // Ensure directory exists
         const dir = path.dirname(dbPath);
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
         }
-        
+
         this.db = new Database(dbPath);
         this.db.exec('PRAGMA journal_mode = WAL');
     }
-    
+
     async initialize(): Promise<void> {
         this.createTables();
         this.createIndices();
     }
-    
+
     private createTables(): void {
         this.db.exec(`
             CREATE TABLE IF NOT EXISTS concepts (
@@ -147,7 +147,7 @@ export class OntologyStorage {
             );
         `);
     }
-    
+
     private createIndices(): void {
         this.db.exec(`
             CREATE INDEX IF NOT EXISTS idx_concepts_canonical_name 
@@ -171,7 +171,7 @@ export class OntologyStorage {
                 ON evolution_history(timestamp);
         `);
     }
-    
+
     async saveConcept(concept: Concept): Promise<void> {
         const transaction = this.db.transaction(() => {
             // Save main concept
@@ -179,27 +179,27 @@ export class OntologyStorage {
                 INSERT OR REPLACE INTO concepts (id, canonical_name, confidence, metadata, updated_at)
                 VALUES (?, ?, ?, ?, strftime('%s', 'now'))
             `);
-            
+
             conceptStmt.run(
                 concept.id,
                 concept.canonicalName,
                 concept.confidence,
                 JSON.stringify(this.serializeConcept(concept))
             );
-            
+
             // Clear existing representations
             const clearRepsStmt = this.db.prepare(`
                 DELETE FROM representations WHERE concept_id = ?
             `);
             clearRepsStmt.run(concept.id);
-            
+
             // Save representations
             const repStmt = this.db.prepare(`
                 INSERT INTO representations 
                 (concept_id, name, location_uri, location_range, first_seen, last_seen, occurrences, context)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             `);
-            
+
             for (const [name, rep] of concept.representations) {
                 repStmt.run(
                     concept.id,
@@ -212,19 +212,19 @@ export class OntologyStorage {
                     rep.context || null
                 );
             }
-            
+
             // Save relations
             const clearRelationsStmt = this.db.prepare(`
                 DELETE FROM relations WHERE from_concept_id = ?
             `);
             clearRelationsStmt.run(concept.id);
-            
+
             const relationStmt = this.db.prepare(`
                 INSERT OR REPLACE INTO relations 
                 (id, from_concept_id, to_concept_id, relation_type, confidence, evidence, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             `);
-            
+
             for (const [_, relation] of concept.relations) {
                 relationStmt.run(
                     relation.id,
@@ -236,19 +236,19 @@ export class OntologyStorage {
                     relation.createdAt.toISOString()
                 );
             }
-            
+
             // Save evolution history
             const clearEvolutionStmt = this.db.prepare(`
                 DELETE FROM evolution_history WHERE concept_id = ?
             `);
             clearEvolutionStmt.run(concept.id);
-            
+
             const evolutionStmt = this.db.prepare(`
                 INSERT INTO evolution_history 
                 (concept_id, timestamp, change_type, from_state, to_state, reason, confidence)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             `);
-            
+
             for (const evolution of concept.evolution) {
                 evolutionStmt.run(
                     concept.id,
@@ -260,14 +260,14 @@ export class OntologyStorage {
                     evolution.confidence
                 );
             }
-            
+
             // Save metadata
             const metadataStmt = this.db.prepare(`
                 INSERT OR REPLACE INTO concept_metadata 
                 (concept_id, category, tags, is_interface, is_abstract, is_deprecated, documentation)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             `);
-            
+
             metadataStmt.run(
                 concept.id,
                 concept.metadata.category || null,
@@ -278,31 +278,35 @@ export class OntologyStorage {
                 concept.metadata.documentation || null
             );
         });
-        
+
         transaction();
     }
-    
+
     async updateConcept(concept: Concept): Promise<void> {
         await this.saveConcept(concept); // Same as save for now
     }
-    
+
     async loadConcept(conceptId: string): Promise<Concept | null> {
-        const conceptRow = this.db.prepare(`
+        const conceptRow = this.db
+            .prepare(`
             SELECT * FROM concepts WHERE id = ?
-        `).get(conceptId) as ConceptRow | undefined;
-        
+        `)
+            .get(conceptId) as ConceptRow | undefined;
+
         if (!conceptRow) return null;
-        
+
         return this.deserializeConcept(conceptRow);
     }
-    
+
     async loadAllConcepts(): Promise<Concept[]> {
-        const conceptRows = this.db.prepare(`
+        const conceptRows = this.db
+            .prepare(`
             SELECT * FROM concepts ORDER BY updated_at DESC
-        `).all();
-        
+        `)
+            .all();
+
         const concepts: Concept[] = [];
-        
+
         for (const row of conceptRows) {
             try {
                 const concept = await this.deserializeConcept(row as ConceptRow);
@@ -313,68 +317,75 @@ export class OntologyStorage {
                 console.warn(`Failed to deserialize concept ${(row as ConceptRow).id}:`, error);
             }
         }
-        
+
         return concepts;
     }
-    
+
     async deleteConcept(conceptId: string): Promise<void> {
         const transaction = this.db.transaction(() => {
             // Relations and other dependent records will be deleted by CASCADE
             this.db.prepare(`DELETE FROM concepts WHERE id = ?`).run(conceptId);
         });
-        
+
         transaction();
     }
-    
+
     async findConceptsByName(name: string): Promise<Concept[]> {
-        const conceptIds = this.db.prepare(`
+        const conceptIds = this.db
+            .prepare(`
             SELECT DISTINCT concept_id FROM representations WHERE name LIKE ?
-        `).all(`%${name}%`).map(row => (row as { concept_id: string }).concept_id);
-        
+        `)
+            .all(`%${name}%`)
+            .map((row) => (row as { concept_id: string }).concept_id);
+
         const concepts: Concept[] = [];
-        
+
         for (const id of conceptIds) {
             const concept = await this.loadConcept(id);
             if (concept) {
                 concepts.push(concept);
             }
         }
-        
+
         return concepts;
     }
-    
+
     async getConceptStatistics(): Promise<{
         totalConcepts: number;
         totalRepresentations: number;
         totalRelations: number;
         averageRepresentationsPerConcept: number;
     }> {
-        const stats = this.db.prepare(`
+        const stats = this.db
+            .prepare(`
             SELECT 
                 COUNT(*) as total_concepts,
                 (SELECT COUNT(*) FROM representations) as total_representations,
                 (SELECT COUNT(*) FROM relations) as total_relations
             FROM concepts
-        `).get() as StatsRow;
-        
+        `)
+            .get() as StatsRow;
+
         return {
             totalConcepts: stats.total_concepts,
             totalRepresentations: stats.total_representations,
             totalRelations: stats.total_relations,
-            averageRepresentationsPerConcept: 
-                stats.total_concepts > 0 ? stats.total_representations / stats.total_concepts : 0
+            averageRepresentationsPerConcept:
+                stats.total_concepts > 0 ? stats.total_representations / stats.total_concepts : 0,
         };
     }
-    
+
     private async deserializeConcept(row: ConceptRow): Promise<Concept | null> {
         try {
             const data = JSON.parse(row.data);
-            
+
             // Load representations
-            const repRows = this.db.prepare(`
+            const repRows = this.db
+                .prepare(`
                 SELECT * FROM representations WHERE concept_id = ?
-            `).all(row.id);
-            
+            `)
+                .all(row.id);
+
             const representations = new Map();
             for (const repRow of repRows) {
                 const row = repRow as RepresentationRow;
@@ -382,20 +393,22 @@ export class OntologyStorage {
                     name: row.name,
                     location: {
                         uri: row.location_uri,
-                        range: JSON.parse(row.location_range)
+                        range: JSON.parse(row.location_range),
                     },
                     firstSeen: new Date(row.first_seen),
                     lastSeen: new Date(row.last_seen),
                     occurrences: row.occurrences,
-                    context: row.context
+                    context: row.context,
                 });
             }
-            
+
             // Load relations
-            const relationRows = this.db.prepare(`
+            const relationRows = this.db
+                .prepare(`
                 SELECT * FROM relations WHERE from_concept_id = ?
-            `).all(row.id);
-            
+            `)
+                .all(row.id);
+
             const relations = new Map();
             for (const relRow of relationRows) {
                 const row = relRow as RelationRow;
@@ -405,16 +418,18 @@ export class OntologyStorage {
                     type: row.relation_type,
                     confidence: row.confidence,
                     evidence: JSON.parse(row.evidence || '[]'),
-                    createdAt: new Date(row.created_at)
+                    createdAt: new Date(row.created_at),
                 });
             }
-            
+
             // Load evolution history
-            const evolutionRows = this.db.prepare(`
+            const evolutionRows = this.db
+                .prepare(`
                 SELECT * FROM evolution_history WHERE concept_id = ? ORDER BY timestamp DESC
-            `).all(row.id);
-            
-            const evolution = evolutionRows.map(evRow => {
+            `)
+                .all(row.id);
+
+            const evolution = evolutionRows.map((evRow) => {
                 const row = evRow as EvolutionRow;
                 return {
                     timestamp: new Date(row.timestamp),
@@ -422,26 +437,30 @@ export class OntologyStorage {
                     from: row.from_state,
                     to: row.to_state,
                     reason: row.reason || '',
-                    confidence: row.confidence
+                    confidence: row.confidence,
                 };
             });
-            
+
             // Load metadata
-            const metadataRow = this.db.prepare(`
+            const metadataRow = this.db
+                .prepare(`
                 SELECT * FROM concept_metadata WHERE concept_id = ?
-            `).get(row.id);
-            
-            const metadata = metadataRow ? {
-                category: (metadataRow as MetadataRow).category || undefined,
-                tags: JSON.parse((metadataRow as MetadataRow).tags || '[]'),
-                isInterface: (metadataRow as MetadataRow).is_interface,
-                isAbstract: (metadataRow as MetadataRow).is_abstract,
-                isDeprecated: (metadataRow as MetadataRow).is_deprecated,
-                documentation: (metadataRow as MetadataRow).documentation || undefined
-            } : {
-                tags: []
-            };
-            
+            `)
+                .get(row.id);
+
+            const metadata = metadataRow
+                ? {
+                      category: (metadataRow as MetadataRow).category || undefined,
+                      tags: JSON.parse((metadataRow as MetadataRow).tags || '[]'),
+                      isInterface: (metadataRow as MetadataRow).is_interface,
+                      isAbstract: (metadataRow as MetadataRow).is_abstract,
+                      isDeprecated: (metadataRow as MetadataRow).is_deprecated,
+                      documentation: (metadataRow as MetadataRow).documentation || undefined,
+                  }
+                : {
+                      tags: [],
+                  };
+
             return {
                 id: row.id,
                 canonicalName: row.canonical_name,
@@ -451,39 +470,38 @@ export class OntologyStorage {
                     parameters: [],
                     sideEffects: [],
                     complexity: 0,
-                    fingerprint: ''
+                    fingerprint: '',
                 },
                 evolution,
                 metadata,
-                confidence: row.confidence
+                confidence: row.confidence,
             };
-            
         } catch (error) {
             console.error(`Failed to deserialize concept ${row.id}:`, error);
             return null;
         }
     }
-    
+
     private serializeConcept(concept: Concept): any {
         return {
             signature: concept.signature,
             // Other serializable data can be added here
         };
     }
-    
+
     async close(): Promise<void> {
         this.db.close();
     }
-    
+
     // Maintenance methods
     async vacuum(): Promise<void> {
         this.db.exec('VACUUM');
     }
-    
+
     async analyze(): Promise<void> {
         this.db.exec('ANALYZE');
     }
-    
+
     async backup(backupPath: string): Promise<void> {
         await this.db.backup(backupPath);
     }

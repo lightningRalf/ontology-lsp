@@ -1,12 +1,12 @@
-import { describe, test, expect, beforeAll } from 'bun:test';
+import { beforeAll, describe, expect, test } from 'bun:test';
+import * as fs from 'fs';
+import * as path from 'path';
 import { ClaudeToolsLayer } from '../../src/layers/claude-tools';
 import { TreeSitterLayer } from '../../src/layers/tree-sitter';
 import { OntologyEngine } from '../../src/ontology/ontology-engine';
 import { PatternLearner } from '../../src/patterns/pattern-learner';
 import { KnowledgeSpreader } from '../../src/propagation/knowledge-spreader';
-import * as fs from 'fs';
-import * as path from 'path';
-import { testPaths, createTestFile } from '../test-helpers';
+import { createTestFile, testPaths } from '../test-helpers';
 
 describe('Performance Benchmarks', () => {
     let claudeTools: ClaudeToolsLayer;
@@ -25,32 +25,32 @@ describe('Performance Benchmarks', () => {
                 bloomFilter: true,
                 frequencyCache: true,
                 recentSearches: true,
-                negativeLookup: true
+                negativeLookup: true,
             },
-            caching: { enabled: true, ttl: 3600, maxEntries: 1000 }
+            caching: { enabled: true, ttl: 3600, maxEntries: 1000 },
         });
 
         treeSitter = new TreeSitterLayer({
             languages: ['typescript', 'javascript', 'python'],
             timeout: 500,
             maxFileSize: 1048576,
-            caching: { enabled: true, ttl: 3600, maxEntries: 100 }
+            caching: { enabled: true, ttl: 3600, maxEntries: 100 },
         });
 
         ontology = new OntologyEngine({
             dbPath: '/tmp/test-ontology.db',
-            caching: { enabled: true, ttl: 3600, maxEntries: 1000 }
+            caching: { enabled: true, ttl: 3600, maxEntries: 1000 },
         });
 
         patterns = new PatternLearner({
             learningThreshold: 3,
             confidenceThreshold: 0.7,
-            maxPatterns: 1000
+            maxPatterns: 1000,
         });
 
         propagation = new KnowledgeSpreader({
             maxDepth: 3,
-            autoApplyThreshold: 0.9
+            autoApplyThreshold: 0.9,
         });
     });
 
@@ -62,7 +62,7 @@ describe('Performance Benchmarks', () => {
             await claudeTools.process({
                 identifier: `testFunction${i}`,
                 searchPath: '.',
-                fileTypes: ['ts']
+                fileTypes: ['ts'],
             });
         }
 
@@ -81,7 +81,7 @@ describe('Performance Benchmarks', () => {
             const result = await claudeTools.process({
                 identifier: `commonFunction`,
                 searchPath: '.',
-                fileTypes: ['ts', 'js']
+                fileTypes: ['ts', 'js'],
             });
         }
 
@@ -97,11 +97,7 @@ describe('Performance Benchmarks', () => {
         const start = performance.now();
 
         for (let i = 0; i < iterations; i++) {
-            await patterns.learnFromRename(
-                `oldName${i}`,
-                `newName${i}`,
-                { file: 'test.ts', line: i }
-            );
+            await patterns.learnFromRename(`oldName${i}`, `newName${i}`, { file: 'test.ts', line: i });
         }
 
         const end = performance.now();
@@ -123,7 +119,7 @@ describe('Performance Benchmarks', () => {
                 to: `NewComponent${i}`,
                 location: 'test.ts',
                 source: 'user_action' as const,
-                timestamp: new Date()
+                timestamp: new Date(),
             };
 
             await propagation.propagateChange(change);
@@ -146,7 +142,7 @@ describe('Performance Benchmarks', () => {
                 canonicalName: `Concept${i}`,
                 representations: new Map([
                     [`concept${i}`, { count: 1, lastSeen: new Date() }],
-                    [`getConcept${i}`, { count: 1, lastSeen: new Date() }]
+                    [`getConcept${i}`, { count: 1, lastSeen: new Date() }],
                 ]),
                 relations: new Map(),
                 confidence: 0.9,
@@ -154,8 +150,8 @@ describe('Performance Benchmarks', () => {
                     createdAt: new Date(),
                     updatedAt: new Date(),
                     source: 'test',
-                    language: 'typescript'
-                }
+                    language: 'typescript',
+                },
             });
         }
 
@@ -176,7 +172,7 @@ describe('Performance Benchmarks', () => {
             await claudeTools.process({
                 identifier: query,
                 searchPath: '.',
-                fileTypes: ['ts']
+                fileTypes: ['ts'],
             });
         }
 
@@ -187,9 +183,9 @@ describe('Performance Benchmarks', () => {
             const result = await claudeTools.process({
                 identifier: query,
                 searchPath: '.',
-                fileTypes: ['ts']
+                fileTypes: ['ts'],
             });
-            
+
             // Check if it was a cache hit (very fast response)
             if (result.searchTime < 5) {
                 cacheHits++;
@@ -214,7 +210,7 @@ describe('Performance Benchmarks', () => {
                 claudeTools.process({
                     identifier: `concurrentTest${i}`,
                     searchPath: '.',
-                    fileTypes: ['ts']
+                    fileTypes: ['ts'],
                 })
             );
         }
@@ -236,13 +232,13 @@ describe('Performance Benchmarks', () => {
         const result = await treeSitter.process({
             identifier: 'test',
             searchPath: testFile,
-            fileTypes: ['ts']
+            fileTypes: ['ts'],
         });
         const end = performance.now();
 
         const parseTime = end - start;
         console.log(`Large File Parse (10K functions): ${parseTime.toFixed(2)}ms`);
-        
+
         // Clean up
         fs.unlinkSync(testFile);
 

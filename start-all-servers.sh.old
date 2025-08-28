@@ -32,8 +32,8 @@ $BUN_PATH run src/api/http-server.ts &
 HTTP_PID=$!
 echo "   PID: $HTTP_PID"
 
-# Start MCP SSE Server
-echo "🔌 Starting MCP SSE Server on port 7001..."
+# Start MCP HTTP Server
+echo "🔌 Starting MCP HTTP Server on port 7001..."
 $BUN_PATH run mcp-ontology-server/index.ts &
 MCP_PID=$!
 echo "   PID: $MCP_PID"
@@ -55,12 +55,12 @@ else
     echo "❌ HTTP API Server: FAILED (status: $HTTP_STATUS)"
 fi
 
-# Test MCP SSE
+# Test MCP HTTP
 MCP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:7001/health)
 if [ "$MCP_STATUS" = "200" ]; then
-    echo "✅ MCP SSE Server: HEALTHY (port 7001)"
+    echo "✅ MCP HTTP Server: HEALTHY (port 7001)"
 else
-    echo "❌ MCP SSE Server: FAILED (status: $MCP_STATUS)"
+    echo "❌ MCP HTTP Server: FAILED (status: $MCP_STATUS)"
 fi
 
 echo ""
@@ -71,12 +71,12 @@ echo "📍 HTTP API: http://localhost:7000"
 echo "   - Health: http://localhost:7000/health"
 echo "   - Stats:  http://localhost:7000/stats"
 echo ""
-echo "📍 MCP SSE:  http://localhost:7001"
+echo "📍 MCP HTTP: http://localhost:7001"
 echo "   - Health: http://localhost:7001/health"
 echo ""
 echo "📍 Process IDs:"
 echo "   - HTTP API: $HTTP_PID"
-echo "   - MCP SSE:  $MCP_PID"
+echo "   - MCP HTTP: $MCP_PID"
 echo ""
 echo "Press Ctrl+C to stop all servers..."
 echo "=================================="
@@ -102,7 +102,7 @@ while true; do
         shutdown
     fi
     if ! kill -0 $MCP_PID 2>/dev/null; then
-        echo "⚠️ MCP SSE Server stopped unexpectedly"
+        echo "⚠️ MCP HTTP Server stopped unexpectedly"
         shutdown
     fi
 done

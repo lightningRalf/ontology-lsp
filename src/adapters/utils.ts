@@ -3,18 +3,18 @@
  * These utilities eliminate duplicate code between LSP, MCP, HTTP, and CLI adapters
  */
 
-import type { URI, Position, Range } from 'vscode-languageserver';
-import type { 
-  FindDefinitionRequest,
-  FindReferencesRequest,
-  PrepareRenameRequest,
-  RenameRequest,
-  CompletionRequest,
-  Definition,
-  Reference,
-  Completion,
-  WorkspaceEdit,
-  CoreConfig
+import type { Position, Range, URI } from 'vscode-languageserver';
+import type {
+    Completion,
+    CompletionRequest,
+    CoreConfig,
+    Definition,
+    FindDefinitionRequest,
+    FindReferencesRequest,
+    PrepareRenameRequest,
+    Reference,
+    RenameRequest,
+    WorkspaceEdit,
 } from '../core/types';
 
 // ===== URI CONVERSION UTILITIES =====
@@ -23,27 +23,27 @@ import type {
  * Convert file paths to standard URIs
  */
 export function pathToUri(filePath: string): string {
-  if (filePath.startsWith('file://')) {
-    return filePath;
-  }
-  return `file://${filePath.replace(/\\/g, '/')}`;
+    if (filePath.startsWith('file://')) {
+        return filePath;
+    }
+    return `file://${filePath.replace(/\\/g, '/')}`;
 }
 
 /**
  * Convert URIs to file paths
  */
 export function uriToPath(uri: string): string {
-  if (uri.startsWith('file://')) {
-    return uri.substring(7).replace(/\//g, process.platform === 'win32' ? '\\' : '/');
-  }
-  return uri;
+    if (uri.startsWith('file://')) {
+        return uri.substring(7).replace(/\//g, process.platform === 'win32' ? '\\' : '/');
+    }
+    return uri;
 }
 
 /**
  * Normalize URI format for consistency across protocols
  */
 export function normalizeUri(uri: string): string {
-  return pathToUri(uriToPath(uri));
+    return pathToUri(uriToPath(uri));
 }
 
 // ===== POSITION AND RANGE UTILITIES =====
@@ -52,62 +52,61 @@ export function normalizeUri(uri: string): string {
  * Create a Position object with validation
  */
 export function createPosition(line: number, character: number): Position {
-  return {
-    line: Math.max(0, line),
-    character: Math.max(0, character)
-  };
+    return {
+        line: Math.max(0, line),
+        character: Math.max(0, character),
+    };
 }
 
 /**
  * Create a Range object with validation
  */
-export function createRange(
-  startLine: number, 
-  startChar: number, 
-  endLine: number, 
-  endChar: number
-): Range {
-  return {
-    start: createPosition(startLine, startChar),
-    end: createPosition(endLine, endChar)
-  };
+export function createRange(startLine: number, startChar: number, endLine: number, endChar: number): Range {
+    return {
+        start: createPosition(startLine, startChar),
+        end: createPosition(endLine, endChar),
+    };
 }
 
 /**
  * Convert from various position formats to standard Position
  */
 export function normalizePosition(pos: any): Position {
-  if (typeof pos === 'object' && pos !== null) {
-    if (typeof pos.line === 'number' && typeof pos.character === 'number') {
-      return createPosition(pos.line, pos.character);
+    if (typeof pos === 'object' && pos !== null) {
+        if (typeof pos.line === 'number' && typeof pos.character === 'number') {
+            return createPosition(pos.line, pos.character);
+        }
+        if (typeof pos.line === 'number' && typeof pos.col === 'number') {
+            return createPosition(pos.line, pos.col);
+        }
+        if (typeof pos.row === 'number' && typeof pos.column === 'number') {
+            return createPosition(pos.row, pos.column);
+        }
     }
-    if (typeof pos.line === 'number' && typeof pos.col === 'number') {
-      return createPosition(pos.line, pos.col);
-    }
-    if (typeof pos.row === 'number' && typeof pos.column === 'number') {
-      return createPosition(pos.row, pos.column);
-    }
-  }
-  throw new Error(`Invalid position format: ${JSON.stringify(pos)}`);
+    throw new Error(`Invalid position format: ${JSON.stringify(pos)}`);
 }
 
 /**
  * Convert from various range formats to standard Range
  */
 export function normalizeRange(range: any): Range {
-  if (typeof range === 'object' && range !== null) {
-    if (range.start && range.end) {
-      return {
-        start: normalizePosition(range.start),
-        end: normalizePosition(range.end)
-      };
+    if (typeof range === 'object' && range !== null) {
+        if (range.start && range.end) {
+            return {
+                start: normalizePosition(range.start),
+                end: normalizePosition(range.end),
+            };
+        }
+        if (
+            typeof range.startLine === 'number' &&
+            typeof range.startChar === 'number' &&
+            typeof range.endLine === 'number' &&
+            typeof range.endChar === 'number'
+        ) {
+            return createRange(range.startLine, range.startChar, range.endLine, range.endChar);
+        }
     }
-    if (typeof range.startLine === 'number' && typeof range.startChar === 'number' &&
-        typeof range.endLine === 'number' && typeof range.endChar === 'number') {
-      return createRange(range.startLine, range.startChar, range.endLine, range.endChar);
-    }
-  }
-  throw new Error(`Invalid range format: ${JSON.stringify(range)}`);
+    throw new Error(`Invalid range format: ${JSON.stringify(range)}`);
 }
 
 // ===== REQUEST BUILDERS =====
@@ -116,89 +115,89 @@ export function normalizeRange(range: any): Range {
  * Build a FindDefinitionRequest from generic parameters
  */
 export function buildFindDefinitionRequest(params: {
-  uri: string;
-  position: Position;
-  identifier?: string;
-  maxResults?: number;
-  includeDeclaration?: boolean;
+    uri: string;
+    position: Position;
+    identifier?: string;
+    maxResults?: number;
+    includeDeclaration?: boolean;
 }): FindDefinitionRequest {
-  return {
-    uri: normalizeUri(params.uri),
-    position: params.position,
-    identifier: params.identifier || '',
-    maxResults: params.maxResults,
-    includeDeclaration: params.includeDeclaration ?? true
-  };
+    return {
+        uri: normalizeUri(params.uri),
+        position: params.position,
+        identifier: params.identifier || '',
+        maxResults: params.maxResults,
+        includeDeclaration: params.includeDeclaration ?? true,
+    };
 }
 
 /**
  * Build a FindReferencesRequest from generic parameters
  */
 export function buildFindReferencesRequest(params: {
-  uri: string;
-  position: Position;
-  identifier?: string;
-  maxResults?: number;
-  includeDeclaration?: boolean;
+    uri: string;
+    position: Position;
+    identifier?: string;
+    maxResults?: number;
+    includeDeclaration?: boolean;
 }): FindReferencesRequest {
-  return {
-    uri: normalizeUri(params.uri),
-    position: params.position,
-    identifier: params.identifier || '',
-    maxResults: params.maxResults,
-    includeDeclaration: params.includeDeclaration ?? false
-  };
+    return {
+        uri: normalizeUri(params.uri),
+        position: params.position,
+        identifier: params.identifier || '',
+        maxResults: params.maxResults,
+        includeDeclaration: params.includeDeclaration ?? false,
+    };
 }
 
 /**
  * Build a PrepareRenameRequest from generic parameters
  */
 export function buildPrepareRenameRequest(params: {
-  uri: string;
-  position: Position;
-  identifier: string;
+    uri: string;
+    position: Position;
+    identifier: string;
 }): PrepareRenameRequest {
-  return {
-    uri: normalizeUri(params.uri),
-    position: params.position,
-    identifier: params.identifier
-  };
+    return {
+        uri: normalizeUri(params.uri),
+        position: params.position,
+        identifier: params.identifier,
+    };
 }
 
 /**
  * Build a RenameRequest from generic parameters
  */
 export function buildRenameRequest(params: {
-  uri: string;
-  position: Position;
-  identifier: string;
-  newName: string;
-  dryRun?: boolean;
+    uri: string;
+    position: Position;
+    identifier: string;
+    newName: string;
+    dryRun?: boolean;
 }): RenameRequest {
-  return {
-    uri: normalizeUri(params.uri),
-    position: params.position,
-    identifier: params.identifier,
-    newName: params.newName,
-    dryRun: params.dryRun ?? false
-  };
+    return {
+        uri: normalizeUri(params.uri),
+        position: params.position,
+        identifier: params.identifier,
+        newName: params.newName,
+        dryRun: params.dryRun ?? false,
+    };
 }
 
 /**
  * Build a CompletionRequest from generic parameters
  */
 export function buildCompletionRequest(params: {
-  uri: string;
-  position: Position;
-  triggerCharacter?: string;
-  maxResults?: number;
+    uri: string;
+    position: Position;
+    triggerCharacter?: string;
+    maxResults?: number;
 }): CompletionRequest {
-  return {
-    uri: normalizeUri(params.uri),
-    position: params.position,
-    triggerCharacter: params.triggerCharacter,
-    maxResults: params.maxResults ?? 20
-  };
+    return {
+        uri: normalizeUri(params.uri),
+        position: params.position,
+        triggerCharacter: params.triggerCharacter,
+        maxResults: params.maxResults ?? 20,
+    };
 }
 
 // ===== RESPONSE CONVERTERS =====
@@ -207,44 +206,44 @@ export function buildCompletionRequest(params: {
  * Convert Definition to LSP Location format
  */
 export function definitionToLspLocation(definition: Definition) {
-  return {
-    uri: definition.uri,
-    range: definition.range
-  };
+    return {
+        uri: definition.uri,
+        range: definition.range,
+    };
 }
 
 /**
  * Convert Reference to LSP Location format
  */
 export function referenceToLspLocation(reference: Reference) {
-  return {
-    uri: reference.uri,
-    range: reference.range
-  };
+    return {
+        uri: reference.uri,
+        range: reference.range,
+    };
 }
 
 /**
  * Convert Completion to LSP CompletionItem format
  */
 export function completionToLspItem(completion: Completion) {
-  return {
-    label: completion.label,
-    kind: mapCompletionKind(completion.kind),
-    detail: completion.detail,
-    documentation: completion.documentation,
-    sortText: completion.sortText || completion.label,
-    insertText: completion.insertText || completion.label,
-    confidence: completion.confidence
-  };
+    return {
+        label: completion.label,
+        kind: mapCompletionKind(completion.kind),
+        detail: completion.detail,
+        documentation: completion.documentation,
+        sortText: completion.sortText || completion.label,
+        insertText: completion.insertText || completion.label,
+        confidence: completion.confidence,
+    };
 }
 
 /**
  * Convert WorkspaceEdit to LSP format
  */
 export function workspaceEditToLsp(edit: WorkspaceEdit) {
-  return {
-    changes: edit.changes
-  };
+    return {
+        changes: edit.changes,
+    };
 }
 
 // ===== HTTP API CONVERTERS =====
@@ -253,31 +252,31 @@ export function workspaceEditToLsp(edit: WorkspaceEdit) {
  * Convert Definition to HTTP API format
  */
 export function definitionToApiResponse(definition: Definition) {
-  return {
-    uri: definition.uri,
-    range: {
-      start: { line: definition.range.start.line, character: definition.range.start.character },
-      end: { line: definition.range.end.line, character: definition.range.end.character }
-    },
-    kind: definition.kind,
-    source: definition.source,
-    confidence: definition.confidence
-  };
+    return {
+        uri: definition.uri,
+        range: {
+            start: { line: definition.range.start.line, character: definition.range.start.character },
+            end: { line: definition.range.end.line, character: definition.range.end.character },
+        },
+        kind: definition.kind,
+        source: definition.source,
+        confidence: definition.confidence,
+    };
 }
 
 /**
  * Convert Reference to HTTP API format
  */
 export function referenceToApiResponse(reference: Reference) {
-  return {
-    uri: reference.uri,
-    range: {
-      start: { line: reference.range.start.line, character: reference.range.start.character },
-      end: { line: reference.range.end.line, character: reference.range.end.character }
-    },
-    kind: reference.kind,
-    confidence: reference.confidence
-  };
+    return {
+        uri: reference.uri,
+        range: {
+            start: { line: reference.range.start.line, character: reference.range.start.character },
+            end: { line: reference.range.end.line, character: reference.range.end.character },
+        },
+        kind: reference.kind,
+        confidence: reference.confidence,
+    };
 }
 
 // ===== MCP CONVERTERS =====
@@ -286,31 +285,31 @@ export function referenceToApiResponse(reference: Reference) {
  * Convert Definition to MCP tool response format
  */
 export function definitionToMcpResponse(definition: Definition) {
-  return {
-    uri: definition.uri,
-    line: definition.range.start.line,
-    character: definition.range.start.character,
-    endLine: definition.range.end.line,
-    endCharacter: definition.range.end.character,
-    kind: definition.kind,
-    source: definition.source,
-    confidence: definition.confidence
-  };
+    return {
+        uri: definition.uri,
+        line: definition.range.start.line,
+        character: definition.range.start.character,
+        endLine: definition.range.end.line,
+        endCharacter: definition.range.end.character,
+        kind: definition.kind,
+        source: definition.source,
+        confidence: definition.confidence,
+    };
 }
 
 /**
- * Convert Reference to MCP tool response format  
+ * Convert Reference to MCP tool response format
  */
 export function referenceToMcpResponse(reference: Reference) {
-  return {
-    uri: reference.uri,
-    line: reference.range.start.line,
-    character: reference.range.start.character,
-    endLine: reference.range.end.line,
-    endCharacter: reference.range.end.character,
-    kind: reference.kind,
-    confidence: reference.confidence
-  };
+    return {
+        uri: reference.uri,
+        line: reference.range.start.line,
+        character: reference.range.start.character,
+        endLine: reference.range.end.line,
+        endCharacter: reference.range.end.character,
+        kind: reference.kind,
+        confidence: reference.confidence,
+    };
 }
 
 // ===== CLI FORMATTERS =====
@@ -319,29 +318,29 @@ export function referenceToMcpResponse(reference: Reference) {
  * Format Definition for CLI output
  */
 export function formatDefinitionForCli(definition: Definition): string {
-  const path = uriToPath(definition.uri);
-  const pos = `${definition.range.start.line + 1}:${definition.range.start.character + 1}`;
-  const confidence = Math.round(definition.confidence * 100);
-  return `${path}:${pos} [${definition.kind}] (${confidence}% confidence)`;
+    const path = uriToPath(definition.uri);
+    const pos = `${definition.range.start.line + 1}:${definition.range.start.character + 1}`;
+    const confidence = Math.round(definition.confidence * 100);
+    return `${path}:${pos} [${definition.kind}] (${confidence}% confidence)`;
 }
 
 /**
  * Format Reference for CLI output
  */
 export function formatReferenceForCli(reference: Reference): string {
-  const path = uriToPath(reference.uri);
-  const pos = `${reference.range.start.line + 1}:${reference.range.start.character + 1}`;
-  const confidence = Math.round(reference.confidence * 100);
-  return `${path}:${pos} [${reference.kind}] (${confidence}% confidence)`;
+    const path = uriToPath(reference.uri);
+    const pos = `${reference.range.start.line + 1}:${reference.range.start.character + 1}`;
+    const confidence = Math.round(reference.confidence * 100);
+    return `${path}:${pos} [${reference.kind}] (${confidence}% confidence)`;
 }
 
 /**
  * Format Completion for CLI output
  */
 export function formatCompletionForCli(completion: Completion): string {
-  const confidence = Math.round(completion.confidence * 100);
-  const detail = completion.detail ? ` - ${completion.detail}` : '';
-  return `${completion.label} [${completion.kind}] (${confidence}% confidence)${detail}`;
+    const confidence = Math.round(completion.confidence * 100);
+    const detail = completion.detail ? ` - ${completion.detail}` : '';
+    return `${completion.label} [${completion.kind}] (${confidence}% confidence)${detail}`;
 }
 
 // ===== ERROR HANDLING =====
@@ -350,54 +349,57 @@ export function formatCompletionForCli(completion: Completion): string {
  * Standardize error responses across protocols
  */
 export interface AdapterError {
-  code: string;
-  message: string;
-  details?: any;
-  requestId?: string;
+    code: string;
+    message: string;
+    details?: any;
+    requestId?: string;
 }
 
 /**
  * Create standardized adapter error
  */
-export function createAdapterError(
-  code: string,
-  message: string,
-  details?: any,
-  requestId?: string
-): AdapterError {
-  return {
-    code,
-    message,
-    details,
-    requestId
-  };
+export function createAdapterError(code: string, message: string, details?: any, requestId?: string): AdapterError {
+    return {
+        code,
+        message,
+        details,
+        requestId,
+    };
 }
 
 /**
  * Convert core errors to protocol-specific format
  */
 export function handleAdapterError(error: any, protocol: 'lsp' | 'mcp' | 'http' | 'cli') {
-  const adapterError: AdapterError = error instanceof Error ? {
-    code: 'ADAPTER_ERROR',
-    message: error.message,
-    details: error.stack
-  } : {
-    code: 'UNKNOWN_ERROR',
-    message: String(error)
-  };
+    const adapterError: AdapterError =
+        error instanceof Error
+            ? {
+                  code: 'ADAPTER_ERROR',
+                  message: error.message,
+                  details: error.stack,
+              }
+            : {
+                  code: 'UNKNOWN_ERROR',
+                  message: String(error),
+              };
 
-  switch (protocol) {
-    case 'lsp':
-      return { code: -32603, message: adapterError.message, data: adapterError.details };
-    case 'mcp':
-      return { error: { code: adapterError.code, message: adapterError.message }, message: adapterError.message };
-    case 'http':
-      return { error: true, code: adapterError.code, message: adapterError.message, details: adapterError.details };
-    case 'cli':
-      return `Error: ${adapterError.message}`;
-    default:
-      return adapterError;
-  }
+    switch (protocol) {
+        case 'lsp':
+            return { code: -32603, message: adapterError.message, data: adapterError.details };
+        case 'mcp':
+            return { error: { code: adapterError.code, message: adapterError.message }, message: adapterError.message };
+        case 'http':
+            return {
+                error: true,
+                code: adapterError.code,
+                message: adapterError.message,
+                details: adapterError.details,
+            };
+        case 'cli':
+            return `Error: ${adapterError.message}`;
+        default:
+            return adapterError;
+    }
 }
 
 // ===== UTILITY HELPERS =====
@@ -406,162 +408,173 @@ export function handleAdapterError(error: any, protocol: 'lsp' | 'mcp' | 'http' 
  * Map completion kinds between different protocol formats
  */
 function mapCompletionKind(kind: string): number {
-  const kindMap: Record<string, number> = {
-    'text': 1,
-    'method': 2,
-    'function': 3,
-    'constructor': 4,
-    'field': 5,
-    'variable': 6,
-    'class': 7,
-    'interface': 8,
-    'module': 9,
-    'property': 10,
-    'unit': 11,
-    'value': 12,
-    'enum': 13,
-    'keyword': 14,
-    'snippet': 15,
-    'color': 16,
-    'file': 17,
-    'reference': 18
-  };
-  
-  return kindMap[kind] || 1; // Default to text
+    const kindMap: Record<string, number> = {
+        text: 1,
+        method: 2,
+        function: 3,
+        constructor: 4,
+        field: 5,
+        variable: 6,
+        class: 7,
+        interface: 8,
+        module: 9,
+        property: 10,
+        unit: 11,
+        value: 12,
+        enum: 13,
+        keyword: 14,
+        snippet: 15,
+        color: 16,
+        file: 17,
+        reference: 18,
+    };
+
+    return kindMap[kind] || 1; // Default to text
 }
 
 /**
  * Create a default core configuration
  */
 export function createDefaultCoreConfig(): CoreConfig {
-  return {
-    layers: {
-      layer1: { 
-        enabled: true, 
-        timeout: 5000,
-        maxResults: 100,
-        fileTypes: ['ts', 'tsx', 'js', 'jsx', 'py', 'java', 'go', 'rust'],
-        grep: {
-          defaultTimeout: 5000,
-          maxResults: 100,
-          caseSensitive: false,
-          includeContext: true,
-          contextLines: 3
+    return {
+        layers: {
+            layer1: {
+                enabled: true,
+                timeout: 5000,
+                maxResults: 100,
+                fileTypes: ['ts', 'tsx', 'js', 'jsx', 'py', 'java', 'go', 'rust'],
+                grep: {
+                    defaultTimeout: 5000,
+                    maxResults: 100,
+                    caseSensitive: false,
+                    includeContext: true,
+                    contextLines: 3,
+                },
+                glob: {
+                    defaultTimeout: 3000,
+                    maxFiles: 1000,
+                    ignorePatterns: ['node_modules/**', 'dist/**', '.git/**', 'coverage/**'],
+                },
+                ls: {
+                    defaultTimeout: 2000,
+                    maxDepth: 10,
+                    followSymlinks: false,
+                    includeDotfiles: false,
+                },
+                optimization: {
+                    bloomFilter: false, // DISABLED - bloom filter is preventing legitimate searches
+                    frequencyCache: true,
+                    parallelSearch: true,
+                },
+                caching: {
+                    enabled: true,
+                    ttl: 300, // 5 minutes in seconds
+                    maxEntries: 1000,
+                },
+            },
+            layer2: {
+                enabled: true,
+                timeout: 50000,
+                languages: ['typescript', 'javascript', 'python'],
+                maxFileSize: 1024 * 1024, // 1MB
+                parseTimeout: 50,
+            },
+            layer3: {
+                enabled: true,
+                timeout: 10000,
+                dbPath: '.ontology/ontology.db',
+                cacheSize: 1000,
+                conceptThreshold: 0.5,
+                relationshipDepth: 3,
+            },
+            layer4: {
+                enabled: true,
+                timeout: 10000,
+                learningThreshold: 3,
+                confidenceThreshold: 0.7,
+                maxPatterns: 1000,
+                decayRate: 0.95,
+            },
+            layer5: {
+                enabled: true,
+                timeout: 20000,
+                maxDepth: 3,
+                autoApplyThreshold: 0.8,
+                propagationTimeout: 100,
+            },
         },
-        glob: {
-          defaultTimeout: 3000,
-          maxFiles: 1000,
-          ignorePatterns: ['node_modules/**', 'dist/**', '.git/**', 'coverage/**']
+        cache: {
+            enabled: true,
+            strategy: 'memory',
+            memory: {
+                maxSize: 100 * 1024 * 1024, // 100MB
+                ttl: 300, // 5 minutes in seconds
+            },
         },
-        ls: {
-          defaultTimeout: 2000,
-          maxDepth: 10,
-          followSymlinks: false,
-          includeDotfiles: false
+        performance: {
+            enableTiming: true,
+            enableProfiling: false,
+            logSlowOperations: true,
+            slowOperationThresholdMs: 1000,
+            // Smart Escalation v2 config surface (deterministic defaults)
+            escalation: {
+                policy: 'auto',
+                l1ConfidenceThreshold: 0.75,
+                l1AmbiguityMaxFiles: 5,
+                l1RequireFilenameMatch: false,
+                layer2: {
+                    budgetMs: 75,
+                    maxCandidateFiles: 10,
+                },
+                layer3: {
+                    budgetMs: 50,
+                },
+            },
         },
-        optimization: {
-          bloomFilter: false,  // DISABLED - bloom filter is preventing legitimate searches
-          frequencyCache: true,
-          parallelSearch: true
-        },
-        caching: {
-          enabled: true,
-          ttl: 300, // 5 minutes in seconds
-          maxEntries: 1000
-        }
-      },
-      layer2: { 
-        enabled: true, 
-        timeout: 50000,
-        languages: ['typescript', 'javascript', 'python'],
-        maxFileSize: 1024 * 1024, // 1MB
-        parseTimeout: 50
-      },
-      layer3: { 
-        enabled: true, 
-        timeout: 10000,
-        dbPath: '.ontology/ontology.db',
-        cacheSize: 1000,
-        conceptThreshold: 0.5,
-        relationshipDepth: 3
-      },
-      layer4: { 
-        enabled: true, 
-        timeout: 10000,
-        learningThreshold: 3,
-        confidenceThreshold: 0.7,
-        maxPatterns: 1000,
-        decayRate: 0.95
-      },
-      layer5: { 
-        enabled: true, 
-        timeout: 20000,
-        maxDepth: 3,
-        autoApplyThreshold: 0.8,
-        propagationTimeout: 100
-      }
-    },
-    cache: {
-      enabled: true,
-      strategy: 'memory',
-      memory: {
-        maxSize: 100 * 1024 * 1024, // 100MB
-        ttl: 300 // 5 minutes in seconds
-      }
-    },
-    performance: {
-      enableTiming: true,
-      enableProfiling: false,
-      logSlowOperations: true,
-      slowOperationThresholdMs: 1000
-    }
-  };
+    };
 }
 
 /**
  * Validate required parameters exist
  */
 export function validateRequired(params: Record<string, any>, required: string[]): void {
-  for (const field of required) {
-    if (params[field] === undefined || params[field] === null) {
-      throw new Error(`Missing required parameter: ${field}`);
+    for (const field of required) {
+        if (params[field] === undefined || params[field] === null) {
+            throw new Error(`Missing required parameter: ${field}`);
+        }
     }
-  }
 }
 
 /**
  * Safe JSON parse with error handling
  */
 export function safeJsonParse(jsonString: string, fallback: any = null): any {
-  try {
-    return JSON.parse(jsonString);
-  } catch (error) {
-    console.warn('Failed to parse JSON:', error);
-    return fallback;
-  }
+    try {
+        return JSON.parse(jsonString);
+    } catch (error) {
+        console.warn('Failed to parse JSON:', error);
+        return fallback;
+    }
 }
 
 /**
  * Strict JSON parse that throws on invalid JSON
  */
 export function strictJsonParse(jsonString: string): any {
-  try {
-    return JSON.parse(jsonString);
-  } catch (error) {
-    throw new Error(`Invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
-  }
+    try {
+        return JSON.parse(jsonString);
+    } catch (error) {
+        throw new Error(`Invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
+    }
 }
 
 /**
  * Debounce function for performance optimization
  */
-export function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(null, args), wait);
-  };
+export function debounce<T extends (...args: any[]) => any>(func: T, wait: number): (...args: Parameters<T>) => void {
+    let timeout: NodeJS.Timeout;
+    return (...args: Parameters<T>) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(null, args), wait);
+    };
 }

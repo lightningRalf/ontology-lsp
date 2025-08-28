@@ -12,7 +12,7 @@ The Ontology-LSP system demonstrates **good overall memory efficiency** with a s
 ### Process Breakdown
 | Process Type | Count | Total RSS | Avg RSS | Virtual Memory |
 |--------------|-------|-----------|---------|----------------|
-| MCP SSE Server | 1 | 72.56 MB | 72.56 MB | 70.87 GB |
+| MCP HTTP Server | 1 | 72.56 MB | 72.56 MB | 70.87 GB |
 | MCP Servers (--watch) | 5 | 446.23 MB | 89.25 MB | 354.30 GB |
 | HTTP API Server | 1 | 88.83 MB | 88.83 MB | 70.78 GB |
 | **TOTAL** | **7** | **607.62 MB** | **86.8 MB** | **495.94 GB** |
@@ -131,7 +131,7 @@ Physical Memory (607.62 MB):
    # Recommendation: 3 processes maximum
    # - 1 HTTP API server
    # - 1 MCP server
-   # - 1 MCP SSE server
+   # - 1 MCP HTTP server
    ```
    **Expected Savings:** ~300 MB
 

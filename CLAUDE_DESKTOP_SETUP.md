@@ -14,7 +14,7 @@ curl -fsSL https://bun.sh/install | bash
 
 # Or start manually:
 bun run src/api/http-server.ts &  # LSP API Server on port 7000
-cd mcp-ontology-server && bun run src/sse-server.ts &  # MCP Server on port 7001
+cd ontology-lsp && bun run src/servers/mcp-http.ts &  # MCP Server (Streamable HTTP) on port 7001
 ```
 
 3. **Add to Claude Desktop configuration**:
@@ -28,10 +28,10 @@ Copy the following to your Claude Desktop config file:
   "mcpServers": {
     "ontology": {
       "command": "bun",
-      "args": ["run", "/path/to/ontology-lsp/mcp-ontology-server/src/sse-server.ts"],
+      "args": ["run", "/path/to/ontology-lsp/src/servers/mcp-http.ts"],
       "env": {
-        "MCP_SSE_HOST": "localhost",
-        "MCP_SSE_PORT": "7001",
+        "MCP_HTTP_HOST": "localhost",
+        "MCP_HTTP_PORT": "7001",
         "ONTOLOGY_LSP_HOST": "localhost",
         "ONTOLOGY_LSP_PORT": "7000",
         "ONTOLOGY_DB_PATH": "/path/to/ontology-lsp/.ontology/ontology.db",
@@ -43,6 +43,8 @@ Copy the following to your Claude Desktop config file:
 ```
 
 **Important**: Replace `/path/to/ontology-lsp` with your actual path.
+
+Note: The MCP server now uses Streamable HTTP (replaces the former SSE-only transport). Initialize sessions with a POST to `/mcp` to receive an `Mcp-Session-Id` response header. Use that header for subsequent POSTs and for the GET `/mcp` notification stream.
 
 4. **Restart Claude Desktop** to load the new configuration.
 
@@ -121,7 +123,7 @@ tail -f /tmp/ontology-api-server-7000.log
 ```
 Claude Desktop
     ↓
-MCP Server (SSE transport on :7001)
+MCP Server (Streamable HTTP on :7001)
     ↓
 HTTP Client (with circuit breaker & caching)
     ↓

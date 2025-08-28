@@ -4,8 +4,8 @@
  * Test MCP find_definition for actual source code symbols
  */
 
-import { spawn } from 'child_process';
-import { createInterface } from 'readline';
+import { spawn } from 'node:child_process';
+import { createInterface } from 'node:readline';
 
 class MCPClient {
   constructor(command, args = []) {

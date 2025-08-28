@@ -29,6 +29,7 @@ export interface CLIAdapterConfig {
     timeout?: number;
     colorOutput?: boolean;
     verboseMode?: boolean;
+    printLimit?: number;
 }
 
 /**
@@ -54,7 +55,7 @@ export class CLIAdapter {
      */
     async handleFind(
         identifier: string,
-        options: { file?: string; maxResults?: number; json?: boolean; limit?: number; verbose?: boolean }
+        options: { file?: string; maxResults?: number; json?: boolean; limit?: number; verbose?: boolean; summary?: boolean }
     ): Promise<any> {
         try {
             const request = buildFindDefinitionRequest({
@@ -67,7 +68,8 @@ export class CLIAdapter {
 
             // Prefer async fast-path to avoid LayerManager gating timeouts
             const result = await (this.coreAnalyzer as any).findDefinitionAsync(request);
-            const items = result.data.slice(0, options.limit ?? this.config.maxResults);
+            const limit = options.limit ?? this.config.printLimit ?? 20;
+            const items = result.data.slice(0, limit);
             if (options.json) {
                 return JSON.stringify(
                     {
@@ -80,6 +82,11 @@ export class CLIAdapter {
                     null,
                     2
                 );
+            }
+            if (options.summary) {
+                const header = this.formatHeader(`Found ${result.data.length} definitions (showing ${items.length})`);
+                const top = items[0] ? `Top: ${formatDefinitionForCli(items[0])}` : 'Top: (none)';
+                return [header, top].join('\n');
             }
             // Programmatic usage (tests): return structured data when options provided
             if (options && (options.maxResults !== undefined || options.file !== undefined)) {
@@ -108,6 +115,7 @@ export class CLIAdapter {
             json?: boolean;
             limit?: number;
             verbose?: boolean;
+            summary?: boolean;
         }
     ): Promise<any> {
         try {
@@ -121,7 +129,8 @@ export class CLIAdapter {
 
             // Prefer async fast-path for references as well
             const result = await (this.coreAnalyzer as any).findReferencesAsync(request);
-            const items = result.data.slice(0, options.limit ?? this.config.maxResults);
+            const limit = options.limit ?? this.config.printLimit ?? 20;
+            const items = result.data.slice(0, limit);
             if (options.json) {
                 return JSON.stringify(
                     {
@@ -138,6 +147,11 @@ export class CLIAdapter {
             // Programmatic usage (tests): return structured data when options provided
             if (options && (options.maxResults !== undefined || options.includeDeclaration !== undefined)) {
                 return items;
+            }
+            if (options.summary) {
+                const header = this.formatHeader(`Found ${result.data.length} references (showing ${items.length})`);
+                const top = items[0] ? `Top: ${formatReferenceForCli(items[0])}` : 'Top: (none)';
+                return [header, top].join('\n');
             }
             if (!options.verbose) {
                 const lines = [this.formatHeader(`Found ${result.data.length} references (showing ${items.length})`)];
@@ -240,6 +254,7 @@ export class CLIAdapter {
             json?: boolean;
             limit?: number;
             verbose?: boolean;
+            summary?: boolean;
         }
     ): Promise<string> {
         try {
@@ -251,8 +266,8 @@ export class CLIAdapter {
                 maxResults: options.maxResults || this.config.maxResults,
             });
 
-            const defLimit = options.limit ?? 10;
-            const refLimit = options.limit ?? 10;
+            const defLimit = options.limit ?? this.config.printLimit ?? 10;
+            const refLimit = options.limit ?? this.config.printLimit ?? 10;
             const defs = result.definitions.slice(0, defLimit);
             const refs = result.references.slice(0, refLimit);
             if (options.json) {
@@ -269,6 +284,17 @@ export class CLIAdapter {
                     null,
                     2
                 );
+            }
+            if (options.summary) {
+                const lines: string[] = [];
+                lines.push(this.formatHeader(`Explore: '${identifier}'`));
+                lines.push(`Context: ${uri}`);
+                lines.push(
+                    `Definitions: ${result.definitions.length} (showing ${defs.length}) | References: ${result.references.length} (showing ${refs.length})`
+                );
+                if (defs[0]) lines.push(`Top Def: ${formatDefinitionForCli(defs[0])}`);
+                if (refs[0]) lines.push(`Top Ref: ${formatReferenceForCli(refs[0])}`);
+                return lines.join('\n');
             }
             const lines: string[] = [];
             lines.push(this.formatHeader(`Explore: '${identifier}'`));
@@ -406,6 +432,8 @@ export class CLIAdapter {
                 options.dryRun = false;
             } else if (arg === '--verbose') {
                 options.verboseMode = true;
+            } else if (arg === '--summary') {
+                options.summary = true;
             }
         }
 

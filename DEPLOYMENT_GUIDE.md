@@ -11,7 +11,7 @@
 - **Production builds**: All services built successfully (0.57MB - 0.74MB optimized bundles)
 - **Test coverage**: 95%+ across all components with 100% critical paths
 - **Performance**: All 5 layers meeting or exceeding targets
-- **Health endpoints**: HTTP API (7000) and MCP SSE (7001) responding correctly
+- **Health endpoints**: HTTP API (7000) and MCP HTTP (7001) responding correctly
 - **Process management**: Robust startup and cleanup verified
 - **Memory usage**: Stable at 607MB under load
 - **Docker configuration**: Multi-stage production Dockerfile ready
@@ -27,7 +27,7 @@ This guide covers all deployment options for the Ontology-LSP system, from local
 1. **Build Verification**: ✅
    ```bash
    just build-prod  # All bundles built successfully
-   # Results: LSP (0.74MB), HTTP API (0.57MB), MCP SSE (0.64MB), CLI (0.60MB)
+   # Results: LSP (0.74MB), HTTP API (0.57MB), MCP HTTP (3.1MB), CLI (0.60MB)
    ```
 
 2. **Service Health Verification**: ✅
@@ -76,7 +76,7 @@ Due to Docker socket permission constraints in the current environment, the cont
 3. **Verify services:**
    ```bash
    curl http://localhost:7000/health  # HTTP API
-   curl http://localhost:7001/health  # MCP SSE
+   curl http://localhost:7001/health  # MCP HTTP
    ```
 
 4. **Access monitoring:**

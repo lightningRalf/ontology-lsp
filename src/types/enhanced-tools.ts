@@ -192,7 +192,7 @@ export interface GlobMetrics extends PerformanceMetrics {
     permissionErrors: number;
 }
 
-// Enhanced LS Types  
+// Enhanced LS Types
 export interface EnhancedLSConfiguration extends SearchToolConfiguration {
     maxEntries: number;
     includeMimeType: boolean;
@@ -300,7 +300,7 @@ export interface LSResult {
         byExtension: Record<string, number>;
         sizeDistribution: {
             small: number; // < 1KB
-            medium: number; // 1KB - 1MB  
+            medium: number; // 1KB - 1MB
             large: number; // 1MB - 100MB
             huge: number; // > 100MB
         };
@@ -328,7 +328,7 @@ export interface EnhancedSearchToolsInterface {
         healthCheck(): Promise<boolean>;
         clearCache(): void;
     };
-    
+
     glob: {
         search(options: GlobSearchOptions): Promise<GlobSearchResult>;
         getMetrics(): GlobMetrics;
@@ -337,7 +337,7 @@ export interface EnhancedSearchToolsInterface {
         healthCheck(): Promise<boolean>;
         clearCache(): void;
     };
-    
+
     ls: {
         list(options: LSOptions): Promise<LSResult>;
         getMetrics(): LSMetrics;
@@ -457,9 +457,9 @@ export interface SearchQueue {
     active(): SearchRequest[];
 }
 
-export type ToolEventType = 
+export type ToolEventType =
     | 'search-start'
-    | 'search-complete' 
+    | 'search-complete'
     | 'search-error'
     | 'cache-hit'
     | 'cache-miss'
@@ -476,9 +476,7 @@ export interface ToolEvent {
     error?: Error;
 }
 
-export interface EventListener {
-    (event: ToolEvent): void;
-}
+export type EventListener = (event: ToolEvent) => void;
 
 // Export all enhanced tool types
 export * from './core';

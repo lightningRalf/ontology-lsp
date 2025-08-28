@@ -3,7 +3,7 @@
  * Test MCP stdio server connection
  */
 
-const { spawn } = require('child_process');
+const { spawn } = require('node:child_process');
 
 // Start the stdio server
 const server = spawn('/home/lightningralf/.bun/bin/bun', ['run', 'src/stdio.ts'], {

@@ -70,6 +70,31 @@ MCP server started successfully
 
 3. Send test requests via stdio (JSON-RPC format)
 
+
+### Streamable HTTP (Recommended for remote)
+
+The Streamable HTTP transport replaces the legacy SSE server. Use the HTTP server at port 7001:
+
+```bash
+# Start the MCP HTTP server (uses port $MCP_HTTP_PORT or 7001 by default)
+bun run src/servers/mcp-http.ts
+
+# 1) Initialize session (note the Mcp-Session-Id response header)
+curl -i -X POST http://localhost:7001/mcp   -H 'Content-Type: application/json'   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl","version":"1.0.0"}}}'
+
+# 2) Use a returned session id (replace <SID>) to list tools
+curl -s -X POST http://localhost:7001/mcp   -H 'Content-Type: application/json'   -H 'Mcp-Session-Id: <SID>'   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | jq .
+
+# 3) Call a tool (example: find_definition)
+curl -s -X POST http://localhost:7001/mcp   -H 'Content-Type: application/json'   -H 'Mcp-Session-Id: <SID>'   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"find_definition","arguments":{"symbol":"CodeAnalyzer"}}}' | jq .
+
+# 4) Stream notifications (server->client events)
+curl -N -H 'Mcp-Session-Id: <SID>' http://localhost:7001/mcp
+
+# 5) Terminate session
+curl -X DELETE -H 'Mcp-Session-Id: <SID>' http://localhost:7001/mcp -i
+```
+
 ## Available MCP Tools
 
 The adapter exposes these tools to Claude:

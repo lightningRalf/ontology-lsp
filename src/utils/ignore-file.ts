@@ -1,7 +1,7 @@
 // .ontologyignore file support
 import * as fs from 'fs';
-import * as path from 'path';
 import { minimatch } from 'minimatch';
+import * as path from 'path';
 
 export class IgnoreFileManager {
     private patterns: string[] = [];
@@ -31,7 +31,7 @@ export class IgnoreFileManager {
         '*.swp',
         '*.swo',
         '*.swn',
-        '.ontology/**'
+        '.ontology/**',
     ];
 
     constructor(workspaceRoot: string) {
@@ -40,16 +40,16 @@ export class IgnoreFileManager {
 
     private loadIgnoreFile(workspaceRoot: string): void {
         const ignoreFilePath = path.join(workspaceRoot, '.ontologyignore');
-        
+
         // Start with default patterns
         this.patterns = [...this.defaultPatterns];
-        
+
         if (!fs.existsSync(ignoreFilePath)) {
             // Create a default .ontologyignore file
             this.createDefaultIgnoreFile(ignoreFilePath);
             return;
         }
-        
+
         try {
             const content = fs.readFileSync(ignoreFilePath, 'utf-8');
             const customPatterns = this.parseIgnoreFile(content);
@@ -62,12 +62,12 @@ export class IgnoreFileManager {
     private parseIgnoreFile(content: string): string[] {
         return content
             .split('\n')
-            .map(line => line.trim())
-            .filter(line => {
+            .map((line) => line.trim())
+            .filter((line) => {
                 // Skip empty lines and comments
                 return line && !line.startsWith('#');
             })
-            .map(line => {
+            .map((line) => {
                 // Handle negation patterns (!)
                 if (line.startsWith('!')) {
                     return line;
@@ -171,7 +171,7 @@ docs/api/
 
     public shouldIgnore(filePath: string): boolean {
         const relativePath = path.relative(process.cwd(), filePath);
-        
+
         for (const pattern of this.patterns) {
             if (pattern.startsWith('!')) {
                 // Negation pattern - if it matches, don't ignore
@@ -186,7 +186,7 @@ docs/api/
                 }
             }
         }
-        
+
         return false;
     }
 

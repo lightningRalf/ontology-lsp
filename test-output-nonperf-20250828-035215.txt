@@ -1,0 +1,880 @@
+bun test v1.2.20 (6ad208bc)
+
+test/layer1-budget.test.ts:
+Would save pipeline comprehensive_learning to database
+Would save pipeline pattern_feedback_cycle to database
+Would save pipeline daily_insights to database
+Would setup cron job for pipeline daily_insights with schedule: 0 9 * * *
+Would load additional pipelines from database
+(pass) Layer 1 budget behavior > findDefinition returns under Layer 1 budget on typical query [611.34ms]
+
+test/layer1-cancellation.test.ts:
+(pass) AsyncEnhancedGrep cancellable operations > searchCancellable can be cancelled quickly [136.40ms]
+(pass) AsyncEnhancedGrep cancellable operations > listFilesCancellable can be cancelled quickly [75.05ms]
+
+test/error-handling.test.ts:
+[INFO] Performance: test_operation completed in 0ms {
+  operation: "test_operation",
+  duration: 0,
+  success: true,
+  attempt: 1,
+  component: "TestComponent",
+}
+(pass) Error Handler > should handle successful operations [16.30ms]
+[ERROR] MCP-Server: retry_test failed {
+  name: "Error",
+  message: "Transient failure",
+  stack: "Error: Transient failure\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:55:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:52:7)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:50:39)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:42:46)",
+}
+[INFO] MCP-Server: Retry attempt 2/4 for retry_test {
+  context: {
+    component: "TestComponent",
+    operation: "retry_test",
+    timestamp: 1756353137023,
+  },
+  attempt: 2,
+}
+[ERROR] MCP-Server: retry_test failed {
+  name: "Error",
+  message: "Transient failure",
+  stack: "Error: Transient failure\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:55:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:52:7)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at processTicksAndRejections (native:7:39)",
+}
+[INFO] MCP-Server: Retry attempt 3/4 for retry_test {
+  context: {
+    component: "TestComponent",
+    operation: "retry_test",
+    timestamp: 1756353137023,
+  },
+  attempt: 3,
+}
+[INFO] Performance: retry_test completed in 0ms {
+  operation: "retry_test",
+  duration: 0,
+  success: true,
+  attempt: 3,
+  component: "TestComponent",
+}
+(pass) Error Handler > should retry on transient failures [95.20ms]
+[ERROR] MCP-Server: validation_test failed {
+  name: "Error",
+  message: "Missing required field: name",
+  stack: "Error: Missing required field: name\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:80:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:78:21)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:76:26)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:66:49)",
+}
+[WARN] MCP-Server: Not retrying due to error type {
+  error: "Missing required field: name",
+  type: "Error",
+}
+[ERROR] MCP-Server: validation_test failed {
+  name: "Error",
+  message: "Missing required field: name",
+  stack: "Error: Missing required field: name\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:80:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:78:21)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:76:26)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:66:49)",
+}
+(pass) Error Handler > should not retry on validation errors [1.01ms]
+[ERROR] MCP-Server: backoff_test failed {
+  name: "Error",
+  message: "Always fail",
+  stack: "Error: Always fail\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:108:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:107:21)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:105:26)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:90:48)",
+}
+[INFO] MCP-Server: Retry attempt 2/4 for backoff_test {
+  context: {
+    component: "TestComponent",
+    operation: "backoff_test",
+    timestamp: 1756353137121,
+  },
+  attempt: 2,
+}
+[ERROR] MCP-Server: backoff_test failed {
+  name: "Error",
+  message: "Always fail",
+  stack: "Error: Always fail\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:108:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:107:21)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at processTicksAndRejections (native:7:39)",
+}
+[INFO] MCP-Server: Retry attempt 3/4 for backoff_test {
+  context: {
+    component: "TestComponent",
+    operation: "backoff_test",
+    timestamp: 1756353137121,
+  },
+  attempt: 3,
+}
+[ERROR] MCP-Server: backoff_test failed {
+  name: "Error",
+  message: "Always fail",
+  stack: "Error: Always fail\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:108:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:107:21)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at processTicksAndRejections (native:7:39)",
+}
+[INFO] MCP-Server: Retry attempt 4/4 for backoff_test {
+  context: {
+    component: "TestComponent",
+    operation: "backoff_test",
+    timestamp: 1756353137121,
+  },
+  attempt: 4,
+}
+[ERROR] MCP-Server: backoff_test failed {
+  name: "Error",
+  message: "Always fail",
+  stack: "Error: Always fail\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:108:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:107:21)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at processTicksAndRejections (native:7:39)",
+}
+[ERROR] MCP-Server: backoff_test failed {
+  name: "Error",
+  message: "Always fail",
+  stack: "Error: Always fail\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:108:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:107:21)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at processTicksAndRejections (native:7:39)",
+}
+(pass) Error Handler > should implement exponential backoff [0.97ms]
+[ERROR] MCP-Server: circuit_test failed {
+  name: "Error",
+  message: "Service failure",
+  stack: "Error: Service failure\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:153:35)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:153:23)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:151:37)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:136:44)",
+}
+[ERROR] MCP-Server: circuit_test failed {
+  name: "Error",
+  message: "Service failure",
+  stack: "Error: Service failure\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:153:35)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:153:23)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:151:37)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:136:44)",
+}
+[ERROR] MCP-Server: circuit_test failed {
+  name: "Error",
+  message: "Service failure",
+  stack: "Error: Service failure\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:153:35)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:153:23)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:151:37)\n    at processTicksAndRejections (native:7:39)",
+}
+[WARN] MCP-Server: Circuit breaker opened for TestComponent:circuit_test {
+  failures: 2,
+  threshold: 2,
+}
+[ERROR] MCP-Server: circuit_test failed {
+  name: "Error",
+  message: "Service failure",
+  stack: "Error: Service failure\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:153:35)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:153:23)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:151:37)\n    at processTicksAndRejections (native:7:39)",
+}
+[ERROR] MCP-Server: circuit_test failed {
+  name: "Error",
+  message: "Circuit breaker open for TestComponent:circuit_test",
+  stack: "Error: Circuit breaker open for TestComponent:circuit_test\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:63:25)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:151:37)\n    at processTicksAndRejections (native:7:39)",
+}
+[ERROR] MCP-Server: circuit_test failed {
+  name: "Error",
+  message: "Circuit breaker open for TestComponent:circuit_test",
+  stack: "Error: Circuit breaker open for TestComponent:circuit_test\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:63:25)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:162:35)\n    at processTicksAndRejections (native:7:39)",
+}
+(pass) Error Handler > should implement circuit breaker [0.62ms]
+[ERROR] MCP-Server: validation failed {
+  name: "Error",
+  message: "Missing required field: required_field",
+  stack: "Error: Missing required field: required_field\n    at validateRequest (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:194:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:180:20)\n    at toThrow (unknown)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:185:8)",
+}
+[ERROR] MCP-Server: validation failed {
+  name: "Error",
+  message: "Request must be an object",
+  stack: "Error: Request must be an object\n    at validateRequest (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:189:19)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:189:20)\n    at toThrow (unknown)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:194:8)",
+}
+(pass) Error Handler > should validate request parameters [0.57ms]
+(pass) Error Handler > should create proper MCP errors [0.05ms]
+(pass) File Logger > should create log entries with proper format [0.16ms]
+(pass) File Logger > should log errors with stack traces [0.07ms]
+(pass) File Logger > should create child loggers [0.07ms]
+[INFO] Connection: Connection connect {
+  connectionCount: 1,
+  metadata: undefined,
+}
+[INFO] Performance: connect completed in 114ms {
+  operation: "connect",
+  duration: 114,
+  success: true,
+  attempt: 1,
+  component: "ConnectionManager",
+}
+[INFO] Connection: Connection disconnect {
+  totalUptime: 1,
+  graceful: true,
+}
+[INFO] Performance: disconnect completed in 0ms {
+  operation: "disconnect",
+  duration: 0,
+  success: true,
+  attempt: 1,
+  component: "ConnectionManager",
+}
+(pass) Connection Manager > should track connection state [113.80ms]
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+[INFO] Connection: Connection connect {
+  connectionCount: 1,
+  metadata: undefined,
+}
+[INFO] Performance: connect completed in 120ms {
+  operation: "connect",
+  duration: 120,
+  success: true,
+  attempt: 1,
+  component: "ConnectionManager",
+}
+(pass) Connection Manager > should track connection metrics [120.27ms]
+[INFO] Connection: Connection disconnect {
+  totalUptime: 0,
+  graceful: true,
+}
+[INFO] Performance: disconnect completed in 0ms {
+  operation: "disconnect",
+  duration: 0,
+  success: true,
+  attempt: 1,
+  component: "ConnectionManager",
+}
+[INFO] Connection: Connection connect {
+  connectionCount: 1,
+  metadata: undefined,
+}
+[INFO] Performance: connect completed in 115ms {
+  operation: "connect",
+  duration: 115,
+  success: true,
+  attempt: 1,
+  component: "ConnectionManager",
+}
+[INFO] Connection: Connection disconnect {
+  totalUptime: 1,
+  graceful: true,
+}
+[INFO] Performance: disconnect completed in 0ms {
+  operation: "disconnect",
+  duration: 0,
+  success: true,
+  attempt: 1,
+  component: "ConnectionManager",
+}
+(pass) Connection Manager > should handle connection events [115.45ms]
+(pass) Connection Manager > should provide health check information [0.29ms]
+[INFO] Performance: test_operation completed in 0ms {
+  operation: "test_operation",
+  duration: 0,
+  success: true,
+  attempt: 1,
+  component: "TestComponent",
+}
+(pass) Utility Functions > withMcpErrorHandling should wrap operations [0.39ms]
+(pass) Utility Functions > createValidationError should create proper error [0.09ms]
+(pass) Utility Functions > createInternalError should create proper error [0.15ms]
+[ERROR] MCP-Server: recovery_scenario failed {
+  name: "Error",
+  message: "Network timeout",
+  stack: "Error: Network timeout\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:402:25)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:409:7)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:407:45)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:393:58)",
+}
+[INFO] MCP-Server: Retry attempt 2/4 for recovery_scenario {
+  context: {
+    component: "IntegrationTest",
+    operation: "recovery_scenario",
+    timestamp: 1756353137503,
+  },
+  attempt: 2,
+}
+[ERROR] MCP-Server: recovery_scenario failed {
+  name: "Error",
+  message: "Temporary failure",
+  stack: "Error: Temporary failure\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:403:25)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:409:7)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at processTicksAndRejections (native:7:39)",
+}
+[INFO] MCP-Server: Retry attempt 3/4 for recovery_scenario {
+  context: {
+    component: "IntegrationTest",
+    operation: "recovery_scenario",
+    timestamp: 1756353137503,
+  },
+  attempt: 3,
+}
+[INFO] Performance: recovery_scenario completed in 0ms {
+  operation: "recovery_scenario",
+  duration: 0,
+  success: true,
+  attempt: 3,
+  component: "IntegrationTest",
+}
+(pass) Integration Tests > should handle complete error recovery scenario [4038.50ms]
+[INFO] Performance: timeout_test completed in 110ms {
+  operation: "timeout_test",
+  duration: 110,
+  success: true,
+  attempt: 1,
+  component: "IntegrationTest",
+}
+(pass) Integration Tests > should handle timeout scenarios [110.10ms]
+[INFO] Connection: Connection connect {
+  connectionCount: 1,
+  metadata: undefined,
+}
+[INFO] Performance: connect completed in 101ms {
+  operation: "connect",
+  duration: 101,
+  success: true,
+  attempt: 1,
+  component: "ConnectionManager",
+}
+[ERROR] MCP-Server: Connection lost {
+  name: "Error",
+  message: "Connection lost",
+  stack: "Error: Connection lost\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:453:33)\n    at processTicksAndRejections (native:7:39)",
+}
+[INFO] MCP-Server: Attempting reconnection in 100ms {
+  attempt: 1,
+  maxAttempts: 2,
+}
+[INFO] Connection: Connection disconnect {
+  totalUptime: 9,
+  graceful: true,
+}
+[INFO] Performance: disconnect completed in 0ms {
+  operation: "disconnect",
+  duration: 0,
+  success: true,
+  attempt: 1,
+  component: "ConnectionManager",
+}
+(pass) Integration Tests > should handle connection loss and recovery [110.41ms]
+
+tests/step3_ontology-engine.test.ts:
+Added concept: Alpha (1)
+(pass) Step 3: OntologyEngine > finds concept by representation [53.16ms]
+Renamed concept: Alpha -> Beta
+Evolved concept: Beta - rename
+(pass) Step 3: OntologyEngine > renames concept through evolution [1.06ms]
+Added concept: Gamma (2)
+Added relation: Beta uses Gamma
+(pass) Step 3: OntologyEngine > adds relations and retrieves related concepts [1.93ms]
+
+tests/file-uri-resolution.test.ts:
+Would save pipeline comprehensive_learning to database
+Would save pipeline pattern_feedback_cycle to database
+Would save pipeline daily_insights to database
+Would setup cron job for pipeline daily_insights with schedule: 0 9 * * *
+Would load additional pipelines from database
+[INFO] Performance: tool_find_definition completed in 30ms {
+  operation: "tool_find_definition",
+  duration: 30,
+  success: true,
+  resultSize: 527,
+}
+[INFO] Performance: tool_find_definition completed in 45ms {
+  operation: "tool_find_definition",
+  duration: 45,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) File URI Resolution - Red Tests > MCP Adapter File Discovery > should discover actual file location when no file context provided [72.21ms]
+[INFO] Performance: tool_find_definition completed in 3053ms {
+  operation: "tool_find_definition",
+  duration: 3053,
+  success: true,
+  resultSize: 268,
+}
+[INFO] Performance: tool_find_definition completed in 3054ms {
+  operation: "tool_find_definition",
+  duration: 3054,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) File URI Resolution - Red Tests > MCP Adapter File Discovery > should handle symbol not found gracefully [3053.87ms]
+[INFO] Performance: tool_find_definition completed in 93ms {
+  operation: "tool_find_definition",
+  duration: 93,
+  success: true,
+  resultSize: 1108,
+}
+[INFO] Performance: tool_find_definition completed in 93ms {
+  operation: "tool_find_definition",
+  duration: 93,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) File URI Resolution - Red Tests > MCP Adapter File Discovery > should use provided file context when available [93.05ms]
+Layer 1 failed: CoreError: Layer layer1 timed out after 1600ms
+     layer: "layer1",
+ requestId: "bfa30d09-0903-4fae-bc66-8b95569d4094",
+   details: undefined,
+      code: "LAYER_TIMEOUT"
+
+      at new CoreError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:412:5)
+      at new LayerTimeoutError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:419:5)
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/core/layer-manager.ts:312:18)
+
+(pass) File URI Resolution - Red Tests > Core Analyzer URI Validation > should reject file://unknown URIs [1682.55ms]
+Layer 1 failed: CoreError: Layer layer1 timed out after 1600ms
+     layer: "layer1",
+ requestId: "c2235f72-15e0-4365-8d8d-c57606d7c816",
+   details: undefined,
+      code: "LAYER_TIMEOUT"
+
+      at new CoreError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:412:5)
+      at new LayerTimeoutError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:419:5)
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/core/layer-manager.ts:312:18)
+
+Layer 1 failed: CoreError: Layer layer1 timed out after 1600ms
+     layer: "layer1",
+ requestId: "5e01c270-e0aa-4408-a19f-14180b66692d",
+   details: undefined,
+      code: "LAYER_TIMEOUT"
+
+      at new CoreError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:412:5)
+      at new LayerTimeoutError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:419:5)
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/core/layer-manager.ts:312:18)
+
+Layer 1 failed: CoreError: Layer layer1 timed out after 1600ms
+     layer: "layer1",
+ requestId: "36809e0c-e225-42d9-8c92-cfe2f7758da6",
+   details: undefined,
+      code: "LAYER_TIMEOUT"
+
+      at new CoreError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:412:5)
+      at new LayerTimeoutError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:419:5)
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/core/layer-manager.ts:312:18)
+
+(pass) File URI Resolution - Red Tests > Core Analyzer URI Validation > should validate URI format [4910.13ms]
+(pass) File URI Resolution - Red Tests > Symbol Locator Integration > should locate symbols across workspace [78.12ms]
+(pass) File URI Resolution - Red Tests > Symbol Locator Integration > should cache symbol locations for performance [14.67ms]
+[INFO] Performance: tool_find_definition completed in 3196ms {
+  operation: "tool_find_definition",
+  duration: 3196,
+  success: true,
+  resultSize: 268,
+}
+[INFO] Performance: tool_find_definition completed in 3197ms {
+  operation: "tool_find_definition",
+  duration: 3197,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) File URI Resolution - Red Tests > Error Handling > should distinguish between "not found" and "location unknown" [3197.33ms]
+[ERROR] MCP-Server: tool_find_definition failed {
+  name: "Error",
+  message: "Parameter 'symbol' cannot be empty",
+  stack: "Error: Parameter 'symbol' cannot be empty\n    at new McpError (/home/lightningralf/programming/ontology-lsp/node_modules/@modelcontextprotocol/sdk/dist/types.js:991:9)\n    at createMcpError (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:226:26)\n    at validateArgs (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:646:15)\n    at handleFindDefinition (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:196:10)\n    at handleFindDefinition (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:195:38)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:163:33)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:147:83)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at handleToolCall (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:147:20)",
+}
+[WARN] MCP-Server: Not retrying due to error type {
+  error: "Parameter 'symbol' cannot be empty",
+  type: "McpError",
+}
+[ERROR] MCP-Server: tool_find_definition failed {
+  name: "Error",
+  message: "Parameter 'symbol' cannot be empty",
+  stack: "Error: Parameter 'symbol' cannot be empty\n    at new McpError (/home/lightningralf/programming/ontology-lsp/node_modules/@modelcontextprotocol/sdk/dist/types.js:991:9)\n    at createMcpError (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:226:26)\n    at validateArgs (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:646:15)\n    at handleFindDefinition (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:196:10)\n    at handleFindDefinition (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:195:38)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:163:33)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:147:83)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at handleToolCall (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:147:20)",
+}
+(pass) File URI Resolution - Red Tests > Error Handling > should provide helpful error messages [1.14ms]
+
+tests/adapters.test.ts:
+Layer layer1 already registered, skipping...
+Layer layer2 already registered, skipping...
+Layer layer3 already registered, skipping...
+Layer layer4 already registered, skipping...
+Layer layer5 already registered, skipping...
+Would save pipeline comprehensive_learning to database
+Would save pipeline pattern_feedback_cycle to database
+Would save pipeline daily_insights to database
+Would setup cron job for pipeline daily_insights with schedule: 0 9 * * *
+Would load additional pipelines from database
+(pass) Protocol Adapters Integration > LSP Adapter > should convert LSP definition requests correctly [59.53ms]
+(pass) Protocol Adapters Integration > LSP Adapter > should convert LSP references requests correctly [2.94ms]
+Created new pattern candidate: symbol_at_10_5 -> RenamedFunction
+(pass) Protocol Adapters Integration > LSP Adapter > should handle LSP rename requests correctly [21.46ms]
+(pass) Protocol Adapters Integration > LSP Adapter > should provide LSP completions correctly [37.63ms]
+(pass) Protocol Adapters Integration > LSP Adapter > should maintain LSP protocol compliance [0.17ms]
+[INFO] Performance: tool_find_definition completed in 25ms {
+  operation: "tool_find_definition",
+  duration: 25,
+  success: true,
+  resultSize: 610,
+}
+[INFO] Performance: tool_find_definition completed in 25ms {
+  operation: "tool_find_definition",
+  duration: 25,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) Protocol Adapters Integration > MCP Adapter > should handle find_definition tool correctly [25.06ms]
+[INFO] Performance: tool_find_definition completed in 1ms {
+  operation: "tool_find_definition",
+  duration: 1,
+  success: true,
+  resultSize: 608,
+}
+[INFO] Performance: tool_find_definition completed in 1ms {
+  operation: "tool_find_definition",
+  duration: 1,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) Protocol Adapters Integration > MCP Adapter > should handle find_definition tool with advanced options [0.74ms]
+[INFO] Performance: tool_find_references completed in 10ms {
+  operation: "tool_find_references",
+  duration: 10,
+  success: true,
+  resultSize: 543,
+}
+[INFO] Performance: tool_find_references completed in 10ms {
+  operation: "tool_find_references",
+  duration: 10,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) Protocol Adapters Integration > MCP Adapter > should handle find_references tool correctly [10.22ms]
+Created new pattern candidate: TestFunction -> RenamedFunction
+[INFO] Performance: tool_rename_symbol completed in 4ms {
+  operation: "tool_rename_symbol",
+  duration: 4,
+  success: true,
+  resultSize: 384,
+}
+[INFO] Performance: tool_rename_symbol completed in 4ms {
+  operation: "tool_rename_symbol",
+  duration: 4,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) Protocol Adapters Integration > MCP Adapter > should handle rename_symbol tool correctly [3.89ms]
+[INFO] Performance: tool_generate_tests completed in 1ms {
+  operation: "tool_generate_tests",
+  duration: 1,
+  success: true,
+  resultSize: 329,
+}
+[INFO] Performance: tool_generate_tests completed in 2ms {
+  operation: "tool_generate_tests",
+  duration: 2,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) Protocol Adapters Integration > MCP Adapter > should handle generate_tests tool correctly [2.44ms]
+(pass) Protocol Adapters Integration > MCP Adapter > should provide correct MCP tool list [4.86ms]
+[INFO] Performance: tool_non_existent_tool completed in 0ms {
+  operation: "tool_non_existent_tool",
+  duration: 0,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) Protocol Adapters Integration > MCP Adapter > should handle invalid MCP tool requests gracefully [0.54ms]
+[DEBUG] API path: /api/v1/definition Endpoint: /definition Method: POST
+(pass) Protocol Adapters Integration > HTTP Adapter > should handle POST /api/definition requests correctly [1.09ms]
+[DEBUG] API path: /api/v1/references Endpoint: /references Method: POST
+(pass) Protocol Adapters Integration > HTTP Adapter > should handle GET /api/references requests correctly [0.70ms]
+[DEBUG] API path: /api/v1/rename Endpoint: /rename Method: POST
+(pass) Protocol Adapters Integration > HTTP Adapter > should handle POST /api/rename requests correctly [0.83ms]
+[DEBUG] API path: /api/v1/completions Endpoint: /completions Method: POST
+(pass) Protocol Adapters Integration > HTTP Adapter > should handle GET /api/completions requests correctly [37.84ms]
+(pass) Protocol Adapters Integration > HTTP Adapter > should provide health check endpoint [0.31ms]
+(pass) Protocol Adapters Integration > HTTP Adapter > should handle CORS requests correctly [1.44ms]
+[DEBUG] API path: /api/v1/definition Endpoint: /definition Method: POST
+(pass) Protocol Adapters Integration > HTTP Adapter > should handle HTTP errors gracefully [0.65ms]
+(pass) Protocol Adapters Integration > CLI Adapter > should handle 'find' command correctly [2.39ms]
+(pass) Protocol Adapters Integration > CLI Adapter > should handle 'references' command correctly [1.95ms]
+Created new pattern candidate: TestFunction -> NewName
+(pass) Protocol Adapters Integration > CLI Adapter > should handle 'rename' command correctly [2.57ms]
+(pass) Protocol Adapters Integration > CLI Adapter > should handle 'stats' command correctly [3.80ms]
+(pass) Protocol Adapters Integration > CLI Adapter > should handle invalid input gracefully [0.41ms]
+[INFO] Performance: tool_find_definition completed in 0ms {
+  operation: "tool_find_definition",
+  duration: 0,
+  success: true,
+  resultSize: 608,
+}
+[INFO] Performance: tool_find_definition completed in 1ms {
+  operation: "tool_find_definition",
+  duration: 1,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+[DEBUG] API path: /api/v1/definition Endpoint: /definition Method: POST
+(pass) Protocol Adapters Integration > Cross-Adapter Consistency > should return equivalent results across all adapters for definition [5.10ms]
+[ERROR] MCP-Server: tool_find_definition failed {
+  name: "Error",
+  message: "Parameter 'symbol' cannot be empty",
+  stack: "Error: Parameter 'symbol' cannot be empty\n    at new McpError (/home/lightningralf/programming/ontology-lsp/node_modules/@modelcontextprotocol/sdk/dist/types.js:991:9)\n    at createMcpError (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:226:26)\n    at validateArgs (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:646:15)\n    at handleFindDefinition (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:196:10)\n    at handleFindDefinition (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:195:38)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:163:33)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:147:83)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at handleToolCall (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:147:20)",
+}
+[WARN] MCP-Server: Not retrying due to error type {
+  error: "Parameter 'symbol' cannot be empty",
+  type: "McpError",
+}
+[ERROR] MCP-Server: tool_find_definition failed {
+  name: "Error",
+  message: "Parameter 'symbol' cannot be empty",
+  stack: "Error: Parameter 'symbol' cannot be empty\n    at new McpError (/home/lightningralf/programming/ontology-lsp/node_modules/@modelcontextprotocol/sdk/dist/types.js:991:9)\n    at createMcpError (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:226:26)\n    at validateArgs (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:646:15)\n    at handleFindDefinition (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:196:10)\n    at handleFindDefinition (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:195:38)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:163:33)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:147:83)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at handleToolCall (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:147:20)",
+}
+(pass) Protocol Adapters Integration > Cross-Adapter Consistency > should handle errors consistently across adapters [41.36ms]
+(pass) Protocol Adapters Integration > Backward Compatibility > should maintain compatibility with existing LSP clients [0.61ms]
+(pass) Protocol Adapters Integration > Backward Compatibility > should maintain compatibility with existing MCP tools [0.24ms]
+[DEBUG] API path: /api/v1/definition Endpoint: /definition Method: POST
+[DEBUG] API path: /api/v1/references Endpoint: /references Method: POST
+[DEBUG] API path: /api/v1/completions Endpoint: /completions Method: POST
+(pass) Protocol Adapters Integration > Backward Compatibility > should maintain compatibility with existing HTTP API clients [0.87ms]
+(pass) Protocol Adapters Integration > Backward Compatibility > should maintain compatibility with existing CLI usage [0.71ms]
+LSP Definition: 1ms
+[INFO] Performance: tool_find_definition completed in 0ms {
+  operation: "tool_find_definition",
+  duration: 0,
+  success: true,
+  resultSize: 608,
+}
+[INFO] Performance: tool_find_definition completed in 0ms {
+  operation: "tool_find_definition",
+  duration: 0,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+MCP Find Definition: 0ms
+HTTP Definition: 0ms
+CLI Find: 1ms
+(pass) Protocol Adapters Integration > Performance Across Adapters > should meet performance targets across all adapters [1.52ms]
+
+tests/step4_pattern-learner.test.ts:
+Created new pattern candidate: getUser -> fetchUser
+Promoted candidate to pattern: 538e4b93-3fa8-45fa-a9d5-6d5d90a8bfe0 (confidence: 0.92)
+(pass) Step 4: PatternLearner > promotes candidate to pattern after threshold [1.61ms]
+Created new pattern candidate: getItem -> fetchItem
+(pass) Step 4: PatternLearner > strengthens existing pattern on further examples [0.29ms]
+
+tests/learning-system.test.ts:
+Would save pipeline comprehensive_learning to database
+Would save pipeline pattern_feedback_cycle to database
+Would save pipeline daily_insights to database
+Would setup cron job for pipeline daily_insights with schedule: 0 9 * * *
+Would load additional pipelines from database
+(pass) Learning System Integration > Learning Orchestrator > should initialize all learning components successfully [1.02ms]
+(pass) Learning System Integration > Learning Orchestrator > should orchestrate comprehensive learning from diverse input [20.57ms]
+(pass) Learning System Integration > Learning Orchestrator > should provide system health monitoring [5.70ms]
+(pass) Learning System Integration > Learning Orchestrator > should provide learning statistics and insights [2.00ms]
+(pass) Learning System Integration > Feedback Loop System > should collect and process feedback efficiently [0.61ms]
+(pass) Learning System Integration > Feedback Loop System > should adapt pattern confidence based on feedback [7.12ms]
+(pass) Learning System Integration > Feedback Loop System > should handle batch feedback processing [1.29ms]
+(pass) Learning System Integration > Feedback Loop System > should generate correction patterns from negative feedback [1.05ms]
+(pass) Learning System Integration > Evolution Tracking System > should track code changes and detect patterns [0.45ms]
+Evolution event seq-1 already exists, skipping insert
+Evolution event seq-2 already exists, skipping insert
+Evolution event seq-3 already exists, skipping insert
+(pass) Learning System Integration > Evolution Tracking System > should analyze architectural trends over time [3.53ms]
+(pass) Learning System Integration > Evolution Tracking System > should detect refactoring patterns [0.96ms]
+(pass) Learning System Integration > Evolution Tracking System > should provide evolution metrics and analytics [1.04ms]
+(pass) Learning System Integration > Team Knowledge System > should facilitate knowledge sharing between team members [6.85ms]
+(pass) Learning System Integration > Team Knowledge System > should validate patterns through team consensus [8.36ms]
+TeamKnowledgeSystem.sharePattern took 36ms (target: 20ms)
+(pass) Learning System Integration > Team Knowledge System > should resolve conflicts in pattern adoption [38.41ms]
+(pass) Learning System Integration > Team Knowledge System > should generate team insights and recommendations [1.59ms]
+(pass) Learning System Integration > Cross-System Learning Integration > should correlate feedback with code evolution [0.63ms]
+(pass) Learning System Integration > Cross-System Learning Integration > should share learning insights across all systems [5.40ms]
+(pass) Learning System Integration > Cross-System Learning Integration > should maintain consistency across learning systems [1.50ms]
+Evolution event bulk-evolution-0 already exists, skipping insert
+Evolution event bulk-evolution-1 already exists, skipping insert
+Evolution event bulk-evolution-2 already exists, skipping insert
+Evolution event bulk-evolution-3 already exists, skipping insert
+Evolution event bulk-evolution-4 already exists, skipping insert
+Evolution event bulk-evolution-5 already exists, skipping insert
+Evolution event bulk-evolution-6 already exists, skipping insert
+Evolution event bulk-evolution-7 already exists, skipping insert
+Evolution event bulk-evolution-8 already exists, skipping insert
+Evolution event bulk-evolution-9 already exists, skipping insert
+Evolution event bulk-evolution-10 already exists, skipping insert
+Evolution event bulk-evolution-11 already exists, skipping insert
+Evolution event bulk-evolution-12 already exists, skipping insert
+Evolution event bulk-evolution-13 already exists, skipping insert
+Evolution event bulk-evolution-14 already exists, skipping insert
+Evolution event bulk-evolution-15 already exists, skipping insert
+Evolution event bulk-evolution-16 already exists, skipping insert
+Evolution event bulk-evolution-17 already exists, skipping insert
+Evolution event bulk-evolution-18 already exists, skipping insert
+Evolution event bulk-evolution-19 already exists, skipping insert
+Evolution event bulk-evolution-20 already exists, skipping insert
+Evolution event bulk-evolution-21 already exists, skipping insert
+Evolution event bulk-evolution-22 already exists, skipping insert
+Evolution event bulk-evolution-23 already exists, skipping insert
+Evolution event bulk-evolution-24 already exists, skipping insert
+Evolution event bulk-evolution-25 already exists, skipping insert
+Evolution event bulk-evolution-26 already exists, skipping insert
+Evolution event bulk-evolution-27 already exists, skipping insert
+Evolution event bulk-evolution-28 already exists, skipping insert
+Evolution event bulk-evolution-29 already exists, skipping insert
+Evolution event bulk-evolution-30 already exists, skipping insert
+Evolution event bulk-evolution-31 already exists, skipping insert
+Evolution event bulk-evolution-32 already exists, skipping insert
+Evolution event bulk-evolution-33 already exists, skipping insert
+Evolution event bulk-evolution-34 already exists, skipping insert
+Evolution event bulk-evolution-35 already exists, skipping insert
+Evolution event bulk-evolution-36 already exists, skipping insert
+Evolution event bulk-evolution-37 already exists, skipping insert
+Evolution event bulk-evolution-38 already exists, skipping insert
+Evolution event bulk-evolution-39 already exists, skipping insert
+Evolution event bulk-evolution-40 already exists, skipping insert
+Evolution event bulk-evolution-41 already exists, skipping insert
+Evolution event bulk-evolution-42 already exists, skipping insert
+Evolution event bulk-evolution-43 already exists, skipping insert
+Evolution event bulk-evolution-44 already exists, skipping insert
+Evolution event bulk-evolution-45 already exists, skipping insert
+Evolution event bulk-evolution-46 already exists, skipping insert
+Evolution event bulk-evolution-47 already exists, skipping insert
+Evolution event bulk-evolution-48 already exists, skipping insert
+Evolution event bulk-evolution-49 already exists, skipping insert
+Processed 100 learning events in 14ms (0.14ms/event)
+(pass) Learning System Integration > Learning Performance and Scalability > should handle high-volume learning data efficiently [14.13ms]
+CodeEvolutionTracker.recordEvolutionEvent took 56ms (target: 15ms)
+Evolution event evolution-1756353156738 already exists, skipping insert
+CodeEvolutionTracker.recordEvolutionEvent took 78ms (target: 15ms)
+Evolution event evolution-1756353156738 already exists, skipping insert
+CodeEvolutionTracker.recordEvolutionEvent took 80ms (target: 15ms)
+Evolution event evolution-1756353156738 already exists, skipping insert
+CodeEvolutionTracker.recordEvolutionEvent took 92ms (target: 15ms)
+Learning operation exceeded target time: 101ms > 100ms
+Evolution event evolution-1756353156738 already exists, skipping insert
+CodeEvolutionTracker.recordEvolutionEvent took 101ms (target: 15ms)
+Learning operation exceeded target time: 108ms > 100ms
+Evolution event evolution-1756353156738 already exists, skipping insert
+CodeEvolutionTracker.recordEvolutionEvent took 110ms (target: 15ms)
+Learning operation exceeded target time: 118ms > 100ms
+Evolution event evolution-1756353156738 already exists, skipping insert
+CodeEvolutionTracker.recordEvolutionEvent took 117ms (target: 15ms)
+Learning operation exceeded target time: 120ms > 100ms
+Evolution event evolution-1756353156738 already exists, skipping insert
+CodeEvolutionTracker.recordEvolutionEvent took 119ms (target: 15ms)
+Learning operation exceeded target time: 122ms > 100ms
+Evolution event evolution-1756353156738 already exists, skipping insert
+CodeEvolutionTracker.recordEvolutionEvent took 121ms (target: 15ms)
+Learning operation exceeded target time: 127ms > 100ms
+Completed 10 concurrent learning operations in 128ms
+(pass) Learning System Integration > Learning Performance and Scalability > should maintain performance under concurrent learning operations [128.54ms]
+(pass) Learning System Integration > Learning Performance and Scalability > should provide real-time learning metrics [1.33ms]
+(pass) Learning System Integration > Learning System Resilience > should handle corrupted learning data gracefully [0.81ms]
+(pass) Learning System Integration > Learning System Resilience > should recover from component failures [5.59ms]
+Would save pipeline comprehensive_learning to database
+Would save pipeline pattern_feedback_cycle to database
+Would save pipeline daily_insights to database
+Would setup cron job for pipeline daily_insights with schedule: 0 9 * * *
+Would load additional pipelines from database
+(pass) Learning System Integration > Learning System Resilience > should provide detailed error reporting for monitoring [29.79ms]
+
+tests/feedback-loop-integration.test.ts:
+(pass) FeedbackLoopSystem Integration > System Initialization > should initialize all components correctly [0.36ms]
+(pass) FeedbackLoopSystem Integration > System Initialization > should have proper configuration [0.13ms]
+(pass) FeedbackLoopSystem Integration > Feedback Recording > should record positive feedback successfully [0.70ms]
+(pass) FeedbackLoopSystem Integration > Feedback Recording > should record negative feedback successfully [0.49ms]
+(pass) FeedbackLoopSystem Integration > Feedback Recording > should record modification feedback with final value [0.74ms]
+(pass) FeedbackLoopSystem Integration > Feedback Recording > should handle multiple feedback types correctly [1.13ms]
+(pass) FeedbackLoopSystem Integration > Learning from Corrections > should learn from user corrections [0.95ms]
+Created new pattern candidate: getData -> fetchData
+(pass) FeedbackLoopSystem Integration > Learning from Corrections > should handle similar corrections (pattern refinement) [0.80ms]
+Created new pattern candidate: myFunction -> calculateTotalPrice
+(pass) FeedbackLoopSystem Integration > Learning from Corrections > should handle dissimilar corrections (new patterns) [0.95ms]
+(pass) FeedbackLoopSystem Integration > Statistics and Analytics > should calculate basic statistics correctly [0.19ms]
+(pass) FeedbackLoopSystem Integration > Statistics and Analytics > should track pattern performance [0.33ms]
+(pass) FeedbackLoopSystem Integration > Statistics and Analytics > should calculate time-based trends [0.19ms]
+(pass) FeedbackLoopSystem Integration > Statistics and Analytics > should handle empty statistics gracefully [32.93ms]
+(pass) FeedbackLoopSystem Integration > Insight Generation > should generate insights from feedback patterns [1.58ms]
+(pass) FeedbackLoopSystem Integration > Insight Generation > should identify strong patterns in insights [1.55ms]
+(pass) FeedbackLoopSystem Integration > Insight Generation > should identify weak patterns in insights [1.68ms]
+(pass) FeedbackLoopSystem Integration > Insight Generation > should identify high modification rate [1.68ms]
+(pass) FeedbackLoopSystem Integration > Pattern Integration > should track feedback for specific patterns [0.46ms]
+(pass) FeedbackLoopSystem Integration > Pattern Integration > should return empty array for non-existent pattern [0.43ms]
+(pass) FeedbackLoopSystem Integration > Pattern Integration > should calculate pattern confidence correctly [0.73ms]
+(pass) FeedbackLoopSystem Integration > Error Handling and Edge Cases > should handle corrupted feedback data gracefully [0.46ms]
+(pass) FeedbackLoopSystem Integration > Error Handling and Edge Cases > should handle missing pattern learner gracefully [0.66ms]
+(pass) FeedbackLoopSystem Integration > Error Handling and Edge Cases > should handle database errors gracefully [0.52ms]
+(pass) FeedbackLoopSystem Integration > Performance Requirements > should record feedback within performance targets [2.70ms]
+(pass) FeedbackLoopSystem Integration > Performance Requirements > should generate insights within performance targets [3.32ms]
+FeedbackLoopSystem.recordFeedback took 14ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 14ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 15ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 15ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 15ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 15ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 15ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 15ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 15ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 15ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 16ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 16ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 16ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 16ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 16ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 16ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 19ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 19ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 20ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 20ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 20ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 20ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 20ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 20ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 20ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 20ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 20ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 21ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 21ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 21ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 21ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 21ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 21ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 21ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 21ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 21ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 22ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 22ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 22ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 22ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 22ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 26ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 26ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 26ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 26ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 27ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 27ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 27ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 27ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 27ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 27ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 27ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 27ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 27ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+FeedbackLoopSystem.recordFeedback took 28ms (target: 10ms)
+(pass) FeedbackLoopSystem Integration > Performance Requirements > should handle high volume feedback efficiently [29.29ms]
+
+tests/bloom-filter-fix.test.ts:
+(pass) Bloom Filter Fix > first-time search should work (not blocked by empty bloom filter) [2182.88ms]
+66 |             includeTests: false
+67 |         };
+68 | 
+69 |         // First search - should actually search and find nothing
+70 |         const firstResults = await layer.process(nonExistentQuery);
+71 |         expect(firstResults.exact.length).toBe(0);
+                                               ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/tests/bloom-filter-fix.test.ts:71:43)
+(fail) Bloom Filter Fix > repeated search for non-existent symbol should use bloom filter negative cache [246.82ms]
+Ran 121 tests across 10 files. [28.90s]
+Bailed out after 1 failure

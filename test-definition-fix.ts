@@ -4,7 +4,7 @@
  * This tests that the early return logic was removed correctly
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync } from 'node:fs';
 
 function testCodeFix() {
   console.log('🧪 Testing AsyncEnhancedGrep definition fix...\n');

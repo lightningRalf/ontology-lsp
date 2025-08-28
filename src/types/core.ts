@@ -1,5 +1,5 @@
 // Core type definitions for the ontology-enhanced LSP proxy
-import { Location, Range, Position } from 'vscode-languageserver';
+import { type Location, Position, type Range } from 'vscode-languageserver';
 
 // Base types
 export interface Symbol {
@@ -20,7 +20,7 @@ export enum SymbolKind {
     Method = 'method',
     Property = 'property',
     Type = 'type',
-    Module = 'module'
+    Module = 'module',
 }
 
 export interface TypeInformation {
@@ -131,7 +131,7 @@ export enum RelationType {
     Calls = 'calls',
     References = 'references',
     SimilarTo = 'similar_to',
-    CoChanges = 'co_changes'
+    CoChanges = 'co_changes',
 }
 
 export interface ConceptSignature {
@@ -185,7 +185,7 @@ export enum PatternCategory {
     Rename = 'rename',
     Refactor = 'refactor',
     Convention = 'convention',
-    Migration = 'migration'
+    Migration = 'migration',
 }
 
 export interface Example {
@@ -477,7 +477,10 @@ export class LayerError extends OntologyError {
 }
 
 export class ConfigError extends OntologyError {
-    constructor(message: string, public configPath?: string) {
+    constructor(
+        message: string,
+        public configPath?: string
+    ) {
         super(message, 'CONFIG_ERROR', { configPath });
     }
 }

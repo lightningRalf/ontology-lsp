@@ -59,7 +59,7 @@ data:
   NODE_ENV: "production"
   LOG_LEVEL: "info"
   HTTP_API_PORT: "7000"
-  MCP_SSE_PORT: "7001"
+  MCP_HTTP_PORT: "7001"
   LSP_SERVER_PORT: "7002"
   CACHE_TTL: "3600"
   PERFORMANCE_MONITORING: "true"
@@ -110,7 +110,7 @@ spec:
             - containerPort: 7000
               name: http-api
             - containerPort: 7001
-              name: mcp-sse
+              name: mcp-http
             - containerPort: 7002
               name: lsp-tcp
           envFrom:
@@ -190,13 +190,13 @@ metadata:
   namespace: ontology-lsp
   labels:
     app.kubernetes.io/name: ontology-lsp
-    app.kubernetes.io/component: mcp-sse
+    app.kubernetes.io/component: mcp-http
 spec:
   type: ClusterIP
   ports:
     - port: 7001
       targetPort: 7001
-      name: mcp-sse
+      name: mcp-http
   selector:
     app.kubernetes.io/name: ontology-lsp
 

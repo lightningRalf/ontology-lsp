@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // Test MCP server with Claude's exact connection pattern
 
-import { spawn } from 'child_process'
+import { spawn } from 'node:child_process'
 
 console.log("Testing MCP server with Claude-like connection pattern...");
 

@@ -1,5 +1,5 @@
 // Test full MCP protocol flow
-import { spawn } from 'child_process';
+import { spawn } from 'node:child_process';
 
 const mcp = spawn('bun', ['dist/mcp-fast/mcp-fast.js'], {
   stdio: ['pipe', 'pipe', 'pipe']

@@ -49,8 +49,8 @@ start: stop-quiet
     @{{bun}} run src/servers/lsp.ts > .ontology/logs/lsp.log 2>&1 & printf '%s\n' $$! > .ontology/pids/lsp.pid
     @echo "Starting HTTP API Server (port 7000)..."
     @{{bun}} run src/servers/http.ts > .ontology/logs/http-api.log 2>&1 & printf '%s\n' $$! > .ontology/pids/http-api.pid
-    @echo "Starting MCP SSE Server (port 7001)..."
-    @{{bun}} run src/servers/mcp-sse.ts > .ontology/logs/mcp-sse.log 2>&1 & printf '%s\n' $$! > .ontology/pids/mcp-sse.pid
+    @echo "Starting MCP HTTP (Streamable) Server (port 7001)..."
+    @{{bun}} run src/servers/mcp-http.ts > .ontology/logs/mcp-http.log 2>&1 & printf '%s\n' $$! > .ontology/pids/mcp-http.pid
     @sleep 3
     @just health
     @echo ""
@@ -65,7 +65,7 @@ stop:
     @echo "  Stopping PID-tracked processes..."
     @-bash -c "if [ -f .ontology/pids/lsp.pid ]; then pid=\$$(cat .ontology/pids/lsp.pid | sed 's/!//g'); kill \$$pid 2>/dev/null && echo '    ✅ LSP server stopped' || true; rm .ontology/pids/lsp.pid; fi"
     @-bash -c "if [ -f .ontology/pids/http-api.pid ]; then pid=\$$(cat .ontology/pids/http-api.pid | sed 's/!//g'); kill \$$pid 2>/dev/null && echo '    ✅ HTTP API stopped' || true; rm .ontology/pids/http-api.pid; fi"
-    @-bash -c "if [ -f .ontology/pids/mcp-sse.pid ]; then pid=\$$(cat .ontology/pids/mcp-sse.pid | sed 's/!//g'); kill \$$pid 2>/dev/null && echo '    ✅ MCP SSE stopped' || true; rm .ontology/pids/mcp-sse.pid; fi"
+    @-bash -c "if [ -f .ontology/pids/mcp-http.pid ]; then pid=\$$(cat .ontology/pids/mcp-http.pid | sed 's/!//g'); kill \$$pid 2>/dev/null && echo '    ✅ MCP HTTP stopped' || true; rm .ontology/pids/mcp-http.pid; fi"
     @echo "  Cleaning up any remaining processes on target ports..."
     @just clean-ports-quiet
     @echo "  Terminating any orphaned processes..."
@@ -79,7 +79,7 @@ stop:
 stop-quiet:
     @-bash -c "if [ -f .ontology/pids/lsp.pid ]; then pid=\$$(cat .ontology/pids/lsp.pid | sed 's/!//g'); kill \$$pid 2>/dev/null; rm .ontology/pids/lsp.pid; fi" 2>/dev/null || true
     @-bash -c "if [ -f .ontology/pids/http-api.pid ]; then pid=\$$(cat .ontology/pids/http-api.pid | sed 's/!//g'); kill \$$pid 2>/dev/null; rm .ontology/pids/http-api.pid; fi" 2>/dev/null || true
-    @-bash -c "if [ -f .ontology/pids/mcp-sse.pid ]; then pid=\$$(cat .ontology/pids/mcp-sse.pid | sed 's/!//g'); kill \$$pid 2>/dev/null; rm .ontology/pids/mcp-sse.pid; fi" 2>/dev/null || true
+    @-bash -c "if [ -f .ontology/pids/mcp-http.pid ]; then pid=\$$(cat .ontology/pids/mcp-http.pid | sed 's/!//g'); kill \$$pid 2>/dev/null; rm .ontology/pids/mcp-http.pid; fi" 2>/dev/null || true
     @just clean-ports-quiet
     @-pkill -f "src/servers" 2>/dev/null || true
     @-pkill -f "ontology-lsp" 2>/dev/null || true
@@ -92,7 +92,7 @@ restart: stop start
 health:
     @echo "🧪 Checking server health..."
     @curl -s --max-time 1 http://localhost:7000/health >/dev/null 2>&1 && echo "✅ HTTP API (7000): HEALTHY" || echo "❌ HTTP API (7000): NOT RESPONDING"
-    @curl -s --max-time 1 http://localhost:7001/health >/dev/null 2>&1 && echo "✅ MCP SSE (7001): HEALTHY" || echo "❌ MCP SSE (7001): NOT RESPONDING"
+    @curl -s --max-time 1 http://localhost:7001/health >/dev/null 2>&1 && echo "✅ MCP HTTP (7001): HEALTHY" || echo "❌ MCP HTTP (7001): NOT RESPONDING"
 
 # Show server status with port information
 status:
@@ -101,7 +101,7 @@ status:
     @echo ""
     @echo "🔌 Background Services:"
     @curl -s --max-time 1 http://localhost:7000/health >/dev/null 2>&1 && echo "  ✅ HTTP API Server: Running on port 7000" || echo "  ❌ HTTP API Server: Not responding on port 7000"  
-    @curl -s --max-time 1 http://localhost:7001/health >/dev/null 2>&1 && echo "  ✅ MCP SSE Server: Running on port 7001" || echo "  ❌ MCP SSE Server: Not responding on port 7001"
+    @curl -s --max-time 1 http://localhost:7001/health >/dev/null 2>&1 && echo "  ✅ MCP HTTP Server: Running on port 7001" || echo "  ❌ MCP HTTP Server: Not responding on port 7001"
     @curl -s --max-time 1 http://localhost:7002 >/dev/null 2>&1 && echo "  ✅ LSP TCP Server: Running on port 7002" || echo "  ❌ LSP TCP Server: Not responding on port 7002"
     @echo ""
     @echo "📝 On-Demand Services (stdio):"
@@ -135,7 +135,7 @@ process-management-info:
     @echo ""
     @echo "✅ Target Ports:"
     @echo "  • 7000: HTTP API Server"
-    @echo "  • 7001: MCP SSE Server"  
+    @echo "  • 7001: MCP HTTP Server"  
     @echo "  • 7002: LSP Server"
     @echo "  • 8081: Monitoring Dashboard"
     @echo ""
@@ -196,7 +196,7 @@ build:
     {{bun}} build src/servers/http.ts --target=bun --outdir=dist/api --format=esm \
         --external tree-sitter --external tree-sitter-typescript \
         --external tree-sitter-javascript --external tree-sitter-python
-    {{bun}} build src/servers/mcp-sse.ts --target=bun --outdir=dist/mcp --format=esm \
+    {{bun}} build src/servers/mcp-http.ts --target=bun --outdir=dist/mcp-http --format=esm \
         --external tree-sitter --external tree-sitter-typescript \
         --external tree-sitter-javascript --external tree-sitter-python
     {{bun}} build src/servers/mcp-fast.ts --target=bun --outfile=dist/mcp-fast/mcp-fast.js --format=esm \
@@ -423,8 +423,8 @@ dev: stop-quiet
     @{{bun}} run --watch src/servers/lsp.ts > .ontology/logs/lsp.log 2>&1 & printf '%s\n' $$! > .ontology/pids/lsp.pid
     @echo "Starting HTTP API with hot-reload (port 7000)..."
     @{{bun}} run --watch src/servers/http.ts > .ontology/logs/http-api.log 2>&1 & printf '%s\n' $$! > .ontology/pids/http-api.pid
-    @echo "Starting MCP SSE with hot-reload (port 7001)..."
-    @{{bun}} run --watch src/servers/mcp.ts > .ontology/logs/mcp-sse.log 2>&1 & printf '%s\n' $$! > .ontology/pids/mcp-sse.pid
+    @echo "Starting MCP (stdio) with hot-reload (port 7001 for HTTP Alt)..."
+    @{{bun}} run --watch src/servers/mcp.ts > .ontology/logs/mcp-stdio.log 2>&1 & printf '%s\n' $$! > .ontology/pids/mcp-stdio.pid
     
     @sleep 2
     @echo "🧠 Knowledge base loaded with $({{bun}} run src/cli/stats.ts --quiet 2>/dev/null | grep concepts | awk '{print $2}' || echo '0') concepts"
@@ -649,7 +649,7 @@ scale replicas="3" namespace="ontology-lsp":
 port-forward namespace="ontology-lsp":
     @echo "🔀 Port forwarding from {{namespace}}..."
     @echo "📍 HTTP API: http://localhost:7000"
-    @echo "📍 MCP SSE: http://localhost:7001" 
+    @echo "📍 MCP HTTP: http://localhost:7001" 
     @echo "Press Ctrl+C to stop"
     kubectl port-forward -n {{namespace}} svc/ontology-lsp-http 7000:7000 &
     kubectl port-forward -n {{namespace}} svc/ontology-lsp-mcp 7001:7001 &
@@ -700,7 +700,7 @@ test-endpoints:
     @echo "HTTP API Health:"
     @curl -s http://localhost:7000/health | jq . || echo "Failed"
     @echo ""
-    @echo "MCP SSE Health:"
+    @echo "MCP HTTP Health:"
     @curl -s http://localhost:7001/health | jq . || echo "Failed"
     @echo ""
     @echo "HTTP API Stats:"
@@ -717,7 +717,7 @@ health-check:
     @echo "🩺 Health Check Report - $(date)"
     @echo "================================"
     @echo "Testing HTTP API (7000):" && (curl -s http://localhost:7000/health >/dev/null 2>&1 && echo "✅ HTTP API (7000): HEALTHY" || echo "❌ HTTP API (7000): UNHEALTHY")
-    @echo "Testing MCP SSE (7001):" && (curl -s http://localhost:7001/health >/dev/null 2>&1 && echo "✅ MCP SSE (7001): HEALTHY" || echo "❌ MCP SSE (7001): UNHEALTHY")
+    @echo "Testing MCP HTTP (7001):" && (curl -s http://localhost:7001/health >/dev/null 2>&1 && echo "✅ MCP HTTP (7001): HEALTHY" || echo "❌ MCP HTTP (7001): UNHEALTHY")
     @echo "Checking processes:" && (pgrep -f "bun run src/servers" >/dev/null && echo "✅ Server processes: RUNNING" || echo "❌ Server processes: NOT RUNNING")
     @echo "Checking .ontology directory:" && ([ -d .ontology ] && echo "✅ .ontology directory: Present" || echo "⚠️  .ontology directory: Not found")
     @echo "================================"
@@ -807,7 +807,7 @@ diagnostics:
           const { getEnvironmentConfig, validatePorts } = require('./src/core/config/server-config.ts');
           const config = getEnvironmentConfig();
           validatePorts(config);
-          console.log('    ✅ Valid - HTTP: ' + config.ports.httpAPI + ', MCP: ' + config.ports.mcpSSE + ', LSP: ' + config.ports.lspServer);
+          console.log('    ✅ Valid - HTTP: ' + config.ports.httpAPI + ', MCP: ' + config.ports.mcpHTTP + ', LSP: ' + config.ports.lspServer);
         } catch (e) {
           console.log('    ❌ Error: ' + e.message);
         }
@@ -825,7 +825,7 @@ diagnostics:
     echo "    NODE_ENV: ${NODE_ENV:-Not set}"
     echo "    BUN_ENV: ${BUN_ENV:-Not set}"
     echo "    HTTP_API_PORT: ${HTTP_API_PORT:-Default (7000)}"
-    echo "    MCP_SSE_PORT: ${MCP_SSE_PORT:-Default (7001)}"
+    echo "    MCP_HTTP_PORT: ${MCP_HTTP_PORT:-Default (7001)}"
     echo "    LSP_SERVER_PORT: ${LSP_SERVER_PORT:-Default (7002)}"
     
     echo ""

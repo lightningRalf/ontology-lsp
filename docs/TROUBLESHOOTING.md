@@ -91,7 +91,7 @@ lsof -i :7000 :7001 :7002
    lsof -ti:7002 | xargs kill -9
    
    # Or use different ports
-   HTTP_API_PORT=8000 MCP_SSE_PORT=8001 LSP_SERVER_PORT=8002 just start
+HTTP_API_PORT=8000 MCP_HTTP_PORT=8001 LSP_SERVER_PORT=8002 just start
    ```
 
 3. **Permission Issues:**
@@ -116,7 +116,7 @@ ps aux | grep bun
 
 # Check server logs
 cat .ontology/logs/http-api.log
-cat .ontology/logs/mcp-sse.log
+cat .ontology/logs/mcp-http.log
 
 # Test direct connection
 curl -v http://localhost:7000/health
@@ -186,13 +186,13 @@ ps aux | grep -E '(bun|ontology)' | grep -v grep
    ```bash
    # Temporary port change
    export HTTP_API_PORT=8000
-   export MCP_SSE_PORT=8001
+   export MCP_HTTP_PORT=8001
    export LSP_SERVER_PORT=8002
    just start
    
    # Permanent change in .env file
    echo "HTTP_API_PORT=8000" >> .env
-   echo "MCP_SSE_PORT=8001" >> .env
+   echo "MCP_HTTP_PORT=8001" >> .env
    echo "LSP_SERVER_PORT=8002" >> .env
    ```
 
@@ -434,9 +434,9 @@ TEST_ENV=debug bun test tests/performance.test.ts
    bun run src/servers/mcp.ts
    ```
 
-2. **Check SSE Connection:**
+2. **Check MCP HTTP Connection:**
    ```bash
-   # Test SSE endpoint
+   # Test MCP HTTP health
    curl -N -H "Accept: text/event-stream" http://localhost:7001/events
    
    # Check tools endpoint
@@ -629,7 +629,7 @@ echo "================================"
 failed=0
 
 check_service "http" "7000" "HTTP API" || ((failed++))
-check_service "mcp" "7001" "MCP SSE" || ((failed++))
+check_service "mcp" "7001" "MCP HTTP" || ((failed++))
 
 # Check processes
 if pgrep -f "bun run src/servers" >/dev/null; then

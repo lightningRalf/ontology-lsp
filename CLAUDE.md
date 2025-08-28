@@ -75,11 +75,11 @@ just --list        # Show all available commands
 ```
 
 ### Server Management
-Use `just` commands to manage all servers (HTTP API, MCP SSE, LSP):
+Use `just` commands to manage all servers (HTTP API, MCP HTTP, LSP):
 
 ```bash
 # Start all servers
-just start        # Starts HTTP API (7000) and MCP SSE (7001)
+just start        # Starts HTTP API (7000) and MCP HTTP (7001)
 
 # Stop all servers  
 just stop         # Cleanly stops all running servers
@@ -125,7 +125,7 @@ The system uses centralized port configuration to avoid conflicts:
 | Service | Default Port | Environment Variable | Description |
 |---------|-------------|---------------------|-------------|
 | HTTP API Server | 7000 | `HTTP_API_PORT` | Main REST API for LSP operations |
-| MCP SSE Server | 7001 | `MCP_SSE_PORT` | Model Context Protocol server |
+| MCP HTTP Server | 7001 | `MCP_HTTP_PORT` | Model Context Protocol server (Streamable HTTP) |
 | LSP Server | 7002 | `LSP_SERVER_PORT` | Language Server Protocol (TCP/stdio) |
 | Test API | 7010 | - | Test instance of HTTP API |
 | Test MCP | 7011 | - | Test instance of MCP server |

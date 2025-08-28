@@ -1,69 +1,69 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { ClaudeToolsLayer } from "../src/layers/claude-tools";
-import { SearchQuery } from "../src/types/core";
-import { ClaudeToolsLayerConfig } from "../src/types/claude-tools";
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { ClaudeToolsLayer } from '../src/layers/claude-tools';
+import type { ClaudeToolsLayerConfig } from '../src/types/claude-tools';
+import type { SearchQuery } from '../src/types/core';
 
-describe("Bloom Filter Fix", () => {
+describe('Bloom Filter Fix', () => {
     let layer: ClaudeToolsLayer;
-    
+
     // Use optimized config with bloom filter enabled
     const config: ClaudeToolsLayerConfig = {
         caching: { enabled: true, ttl: 300, maxEntries: 1000 },
         optimization: { bloomFilter: true, frequencyCache: true, parallelSearch: true },
-        grep: { 
-            defaultTimeout: 2000, 
-            maxResults: 50, 
+        grep: {
+            defaultTimeout: 2000,
+            maxResults: 50,
             contextLines: 2,
             strategies: ['exact', 'fuzzy', 'semantic'],
-            enableRegex: true
+            enableRegex: true,
         },
-        glob: { 
+        glob: {
             defaultTimeout: 1000,
             maxFiles: 1000,
             ignorePatterns: ['node_modules/**', '.git/**'],
-            followSymlinks: false 
+            followSymlinks: false,
         },
-        ls: { 
+        ls: {
             defaultTimeout: 500,
             maxEntries: 500,
             includeDotfiles: false,
-            includeMetadata: true
-        }
+            includeMetadata: true,
+        },
     };
-    
+
     beforeEach(async () => {
         layer = new ClaudeToolsLayer(config);
     });
 
-    test("first-time search should work (not blocked by empty bloom filter)", async () => {
+    test('first-time search should work (not blocked by empty bloom filter)', async () => {
         const query: SearchQuery = {
-            identifier: "AsyncEnhancedGrep",
-            searchPath: "./src",
-            fileTypes: ["ts"],
+            identifier: 'AsyncEnhancedGrep',
+            searchPath: './src',
+            fileTypes: ['ts'],
             caseSensitive: false,
-            includeTests: false
+            includeTests: false,
         };
 
         // This should work now - previously failed due to bloom filter blocking
         const results = await layer.process(query);
-        
+
         // Should find actual results, not be blocked by bloom filter
         expect(results).toBeDefined();
         expect(results.searchTime).toBeGreaterThan(0);
         expect(results.toolsUsed).not.toContain('bloomFilter'); // First time shouldn't use bloom filter
-        
+
         // We should find AsyncEnhancedGrep in the codebase
         const totalMatches = results.exact.length + results.fuzzy.length + results.conceptual.length;
         expect(totalMatches).toBeGreaterThan(0);
     });
 
-    test("repeated search for non-existent symbol should use bloom filter negative cache", async () => {
+    test('repeated search for non-existent symbol should use bloom filter negative cache', async () => {
         const nonExistentQuery: SearchQuery = {
-            identifier: "XyZ1234ThisSymbolDefinitelyDoesNotExist987654321",
-            searchPath: "./src",
-            fileTypes: ["ts"],
+            identifier: 'XyZ1234ThisSymbolDefinitelyDoesNotExist987654321',
+            searchPath: './src',
+            fileTypes: ['ts'],
             caseSensitive: false,
-            includeTests: false
+            includeTests: false,
         };
 
         // First search - should actually search and find no exact matches
@@ -78,13 +78,13 @@ describe("Bloom Filter Fix", () => {
         expect(secondResults.searchTime).toBeLessThan(firstResults.searchTime); // Should be faster
     });
 
-    test("bloom filter should not affect positive results", async () => {
+    test('bloom filter should not affect positive results', async () => {
         const existingQuery: SearchQuery = {
-            identifier: "SearchQuery", // This definitely exists in our codebase
-            searchPath: "./src",
-            fileTypes: ["ts"],
+            identifier: 'SearchQuery', // This definitely exists in our codebase
+            searchPath: './src',
+            fileTypes: ['ts'],
             caseSensitive: false,
-            includeTests: false
+            includeTests: false,
         };
 
         // First search - should find results
@@ -95,26 +95,24 @@ describe("Bloom Filter Fix", () => {
         // Second search - should still find the same results (bloom filter shouldn't interfere)
         const secondResults = await layer.process(existingQuery);
         const secondTotalMatches = secondResults.exact.length + secondResults.fuzzy.length;
-        
+
         // Results should be consistent
         expect(secondTotalMatches).toBe(firstTotalMatches);
-        
+
         // Second search should use cache or bloom filter for optimization
         expect(secondResults.searchTime).toBeLessThanOrEqual(firstResults.searchTime);
     });
 
-    test("bloom filter performance benefit for negative results", async () => {
-        const queries = [
-            "XyZ9999NonExistent1QwErTy",
-            "AbC8888NonExistent2ZxCvBn", 
-            "DeF7777NonExistent3MnBvCx"
-        ].map(id => ({
-            identifier: id,
-            searchPath: "./src",
-            fileTypes: ["ts"] as string[],
-            caseSensitive: false,
-            includeTests: false
-        }));
+    test('bloom filter performance benefit for negative results', async () => {
+        const queries = ['XyZ9999NonExistent1QwErTy', 'AbC8888NonExistent2ZxCvBn', 'DeF7777NonExistent3MnBvCx'].map(
+            (id) => ({
+                identifier: id,
+                searchPath: './src',
+                fileTypes: ['ts'] as string[],
+                caseSensitive: false,
+                includeTests: false,
+            })
+        );
 
         // First round - populate bloom filter
         const firstRoundTimes: number[] = [];
@@ -136,17 +134,17 @@ describe("Bloom Filter Fix", () => {
         // Performance improvement check (second round should be faster on average)
         const firstAvg = firstRoundTimes.reduce((a, b) => a + b, 0) / firstRoundTimes.length;
         const secondAvg = secondRoundTimes.reduce((a, b) => a + b, 0) / secondRoundTimes.length;
-        
+
         expect(secondAvg).toBeLessThan(firstAvg * 0.5); // At least 50% faster
     });
 
-    test("metrics should reflect bloom filter usage", async () => {
+    test('metrics should reflect bloom filter usage', async () => {
         const query: SearchQuery = {
-            identifier: "ZxY4321BloomFilterMetricsTestQwErTyUi",
-            searchPath: "./src",
-            fileTypes: ["ts"],
+            identifier: 'ZxY4321BloomFilterMetricsTestQwErTyUi',
+            searchPath: './src',
+            fileTypes: ['ts'],
             caseSensitive: false,
-            includeTests: false
+            includeTests: false,
         };
 
         // Search twice

@@ -26,7 +26,7 @@
 
 ### 🌐 **Multi-Protocol Support**
 - **LSP Protocol**: Full VS Code and IDE integration (stdio/TCP on port 7002)
-- **MCP Protocol**: Claude Code integration with SSE transport (port 7001)
+- **MCP Protocol**: Claude Code integration with Streamable HTTP (port 7001)
 - **HTTP API**: REST endpoints for web applications and CI/CD (port 7000)
 - **CLI Tool**: Terminal interface with comprehensive command set
 - **Web UI Dashboard**: Real-time monitoring and pattern visualization (port 8080)
@@ -109,7 +109,7 @@ bun install
 # Initialize the project
 just init
 
-# Start all servers (HTTP API on 7000, MCP SSE on 7001)
+# Start all servers (HTTP API on 7000, MCP HTTP on 7001)
 just start
 
 # Check server status
@@ -138,7 +138,7 @@ Add to your `.mcp.json`:
     "ontology-lsp-sse": {
       "type": "sse",
       "url": "http://localhost:7001/mcp/sse",
-      "description": "Ontology-enhanced LSP with SSE transport (requires 'just start')"
+      "description": "Ontology-enhanced LSP with Streamable HTTP transport (requires 'just start')"
     }
   }
 }
@@ -152,7 +152,7 @@ The system uses the following default ports (all configurable via environment va
 | Service | Default Port | Environment Variable | Description |
 |---------|-------------|---------------------|-------------|
 | HTTP API | 7000 | `HTTP_API_PORT` | REST API for LSP operations |
-| MCP SSE | 7001 | `MCP_SSE_PORT` | Model Context Protocol server |
+| MCP HTTP | 7001 | `MCP_HTTP_PORT` | Model Context Protocol server (Streamable HTTP) |
 | LSP Server | 7002 | `LSP_SERVER_PORT` | Language Server Protocol |
 
 ### Project Configuration
@@ -166,7 +166,7 @@ version: 1.0.0
 server:
   ports:
     httpAPI: 7000
-    mcpSSE: 7001
+    mcpHTTP: 7001
     lspServer: 7002
 
 # Layer configuration
@@ -497,7 +497,7 @@ cache:
 # Quick system check
 just health
 # ✅ HTTP API (7000): HEALTHY
-# ✅ MCP SSE (7001): HEALTHY
+# ✅ MCP HTTP (7001): HEALTHY
 
 # Detailed status
 just status
@@ -516,7 +516,7 @@ just logs
 lsof -i :7000 :7001 :7002
 
 # Use custom ports if needed
-export HTTP_API_PORT=8000 MCP_SSE_PORT=8001 LSP_SERVER_PORT=8002
+export HTTP_API_PORT=8000 MCP_HTTP_PORT=8001 LSP_SERVER_PORT=8002
 just start
 
 # Clean restart

@@ -1,0 +1,724 @@
+bun test v1.2.20 (6ad208bc)
+
+test/layer1-budget.test.ts:
+Would save pipeline comprehensive_learning to database
+Would save pipeline pattern_feedback_cycle to database
+Would save pipeline daily_insights to database
+Would setup cron job for pipeline daily_insights with schedule: 0 9 * * *
+Would load additional pipelines from database
+(pass) Layer 1 budget behavior > findDefinition returns under Layer 1 budget on typical query [632.17ms]
+
+test/layer1-cancellation.test.ts:
+(pass) AsyncEnhancedGrep cancellable operations > searchCancellable can be cancelled quickly [106.31ms]
+(pass) AsyncEnhancedGrep cancellable operations > listFilesCancellable can be cancelled quickly [79.24ms]
+
+test/error-handling.test.ts:
+[INFO] Performance: test_operation completed in 1ms {
+  operation: "test_operation",
+  duration: 1,
+  success: true,
+  attempt: 1,
+  component: "TestComponent",
+}
+(pass) Error Handler > should handle successful operations [2.20ms]
+[ERROR] MCP-Server: retry_test failed {
+  name: "Error",
+  message: "Transient failure",
+  stack: "Error: Transient failure\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:55:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:52:7)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:50:39)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:42:46)",
+}
+[INFO] MCP-Server: Retry attempt 2/4 for retry_test {
+  context: {
+    component: "TestComponent",
+    operation: "retry_test",
+    timestamp: 1756352486575,
+  },
+  attempt: 2,
+}
+[ERROR] MCP-Server: retry_test failed {
+  name: "Error",
+  message: "Transient failure",
+  stack: "Error: Transient failure\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:55:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:52:7)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at processTicksAndRejections (native:7:39)",
+}
+[INFO] MCP-Server: Retry attempt 3/4 for retry_test {
+  context: {
+    component: "TestComponent",
+    operation: "retry_test",
+    timestamp: 1756352486575,
+  },
+  attempt: 3,
+}
+[INFO] Performance: retry_test completed in 0ms {
+  operation: "retry_test",
+  duration: 0,
+  success: true,
+  attempt: 3,
+  component: "TestComponent",
+}
+(pass) Error Handler > should retry on transient failures [78.15ms]
+[ERROR] MCP-Server: validation_test failed {
+  name: "Error",
+  message: "Missing required field: name",
+  stack: "Error: Missing required field: name\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:80:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:78:21)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:76:26)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:66:49)",
+}
+[WARN] MCP-Server: Not retrying due to error type {
+  error: "Missing required field: name",
+  type: "Error",
+}
+[ERROR] MCP-Server: validation_test failed {
+  name: "Error",
+  message: "Missing required field: name",
+  stack: "Error: Missing required field: name\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:80:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:78:21)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:76:26)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:66:49)",
+}
+(pass) Error Handler > should not retry on validation errors [0.83ms]
+[ERROR] MCP-Server: backoff_test failed {
+  name: "Error",
+  message: "Always fail",
+  stack: "Error: Always fail\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:108:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:107:21)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:105:26)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:90:48)",
+}
+[INFO] MCP-Server: Retry attempt 2/4 for backoff_test {
+  context: {
+    component: "TestComponent",
+    operation: "backoff_test",
+    timestamp: 1756352486656,
+  },
+  attempt: 2,
+}
+[ERROR] MCP-Server: backoff_test failed {
+  name: "Error",
+  message: "Always fail",
+  stack: "Error: Always fail\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:108:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:107:21)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at processTicksAndRejections (native:7:39)",
+}
+[INFO] MCP-Server: Retry attempt 3/4 for backoff_test {
+  context: {
+    component: "TestComponent",
+    operation: "backoff_test",
+    timestamp: 1756352486656,
+  },
+  attempt: 3,
+}
+[ERROR] MCP-Server: backoff_test failed {
+  name: "Error",
+  message: "Always fail",
+  stack: "Error: Always fail\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:108:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:107:21)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at processTicksAndRejections (native:7:39)",
+}
+[INFO] MCP-Server: Retry attempt 4/4 for backoff_test {
+  context: {
+    component: "TestComponent",
+    operation: "backoff_test",
+    timestamp: 1756352486656,
+  },
+  attempt: 4,
+}
+[ERROR] MCP-Server: backoff_test failed {
+  name: "Error",
+  message: "Always fail",
+  stack: "Error: Always fail\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:108:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:107:21)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at processTicksAndRejections (native:7:39)",
+}
+[ERROR] MCP-Server: backoff_test failed {
+  name: "Error",
+  message: "Always fail",
+  stack: "Error: Always fail\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:108:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:107:21)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at processTicksAndRejections (native:7:39)",
+}
+(pass) Error Handler > should implement exponential backoff [8.61ms]
+[ERROR] MCP-Server: circuit_test failed {
+  name: "Error",
+  message: "Service failure",
+  stack: "Error: Service failure\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:153:35)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:153:23)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:151:37)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:136:44)",
+}
+[ERROR] MCP-Server: circuit_test failed {
+  name: "Error",
+  message: "Service failure",
+  stack: "Error: Service failure\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:153:35)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:153:23)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:151:37)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:136:44)",
+}
+[ERROR] MCP-Server: circuit_test failed {
+  name: "Error",
+  message: "Service failure",
+  stack: "Error: Service failure\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:153:35)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:153:23)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:151:37)\n    at processTicksAndRejections (native:7:39)",
+}
+[WARN] MCP-Server: Circuit breaker opened for TestComponent:circuit_test {
+  failures: 2,
+  threshold: 2,
+}
+[ERROR] MCP-Server: circuit_test failed {
+  name: "Error",
+  message: "Service failure",
+  stack: "Error: Service failure\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:153:35)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:153:23)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:151:37)\n    at processTicksAndRejections (native:7:39)",
+}
+[ERROR] MCP-Server: circuit_test failed {
+  name: "Error",
+  message: "Circuit breaker open for TestComponent:circuit_test",
+  stack: "Error: Circuit breaker open for TestComponent:circuit_test\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:63:25)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:151:37)\n    at processTicksAndRejections (native:7:39)",
+}
+[ERROR] MCP-Server: circuit_test failed {
+  name: "Error",
+  message: "Circuit breaker open for TestComponent:circuit_test",
+  stack: "Error: Circuit breaker open for TestComponent:circuit_test\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:63:25)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:162:35)\n    at processTicksAndRejections (native:7:39)",
+}
+(pass) Error Handler > should implement circuit breaker [0.77ms]
+[ERROR] MCP-Server: validation failed {
+  name: "Error",
+  message: "Missing required field: required_field",
+  stack: "Error: Missing required field: required_field\n    at validateRequest (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:194:21)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:180:20)\n    at toThrow (unknown)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:185:8)",
+}
+[ERROR] MCP-Server: validation failed {
+  name: "Error",
+  message: "Request must be an object",
+  stack: "Error: Request must be an object\n    at validateRequest (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:189:19)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:189:20)\n    at toThrow (unknown)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:194:8)",
+}
+(pass) Error Handler > should validate request parameters [0.49ms]
+(pass) Error Handler > should create proper MCP errors [0.06ms]
+(pass) File Logger > should create log entries with proper format [0.10ms]
+(pass) File Logger > should log errors with stack traces [0.06ms]
+(pass) File Logger > should create child loggers [6.88ms]
+[INFO] Connection: Connection connect {
+  connectionCount: 1,
+  metadata: undefined,
+}
+[INFO] Performance: connect completed in 101ms {
+  operation: "connect",
+  duration: 101,
+  success: true,
+  attempt: 1,
+  component: "ConnectionManager",
+}
+[INFO] Connection: Connection disconnect {
+  totalUptime: 1,
+  graceful: true,
+}
+[INFO] Performance: disconnect completed in 1ms {
+  operation: "disconnect",
+  duration: 1,
+  success: true,
+  attempt: 1,
+  component: "ConnectionManager",
+}
+(pass) Connection Manager > should track connection state [101.80ms]
+[INFO] Connection: Connection connect {
+  connectionCount: 1,
+  metadata: undefined,
+}
+[INFO] Performance: connect completed in 100ms {
+  operation: "connect",
+  duration: 100,
+  success: true,
+  attempt: 1,
+  component: "ConnectionManager",
+}
+(pass) Connection Manager > should track connection metrics [101.00ms]
+[INFO] Connection: Connection disconnect {
+  totalUptime: 0,
+  graceful: true,
+}
+[INFO] Performance: disconnect completed in 1ms {
+  operation: "disconnect",
+  duration: 1,
+  success: true,
+  attempt: 1,
+  component: "ConnectionManager",
+}
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+LS analysis failed for directory: src warn: Operation timed out after 200ms
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/layers/claude-tools.ts:1381:24)
+
+[INFO] Connection: Connection connect {
+  connectionCount: 1,
+  metadata: undefined,
+}
+[INFO] Performance: connect completed in 103ms {
+  operation: "connect",
+  duration: 103,
+  success: true,
+  attempt: 1,
+  component: "ConnectionManager",
+}
+[INFO] Connection: Connection disconnect {
+  totalUptime: 0,
+  graceful: true,
+}
+[INFO] Performance: disconnect completed in 0ms {
+  operation: "disconnect",
+  duration: 0,
+  success: true,
+  attempt: 1,
+  component: "ConnectionManager",
+}
+(pass) Connection Manager > should handle connection events [102.95ms]
+(pass) Connection Manager > should provide health check information [0.23ms]
+[INFO] Performance: test_operation completed in 0ms {
+  operation: "test_operation",
+  duration: 0,
+  success: true,
+  attempt: 1,
+  component: "TestComponent",
+}
+(pass) Utility Functions > withMcpErrorHandling should wrap operations [0.27ms]
+(pass) Utility Functions > createValidationError should create proper error [0.08ms]
+(pass) Utility Functions > createInternalError should create proper error [0.06ms]
+[ERROR] MCP-Server: recovery_scenario failed {
+  name: "Error",
+  message: "Network timeout",
+  stack: "Error: Network timeout\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:402:25)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:409:7)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:407:45)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:393:58)",
+}
+[INFO] MCP-Server: Retry attempt 2/4 for recovery_scenario {
+  context: {
+    component: "IntegrationTest",
+    operation: "recovery_scenario",
+    timestamp: 1756352487008,
+  },
+  attempt: 2,
+}
+[ERROR] MCP-Server: recovery_scenario failed {
+  name: "Error",
+  message: "Temporary failure",
+  stack: "Error: Temporary failure\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:403:25)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:409:7)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at processTicksAndRejections (native:7:39)",
+}
+[INFO] MCP-Server: Retry attempt 3/4 for recovery_scenario {
+  context: {
+    component: "IntegrationTest",
+    operation: "recovery_scenario",
+    timestamp: 1756352487008,
+  },
+  attempt: 3,
+}
+[INFO] Performance: recovery_scenario completed in 0ms {
+  operation: "recovery_scenario",
+  duration: 0,
+  success: true,
+  attempt: 3,
+  component: "IntegrationTest",
+}
+(pass) Integration Tests > should handle complete error recovery scenario [4178.37ms]
+[INFO] Performance: timeout_test completed in 100ms {
+  operation: "timeout_test",
+  duration: 100,
+  success: true,
+  attempt: 1,
+  component: "IntegrationTest",
+}
+(pass) Integration Tests > should handle timeout scenarios [100.61ms]
+[INFO] Connection: Connection connect {
+  connectionCount: 1,
+  metadata: undefined,
+}
+[INFO] Performance: connect completed in 100ms {
+  operation: "connect",
+  duration: 100,
+  success: true,
+  attempt: 1,
+  component: "ConnectionManager",
+}
+[ERROR] MCP-Server: Connection lost {
+  name: "Error",
+  message: "Connection lost",
+  stack: "Error: Connection lost\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/test/error-handling.test.ts:453:33)\n    at processTicksAndRejections (native:7:39)",
+}
+[INFO] MCP-Server: Attempting reconnection in 100ms {
+  attempt: 1,
+  maxAttempts: 2,
+}
+[INFO] Connection: Connection disconnect {
+  totalUptime: 1,
+  graceful: true,
+}
+[INFO] Performance: disconnect completed in 0ms {
+  operation: "disconnect",
+  duration: 0,
+  success: true,
+  attempt: 1,
+  component: "ConnectionManager",
+}
+(pass) Integration Tests > should handle connection loss and recovery [101.24ms]
+
+tests/step3_ontology-engine.test.ts:
+Added concept: Alpha (1)
+(pass) Step 3: OntologyEngine > finds concept by representation [21.47ms]
+Renamed concept: Alpha -> Beta
+Evolved concept: Beta - rename
+(pass) Step 3: OntologyEngine > renames concept through evolution [1.19ms]
+Added concept: Gamma (2)
+Added relation: Beta uses Gamma
+(pass) Step 3: OntologyEngine > adds relations and retrieves related concepts [9.02ms]
+
+tests/file-uri-resolution.test.ts:
+Would save pipeline comprehensive_learning to database
+Would save pipeline pattern_feedback_cycle to database
+Would save pipeline daily_insights to database
+Would setup cron job for pipeline daily_insights with schedule: 0 9 * * *
+Would load additional pipelines from database
+[INFO] Performance: tool_find_definition completed in 26ms {
+  operation: "tool_find_definition",
+  duration: 26,
+  success: true,
+  resultSize: 527,
+}
+[INFO] Performance: tool_find_definition completed in 27ms {
+  operation: "tool_find_definition",
+  duration: 27,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) File URI Resolution - Red Tests > MCP Adapter File Discovery > should discover actual file location when no file context provided [46.83ms]
+[INFO] Performance: tool_find_definition completed in 3089ms {
+  operation: "tool_find_definition",
+  duration: 3089,
+  success: true,
+  resultSize: 268,
+}
+[INFO] Performance: tool_find_definition completed in 3090ms {
+  operation: "tool_find_definition",
+  duration: 3090,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) File URI Resolution - Red Tests > MCP Adapter File Discovery > should handle symbol not found gracefully [3089.94ms]
+[INFO] Performance: tool_find_definition completed in 32ms {
+  operation: "tool_find_definition",
+  duration: 32,
+  success: true,
+  resultSize: 1108,
+}
+[INFO] Performance: tool_find_definition completed in 32ms {
+  operation: "tool_find_definition",
+  duration: 32,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) File URI Resolution - Red Tests > MCP Adapter File Discovery > should use provided file context when available [32.48ms]
+Layer 1 failed: CoreError: Layer layer1 timed out after 1600ms
+     layer: "layer1",
+ requestId: "ecf2507b-c569-42d8-a480-9a57e54afa83",
+   details: undefined,
+      code: "LAYER_TIMEOUT"
+
+      at new CoreError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:412:5)
+      at new LayerTimeoutError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:419:5)
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/core/layer-manager.ts:312:18)
+
+(pass) File URI Resolution - Red Tests > Core Analyzer URI Validation > should reject file://unknown URIs [1686.79ms]
+Layer 1 failed: CoreError: Layer layer1 timed out after 1600ms
+     layer: "layer1",
+ requestId: "6f1d25fd-f816-4bec-a620-20d2018dd629",
+   details: undefined,
+      code: "LAYER_TIMEOUT"
+
+      at new CoreError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:412:5)
+      at new LayerTimeoutError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:419:5)
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/core/layer-manager.ts:312:18)
+
+Layer 1 failed: CoreError: Layer layer1 timed out after 1600ms
+     layer: "layer1",
+ requestId: "7ef2e256-bda3-4bc3-a9d8-aac52c30223d",
+   details: undefined,
+      code: "LAYER_TIMEOUT"
+
+      at new CoreError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:412:5)
+      at new LayerTimeoutError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:419:5)
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/core/layer-manager.ts:312:18)
+
+Layer 1 failed: CoreError: Layer layer1 timed out after 1600ms
+     layer: "layer1",
+ requestId: "25c75723-94ed-40a7-b413-e410343e539b",
+   details: undefined,
+      code: "LAYER_TIMEOUT"
+
+      at new CoreError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:412:5)
+      at new LayerTimeoutError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:419:5)
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/core/layer-manager.ts:312:18)
+
+(pass) File URI Resolution - Red Tests > Core Analyzer URI Validation > should validate URI format [4972.45ms]
+(pass) File URI Resolution - Red Tests > Symbol Locator Integration > should locate symbols across workspace [69.02ms]
+(pass) File URI Resolution - Red Tests > Symbol Locator Integration > should cache symbol locations for performance [6.11ms]
+[INFO] Performance: tool_find_definition completed in 3128ms {
+  operation: "tool_find_definition",
+  duration: 3128,
+  success: true,
+  resultSize: 268,
+}
+[INFO] Performance: tool_find_definition completed in 3129ms {
+  operation: "tool_find_definition",
+  duration: 3129,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) File URI Resolution - Red Tests > Error Handling > should distinguish between "not found" and "location unknown" [3129.28ms]
+[ERROR] MCP-Server: tool_find_definition failed {
+  name: "Error",
+  message: "Parameter 'symbol' cannot be empty",
+  stack: "Error: Parameter 'symbol' cannot be empty\n    at new McpError (/home/lightningralf/programming/ontology-lsp/node_modules/@modelcontextprotocol/sdk/dist/types.js:991:9)\n    at createMcpError (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:226:26)\n    at validateArgs (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:646:15)\n    at handleFindDefinition (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:196:10)\n    at handleFindDefinition (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:195:38)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:163:33)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:147:83)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at handleToolCall (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:147:20)",
+}
+[WARN] MCP-Server: Not retrying due to error type {
+  error: "Parameter 'symbol' cannot be empty",
+  type: "McpError",
+}
+[ERROR] MCP-Server: tool_find_definition failed {
+  name: "Error",
+  message: "Parameter 'symbol' cannot be empty",
+  stack: "Error: Parameter 'symbol' cannot be empty\n    at new McpError (/home/lightningralf/programming/ontology-lsp/node_modules/@modelcontextprotocol/sdk/dist/types.js:991:9)\n    at createMcpError (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:226:26)\n    at validateArgs (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:646:15)\n    at handleFindDefinition (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:196:10)\n    at handleFindDefinition (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:195:38)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:163:33)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:147:83)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at handleToolCall (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:147:20)",
+}
+(pass) File URI Resolution - Red Tests > Error Handling > should provide helpful error messages [1.05ms]
+
+tests/adapters.test.ts:
+Layer layer1 already registered, skipping...
+Layer layer2 already registered, skipping...
+Layer layer3 already registered, skipping...
+Layer layer4 already registered, skipping...
+Layer layer5 already registered, skipping...
+Would save pipeline comprehensive_learning to database
+Would save pipeline pattern_feedback_cycle to database
+Would save pipeline daily_insights to database
+Would setup cron job for pipeline daily_insights with schedule: 0 9 * * *
+Would load additional pipelines from database
+(pass) Protocol Adapters Integration > LSP Adapter > should convert LSP definition requests correctly [76.64ms]
+(pass) Protocol Adapters Integration > LSP Adapter > should convert LSP references requests correctly [3.62ms]
+Created new pattern candidate: symbol_at_10_5 -> RenamedFunction
+(pass) Protocol Adapters Integration > LSP Adapter > should handle LSP rename requests correctly [8.82ms]
+(pass) Protocol Adapters Integration > LSP Adapter > should provide LSP completions correctly [30.18ms]
+(pass) Protocol Adapters Integration > LSP Adapter > should maintain LSP protocol compliance [5.14ms]
+[INFO] Performance: tool_find_definition completed in 25ms {
+  operation: "tool_find_definition",
+  duration: 25,
+  success: true,
+  resultSize: 610,
+}
+[INFO] Performance: tool_find_definition completed in 26ms {
+  operation: "tool_find_definition",
+  duration: 26,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) Protocol Adapters Integration > MCP Adapter > should handle find_definition tool correctly [26.80ms]
+[INFO] Performance: tool_find_definition completed in 0ms {
+  operation: "tool_find_definition",
+  duration: 0,
+  success: true,
+  resultSize: 608,
+}
+[INFO] Performance: tool_find_definition completed in 0ms {
+  operation: "tool_find_definition",
+  duration: 0,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) Protocol Adapters Integration > MCP Adapter > should handle find_definition tool with advanced options [4.89ms]
+[INFO] Performance: tool_find_references completed in 0ms {
+  operation: "tool_find_references",
+  duration: 0,
+  success: true,
+  resultSize: 543,
+}
+[INFO] Performance: tool_find_references completed in 1ms {
+  operation: "tool_find_references",
+  duration: 1,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) Protocol Adapters Integration > MCP Adapter > should handle find_references tool correctly [8.14ms]
+Created new pattern candidate: TestFunction -> RenamedFunction
+[INFO] Performance: tool_rename_symbol completed in 1ms {
+  operation: "tool_rename_symbol",
+  duration: 1,
+  success: true,
+  resultSize: 384,
+}
+[INFO] Performance: tool_rename_symbol completed in 1ms {
+  operation: "tool_rename_symbol",
+  duration: 1,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) Protocol Adapters Integration > MCP Adapter > should handle rename_symbol tool correctly [1.25ms]
+[INFO] Performance: tool_generate_tests completed in 7ms {
+  operation: "tool_generate_tests",
+  duration: 7,
+  success: true,
+  resultSize: 329,
+}
+[INFO] Performance: tool_generate_tests completed in 7ms {
+  operation: "tool_generate_tests",
+  duration: 7,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) Protocol Adapters Integration > MCP Adapter > should handle generate_tests tool correctly [7.28ms]
+(pass) Protocol Adapters Integration > MCP Adapter > should provide correct MCP tool list [0.34ms]
+[INFO] Performance: tool_non_existent_tool completed in 1ms {
+  operation: "tool_non_existent_tool",
+  duration: 1,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+(pass) Protocol Adapters Integration > MCP Adapter > should handle invalid MCP tool requests gracefully [0.42ms]
+[DEBUG] API path: /api/v1/definition Endpoint: /definition Method: POST
+(pass) Protocol Adapters Integration > HTTP Adapter > should handle POST /api/definition requests correctly [1.06ms]
+[DEBUG] API path: /api/v1/references Endpoint: /references Method: POST
+(pass) Protocol Adapters Integration > HTTP Adapter > should handle GET /api/references requests correctly [0.66ms]
+[DEBUG] API path: /api/v1/rename Endpoint: /rename Method: POST
+(pass) Protocol Adapters Integration > HTTP Adapter > should handle POST /api/rename requests correctly [2.05ms]
+[DEBUG] API path: /api/v1/completions Endpoint: /completions Method: POST
+(pass) Protocol Adapters Integration > HTTP Adapter > should handle GET /api/completions requests correctly [35.84ms]
+(pass) Protocol Adapters Integration > HTTP Adapter > should provide health check endpoint [0.36ms]
+(pass) Protocol Adapters Integration > HTTP Adapter > should handle CORS requests correctly [0.12ms]
+[DEBUG] API path: /api/v1/definition Endpoint: /definition Method: POST
+(pass) Protocol Adapters Integration > HTTP Adapter > should handle HTTP errors gracefully [0.45ms]
+(pass) Protocol Adapters Integration > CLI Adapter > should handle 'find' command correctly [0.64ms]
+(pass) Protocol Adapters Integration > CLI Adapter > should handle 'references' command correctly [0.72ms]
+Created new pattern candidate: TestFunction -> NewName
+(pass) Protocol Adapters Integration > CLI Adapter > should handle 'rename' command correctly [5.68ms]
+(pass) Protocol Adapters Integration > CLI Adapter > should handle 'stats' command correctly [7.30ms]
+(pass) Protocol Adapters Integration > CLI Adapter > should handle invalid input gracefully [0.53ms]
+[INFO] Performance: tool_find_definition completed in 0ms {
+  operation: "tool_find_definition",
+  duration: 0,
+  success: true,
+  resultSize: 608,
+}
+[INFO] Performance: tool_find_definition completed in 1ms {
+  operation: "tool_find_definition",
+  duration: 1,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+[DEBUG] API path: /api/v1/definition Endpoint: /definition Method: POST
+(pass) Protocol Adapters Integration > Cross-Adapter Consistency > should return equivalent results across all adapters for definition [5.63ms]
+[ERROR] MCP-Server: tool_find_definition failed {
+  name: "Error",
+  message: "Parameter 'symbol' cannot be empty",
+  stack: "Error: Parameter 'symbol' cannot be empty\n    at new McpError (/home/lightningralf/programming/ontology-lsp/node_modules/@modelcontextprotocol/sdk/dist/types.js:991:9)\n    at createMcpError (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:226:26)\n    at validateArgs (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:646:15)\n    at handleFindDefinition (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:196:10)\n    at handleFindDefinition (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:195:38)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:163:33)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:147:83)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at handleToolCall (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:147:20)",
+}
+[WARN] MCP-Server: Not retrying due to error type {
+  error: "Parameter 'symbol' cannot be empty",
+  type: "McpError",
+}
+[ERROR] MCP-Server: tool_find_definition failed {
+  name: "Error",
+  message: "Parameter 'symbol' cannot be empty",
+  stack: "Error: Parameter 'symbol' cannot be empty\n    at new McpError (/home/lightningralf/programming/ontology-lsp/node_modules/@modelcontextprotocol/sdk/dist/types.js:991:9)\n    at createMcpError (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:226:26)\n    at validateArgs (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:646:15)\n    at handleFindDefinition (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:196:10)\n    at handleFindDefinition (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:195:38)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:163:33)\n    at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:147:83)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:82:47)\n    at withErrorHandling (/home/lightningralf/programming/ontology-lsp/src/core/utils/error-handler.ts:54:5)\n    at handleToolCall (/home/lightningralf/programming/ontology-lsp/src/adapters/mcp-adapter.ts:147:20)",
+}
+(pass) Protocol Adapters Integration > Cross-Adapter Consistency > should handle errors consistently across adapters [43.67ms]
+(pass) Protocol Adapters Integration > Backward Compatibility > should maintain compatibility with existing LSP clients [0.47ms]
+(pass) Protocol Adapters Integration > Backward Compatibility > should maintain compatibility with existing MCP tools [0.17ms]
+[DEBUG] API path: /api/v1/definition Endpoint: /definition Method: POST
+[DEBUG] API path: /api/v1/references Endpoint: /references Method: POST
+[DEBUG] API path: /api/v1/completions Endpoint: /completions Method: POST
+(pass) Protocol Adapters Integration > Backward Compatibility > should maintain compatibility with existing HTTP API clients [0.84ms]
+(pass) Protocol Adapters Integration > Backward Compatibility > should maintain compatibility with existing CLI usage [0.51ms]
+LSP Definition: 0ms
+[INFO] Performance: tool_find_definition completed in 0ms {
+  operation: "tool_find_definition",
+  duration: 0,
+  success: true,
+  resultSize: 608,
+}
+[INFO] Performance: tool_find_definition completed in 0ms {
+  operation: "tool_find_definition",
+  duration: 0,
+  success: true,
+  attempt: 1,
+  component: "MCPAdapter",
+}
+MCP Find Definition: 0ms
+HTTP Definition: 0ms
+CLI Find: 0ms
+(pass) Protocol Adapters Integration > Performance Across Adapters > should meet performance targets across all adapters [1.11ms]
+
+tests/step4_pattern-learner.test.ts:
+Created new pattern candidate: getUser -> fetchUser
+Promoted candidate to pattern: 75a0389f-c47f-46b7-a490-a3c0d67aa884 (confidence: 0.92)
+(pass) Step 4: PatternLearner > promotes candidate to pattern after threshold [1.69ms]
+Created new pattern candidate: getItem -> fetchItem
+(pass) Step 4: PatternLearner > strengthens existing pattern on further examples [0.39ms]
+
+tests/performance.test.ts:
+Would save pipeline comprehensive_learning to database
+Would save pipeline pattern_feedback_cycle to database
+Would save pipeline daily_insights to database
+Would setup cron job for pipeline daily_insights with schedule: 0 9 * * *
+Would load additional pipelines from database
+Layer 1 failed: CoreError: Layer layer1 timed out after 1600ms
+     layer: "layer1",
+ requestId: "b3b26b1c-eecb-4fa4-a146-418f6a9219fd",
+   details: undefined,
+      code: "LAYER_TIMEOUT"
+
+      at new CoreError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:412:5)
+      at new LayerTimeoutError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:419:5)
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/core/layer-manager.ts:312:18)
+
+Layer 1 failed: CoreError: Layer layer1 timed out after 1600ms
+     layer: "layer1",
+ requestId: "64e608ff-2e26-4169-8d07-c4c371d4d6e5",
+   details: undefined,
+      code: "LAYER_TIMEOUT"
+
+      at new CoreError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:412:5)
+      at new LayerTimeoutError (/home/lightningralf/programming/ontology-lsp/src/core/types.ts:419:5)
+      at <anonymous> (/home/lightningralf/programming/ontology-lsp/src/core/layer-manager.ts:312:18)
+
+error: Test "Layer 1 (Fast Search) should meet 50ms target" timed out after 5020ms (killed 4 dangling processes)
+(fail) Performance Benchmarks > Individual Layer Performance > Layer 1 (Fast Search) should meet 50ms target [5020.50ms]
+Ran 69 tests across 8 files. [26.38s]
+Bailed out after 1 failure
