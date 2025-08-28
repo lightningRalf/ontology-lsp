@@ -180,13 +180,24 @@ const consistencyTestData = {
 };
 
 // Utility functions for result comparison
+const parseMcpTextPayload = (mcpResult: any): any => {
+  try {
+    const item = Array.isArray(mcpResult?.content) ? mcpResult.content.find((c: any) => typeof c?.text === 'string') : null;
+    if (!item || typeof item.text !== 'string') return null;
+    return JSON.parse(item.text);
+  } catch {
+    return null;
+  }
+};
+
 const normalizeDefinitionResult = (result: any, source: string) => {
   if (source === 'core') {
     return result.data || [];
   } else if (source === 'lsp') {
     return Array.isArray(result) ? result : [];
   } else if (source === 'mcp') {
-    return result.content || [];
+    const parsed = parseMcpTextPayload(result);
+    return parsed?.definitions || [];
   } else if (source === 'http') {
     return result.data || [];
   } else if (source === 'cli') {
@@ -201,7 +212,8 @@ const normalizeReferenceResult = (result: any, source: string) => {
   } else if (source === 'lsp') {
     return Array.isArray(result) ? result : [];
   } else if (source === 'mcp') {
-    return result.content || [];
+    const parsed = parseMcpTextPayload(result);
+    return parsed?.references || [];
   } else if (source === 'http') {
     return result.data || [];
   } else if (source === 'cli') {
