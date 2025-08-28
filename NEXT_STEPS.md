@@ -7,7 +7,7 @@
 See PROJECT_STATUS.md for achievements and historical context. -->
 
 
-## 🚀 Next Development Priorities (Updated 2025-08-27)
+## 🚀 Next Development Priorities (Updated 2025-08-28)
 
 ### 1. Execute Production Deployment ✅ DEPLOYMENT-READY  
 **Status**: All preparation complete, ready for immediate execution
@@ -82,11 +82,8 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 - **Perf Benchmarks**: Tune Layer 1 budget/timeouts in perf tests or mock FS for determinism
 - **Budgets**: Lock performance budgets; guardrail on >20% regressions
 - **Fixtures**: Add synthetic large-tree fixture for race tests (deterministic)
- - **Unified Core Validation**: Ensure `CodeAnalyzer.findDefinition` rejects invalid requests (empty identifier/URI). Repro: `bun test tests/unified-core.test.ts --timeout 120000` (fails "should handle invalid requests gracefully").
- - **Smart Escalation Integration**: Fix `tests/smart-escalation.test.ts` to disable learning or provide in-memory DB in `createMockAnalyzer` (current failure: `LearningOrchestrator` missing `SharedServices.database`). Repro: `bun test tests/smart-escalation.test.ts`.
  - **Consistency Alignment**: Align MCP vs Core definition result normalization. Investigate `src/adapters/mcp-adapter.ts` vs `CodeAnalyzer.findDefinition`. Repro: `bun test tests/consistency.test.ts --timeout 180000`.
  - **Enhanced Search Caps**: Enforce result cap in async aggregator or adjust test threshold to configured cap. Repro: `bun test tests/enhanced-search-async.test.ts` (fails large result set efficiency).
- - **Bloom Filter Negatives**: Tighten negative query or assert only `exact` zero for negative path. Repro: `bun test tests/bloom-filter-fix.test.ts`.
  - **Layer 1 Timeouts**: Increase LS directory analysis timeout and Layer 1 budget in perf suite or gate by env. Repro: `bun test tests/performance.test.ts --timeout 300000`.
 
 ### 10. Release & CI/CD (New)

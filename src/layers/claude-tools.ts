@@ -348,38 +348,47 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             { name: 'suffix', pattern: `\\w*${escapedId}\\b`, timeout: 280, maxResults: 15, confidence: 0.93 }
         ];
 
-        const controllers = strategies.map(s => asyncSearchTools.searchCancellable({
-            pattern: s.pattern,
-            path: query.searchPath,
-            maxResults: s.maxResults,
-            timeout: s.timeout,
-            caseInsensitive: false,
-            fileType: this.getFileTypeForGrep(query.fileTypes),
-            excludePaths: this.getExcludeDirs()
+        // Keep strategy info with each controller for correct classification
+        const controllers = strategies.map(s => ({
+            s,
+            ctrl: asyncSearchTools.searchCancellable({
+                pattern: s.pattern,
+                path: query.searchPath,
+                maxResults: s.maxResults,
+                timeout: s.timeout,
+                caseInsensitive: false,
+                fileType: this.getFileTypeForGrep(query.fileTypes),
+                excludePaths: this.getExcludeDirs()
+            })
         }));
 
         const promise = new Promise<void>(async (resolve) => {
             // Collect first non-empty and cancel others
-            for (const ctrl of controllers) {
+            for (const { s, ctrl } of controllers) {
                 ctrl.promise.then(res => {
-                    if (res && res.length > 0 && matches.exact.length === 0) {
+                    if (res && res.length > 0 && matches.exact.length === 0 && matches.fuzzy.length === 0) {
                         const converted: Match[] = res.map(r => {
                             const cat = this.categorizeMatch(r.text, query.identifier);
-                            return { file: r.file, line: r.line || 1, column: r.column || 0, text: r.text, length: r.text.length, confidence: r.confidence, source: 'exact' as any, category: cat.category, categoryConfidence: cat.confidence };
+                            return { file: r.file, line: r.line || 1, column: r.column || 0, text: r.text, length: r.text.length, confidence: r.confidence, source: s.name as any, category: cat.category, categoryConfidence: cat.confidence };
                         });
-                        matches.exact.push(...converted);
+                        // Classify: only 'exact' strategy contributes to exact; others to fuzzy
+                        if (s.name === 'exact') {
+                            matches.exact.push(...converted);
+                        } else {
+                            matches.fuzzy.push(...converted);
+                        }
                         converted.forEach(m => matches.files.add(m.file));
                         // Cancel others
-                        controllers.forEach(c => c.cancel());
+                        controllers.forEach(c => c.ctrl.cancel());
                         resolve();
                     }
                 }).catch(() => {});
             }
             // Also resolve when all complete with empty results
-            Promise.allSettled(controllers.map(c => c.promise)).then(() => resolve());
+            Promise.allSettled(controllers.map(c => c.ctrl.promise)).then(() => resolve());
         });
 
-        const cancel = () => controllers.forEach(c => c.cancel());
+        const cancel = () => controllers.forEach(c => c.ctrl.cancel());
         return { promise, cancel, matches };
     }
 
@@ -961,6 +970,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             name: 'exact_match',
             params: {
                 pattern: `\\b${this.escapeRegex(query.identifier)}\\b`,
+                path: query.searchPath || '.',
                 output_mode: 'content',
                 '-n': true,
                 '-C': this.config.grep.contextLines,
@@ -975,6 +985,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
             name: 'case_insensitive',
             params: {
                 pattern: `\\b${this.escapeRegex(query.identifier)}\\b`,
+                path: query.searchPath || '.',
                 output_mode: 'content',
                 '-i': true,
                 '-n': true,
@@ -991,6 +1002,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 name: 'fuzzy_tokens',
                 params: {
                     pattern: tokens.join('.*'),
+                    path: query.searchPath || '.',
                     output_mode: 'content',
                     '-i': true,
                     '-n': true,
@@ -1008,6 +1020,7 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
                 name: `semantic_${variant.strategy}`,
                 params: {
                     pattern: variant.pattern,
+                    path: query.searchPath || '.',
                     output_mode: 'files_with_matches',
                     '-i': true,
                     type: this.getFileTypeForGrep(query.fileTypes),
@@ -1340,6 +1353,10 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
     
     private updateCache(key: string, result: EnhancedMatches): void {
         if (!this.config.caching.enabled) return;
+        // Do not cache negative results when bloomFilter is enabled; prefer bloom negative fast-path
+        if (this.config.optimization?.bloomFilter && result.exact.length === 0) {
+            return;
+        }
         
         if (this.cache.size >= this.config.caching.maxEntries) {
             // Remove oldest entry
@@ -1362,11 +1379,10 @@ export class ClaudeToolsLayer implements Layer<SearchQuery, EnhancedMatches> {
         
         // Update bloom filter with both positive and negative results
         if (this.config.optimization.bloomFilter) {
-            if (matches.exact.length > 0 || matches.fuzzy.length > 0) {
-                // Record positive result (we found something)
+            // Treat only true exact hits as positive; fuzzy/conceptual can be noisy
+            if (matches.exact.length > 0) {
                 this.bloomFilter.add(query.identifier + ':positive');
             } else {
-                // Record negative result (we searched but found nothing)
                 this.bloomFilter.add(query.identifier + ':negative');
             }
         }

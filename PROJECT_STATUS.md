@@ -35,14 +35,16 @@ The unified core architecture is fully implemented and operational with all crit
   - Layer 5 (Knowledge Propagation): 1.2ms response time (94% under target)
 
 ### Testing Infrastructure ✅
-- **Core tests**: 95%+ success rate VERIFIED (all functional suites passing)
+- **Across suites**: 257/267 passing (~96%) as of 2025-08-28
 - **Adapter tests**: 31/31 passing (100%)
 - **Unified core tests**: 23/23 passing (100%)
 - **Integration tests**: 9/9 passing (100%)
-- **Enhanced Search tests**: 15/15 passing (100%)
 - **Learning system tests**: 25/25 passing (100%)
-- **Consistency tests**: 9/9 passing (100%)
-- **Performance tests**: 13/13 passing (100%)
+- **Layer 1 Categorization**: 40/40 passing (100%)
+- **Smart Escalation (unit/integration)**: 26/26 and 25/25 passing (100%)
+- **Enhanced Search (async)**: 15/15 passing (100%)
+- **Consistency tests**: 6/9 passing (67%)
+- **Performance tests**: 7/13 passing (54%)
 
 ### Protocol Adapters ✅
 - **LSP Adapter**: Fully operational with stdio
@@ -110,7 +112,7 @@ ontology-lsp/
 
 ### 🧪 Test Suite Validation (Local Run)
 - Environment: Bun 1.2.20, Node v24.6.0
-- Summary: 254 pass, 38 fail across targeted suites (after fixes)
+- Summary: 257 pass, 10 fail across suites (latest run)
 - Logs: see `test-output.txt` (summary appended) and per-suite `*.out` files in repo root
 
 ### Results by Suite
@@ -124,8 +126,8 @@ ontology-lsp/
 - Smart Escalation (integration): 25/25 passing (added in-memory DB + cache stub in test)
 - Performance Benchmarks: 7/13 passing (timing budget flakiness on this host)
 - Cross‑Protocol Consistency: 6/9 passing
-- Enhanced Search (async): 14/15 passing
-- Bloom Filter Fix: 3/5 passing
+- Enhanced Search (async): 15/15 passing
+- Bloom Filter Fix: 5/5 passing
 - File URI Resolution: 9/9 passing
 
 ### Notable Failures and Likely Root Causes
@@ -134,7 +136,7 @@ ontology-lsp/
 - Consistency suite: MCP returns results while core returns none in some cases. Action: align normalization and search pathways between MCPAdapter and core; inspect `src/adapters/mcp-adapter.ts` vs `CodeAnalyzer.findDefinition` for default symbol handling.
 - [Fixed] Smart Escalation (integration): Provided in‑memory DB and cache stubs in `tests/smart-escalation.test.ts` to satisfy LearningOrchestrator init; added malformed-definition safeguard in `shouldEscalateToLayer2`.
 - Enhanced Search large result cap: resultCount 1126 > 1000 cap. Action: enforce cap in async aggregator or adjust test limit to configured cap.
-- Bloom filter negative path: negative queries still returned fuzzy matches. Action: tighten query in test or ensure negative-path filtering only asserts `exact` is 0.
+-- [Fixed] Bloom filter negative path: scope grep to query.path, prevent misclassification in fast-path, avoid caching negatives so bloom kicks in on repeat.
 
 ### Repro Commands
 - Unified core: `bun test tests/unified-core.test.ts --timeout 120000`
@@ -281,7 +283,7 @@ ontology-lsp/
 - **Layer 1 Categorization**: 40/40 tests passing (100%)
 - **Smart Escalation**: 26/26 tests passing (100%)
 - **Integration**: 9/9 tests passing (100%)
-- **Performance**: All benchmarks within target ranges
+- **Performance**: Most benchmarks within target; performance suite currently 7/13 passing (environment-sensitive budgets)
 
 **Production Readiness**: System now demonstrates true hybrid intelligence with:
 - Fast initial categorization (Layer 1)
@@ -347,7 +349,7 @@ ontology-lsp/
 
 ## 🎬 System Status
 
-The Ontology-LSP system is **100% PRODUCTION READY** with **HYBRID INTELLIGENCE COMPLETED**:
+The Ontology-LSP system has a **production-ready core** with **HYBRID INTELLIGENCE COMPLETED** (a few non-functional/perf tests outstanding):
 - **Understands** code at semantic level with real database-backed ontology
 - **Categorizes** search results intelligently with 15+ pattern recognition rules
 - **Optimizes** performance through smart layer escalation (30-40% reduction in deep analysis)
@@ -391,7 +393,7 @@ The system is now **100% feature-complete** and ready for production deployment.
 - ✅ **Smart categorization** with 15+ code pattern recognition rules
 - ✅ **Bloom filter optimization** eliminating search blocking issues
 - ✅ **Production deployment** fully verified and ready
-- ✅ **Comprehensive testing** with 100% pass rates across all test suites
+- ✅ **Comprehensive testing** with the majority of suites passing; remaining failures documented above
 
 ### Ready for Production
 The Ontology-LSP system is now a **complete, production-ready intelligent code analysis platform** that truly understands code at a semantic level while delivering exceptional performance through hybrid intelligence.
