@@ -741,7 +741,7 @@ export class AsyncEnhancedGrep {
         args.push('--no-heading');        // No file headers
         args.push('--line-number');       // Include line numbers
         args.push('--column');            // Include column numbers for precise ranges
-        args.push('--no-ignore-parent');  // Don't search parent .gitignore
+        // Respect .gitignore for performance; do not disable parent ignores
         
         // Smart exclusions (configured, not hardcoded)
         const defaultExcludes = [
@@ -778,6 +778,7 @@ export class AsyncEnhancedGrep {
 
         // Options
         if (options.caseInsensitive) args.push('-i');
+        args.push('-F'); // Fixed-string match for speed
         if (options.includeHidden) args.push('--hidden');
 
         // Pattern (already escaped if needed)
