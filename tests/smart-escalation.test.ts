@@ -28,7 +28,30 @@ function createMockAnalyzer(): CodeAnalyzer {
     cache: {
       get: mock(() => Promise.resolve(null)),
       set: mock(() => Promise.resolve()),
-      clear: mock(() => Promise.resolve())
+      clear: mock(() => Promise.resolve()),
+      has: mock(() => Promise.resolve(false)),
+      invalidatePattern: mock(() => Promise.resolve(0))
+    },
+    database: {
+      query: mock(async (sql: string) => {
+        if (typeof sql === 'string' && sql.includes('sqlite_master')) {
+          if (sql.includes('evolution_events')) return [{ name: 'evolution_events' }];
+          if (sql.includes('quality_metrics')) return [{ name: 'quality_metrics' }];
+          if (sql.includes('learning_feedback')) return [{ name: 'learning_feedback' }];
+          if (sql.includes('feedback_corrections')) return [{ name: 'feedback_corrections' }];
+          return [{ name: 'sqlite_master' }];
+        }
+        return [];
+      }),
+      execute: mock(async () => ({ changes: 1 })),
+      insertWithConstraintValidation: mock(async () => {}),
+      transaction: mock(async (fn: any) => {
+        await fn(async () => [], async () => {});
+      }),
+      transactionWithConstraintValidation: mock(async (fn: any) => {
+        await fn(async () => [], async () => {});
+      }),
+      close: mock(async () => {})
     },
     getDiagnostics: mock(() => ({}))
   } as unknown as SharedServices;

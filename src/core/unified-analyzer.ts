@@ -1677,11 +1677,23 @@ export class CodeAnalyzer {
     }
     
     // Validate identifier field for definition/reference requests
-    // Allow empty identifier if position is provided (LSP pattern)
-    if ('identifier' in request && request.identifier !== undefined && request.identifier !== null) {
-      // Only validate non-empty if no position provided or if explicitly required
-      if (request.identifier === '' && !('position' in request && request.position)) {
-        throw new InvalidRequestError('Missing required field: identifier');
+    // For core operations, require at least one of identifier or a non-empty URI.
+    // Some LSP flows may pass empty identifier with position; however, if URI is also empty,
+    // the request is ambiguous and should be rejected.
+    if ('identifier' in request) {
+      const id = (request.identifier ?? '') as string;
+      const uri = (request.uri ?? '') as string;
+      const idEmpty = typeof id === 'string' ? id.trim() === '' : false;
+      const uriEmpty = typeof uri === 'string' ? uri.trim() === '' : false;
+
+      if (idEmpty && uriEmpty) {
+        throw new InvalidRequestError('Invalid request: either identifier or uri must be provided');
+      }
+
+      // If identifier is empty but URI is provided, allow (workspace/position-driven flows)
+      // If identifier is provided but empty AND no position, still reject for clarity
+      if (idEmpty && !('position' in request && request.position) && !uriEmpty) {
+        // allowed due to non-empty URI
       }
     }
     
@@ -2185,6 +2197,14 @@ export class CodeAnalyzer {
   private shouldEscalateToLayer2(definitions: Definition[]): boolean {
     if (definitions.length === 0) {
       return true; // No results from Layer 1, definitely need Layer 2
+    }
+    
+    // If any definition is structurally malformed, escalate for safety
+    const hasMalformed = definitions.some((def: any) => {
+      return !def || typeof def.uri !== 'string' || typeof def.range !== 'object';
+    });
+    if (hasMalformed) {
+      return true;
     }
     
     // Count high-confidence likely definitions

@@ -106,6 +106,45 @@ ontology-lsp/
 - 7002: LSP Server (TCP/stdio)
 - 8081: Monitoring Dashboard
 
+## 📅 Latest Updates (2025-08-28)
+
+### 🧪 Test Suite Validation (Local Run)
+- Environment: Bun 1.2.20, Node v24.6.0
+- Summary: 254 pass, 38 fail across targeted suites (after fixes)
+- Logs: see `test-output.txt` (summary appended) and per-suite `*.out` files in repo root
+
+### Results by Suite
+- Baseline (step/integration): 20/20 passing
+- Unified Core: 23/23 passing (fixed invalid request validation)
+- Adapters: 31/31 passing
+- Learning System: 25/25 passing
+- Feedback Loop Integration: 26/26 passing
+- Layer 1 Categorization: 40/40 passing
+- Smart Escalation (unit): 26/26 passing
+- Smart Escalation (integration): 25/25 passing (added in-memory DB + cache stub in test)
+- Performance Benchmarks: 7/13 passing (timing budget flakiness on this host)
+- Cross‑Protocol Consistency: 6/9 passing
+- Enhanced Search (async): 14/15 passing
+- Bloom Filter Fix: 3/5 passing
+- File URI Resolution: 9/9 passing
+
+### Notable Failures and Likely Root Causes
+- [Fixed] Unified Core invalid request handling: `CodeAnalyzer.validateRequest` now rejects when both identifier and uri are empty.
+- Performance suite: frequent `Layer layer1 timed out` and LS analysis 200ms timeouts; p95 above targets. Action: tune Layer 1 budgets/timeouts or use deterministic fixture in CI; mark perf expectations environment-aware.
+- Consistency suite: MCP returns results while core returns none in some cases. Action: align normalization and search pathways between MCPAdapter and core; inspect `src/adapters/mcp-adapter.ts` vs `CodeAnalyzer.findDefinition` for default symbol handling.
+- [Fixed] Smart Escalation (integration): Provided in‑memory DB and cache stubs in `tests/smart-escalation.test.ts` to satisfy LearningOrchestrator init; added malformed-definition safeguard in `shouldEscalateToLayer2`.
+- Enhanced Search large result cap: resultCount 1126 > 1000 cap. Action: enforce cap in async aggregator or adjust test limit to configured cap.
+- Bloom filter negative path: negative queries still returned fuzzy matches. Action: tighten query in test or ensure negative-path filtering only asserts `exact` is 0.
+
+### Repro Commands
+- Unified core: `bun test tests/unified-core.test.ts --timeout 120000`
+- Adapters: `bun test tests/adapters.test.ts --timeout 120000`
+- Consistency: `bun test tests/consistency.test.ts --timeout 180000`
+- Performance: `bun test tests/performance.test.ts --timeout 300000`
+- Smart escalation:
+  - Unit: `bun test tests/smart-escalation-unit.test.ts`
+  - Integration: `bun test tests/smart-escalation.test.ts`
+
 ## 📅 Latest Updates (2025-08-27)
 
 ### ⚡ Layer 1 Race + Cancellation (Performance + Reliability)

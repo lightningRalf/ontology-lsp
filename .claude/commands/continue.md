@@ -56,6 +56,37 @@ At the end of the session:
 - Use `just dev` to start servers, `just logs` to check logs
 - Use `just stop` before cleaning up database files
 
+## Test Suite Validation
+Use this validation flow before marking any task as completed. For significant changes (core, adapters, performance), run the full validation.
+
+### Baseline (per task)
+- Run `just check` to format, lint, typecheck, and run unit tests.
+- Run core tests: `just test` (covers step tests and integration basics).
+- Capture logs: `bun test --bail=1 > test-output.txt 2>&1` (attach failures to PROJECT_STATUS.md).
+
+### Full Validation (major changes)
+- All tests: `just test-all` (includes comprehensive integration and extension tests).
+- Vision compliance: `just test-vision-compliance` (validates VISION.md guarantees).
+- Optional E2E: `just test-e2e-local` (runs end-to-end scenarios locally).
+
+### Targeted Repro (fast feedback)
+- Stop at first failure: `bun test --bail=1`.
+- Single suite: `bun test tests/unified-core.test.ts`.
+- Performance: `bun test tests/performance.test.ts --timeout 180000`.
+- File-URI: `bun test tests/file-uri-resolution.test.ts --bail=1`.
+
+### Artifacts
+- Full logs: `test-output.txt` (latest run; referenced in PROJECT_STATUS.md and NEXT_STEPS.md).
+- JUnit (optional/CI): `bun test --reporter=junit --reporter-outfile report.xml`.
+
+### Acceptance Criteria
+- Baseline: No failing tests in `just test` and `just check`.
+- Full validation (when required): `just test-all` passes, or any failure is documented with reproduction steps and tracked in NEXT_STEPS.md under “Test Suite Stabilization”.
+- Flaky performance benchmarks: acceptable with note; rerun up to 2x. If still flaky, add an action in NEXT_STEPS.md to tune Layer 1 budgets or use deterministic fixtures.
+- Update docs on every run:
+  - PROJECT_STATUS.md: summarize pass/fail counts and notable changes; link `test-output.txt`.
+  - NEXT_STEPS.md: add any failures with exact command, failing test name, and error snippet.
+
 ## Execution Example
 When executing tasks, use the Task tool like this:
 
