@@ -447,3 +447,18 @@ The Ontology-LSP system is now a **complete, production-ready intelligent code a
 For detailed implementation history, see git commit history.
 - Async‑first refactor finalized: legacy sequential fallbacks removed from core; LayerManager cascade removed
 - CLI defaults now use `file://workspace` for consistent scope across adapters
+### Implementation Plan Published
+- New document: `IMPLEMENTATION_PLAN_LAYER3_SYMBOL_MAP.md`
+  - Adds Layer 3 (Symbol Map + Rename Planner) plan and a universal tool registry alignment.
+  - Describes adapter wiring (MCP/HTTP/CLI/LSP), data shapes, tests, telemetry, rollout and docs updates.
+
+### Layer Renumbering
+- Logical layers are now:
+  - Layer 1: Fast Search
+  - Layer 2: AST Analysis
+  - Layer 3: Symbol Map + Rename Planner (new)
+  - Layer 4: Ontology/Semantic Graph (was Layer 3)
+  - Layer 5: Pattern Mining/Learning (was Layer 4)
+  - Layer 6: Knowledge Propagation (was Layer 5)
+
+Metrics will include both logical names and stable keys during the transition.

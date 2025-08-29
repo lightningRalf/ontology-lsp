@@ -218,6 +218,54 @@ performance:
 search:
   fuzzy:
     editDistanceThreshold: 3
+
+### Tools Preferences
+
+Optional tooling preferences improve developer experience without changing server behavior when unavailable.
+
+- File discovery: set `performance.tools.fileDiscovery.prefer` to:
+  - `auto` (default): prefer `fd` if available; fallback to `rg --files`.
+  - `rg`: always use `rg --files` (respects .gitignore).
+  - `fd`: use `fd` for listing files (Git-aware by default).
+
+- CLI tree view: set `performance.tools.tree.prefer` to:
+  - `auto` (default): prefer `eza -T` if available; fallback to `tree`; else minimal listing.
+  - `eza` | `tree` | `none`.
+
+Examples:
+
+```yaml
+performance:
+  tools:
+    fileDiscovery:
+      prefer: auto   # or 'fd' | 'rg'
+    tree:
+      prefer: auto   # or 'eza' | 'tree' | 'none'
+```
+
+CLI example using tree view:
+
+```bash
+ontology-lsp explore parseFile --file src --summary --tree --tree-depth 3
+```
+
+### Environment Overrides (Escalation/AST)
+
+The following environment variables allow quick tuning without code changes:
+
+- `ESCALATION_L2_BUDGET_MS`: Layer 2 (AST) budget in milliseconds (e.g., `150` or `200`).
+- `ESCALATION_L1_CONFIDENCE_THRESHOLD`: Raise Layer 1 top‑confidence threshold to trigger AST (e.g., `0.8`).
+- `ESCALATION_L1_AMBIGUITY_MAX_FILES`: Trip AST sooner when many files match (e.g., `3`).
+- `ESCALATION_L1_REQUIRE_FILENAME_MATCH`: `1|true` to escalate when top file basenames don’t include the identifier.
+
+Examples:
+
+```bash
+export ESCALATION_L2_BUDGET_MS=150
+export ESCALATION_L1_CONFIDENCE_THRESHOLD=0.8
+export ESCALATION_L1_AMBIGUITY_MAX_FILES=3
+export ESCALATION_L1_REQUIRE_FILENAME_MATCH=1
+```
     tokenOverlapThreshold: 0.5
     semanticSimilarityThreshold: 0.7
   

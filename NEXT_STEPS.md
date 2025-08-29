@@ -161,6 +161,16 @@ Timestamp: 2025-08-28T05:29:31Z
 ### 12. Cleanup (New)
 - **Legacy Shims Removal**: After a stability period, remove compatibility shims for `claude-tools` imports and types; consolidate references to `layer1-fast-search`.
 
+### 13. Layer 3 (Symbol Map + Rename Planner) & Tool Registry (New)
+- Create universal core tool registry (≥12 tools), adapters derive capabilities from it.
+- Implement Layer 3 (TS/JS) with shared parse cache (with Layer 2):
+  - Extraction: bindings/import/export/usages; scope-aware resolution.
+  - Planner: safe WorkspaceEdits (skip strings/comments/property keys by default); impact summary.
+- CodeAnalyzer: add `buildSymbolMap`, `planRename`, `applyRename` with progress events.
+- MCP/HTTP/CLI/LSP wiring: add plan/apply rename tools/endpoints/commands; LSP uses planner for prepareRename/rename.
+- Tests: unit + integration + bounded perf; Telemetry: semantic-pass events.
+- Docs: update README/API_SPECIFICATION/ADAPTER_ARCHITECTURE/VISION; status sections.
+
 ## 📊 Technical Debt to Address
 
 ### Testing Improvements
