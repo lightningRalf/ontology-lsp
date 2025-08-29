@@ -135,6 +135,26 @@ suite('Language Client Integration Test Suite', () => {
             await client.sendRequest('ontology/import', { data: exportedData });
         });
     });
+
+    test('Should handle symbol/buildSymbolMap request', async () => {
+        const res = await client.sendRequest('symbol/buildSymbolMap', {
+            symbol: 'testSymbol',
+            maxFiles: 5,
+            astOnly: true
+        } as any);
+        // Shape can vary; ensure no error and object-like
+        assert.ok(res !== undefined);
+    });
+
+    test('Should handle refactor/planRename request', async () => {
+        const res = await client.sendRequest('refactor/planRename', {
+            oldName: 'oldName',
+            newName: 'newName'
+        } as any);
+        assert.ok(res !== undefined);
+        const summary = (res as any).summary;
+        assert.ok(summary === undefined || (typeof summary.filesAffected === 'number'));
+    });
     
     test('Should handle cache operations', async () => {
         // Clear cache should not throw

@@ -1,4 +1,4 @@
-# Implementation Plan — Layer 3 (Symbol Map + Rename Planner) and Universal Tool Registry
+# [ARCHIVED] Implementation Plan — Layer 3 (Symbol Map + Rename Planner) and Universal Tool Registry
 
 Purpose: Capture everything needed to start from zero context and implement a targeted Symbol Map + Rename Planner (Layer 3) and a universal core tool registry, wired to all adapters (MCP/HTTP/LSP/CLI). This document is self-contained and serves as the kickoff plan.
 

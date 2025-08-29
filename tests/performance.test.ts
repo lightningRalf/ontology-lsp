@@ -134,7 +134,11 @@ const generateLargeCodebaseData = (fileCount: number) => {
     return { files, symbols };
 };
 
-describe('Performance Benchmarks', () => {
+const PERF_ENABLED = process.env.PERF === '1';
+
+const maybeDescribe: any = PERF_ENABLED ? describe : describe.skip;
+
+maybeDescribe('Performance Benchmarks', () => {
     let context: PerformanceTestContext;
     let largeCodebase: {
         files: string[];

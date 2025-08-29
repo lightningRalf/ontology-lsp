@@ -22,7 +22,7 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 - **Monitoring**: Enable production monitoring and alerting
 - **Load Testing**: Validate production performance under load
 
-**Verification Complete**: ✅ Builds, ✅ Health Endpoints, ✅ Performance, ✅ Docker Config, ✅ Hybrid Intelligence, ✅ Layer 3 Ontology
+**Verification Complete**: ✅ Builds, ✅ Health Endpoints, ✅ Performance, ✅ Docker Config, ✅ Hybrid Intelligence, ✅ Layer 4 Ontology
 **Ready**: System is 100% production ready with all major features implemented
 
 ### 2. Advanced Performance Optimization
@@ -48,6 +48,7 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 ### 2.3 Test Infrastructure Hygiene (New)
 - **Biome, not ESLint**: Remove stray ESLint directives in tests; use Biome comments if suppression is needed (or avoid suppression entirely). Validate via `bun run lint`.
 - **No stdout from LSP**: Keep LSP server logs on stderr to avoid stdio protocol contamination (done). Confirm Biome allows console in tests or adjust via Biome ignore comments if necessary.
+- **VS Code Integration Harness**: Ensure tests open a workspace folder before writing settings; guard client/server connection via `ONTOLOGY_TEST_WITH_SERVER=1` to avoid start/stop failures in headless CI; use minimal fixture workspace.
 
 ### 2.4 Smart Escalation v2 (New)
 - **Policy (Configurable)**: Add `core.performance.escalation.policy` = `auto | always | never` (default: `auto`).
@@ -157,19 +158,13 @@ Timestamp: 2025-08-28T05:29:31Z
 - **Troubleshooting**: Extend `docs/TROUBLESHOOTING.md` with common adapter errors
 - **OpenAPI**: Freeze and version the HTTP schemas; publish under `/openapi.json`
 - **Tools Preferences**: Document optional tooling prefs (`fd` file discovery; `eza -T` for tree in CLI only) and environment overrides (see above) in README with examples.
+- **VS Code Palette Labels**: Use “Symbol: Build Symbol Map” and “Refactor: Plan Rename (Preview)” (avoid “Ontology:” prefix).
+ - **Layer Numbering**: Normalize all docs to use the new L1–L6 mapping (Ontology now Layer 4; Planner now Layer 3).
 
 ### 12. Cleanup (New)
 - **Legacy Shims Removal**: After a stability period, remove compatibility shims for `claude-tools` imports and types; consolidate references to `layer1-fast-search`.
 
-### 13. Layer 3 (Symbol Map + Rename Planner) & Tool Registry (New)
-- Create universal core tool registry (≥12 tools), adapters derive capabilities from it.
-- Implement Layer 3 (TS/JS) with shared parse cache (with Layer 2):
-  - Extraction: bindings/import/export/usages; scope-aware resolution.
-  - Planner: safe WorkspaceEdits (skip strings/comments/property keys by default); impact summary.
-- CodeAnalyzer: add `buildSymbolMap`, `planRename`, `applyRename` with progress events.
-- MCP/HTTP/CLI/LSP wiring: add plan/apply rename tools/endpoints/commands; LSP uses planner for prepareRename/rename.
-- Tests: unit + integration + bounded perf; Telemetry: semantic-pass events.
-- Docs: update README/API_SPECIFICATION/ADAPTER_ARCHITECTURE/VISION; status sections.
+<!-- Completed Layer 3 (Symbol Map + Planner) work is tracked in PROJECT_STATUS.md; NEXT_STEPS omits completed items by design. -->
 
 ### 14. Native LS Interop (Type-Aware Providers) (New)
 - Define provider interface for type-aware servers (initial: tsserver):
@@ -201,6 +196,8 @@ Timestamp: 2025-08-28T05:29:31Z
   - `timeout 20s ./ontology-lsp find <Symbol> -n 50 -l 20 --json`
   - `timeout 20s ./ontology-lsp references <Symbol> -n 50 -l 20 --json`
   - `timeout 20s ./ontology-lsp explore <Symbol> -n 100 -l 10 --json`
+  - `timeout 20s ./ontology-lsp symbol-map <Symbol> --max-files 10 --json`
+  - `timeout 20s ./ontology-lsp plan-rename <Old> <New> --json`
 
 ## 🔧 Useful Commands
 

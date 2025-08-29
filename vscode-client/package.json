@@ -191,6 +191,16 @@
                 "command": "ontology.suggestRefactoring",
                 "title": "Suggest Refactorings",
                 "category": "Ontology"
+            },
+            {
+                "command": "ontology.buildSymbolMap",
+                "title": "Build Symbol Map",
+                "category": "Symbol"
+            },
+            {
+                "command": "ontology.planRename",
+                "title": "Plan Rename (Preview)",
+                "category": "Refactor"
             }
         ],
         "menus": {
@@ -204,12 +214,28 @@
                     "command": "ontology.trainPattern",
                     "when": "editorHasSelection",
                     "group": "1_modification"
+                },
+                {
+                    "command": "ontology.buildSymbolMap",
+                    "when": "editorTextFocus",
+                    "group": "2_navigation"
+                },
+                {
+                    "command": "ontology.planRename",
+                    "when": "editorTextFocus",
+                    "group": "2_navigation"
                 }
             ],
             "commandPalette": [
                 {
                     "command": "ontology.trainPattern",
                     "when": "editorHasSelection"
+                },
+                {
+                    "command": "ontology.buildSymbolMap"
+                },
+                {
+                    "command": "ontology.planRename"
                 }
             ]
         },
@@ -223,6 +249,16 @@
                 "command": "ontology.suggestRefactoring",
                 "key": "ctrl+shift+o r",
                 "mac": "cmd+shift+o r"
+            },
+            {
+                "command": "ontology.buildSymbolMap",
+                "key": "ctrl+shift+o s",
+                "mac": "cmd+shift+o s"
+            },
+            {
+                "command": "ontology.planRename",
+                "key": "ctrl+shift+o n",
+                "mac": "cmd+shift+o n"
             }
         ],
         "colors": [

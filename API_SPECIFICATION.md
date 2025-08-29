@@ -534,3 +534,88 @@ For existing implementations:
 5. **Run in parallel** during transition period
 
 This specification ensures all adapters speak the same language when communicating with the core, enabling true protocol independence.
+## HTTP Endpoints (Implemented)
+
+The HTTP adapter exposes the following REST endpoints under `/api/v1`:
+
+- POST `/definition` – Find definitions
+- POST `/references` – Find references
+- POST `/explore` – Aggregate definition + reference results
+- POST `/rename` – Execute rename (supports `dryRun` flag)
+- POST `/plan-rename` – Plan a rename (preview only; returns WorkspaceEdit and summary)
+- POST `/apply-rename` – Apply a previously planned rename (or execute directly)
+- POST `/symbol-map` – Build a targeted symbol map for a given identifier
+- POST `/completions` – Get completions
+
+Example: POST `/symbol-map`
+
+Request
+```
+{
+  "identifier": "parseFile",
+  "file": "file:///workspace/src",
+  "maxFiles": 10,
+  "astOnly": true
+}
+```
+
+Response
+```
+{
+  "success": true,
+  "data": {
+    "identifier": "parseFile",
+    "files": 3,
+    "declarations": [ { "uri": "file:///...", "range": {"start": {"line": 1,"character":2}, "end": {...}}, "kind": "function", "name": "parseFile" } ],
+    "references": [ { "uri": "file:///...", "range": {...}, "kind": "call", "name": "parseFile" } ],
+    "imports": [],
+    "exports": []
+  }
+}
+```
+
+Example: POST `/plan-rename`
+
+Request
+```
+{
+  "identifier": "parseFile",
+  "newName": "parseSourceFile",
+  "file": "file:///workspace"
+}
+```
+
+Response
+```
+{
+  "success": true,
+  "data": {
+    "changes": [ { "file": "file:///...", "edits": [ { "range": {"start": {"line":0,"character":10}, "end": {...}}, "newText": "parseSourceFile" } ] } ],
+    "summary": { "filesAffected": 2, "totalEdits": 5 },
+    "performance": { "layer1": 10, "layer2": 25, "total": 40 },
+    "requestId": "...",
+    "preview": true
+  }
+}
+```
+
+## MCP Tool Registry (Implemented)
+
+MCP tools are derived from a universal registry (`src/core/tools/registry.ts`). Core tools include:
+
+- `find_definition`, `find_references`, `explore_codebase`
+- `build_symbol_map`, `plan_rename`, `apply_rename`, `rename_symbol` (compat)
+- `get_completions`, `list_symbols`, `grep_content`, `list_files`
+- `diagnostics`, `pattern_stats`, `knowledge_insights`, `cache_controls`
+- `generate_tests` (stub)
+
+## LSP Custom Methods (Implemented)
+
+In addition to standard LSP methods, the LSP server handles:
+
+- `ontology/getStatistics`
+- `ontology/getConceptGraph`
+- `symbol/buildSymbolMap` – Params: `{ symbol: string, uri?: string, maxFiles?: number, astOnly?: boolean }`
+  - Result: `{ identifier, files, declarations, references, imports, exports }`
+- `refactor/planRename` – Params: `{ oldName: string, newName: string, uri?: string }`
+  - Result: `{ changes: Record<uri, TextEdit[]>, summary: { filesAffected, totalEdits } }`

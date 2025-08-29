@@ -200,6 +200,54 @@ export class CLIAdapter {
     }
 
     /**
+     * Handle plan-rename command (preview only)
+     */
+    async handlePlanRename(identifier: string, newName: string, options: { json?: boolean; limit?: number }): Promise<string> {
+        try {
+            const request = buildRenameRequest({
+                uri: normalizeUri('file://workspace'),
+                position: createPosition(0, 0),
+                identifier,
+                newName,
+                dryRun: true,
+            });
+
+            const result = await this.coreAnalyzer.rename(request);
+            const changes = Object.entries(result.data.changes || {});
+            const totalEdits = changes.reduce((acc, [, edits]) => acc + (edits as any[]).length, 0);
+
+            if ((options as any).json) {
+                return JSON.stringify(
+                    {
+                        preview: true,
+                        filesAffected: changes.length,
+                        totalEdits,
+                        changes: result.data.changes,
+                        performance: result.performance,
+                    },
+                    null,
+                    2
+                );
+            }
+
+            const output = [
+                this.formatHeader(`Plan: Rename '${identifier}' → '${newName}'`),
+                `Files: ${changes.length}, Edits: ${totalEdits}`,
+            ];
+            const shown = changes.slice(0, Math.min(changes.length, options.limit ?? 10));
+            for (const [uri, edits] of shown) {
+                output.push(`  ${uri} (${(edits as any[]).length} edits)`);
+            }
+            if (shown.length < changes.length) {
+                output.push(`  ... and ${changes.length - shown.length} more files`);
+            }
+            return output.join('\n');
+        } catch (error) {
+            return this.formatError(`Plan rename failed: ${handleAdapterError(error, 'cli')}`);
+        }
+    }
+
+    /**
      * Handle stats command
      */
     async handleStats(): Promise<string> {
@@ -314,6 +362,46 @@ export class CLIAdapter {
         }
     }
 
+    /**
+     * Handle symbol-map command
+     */
+    async handleSymbolMap(
+        identifier: string,
+        options: { file?: string; maxFiles?: number; json?: boolean }
+    ): Promise<string> {
+        try {
+            const res = await (this.coreAnalyzer as any).buildSymbolMap({
+                identifier,
+                uri: normalizeUri(options.file || 'file://workspace'),
+                maxFiles: Math.min(options.maxFiles ?? 10, 100),
+                astOnly: true,
+            });
+            if (options.json) return JSON.stringify(res, null, 2);
+
+            const lines: string[] = [];
+            lines.push(this.formatHeader(`Symbol Map: '${identifier}'`));
+            lines.push(`Files analyzed: ${res.files}`);
+            lines.push(`Declarations: ${res.declarations.length} | References: ${res.references.length}`);
+            const show = (arr: any[], label: string) => {
+                if (arr.length === 0) return;
+                lines.push(this.formatHeader(label));
+                for (const item of arr.slice(0, 10)) {
+                    lines.push(
+                        `  ${item.uri}:${item.range.start.line + 1}:${item.range.start.character + 1} ${
+                            item.kind || ''
+                        } ${item.name || ''}`
+                    );
+                }
+                if (arr.length > 10) lines.push(`  ... and ${arr.length - 10} more`);
+            };
+            show(res.declarations, 'Declarations');
+            show(res.references, 'References');
+            return lines.join('\n');
+        } catch (error) {
+            return this.formatError(`Symbol map failed: ${handleAdapterError(error, 'cli')}`);
+        }
+    }
+
     // ===== FORMATTING METHODS =====
 
     private formatHeader(text: string): string {
@@ -387,8 +475,22 @@ export class CLIAdapter {
                     result = await this.handleRename(args[1], args[2], options);
                     return { success: true, data: result };
 
+                case 'plan-rename':
+                    if (!args[1] || !args[2]) {
+                        return { success: false, message: 'Old name and new name required for plan-rename command' };
+                    }
+                    result = await this.handlePlanRename(args[1], args[2], options as any);
+                    return { success: true, data: result };
+
                 case 'stats':
                     result = await this.handleStats();
+                    return { success: true, data: result };
+
+                case 'symbol-map':
+                    if (!args[1]) {
+                        return { success: false, message: 'Identifier required for symbol-map command' };
+                    }
+                    result = await this.handleSymbolMap(args[1], options as any);
                     return { success: true, data: result };
 
                 default:
@@ -422,6 +524,11 @@ export class CLIAdapter {
                 options.verboseMode = true;
             } else if (arg === '--summary') {
                 options.summary = true;
+            } else if (arg === '--json') {
+                options.json = true;
+            } else if (arg === '--max-files' && i + 1 < args.length) {
+                options.maxFiles = parseInt(args[i + 1], 10);
+                i++;
             }
         }
 

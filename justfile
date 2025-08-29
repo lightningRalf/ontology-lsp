@@ -27,8 +27,10 @@ default:
     @echo "  just stats          - Show system statistics"
     @echo ""
     @echo "🔍 CLI Tools:"
-    @echo "  just find <symbol>  - Find symbol definitions"
-    @echo "  just references <symbol> - Find all references"
+    @echo "  just find <symbol>             - Find symbol definitions"
+    @echo "  just references <symbol>       - Find all references"
+    @echo "  just symbol-map <symbol>       - Symbol: build symbol map"
+    @echo "  just plan-rename <old> <new>   - Refactor: plan rename (preview)"
     @echo ""
     @echo "Run 'just --list' for complete command list"
 
@@ -262,6 +264,14 @@ rename old new:
 # Show system statistics and health
 cli-stats:
     @just cli stats
+
+# Build a targeted symbol map (Layer 3)
+symbol-map identifier:
+    @just cli symbol-map {{identifier}}
+
+# Plan a rename (preview) (Layer 3)
+plan-rename old new:
+    @just cli plan-rename {{old}} {{new}}
 
 # Initialize ontology LSP via CLI
 cli-init:

@@ -52,6 +52,7 @@ The main entry point that provides all core functionality:
 - `prepareRename()` - Validate rename operations
 - `rename()` - Execute rename with learning and propagation
 - `getCompletions()` - Intelligent completions
+- `buildSymbolMap()` - Layer 3 targeted symbol/declaration/reference map (TS/JS)
 
 ### 2. LayerManager (`layer-manager.ts`)
 Orchestrates the 5 performance layers:
@@ -311,3 +312,18 @@ The unified architecture provides extensive monitoring:
 - Optimization recommendations
 
 All metrics are available through the event bus and can be exported to external monitoring systems.
+## Tool Registry
+
+The universal tool registry (`src/core/tools/registry.ts`) declares a canonical list of capabilities. Adapters (MCP/HTTP/CLI) derive their public tools/endpoints from here, ensuring consistency.
+
+Highlights: `find_definition`, `find_references`, `explore_codebase`, `build_symbol_map`, `plan_rename`, `apply_rename`, `rename_symbol`, `get_completions`, `list_symbols`, `diagnostics`, `pattern_stats`, `knowledge_insights`, `cache_controls`, and more.
+
+## LSP Extensions
+
+The LSP server exposes additional custom requests:
+- `symbol/buildSymbolMap` – params: `{ symbol, uri?, maxFiles?, astOnly? }` → returns declarations/references.
+- `refactor/planRename` – params: `{ oldName, newName, uri? }` → returns a WorkspaceEdit preview and summary.
+
+## HTTP Endpoints
+
+Under `/api/v1`, the HTTP adapter exposes: `/definition`, `/references`, `/explore`, `/rename`, `/plan-rename`, `/apply-rename`, `/symbol-map`, `/completions`.

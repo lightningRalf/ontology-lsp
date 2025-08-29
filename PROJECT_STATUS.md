@@ -27,12 +27,13 @@ The unified core architecture is fully implemented and operational with all crit
 
 ### Unified Core System ✅
 - Protocol-agnostic `CodeAnalyzer` class
-- All 5 layers operational and optimized:
+- All layers operational and optimized (layer keys renumbered):
   - Layer 1 (Fast Search): 0.20ms response time (99.75% under target) 🚀
-  - Layer 2 (AST Analysis): 1.8ms response time (96.4% under target) 🚀  
-  - Layer 3 (Semantic Graph): 1.4ms response time (86% under target) ✅ **FULLY IMPLEMENTED**
-  - Layer 4 (Pattern Mining): 2.7ms response time (73% under target)
-  - Layer 5 (Knowledge Propagation): 1.2ms response time (94% under target)
+  - Layer 2 (AST Analysis): 1.8ms response time (96.4% under target) 🚀
+  - Layer 3 (Symbol Map + Rename Planner): integrated; used by LSP/HTTP/CLI
+  - Layer 4 (Ontology/Semantic Graph): 1.4ms response time (86% under target) ✅ **FULLY IMPLEMENTED**
+  - Layer 5 (Pattern Mining/Learning): 2.7ms response time (73% under target)
+  - Layer 6 (Knowledge Propagation): 1.2ms response time (94% under target)
 
 ### Testing Infrastructure ✅
 - **Across suites**: 257/267 passing (~96%) as of 2025-08-28
@@ -47,10 +48,17 @@ The unified core architecture is fully implemented and operational with all crit
 - **Performance tests**: 7/13 passing (54%)
 
 ### Protocol Adapters ✅
-- **LSP Adapter**: Fully operational with stdio
+- **LSP Adapter**: Fully operational with stdio; custom methods aligned to layers:
+  - `symbol/buildSymbolMap` (Layer 3)
+  - `refactor/planRename` (Layer 3)
 - **MCP Adapter**: Running on port 7001 with SSE
 - **HTTP Adapter**: Running on port 7000, all endpoints working
-- **CLI Adapter**: Architecture complete and ready
+- **CLI Adapter**: Commands exposed for Layer 3 features:
+  - `symbol-map <identifier>` (Symbol)
+  - `plan-rename <old> <new>` (Refactor)
+- **VS Code Extension**: Command Palette entries aligned with namespaces:
+  - “Symbol: Build Symbol Map”
+  - “Refactor: Plan Rename (Preview)”
 
 ### Learning System ✅
 - Pattern Detection: Persisting to database
@@ -133,8 +141,14 @@ ontology-lsp/
 - Explore supports `--tree` (default depth 3) for quick context; presentation‑only.
 
 ### Docs + Naming
-- Replaced remaining vendor‑specific terminology with neutral language (e.g., “MCP client”).
-- Updated examples and config keys (`layer1_fast` instead of `claude_tools`).
+- Layer 3 naming aligned across adapters:
+  - LSP: `symbol/buildSymbolMap`, `refactor/planRename`
+  - HTTP: `/symbol-map`, `/plan-rename`, `/apply-rename`
+  - CLI: `symbol-map`, `plan-rename`
+- Updated examples and config keys; documented tool registry.
+
+### Plans Archive
+- Moved `IMPLEMENTATION_PLAN_LAYER3_SYMBOL_MAP.md` to `docs/archive/` (completed).
 
 ## 📅 Latest Updates (2025-08-28)
 
@@ -287,7 +301,7 @@ ontology-lsp/
 - **Memory Efficiency**: Reduced AST parsing load by processing fewer irrelevant files
 - **Integration Tests**: 9/9 tests passing confirming Layer 1→2 handoff works correctly
 
-#### Layer 3 Ontology Engine Implementation ✅
+#### Ontology Engine Implementation (Layer 4) ✅
 - **Database Integration**: Replaced stub with real SQLite ontology queries
 - **Actual File Resolution**: Returns genuine file paths and line positions from indexed data
 - **Confidence Scoring**: Semantic matching confidence based on concept relationships
@@ -462,4 +476,4 @@ For detailed implementation history, see git commit history.
   - Layer 5: Pattern Mining/Learning (was Layer 4)
   - Layer 6: Knowledge Propagation (was Layer 5)
 
-Metrics will include both logical names and stable keys during the transition.
+Metrics and docs now reflect the new numbering; stable keys are retained in telemetry for continuity.

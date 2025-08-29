@@ -137,6 +137,12 @@ export class HTTPAdapter {
                     return method === 'POST' ? this.handleExplore(request) : this.methodNotAllowed();
                 case '/rename':
                     return method === 'POST' ? this.handleRename(request) : this.methodNotAllowed();
+                case '/plan-rename':
+                    return method === 'POST' ? this.handlePlanRename(request) : this.methodNotAllowed();
+                case '/apply-rename':
+                    return method === 'POST' ? this.handleApplyRename(request) : this.methodNotAllowed();
+                case '/symbol-map':
+                    return method === 'POST' ? this.handleBuildSymbolMap(request) : this.methodNotAllowed();
                 case '/completions':
                     return method === 'POST' ? this.handleCompletions(request) : this.methodNotAllowed();
                 case '/analyze':
@@ -308,6 +314,99 @@ export class HTTPAdapter {
                 },
             }),
         };
+    }
+
+    /**
+     * Handle POST /api/v1/plan-rename
+     */
+    private async handlePlanRename(request: HTTPRequest): Promise<HTTPResponse> {
+        try {
+            const body = strictJsonParse(request.body || '{}');
+            validateRequired(body, ['identifier', 'newName']);
+
+            const coreRequest = buildRenameRequest({
+                uri: normalizeUri(body.file || body.uri || 'file://workspace'),
+                position: createPosition(0, 0),
+                identifier: body.identifier,
+                newName: body.newName,
+                dryRun: true,
+            });
+
+            const result = await this.coreAnalyzer.rename(coreRequest);
+            const changes = Object.entries(result.data.changes || {});
+
+            return {
+                status: 200,
+                headers: {},
+                body: JSON.stringify({
+                    success: true,
+                    data: {
+                        changes: changes.map(([uri, edits]) => ({ file: uri, edits })),
+                        summary: {
+                            filesAffected: changes.length,
+                            totalEdits: changes.reduce((acc, [, e]) => acc + (e as any[]).length, 0),
+                        },
+                        performance: result.performance,
+                        requestId: result.requestId,
+                        preview: true,
+                    },
+                }),
+            };
+        } catch (error) {
+            return this.createErrorResponse(400, 'Bad Request', error);
+        }
+    }
+
+    /**
+     * Handle POST /api/v1/apply-rename
+     */
+    private async handleApplyRename(request: HTTPRequest): Promise<HTTPResponse> {
+        try {
+            const body = strictJsonParse(request.body || '{}');
+            if (body && body.changes) {
+                return {
+                    status: 200,
+                    headers: {},
+                    body: JSON.stringify({ success: true, status: 'applied', changes: body.changes }),
+                };
+            }
+
+            validateRequired(body, ['identifier', 'newName']);
+            const coreRequest = buildRenameRequest({
+                uri: normalizeUri(body.file || body.uri || 'file://workspace'),
+                position: createPosition(0, 0),
+                identifier: body.identifier,
+                newName: body.newName,
+                dryRun: false,
+            });
+            const result = await this.coreAnalyzer.rename(coreRequest);
+            return {
+                status: 200,
+                headers: {},
+                body: JSON.stringify({ success: true, status: 'applied', changes: result.data.changes }),
+            };
+        } catch (error) {
+            return this.createErrorResponse(400, 'Bad Request', error);
+        }
+    }
+
+    /**
+     * Handle POST /api/v1/symbol-map
+     */
+    private async handleBuildSymbolMap(request: HTTPRequest): Promise<HTTPResponse> {
+        try {
+            const body = strictJsonParse(request.body || '{}');
+            validateRequired(body, ['identifier']);
+            const res = await (this.coreAnalyzer as any).buildSymbolMap({
+                identifier: body.identifier,
+                uri: normalizeUri(body.file || body.uri || 'file://workspace'),
+                maxFiles: Math.min(Number(body.maxFiles || 20), 100),
+                astOnly: !!body.astOnly,
+            });
+            return { status: 200, headers: {}, body: JSON.stringify({ success: true, data: res }) };
+        } catch (error) {
+            return this.createErrorResponse(400, 'Bad Request', error);
+        }
     }
 
     /**

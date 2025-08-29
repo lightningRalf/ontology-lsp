@@ -517,6 +517,7 @@ export class AsyncEnhancedGrep {
 
                 const results: StreamingGrepResult[] = [];
 
+                let emitted = 0;
                 rl.on('line', (line) => {
                     if (cancelled) {
                         rl.close();
@@ -526,7 +527,12 @@ export class AsyncEnhancedGrep {
                     const result = this.parseLine(line, options);
                     if (result) {
                         results.push(result);
-                        emitter.emit('data', result);
+                        if (emitted === 0) {
+                            emitter.emit('data', result);
+                        } else {
+                            setTimeout(() => emitter.emit('data', result), 1);
+                        }
+                        emitted++;
                         matchesFound++;
 
                         // Check max results
@@ -918,6 +924,17 @@ export class AsyncEnhancedGrep {
         return new Promise((resolve, reject) => {
             const results: StreamingGrepResult[] = [];
             const stream = this.searchStream(options);
+            let settled = false;
+            let timer: NodeJS.Timeout | null = null;
+            if (options.timeout && options.timeout > 0) {
+                timer = setTimeout(() => {
+                    if (!settled) {
+                        settled = true;
+                        reject(new Error(`Operation timed out after ${options.timeout}ms`));
+                        try { stream.cancel(); } catch {}
+                    }
+                }, options.timeout);
+            }
 
             stream.on('data', (result) => {
                 results.push(result);
@@ -930,15 +947,27 @@ export class AsyncEnhancedGrep {
                     errorMessage.includes('no such file') ||
                     errorMessage.includes('(os error 2)') ||
                     errorMessage.includes('permission denied')) {
-                    resolve([]);
+                    if (!settled) {
+                        settled = true;
+                        if (timer) clearTimeout(timer);
+                        resolve([]);
+                    }
                     return;
                 }
                 
-                reject(error);
+                if (!settled) {
+                    settled = true;
+                    if (timer) clearTimeout(timer);
+                    reject(error);
+                }
             });
 
             stream.on('end', () => {
-                resolve(results);
+                if (!settled) {
+                    settled = true;
+                    if (timer) clearTimeout(timer);
+                    resolve(results);
+                }
             });
         });
     }

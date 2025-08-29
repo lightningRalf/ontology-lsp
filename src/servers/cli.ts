@@ -138,6 +138,26 @@ class CLI {
                 process.exit(0);
             });
 
+        // Symbol: Build Symbol Map (Layer 3)
+        this.program
+            .command('symbol-map <identifier>')
+            .description('Build a targeted symbol map (declarations/references/imports/exports)')
+            .option('-f, --file <path>', 'Optional file or directory context')
+            .option('--max-files <count>', 'Maximum files to analyze (default: 10)', '10')
+            .option('-j, --json', 'Output JSON')
+            .option('--no-color', 'Disable colored output')
+            .action(async (identifier, options) => {
+                await this.ensureInitialized(options);
+                const result = await this.cliAdapter.handleSymbolMap(identifier, {
+                    file: options.file,
+                    maxFiles: parseInt(options.maxFiles),
+                    json: !!options.json,
+                });
+                console.log(result);
+                await this.shutdown();
+                process.exit(0);
+            });
+
         // Rename command
         this.program
             .command('rename <identifier> <newName>')
@@ -149,6 +169,24 @@ class CLI {
                 await this.ensureInitialized(options);
                 const result = await this.cliAdapter.handleRename(identifier, newName, {
                     dryRun: options.dryRun !== false,
+                });
+                console.log(result);
+                await this.shutdown();
+                process.exit(0);
+            });
+
+        // Refactor: Plan Rename (preview only, Layer 3)
+        this.program
+            .command('plan-rename <identifier> <newName>')
+            .description('Plan a rename and preview WorkspaceEdit changes (does not apply)')
+            .option('-j, --json', 'Output JSON preview')
+            .option('-l, --limit <count>', 'Limit previewed files in human output', '10')
+            .option('--no-color', 'Disable colored output')
+            .action(async (identifier, newName, options) => {
+                await this.ensureInitialized(options);
+                const result = await this.cliAdapter.handlePlanRename(identifier, newName, {
+                    json: !!options.json,
+                    limit: parseInt(options.limit),
                 });
                 console.log(result);
                 await this.shutdown();
@@ -372,6 +410,8 @@ build/
         console.log('\nYou can now use other commands like:');
         console.log('  ontology-lsp find <symbol>');
         console.log('  ontology-lsp references <symbol>');
+        console.log('  ontology-lsp symbol-map <symbol>');
+        console.log('  ontology-lsp plan-rename <old> <new>');
         console.log('  ontology-lsp stats');
     }
 

@@ -29,6 +29,9 @@ export class CommandManager {
         this.registerCommand('ontology.showGraph', this.showConceptGraph);
         this.registerCommand('ontology.showPatterns', this.showLearnedPatterns);
         this.registerCommand('ontology.showStats', this.showStatistics);
+        // Layer 3 targeted features
+        this.registerCommand('ontology.buildSymbolMap', this.buildSymbolMap);
+        this.registerCommand('ontology.planRename', this.planRenamePreview);
         
         // Management commands
         this.registerCommand('ontology.clearCache', this.clearCache);
@@ -190,6 +193,86 @@ export class CommandManager {
         }
         
         output.show();
+    }
+
+    private async buildSymbolMap(): Promise<void> {
+        if (!this.client) {
+            vscode.window.showErrorMessage('Language server not running');
+            return;
+        }
+        const editor = vscode.window.activeTextEditor;
+        const activeSymbol = editor ? this.extractWordAtPosition(editor) : undefined;
+        const symbol = await vscode.window.showInputBox({
+            prompt: 'Enter symbol to build symbol map for',
+            value: activeSymbol || ''
+        });
+        if (!symbol) return;
+        const uri = editor?.document.uri.toString();
+        const astOnlyPick = await vscode.window.showQuickPick(['Yes', 'No'], {
+            placeHolder: 'AST-only mode? (faster, more precise)'
+        });
+        const astOnly = astOnlyPick ? astOnlyPick === 'Yes' : true;
+        const maxFilesStr = await vscode.window.showInputBox({
+            prompt: 'Max files to analyze (default 10)',
+            value: '10'
+        });
+        const maxFiles = Number(maxFilesStr || '10');
+
+        try {
+            const res = await this.client.sendRequest('symbol/buildSymbolMap', {
+                symbol,
+                uri,
+                maxFiles,
+                astOnly
+            } as any);
+            const doc = await vscode.workspace.openTextDocument({
+                content: JSON.stringify(res, null, 2),
+                language: 'json'
+            });
+            await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
+        } catch (err: any) {
+            vscode.window.showErrorMessage(`Failed to build symbol map: ${err.message || err}`);
+        }
+    }
+
+    private async planRenamePreview(): Promise<void> {
+        if (!this.client) {
+            vscode.window.showErrorMessage('Language server not running');
+            return;
+        }
+        const editor = vscode.window.activeTextEditor;
+        const activeSymbol = editor ? this.extractWordAtPosition(editor) : undefined;
+        const oldName = await vscode.window.showInputBox({
+            prompt: 'Old symbol name',
+            value: activeSymbol || ''
+        });
+        if (!oldName) return;
+        const newName = await vscode.window.showInputBox({
+            prompt: `New name for "${oldName}"`,
+        });
+        if (!newName) return;
+        const uri = editor?.document.uri.toString();
+        try {
+            const res = await this.client.sendRequest('refactor/planRename', {
+                oldName,
+                newName,
+                uri
+            } as any);
+            const summary = (res as any)?.summary || { filesAffected: 0, totalEdits: 0 };
+            const doc = await vscode.workspace.openTextDocument({
+                content: `// Plan Rename Preview\n// ${oldName} -> ${newName}\n// Files affected: ${summary.filesAffected}\n// Total edits: ${summary.totalEdits}\n\n${JSON.stringify(res, null, 2)}\n`,
+                language: 'json'
+            });
+            await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
+        } catch (err: any) {
+            vscode.window.showErrorMessage(`Failed to plan rename: ${err.message || err}`);
+        }
+    }
+
+    private extractWordAtPosition(editor: vscode.TextEditor): string | undefined {
+        const pos = editor.selection.active;
+        const range = editor.document.getWordRangeAtPosition(pos);
+        return range ? editor.document.getText(range) : undefined;
     }
     
     private async clearCache(): Promise<void> {

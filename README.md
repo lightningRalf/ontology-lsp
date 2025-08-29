@@ -249,6 +249,34 @@ CLI example using tree view:
 ontology-lsp explore parseFile --file src --summary --tree --tree-depth 3
 ```
 
+#### CLI Layer 3 (Symbol Map + Rename Planner)
+
+Build a targeted symbol map (declarations/references/imports/exports):
+
+```bash
+# JSON output for tooling
+ontology-lsp symbol-map MySymbol --max-files 10 --json
+
+# Pretty summary
+ontology-lsp symbol-map MySymbol --max-files 10
+
+# Justfile helpers
+just symbol-map MySymbol
+```
+
+Plan a rename (preview only; does not apply changes):
+
+```bash
+# JSON preview
+ontology-lsp plan-rename OldName NewName --json
+
+# Human-readable preview
+ontology-lsp plan-rename OldName NewName
+
+# Justfile helper
+just plan-rename OldName NewName
+```
+
 ### Environment Overrides (Escalation/AST)
 
 The following environment variables allow quick tuning without code changes:
@@ -388,6 +416,34 @@ Create `.vscode/settings.json`:
   "ontologyLSP.propagation.autoApply": false
 }
 ```
+
+#### Custom LSP Methods (Layer 3)
+- `symbol/buildSymbolMap`: Build a targeted map of declarations/references/imports/exports for a symbol.
+- `refactor/planRename`: Produce a preview WorkspaceEdit for safely renaming a symbol.
+
+Example (from an extension):
+```ts
+// Using the public Extension API
+const api = await vscode.extensions.getExtension('your.publisher.ontology-lsp')?.activate();
+const symbolMap = await api?.buildSymbolMap('MySymbol', { astOnly: true, maxFiles: 10 });
+const plan = await api?.planRename('OldName', 'NewName');
+```
+
+Direct LanguageClient usage:
+```ts
+await client.sendRequest('symbol/buildSymbolMap', { symbol: 'MySymbol', astOnly: true, maxFiles: 10 });
+await client.sendRequest('refactor/planRename', { oldName: 'OldName', newName: 'NewName' });
+```
+
+#### Performance Tuning (Env Overrides)
+Quick knobs for local/CI tuning (documented in NEXT_STEPS):
+- `ESCALATION_POLICY` = `auto|always|never`
+- `ESCALATION_L2_BUDGET_MS`
+- `ESCALATION_L1_CONFIDENCE_THRESHOLD`
+- `ESCALATION_L1_AMBIGUITY_MAX_FILES`
+- `ESCALATION_L1_REQUIRE_FILENAME_MATCH`
+
+These influence smart escalation between Layer 1/2/3 for precision and performance.
 
 ### MCP Integration
 The proxy integrates with MCP clients and tools:

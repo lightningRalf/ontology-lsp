@@ -106,6 +106,8 @@ Access via Command Palette (`Ctrl+Shift+P`):
 - `Ontology: Import Ontology` - Import ontology data
 - `Ontology: Train Pattern` - Train pattern from selection
 - `Ontology: Suggest Refactoring` - Get refactoring suggestions
+- `Symbol: Build Symbol Map` - Build targeted declarations/references map for a symbol
+- `Refactor: Plan Rename (Preview)` - Preview WorkspaceEdit for symbol rename
 
 ## Keyboard Shortcuts
 

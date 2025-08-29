@@ -21,10 +21,10 @@ import {
 } from 'vscode-languageserver/node';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { LSPAdapter } from '../adapters/lsp-adapter.js';
-import { createDefaultCoreConfig } from '../adapters/utils.js';
-import { createCodeAnalyzer } from '../core/index.js';
-import type { CodeAnalyzer } from '../core/unified-analyzer.js';
+  import { LSPAdapter } from '../adapters/lsp-adapter.js';
+  import { createDefaultCoreConfig } from '../adapters/utils.js';
+  import { createCodeAnalyzer } from '../core/index.js';
+  import type { CodeAnalyzer } from '../core/unified-analyzer.js';
 
 export class LSPServer {
     private connection = createConnection(ProposedFeatures.all);
@@ -134,7 +134,7 @@ export class LSPServer {
             return await this.lspAdapter.handleCompletion(params);
         });
 
-        // Custom ontology requests (lightweight stubs for integration tests)
+        // Custom requests (lightweight stubs for integration tests)
         const OntologyStatsRequest = new RequestType<{}, { ontology: any; patterns: any }, void>(
             'ontology/getStatistics'
         );
@@ -153,6 +153,42 @@ export class LSPServer {
                 nodes: [],
                 edges: [],
             };
+        });
+
+        // New: Build Symbol Map (Layer 3 targeted map)
+        const BuildSymbolMapRequest = new RequestType<
+            { symbol: string; uri?: string; maxFiles?: number; astOnly?: boolean },
+            { identifier: string; files: number; declarations: any[]; references: any[]; imports: any[]; exports: any[] },
+            void
+        >('symbol/buildSymbolMap');
+        this.connection.onRequest(BuildSymbolMapRequest, async (params) => {
+            const res = await (this.coreAnalyzer as any).buildSymbolMap({
+                identifier: params.symbol,
+                uri: params.uri,
+                maxFiles: params.maxFiles ?? 10,
+                astOnly: params.astOnly ?? true,
+            });
+            return res;
+        });
+
+        // New: Plan Rename (preview WorkspaceEdit)
+        const PlanRenameRequest = new RequestType<
+            { oldName: string; newName: string; uri?: string },
+            { changes: Record<string, any[]>; summary?: { filesAffected: number; totalEdits: number } },
+            void
+        >('refactor/planRename');
+        this.connection.onRequest(PlanRenameRequest, async (params) => {
+            const result = await this.coreAnalyzer.rename({
+                uri: params.uri || (this.coreAnalyzer as any)?.config?.workspaceRoot || 'file://workspace',
+                position: { line: 0, character: 0 },
+                identifier: params.oldName,
+                newName: params.newName,
+                dryRun: true,
+            } as any);
+            const changes = result.data.changes || {};
+            const files = Object.keys(changes).length;
+            const total = Object.values(changes).reduce((acc: number, arr: any) => acc + (arr as any[]).length, 0);
+            return { changes, summary: { filesAffected: files, totalEdits: total } } as any;
         });
 
         // Configuration changes

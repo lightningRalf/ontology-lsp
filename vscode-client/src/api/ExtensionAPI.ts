@@ -67,6 +67,16 @@ export interface OntologyAPI {
      * Import ontology data
      */
     importOntology(data: OntologyData): Promise<void>;
+
+    /**
+     * Build a targeted symbol map for a symbol (Layer 3)
+     */
+    buildSymbolMap(symbol: string, options?: { uri?: string; maxFiles?: number; astOnly?: boolean }): Promise<any>;
+
+    /**
+     * Plan a rename and return a preview WorkspaceEdit summary (Layer 3)
+     */
+    planRename(oldName: string, newName: string, uri?: string): Promise<any>;
 }
 
 export interface ConceptInfo {
@@ -283,6 +293,26 @@ export class ExtensionAPI implements OntologyAPI {
         }
         
         await this.client.sendRequest('ontology/import', { data });
+    }
+
+    async buildSymbolMap(symbol: string, options?: { uri?: string; maxFiles?: number; astOnly?: boolean }): Promise<any> {
+        if (!this.client) {
+            throw new Error('Language server not available');
+        }
+        const params = {
+            symbol,
+            uri: options?.uri,
+            maxFiles: options?.maxFiles ?? 10,
+            astOnly: options?.astOnly ?? true
+        } as any;
+        return await this.client.sendRequest('symbol/buildSymbolMap', params);
+    }
+
+    async planRename(oldName: string, newName: string, uri?: string): Promise<any> {
+        if (!this.client) {
+            throw new Error('Language server not available');
+        }
+        return await this.client.sendRequest('refactor/planRename', { oldName, newName, uri } as any);
     }
     
     private setupEventHandlers(): void {
