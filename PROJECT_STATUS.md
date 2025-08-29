@@ -451,6 +451,7 @@ For detailed implementation history, see git commit history.
 - New document: `IMPLEMENTATION_PLAN_LAYER3_SYMBOL_MAP.md`
   - Adds Layer 3 (Symbol Map + Rename Planner) plan and a universal tool registry alignment.
   - Describes adapter wiring (MCP/HTTP/CLI/LSP), data shapes, tests, telemetry, rollout and docs updates.
+  - Includes optional interop with native language servers (e.g., tsserver) for type‑aware disambiguation under strict budgets.
 
 ### Layer Renumbering
 - Logical layers are now:

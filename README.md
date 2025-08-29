@@ -266,6 +266,22 @@ export ESCALATION_L1_CONFIDENCE_THRESHOLD=0.8
 export ESCALATION_L1_AMBIGUITY_MAX_FILES=3
 export ESCALATION_L1_REQUIRE_FILENAME_MATCH=1
 ```
+
+### Language Server Interop (Optional)
+
+Layer 3 (Symbol Map + Rename Planner) can optionally consult native language servers (e.g., tsserver) to improve precision on complex cases.
+
+- Enable locally via environment:
+
+```bash
+export PROVIDERS_TS_ENABLE=1
+export PROVIDERS_TS_BUDGET_MS=120  # time budget for provider calls
+```
+
+- Behavior:
+  - Provider is strictly budgeted/cancellable; planner always produces a plan even without provider.
+  - Provider results are merged with AST findings with provenance. Our planner validates final edit ranges.
+  - Default in CI: provider disabled unless explicitly enabled.
     tokenOverlapThreshold: 0.5
     semanticSimilarityThreshold: 0.7
   

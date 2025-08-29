@@ -171,6 +171,14 @@ Timestamp: 2025-08-28T05:29:31Z
 - Tests: unit + integration + bounded perf; Telemetry: semantic-pass events.
 - Docs: update README/API_SPECIFICATION/ADAPTER_ARCHITECTURE/VISION; status sections.
 
+### 14. Native LS Interop (Type-Aware Providers) (New)
+- Define provider interface for type-aware servers (initial: tsserver):
+  - Methods: prepareRename, rename, findDefinition, findReferences; cancellable + timeouts.
+- Add provider manager with detection + config toggles: `PROVIDERS_TS_ENABLE`, `PROVIDERS_TS_BUDGET_MS`.
+- Integrate into Layer 3 planner as an optional refinement step under strict budgets; merge results with provenance.
+- Tests: ensure identical behavior when provider disabled; improved precision for complex TS rename when enabled.
+- Docs: README section on “Language Server Interop”; env variables; risks/mitigations.
+
 ## 📊 Technical Debt to Address
 
 ### Testing Improvements

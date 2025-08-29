@@ -41,6 +41,38 @@ Purpose: Capture everything needed to start from zero context and implement a ta
   - L4–L6 remain optional plug-ins with strict budgets/opt-in.
   - Prioritize deterministic, bounded behavior and stable outputs; document environment overrides.
 
+## Interop with Native Language Servers (Type-Aware Providers)
+
+We will optionally consult native language servers (e.g., tsserver) during Layer 3 planning for type‑aware disambiguation, without coupling core to any single provider.
+
+Design:
+- Provider interface (pluggable):
+  - `SymbolProvider` with methods like `prepareRename(uri, position)`, `rename(uri, position, newName)`, `findDefinition(uri, position)`, `findReferences(uri, position)`; all bounded with timeouts and cancellable.
+  - Minimal mapping layer converts provider responses into our SymbolMap inputs (locations/ranges) and confidence hints.
+- Detection & control:
+  - Detect tsserver availability (local process or language SDK).
+  - Config/env toggles: `PROVIDERS_TS_ENABLE=1`, budget `PROVIDERS_TS_BUDGET_MS`, and per‑call timeouts.
+  - Default: off in CI; opt‑in locally.
+- Flow in Layer 3:
+  - Build candidate set from L1/L2.
+  - If provider enabled and budget available, consult provider for the current file/position(s) to refine binding resolution.
+  - Merge provider hits into SymbolMap with provenance (provider vs AST), and prefer provider ranges when confidence is higher.
+- Budgets & cancellation:
+  - Hard timeouts; immediate cancellation if budget exceeded.
+  - Always produce a plan from our AST map even if provider is unavailable or times out.
+- Security/trust:
+  - Provider runs locally; no network calls.
+  - Inputs/outputs sanitized; never apply edits without our planner validating ranges.
+
+Benefits:
+- Higher precision on complex TypeScript rename cases (union types, overloads, inferred names).
+- Keeps our bounded, repo‑aware planner while leveraging native semantics when present.
+
+Risks/Mitigations:
+- Provider latency: strictly budgeted; fallback to AST map.
+- Divergence: provenance tracked; unit tests ensure identical behavior when provider is off.
+
+
 ## Goals (Deliverables)
 
 1) Layer 3 (Symbol Map + Rename Planner) for TS/JS
@@ -171,4 +203,3 @@ MCP exposes these as tools; HTTP as endpoints; CLI as commands; LSP uses standar
 - Week 1: Tool registry; Layer 3 skeleton; CodeAnalyzer APIs; unit tests.
 - Week 2: TS/JS extraction/resolve; planner; CLI command; integration tests.
 - Week 3: MCP/HTTP/LSP wiring; telemetry/metrics; docs; rollout.
-
