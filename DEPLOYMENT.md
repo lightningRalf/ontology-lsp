@@ -703,4 +703,4 @@ just configure-claude
 # Ask Claude: "What tools do you have available?"
 ```
 
-This deployment configuration provides everything needed to get the unified system running with the MCP adapter for Claude Code.
+This deployment configuration provides everything needed to get the unified system running with the MCP adapter for clients.

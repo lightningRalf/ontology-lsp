@@ -4,7 +4,7 @@
  * REAL Performance Comparison - No Mocks!
  *
  * Comparing:
- * 1. Claude's actual tools (as used by Claude Code)
+ * 1. External tools provided by IDE/agent integrations
  * 2. Our Enhanced tools
  * 3. Native ripgrep/glob/fs
  *
@@ -48,7 +48,7 @@ async function testGrepPerformance() {
         nativeTimes.push(time);
     }
 
-    // Claude's Grep (simulated via Claude Code CLI if available)
+    // External Grep (simulated via CLI if available)
     // Note: We can't directly call Claude's internal Grep from here,
     // but we know it uses ripgrep under the hood with some overhead
     const claudeEstimatedOverhead = 5; // ms for function call wrapper

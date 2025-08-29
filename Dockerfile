@@ -217,7 +217,7 @@ LABEL \
     org.opencontainers.image.title="Ontology-LSP" \
     org.opencontainers.image.description="Intelligent Programming Companion with MCP, LSP, and HTTP protocols" \
     org.opencontainers.image.version="2.0.0" \
-    org.opencontainers.image.vendor="Claude Code Enhanced" \
+    org.opencontainers.image.vendor="Ontology LSP" \
     org.opencontainers.image.licenses="MIT" \
     org.opencontainers.image.source="https://github.com/yourusername/ontology-lsp" \
     ontology.protocols="lsp,mcp,http" \

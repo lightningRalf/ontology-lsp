@@ -313,14 +313,14 @@ export interface Config {
 }
 
 export interface LayerConfig {
-    claude_tools: ClaudeToolsConfig;
+    layer1_fast: FastSearchConfig;
     tree_sitter: TreeSitterConfig;
     ontology: OntologyConfig;
     patterns: PatternLearningConfig;
     propagation: PropagationConfig;
 }
 
-export interface ClaudeToolsConfig {
+export interface FastSearchConfig {
     enabled: boolean;
     timeout: number;
     maxResults: number;

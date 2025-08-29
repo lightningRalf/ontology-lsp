@@ -43,9 +43,9 @@ dev:
     @echo "🔌 Adapters: MCP (7001), HTTP (7000), LSP (7002)"
     bun run --watch core/server.ts
 
-# Start only the MCP adapter (for Claude Code)
+# Start only the MCP adapter (for MCP clients)
 dev-mcp:
-    @echo "🤖 Starting MCP adapter for Claude Code..."
+    @echo "🤖 Starting MCP adapter for MCP clients..."
     bun run --watch adapters/mcp/index.ts
 
 # Start only the HTTP adapter (for CLI/Web)
@@ -193,7 +193,7 @@ start:
     @just start-http &
     @just start-lsp &
     @echo "✅ All servers running"
-    @echo "📍 MCP: localhost:7001 (Claude Code)"
+    @echo "📍 MCP: localhost:7001 (MCP)"
     @echo "📍 HTTP: localhost:7000 (API/CLI)"
     @echo "📍 LSP: localhost:7002 (VS Code)"
 

@@ -123,7 +123,7 @@ FALLBACK Native     # For cold cache scenarios
 
 ### Claude Integration
 ```bash
-# When working with Claude Code
+# When working with MCP clients
 USE Enhanced Tools  # Provide results to Claude
 CACHE Results      # For repeated Claude operations
 ```

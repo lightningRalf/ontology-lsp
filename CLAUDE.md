@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance for MCP-compatible coding assistants working with this repository.
 
 @.claude/docs/software-principles.md  
 @.claude/docs/tech-stack-ts.md
@@ -136,7 +136,7 @@ Configuration is managed in `mcp-ontology-server/src/config/server-config.ts`.
 ### Layered System (Performance-Optimized)
 The system uses a 5-layer architecture, each progressively more sophisticated:
 
-1. **Claude Tools Layer** (`src/layers/claude-tools.ts`)
+1. **Fast Search Layer (Layer 1)** (`src/layers/layer1-fast-search.ts`)
    - Fast initial search using Grep, Glob, LS tools
    - ~5ms response time
    - First line of defense for file/content searches

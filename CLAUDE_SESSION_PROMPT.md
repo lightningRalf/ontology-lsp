@@ -1,4 +1,4 @@
-# Claude Code Session Prompt
+# Session Prompt (MCP Clients)
 
 Copy and paste this at the start of each session:
 

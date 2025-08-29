@@ -15,7 +15,7 @@ import { createDefaultCoreConfig } from '../adapters/utils.js';
 import { getEnvironmentConfig, type ServerConfig } from '../core/config/server-config.js';
 import { createCodeAnalyzer } from '../core/index';
 import type { CodeAnalyzer } from '../core/unified-analyzer';
-import type { ClaudeToolsLayer } from '../layers/claude-tools.js';
+import type { FastSearchLayer } from '../layers/layer1-fast-search.js';
 import type { SearchQuery } from '../types/core.js';
 
 interface HTTPServerConfig {
@@ -223,7 +223,7 @@ export class HTTPServer {
         // Try to get the ClaudeToolsLayer for streaming
         const layerManager = (this.coreAnalyzer as any).layerManager;
         if (layerManager) {
-            const claudeLayer = layerManager.getLayer('layer1') as ClaudeToolsLayer;
+            const claudeLayer = layerManager.getLayer('layer1') as FastSearchLayer;
 
             if (claudeLayer && claudeLayer.streamSearch) {
                 const searchQuery: SearchQuery = {

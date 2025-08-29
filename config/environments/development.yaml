@@ -107,7 +107,7 @@ performance:
   
   # More relaxed targets for development
   layer_targets:
-    claude_tools: 10    # 2x production
+    layer1_fast: 10    # 2x production
     tree_sitter: 100    # 2x production
     ontology: 20        # 2x production
     patterns: 20        # 2x production

@@ -85,19 +85,12 @@ export class CLIAdapter {
                     2
                 );
             }
-            if (options.summary) {
-                const header = this.formatHeader(`Found ${result.data.length} definitions (showing ${items.length})`);
-                const top = items[0] ? `Top: ${formatDefinitionForCli(items[0])}` : 'Top: (none)';
-                return [header, top].join('\n');
+            if (options.summary || options.verbose) {
+                // For programmatic use, return structured items; CLI wrapper adds presentation
+                return items;
             }
-            // Always return formatted output unless --json or --summary is used
-            if (!options.verbose) {
-                const lines = [this.formatHeader(`Found ${result.data.length} definitions (showing ${items.length})`)];
-                for (const d of items) lines.push(`  ${formatDefinitionForCli(d)}`);
-                return lines.join('\n');
-            }
-            // Verbose: list all (capped by limit)
-            return items.map(formatDefinitionForCli).join('\n');
+            // Default for adapters/tests: structured items array
+            return items;
         } catch (error) {
             return this.formatError(`Find failed: ${handleAdapterError(error, 'cli')}`);
         }
@@ -148,18 +141,10 @@ export class CLIAdapter {
                     2
                 );
             }
-            // Always return formatted output unless --json or --summary is used
-            if (options.summary) {
-                const header = this.formatHeader(`Found ${result.data.length} references (showing ${items.length})`);
-                const top = items[0] ? `Top: ${formatReferenceForCli(items[0])}` : 'Top: (none)';
-                return [header, top].join('\n');
+            if (options.summary || options.verbose) {
+                return items;
             }
-            if (!options.verbose) {
-                const lines = [this.formatHeader(`Found ${result.data.length} references (showing ${items.length})`)];
-                for (const r of items) lines.push(`  ${formatReferenceForCli(r)}`);
-                return lines.join('\n');
-            }
-            return items.map(formatReferenceForCli).join('\n');
+            return items;
         } catch (error) {
             return this.formatError(`References search failed: ${handleAdapterError(error, 'cli')}`);
         }

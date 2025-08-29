@@ -45,7 +45,7 @@ src/
 │   ├── http-adapter.ts
 │   └── cli-adapter.ts
 ├── layers/                 # The ONLY layer implementations
-│   ├── claude-tools.ts
+│   ├── layer1-fast-search.ts
 │   └── tree-sitter.ts
 └── servers/               # ALL server entry points (organized)
     ├── lsp.ts            # LSP server

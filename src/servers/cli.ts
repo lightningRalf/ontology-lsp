@@ -17,6 +17,7 @@ process.env.STDIO_MODE = 'true';
 
 import { Command } from 'commander';
 import * as fs from 'fs';
+import { spawnSync } from 'child_process';
 // Note: defer heavy imports (tree-sitter, analyzer, adapter) to runtime.
 // This keeps `--help` and `init` working even if native deps are unavailable.
 import * as path from 'path';
@@ -26,6 +27,10 @@ class CLI {
     private coreAnalyzer!: any;
     private cliAdapter!: any;
     private initialized = false;
+    private coreConfig: any;
+    private workspaceRoot: string = process.cwd();
+    private fmtDef?: (d: any) => string;
+    private fmtRef?: (r: any) => string;
 
     constructor() {
         this.program = new Command();
@@ -61,7 +66,24 @@ class CLI {
                     json: !!options.json,
                     verbose: !!options.verbose,
                 });
-                console.log(result);
+                if (typeof result === 'string' || options.json) {
+                    console.log(result);
+                } else if (Array.isArray(result)) {
+                    const items = result as any[];
+                    if (options.summary) {
+                        const header = this.formatHeader(`Found ${items.length} definitions (showing ${items.length})`);
+                        const top = items[0] ? `Top: ${this.fmtDef ? this.fmtDef(items[0]) : JSON.stringify(items[0])}` : 'Top: (none)';
+                        console.log([header, top].join('\n'));
+                    } else {
+                        const lines: string[] = [
+                            this.formatHeader(`Found ${items.length} definitions (showing ${items.length})`),
+                        ];
+                        for (const d of items) lines.push(`  ${this.fmtDef ? this.fmtDef(d) : JSON.stringify(d)}`);
+                        console.log(lines.join('\n'));
+                    }
+                } else {
+                    console.log(result);
+                }
                 await this.shutdown();
                 process.exit(0);
             });
@@ -94,7 +116,24 @@ class CLI {
                     json: !!options.json,
                     verbose: !!options.verbose,
                 });
-                console.log(result);
+                if (typeof result === 'string' || options.json) {
+                    console.log(result);
+                } else if (Array.isArray(result)) {
+                    const items = result as any[];
+                    if (options.summary) {
+                        const header = this.formatHeader(`Found ${items.length} references (showing ${items.length})`);
+                        const top = items[0] ? `Top: ${this.fmtRef ? this.fmtRef(items[0]) : JSON.stringify(items[0])}` : 'Top: (none)';
+                        console.log([header, top].join('\n'));
+                    } else {
+                        const lines: string[] = [
+                            this.formatHeader(`Found ${items.length} references (showing ${items.length})`),
+                        ];
+                        for (const r of items) lines.push(`  ${this.fmtRef ? this.fmtRef(r) : JSON.stringify(r)}`);
+                        console.log(lines.join('\n'));
+                    }
+                } else {
+                    console.log(result);
+                }
                 await this.shutdown();
                 process.exit(0);
             });
@@ -140,11 +179,13 @@ class CLI {
             .option('-d, --include-declaration', 'Include declaration in references')
             .option('-s, --summary', 'Show summary output only')
             .option('--precise', 'Run a quick AST validation pass')
+            .option('--tree', 'Append a directory tree view (CLI only)')
+            .option('--tree-depth <n>', 'Tree depth for --tree (default: 3)', '3')
             .option('-j, --json', 'Output JSON')
             .option('--no-color', 'Disable colored output')
             .action(async (identifier, options) => {
                 await this.ensureInitialized(options);
-                const result = await this.cliAdapter.handleExplore(identifier, {
+                let output = await this.cliAdapter.handleExplore(identifier, {
                     file: options.file,
                     maxResults: parseInt(options.maxResults),
                     includeDeclaration: !!options.includeDeclaration,
@@ -154,7 +195,15 @@ class CLI {
                     json: !!options.json,
                     verbose: !!options.verbose,
                 });
-                console.log(result);
+                if (options.tree && !options.json) {
+                    const target = options.file ? options.file : this.workspaceRoot;
+                    const depth = parseInt(options.treeDepth) || 2;
+                    const tree = this.renderTree(target, depth);
+                    if (tree) {
+                        output += `\n\n` + tree;
+                    }
+                }
+                console.log(output);
                 await this.shutdown();
                 process.exit(0);
             });
@@ -176,7 +225,7 @@ class CLI {
 
         try {
             // Lazy import heavy modules only when needed
-            const [{ createDefaultCoreConfig }, { createCodeAnalyzer }, { CLIAdapter }] = await Promise.all([
+            const [{ createDefaultCoreConfig, formatDefinitionForCli, formatReferenceForCli }, { createCodeAnalyzer }, { CLIAdapter }] = await Promise.all([
                 import('../adapters/utils.js'),
                 import('../core/index.js'),
                 import('../adapters/cli-adapter.js'),
@@ -200,10 +249,55 @@ class CLI {
                 timeout: 30000,
             });
 
+            this.coreConfig = config;
+            this.workspaceRoot = workspaceRoot;
+            this.fmtDef = formatDefinitionForCli as any;
+            this.fmtRef = formatReferenceForCli as any;
             this.initialized = true;
         } catch (error) {
             console.error(`Failed to initialize: ${error instanceof Error ? error.message : String(error)}`);
             process.exit(1);
+        }
+    }
+
+    private formatHeader(text: string): string {
+        return `\x1b[1m\x1b[36m${text}\x1b[0m`;
+    }
+
+    private hasCommand(cmd: string): boolean {
+        const res = spawnSync('bash', ['-lc', `command -v ${cmd}`], { stdio: 'pipe' });
+        return res.status === 0;
+    }
+
+    private renderTree(pathStr: string, depth: number): string {
+        try {
+            const prefer = this.coreConfig?.performance?.tools?.tree?.prefer || 'auto';
+            const inGitRepo = fs.existsSync(`${this.workspaceRoot}/.git`);
+            const safeDepth = Math.max(1, Math.min(depth, 5));
+            // eza preferred
+            if (prefer !== 'none' && (prefer === 'eza' || (prefer === 'auto' && this.hasCommand('eza')))) {
+                const args = ['-T', '-L', String(safeDepth), pathStr];
+                if (inGitRepo) args.splice(1, 0, '--git-ignore');
+                const r = spawnSync('eza', args, { encoding: 'utf8' });
+                if (r.status === 0 && r.stdout) {
+                    return ['Tree (eza):', r.stdout.trim()].join('\n');
+                }
+            }
+            // tree fallback
+            if (prefer !== 'none' && (prefer === 'tree' || (prefer === 'auto' && this.hasCommand('tree')))) {
+                const ignore = 'node_modules|dist|.git|coverage|out|build|logs';
+                const r = spawnSync('tree', ['-L', String(safeDepth), '-I', ignore, pathStr], { encoding: 'utf8' });
+                if (r.status === 0 && r.stdout) {
+                    return ['Tree (tree):', r.stdout.trim()].join('\n');
+                }
+            }
+            // Minimal fallback
+            const entries = fs.readdirSync(pathStr, { withFileTypes: true }).slice(0, 50);
+            const lines = ['Tree (fallback):', pathStr];
+            for (const e of entries) lines.push(`  ${e.isDirectory() ? '📁' : '📄'} ${e.name}`);
+            return lines.join('\n');
+        } catch {
+            return '';
         }
     }
 

@@ -26,7 +26,7 @@
 
 ### 🌐 **Multi-Protocol Support**
 - **LSP Protocol**: Full VS Code and IDE integration (stdio/TCP on port 7002)
-- **MCP Protocol**: Claude Code integration with Streamable HTTP (port 7001)
+- **MCP Protocol**: MCP-compatible client integration with Streamable HTTP (port 7001)
 - **HTTP API**: REST endpoints for web applications and CI/CD (port 7000)
 - **CLI Tool**: Terminal interface with comprehensive command set
 - **Web UI Dashboard**: Real-time monitoring and pattern visualization (port 8080)
@@ -48,7 +48,7 @@
 ┌─────────────────────────────┐
 │   ONTOLOGY LSP PROXY        │
 │ ┌─────────────────────────┐ │
-│ │ Layer 1: Claude Tools   │ │ ← Grep, Glob, LS (5ms)
+│ │ Layer 1: Fast Search    │ │ ← Grep, Glob, LS (5ms)
 │ │ Layer 2: Tree-sitter    │ │ ← AST Analysis (50ms)
 │ │ Layer 3: Ontology       │ │ ← Concept Management (10ms)
 │ │ Layer 4: Patterns       │ │ ← Learning & Prediction (10ms)
@@ -66,7 +66,7 @@
 
 ### Prerequisites
 - Bun runtime (recommended) or Node.js 18+
-- Claude Code environment (optional)
+- MCP client environment (optional)
 - TypeScript/JavaScript/Python project
 
 ### Quick Start with bunx (No Install Required!)
@@ -122,7 +122,7 @@ just logs
 just stop
 ```
 
-### Using with Claude Code
+### Using with an MCP Client
 
 Add to your `.mcp.json`:
 
@@ -171,7 +171,7 @@ server:
 
 # Layer configuration
 layers:
-  claude_tools:
+  layer1_fast:
     enabled: true
     timeout: 100
     maxResults: 100
@@ -325,8 +325,8 @@ Create `.vscode/settings.json`:
 }
 ```
 
-### Claude Code Integration
-The proxy automatically integrates with Claude Code's tools:
+### MCP Integration
+The proxy integrates with MCP clients and tools:
 - Uses `Grep` for fast content search
 - Uses `Glob` for file pattern matching  
 - Uses `LS` for directory structure analysis
@@ -371,8 +371,8 @@ npm run lint
 
 The system consists of several key components:
 
-1. **Claude Tools Layer** (`src/layers/claude-tools.ts`)
-   - Integrates with Claude Code's Grep, Glob, LS tools
+1. **Fast Search Layer (Layer 1)** (`src/layers/layer1-fast-search.ts`)
+   - Integrates with Grep, Glob, LS tooling via Layer 1 (Fast Search)
    - Provides fast, initial filtering of search results
 
 2. **Tree-sitter Layer** (`src/layers/tree-sitter.ts`)

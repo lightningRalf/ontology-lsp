@@ -6,7 +6,7 @@ This document provides examples of how to use each of the 16 MCP tools exposed b
 
 The tools are organized in a 5-layer architecture, with each layer providing progressively more sophisticated capabilities:
 
-1. **Claude Tools Layer** (5ms) - Fast file/content search
+1. **Fast Search Layer (Layer 1)** (5ms) - Fast file/content search
 2. **Tree-sitter Layer** (50ms) - AST-based code analysis
 3. **Ontology Layer** (10ms) - Concept relationships
 4. **Pattern Layer** (10ms) - Pattern detection and learning
@@ -198,7 +198,7 @@ Analyze dependency graph and detect issues.
 {
   "dependencies": {
     "direct": ["./layers/orchestrator", "@modelcontextprotocol/sdk"],
-    "transitive": ["./layers/claude-tools", "./layers/tree-sitter"],
+    "transitive": ["./layers/layer1-fast-search", "./layers/tree-sitter"],
     "cycles": [],
     "depth": 3
   },
@@ -466,9 +466,9 @@ Generate tests for code.
 }
 ```
 
-## Integration with Claude Code
+## MCP Integration
 
-When these tools are called from Claude Code, the Claude Tools Layer can access Claude's native Glob, Grep, and LS tools for enhanced performance. The system automatically falls back to native implementations when running standalone.
+When these tools are called from an MCP client, the Fast Search Layer can access native Glob, Grep, and LS implementations (ripgrep/fast-glob/ls) for enhanced performance. The system automatically falls back to internal implementations when running standalone.
 
 ## Performance Characteristics
 

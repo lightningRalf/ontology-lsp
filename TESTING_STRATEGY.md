@@ -2,7 +2,7 @@
 
 ## Overview
 
-Comprehensive testing strategy for the MCP adapter integration with Claude Code, ensuring reliability, performance, and compatibility.
+Comprehensive testing strategy for the MCP adapter integration with MCP clients, ensuring reliability, performance, and compatibility.
 
 ## Testing Pyramid
 
@@ -290,33 +290,33 @@ describe("Core to MCP Round-Trip", () => {
 
 ## 3. End-to-End Tests (10% Coverage)
 
-### Claude Code Simulation
+### MCP Client Simulation
 
 ```typescript
 // test/e2e/claude-simulation.test.ts
-describe("Claude Code E2E Simulation", () => {
-  let claudeSimulator: ClaudeSimulator
+describe("MCP Client E2E Simulation", () => {
+  let mcpSimulator: MCPClientSimulator
   
   beforeAll(async () => {
-    claudeSimulator = new ClaudeSimulator()
-    await claudeSimulator.connect("http://localhost:7001")
+    mcpSimulator = new MCPClientSimulator()
+    await mcpSimulator.connect("http://localhost:7001")
   })
   
   test("complete workflow: find definition → references → rename", async () => {
     // Step 1: Find definition
-    const definition = await claudeSimulator.ask(
+    const definition = await mcpSimulator.ask(
       "Find the definition of UserService"
     )
     expect(definition).toContain("class UserService")
     
     // Step 2: Find references
-    const references = await claudeSimulator.ask(
+    const references = await mcpSimulator.ask(
       "Find all references to UserService"
     )
     expect(references).toContain("5 references found")
     
     // Step 3: Rename
-    const rename = await claudeSimulator.ask(
+    const rename = await mcpSimulator.ask(
       "Rename UserService to AccountService"
     )
     expect(rename).toContain("5 files updated")
@@ -342,7 +342,7 @@ describe("Claude Code E2E Simulation", () => {
     ]
     
     for (const testCase of testCases) {
-      const toolCall = await claudeSimulator.parseQuery(testCase.query)
+      const toolCall = await mcpSimulator.parseQuery(testCase.query)
       expect(toolCall.tool).toBe(testCase.expectedTool)
       expect(toolCall.arguments.symbol).toBe(testCase.expectedSymbol)
     }
@@ -350,14 +350,14 @@ describe("Claude Code E2E Simulation", () => {
 })
 ```
 
-### Real Claude Desktop Test
+### Real MCP Client Test
 
 ```typescript
-// test/e2e/real-claude.test.ts
-describe("Real Claude Desktop Integration", () => {
+// test/e2e/real-mcp-client.test.ts
+describe("Real MCP Client Integration", () => {
   test("manual test checklist", () => {
     console.log(`
-    Manual Testing Checklist for Claude Desktop:
+    Manual Testing Checklist for MCP Client:
     
     1. [ ] Start MCP server: just start-mcp
     2. [ ] Configure Claude: just configure-claude
@@ -666,4 +666,4 @@ export function reportTestMetrics(results: TestResults) {
 }
 ```
 
-This comprehensive testing strategy ensures the MCP adapter works reliably with Claude Code while maintaining high performance and quality standards.
+This comprehensive testing strategy ensures the MCP adapter works reliably with MCP clients while maintaining high performance and quality standards.

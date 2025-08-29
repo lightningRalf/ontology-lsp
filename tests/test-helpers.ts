@@ -283,7 +283,7 @@ export async function createRealLayers(config: any): Promise<any[]> {
     const { TreeSitterLayer } = await import('../src/layers/tree-sitter.js');
     const { PatternLearnerLayer } = await import('../src/layers/pattern-learner-layer.js');
 
-    // Create Claude Tools Layer (Layer 1) configuration
+    // Create Fast Search Layer (Layer 1) configuration
     const claudeToolsConfig = {
         grep: {
             defaultTimeout: config.layers.layer1.timeout || 50,
@@ -335,7 +335,7 @@ export async function createRealLayers(config: any): Promise<any[]> {
 
     const layers = [];
 
-    // Layer 1: Claude Tools Layer (Fast search)
+    // Layer 1: Fast Search Layer
     if (config.layers.layer1.enabled) {
         const layer1 = new ClaudeToolsLayer(claudeToolsConfig);
         layer1.name = 'layer1';

@@ -64,8 +64,11 @@ describe('File URI Resolution - Red Tests', () => {
         });
 
         test('should handle symbol not found gracefully', async () => {
+            // Constrain search to test workspace and request precise matching to avoid broad L1 hits
             const result = await mcpAdapter.handleToolCall('find_definition', {
                 symbol: 'NonExistentSymbol',
+                file: path.join(testDir, 'user.ts'),
+                precise: true,
             });
             const payload = JSON.parse(result.content?.[0]?.text || '{}');
             expect(payload.definitions || []).toEqual([]);

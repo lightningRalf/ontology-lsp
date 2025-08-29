@@ -47,7 +47,7 @@
     "pattern-learning",
     "fuzzy-matching"
   ],
-  "author": "Claude Code Enhanced",
+  "author": "Ontology LSP",
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.4",

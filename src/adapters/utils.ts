@@ -484,7 +484,7 @@ function mapCompletionKind(kind: string): number {
  * Create a default core configuration
  */
 export function createDefaultCoreConfig(): CoreConfig {
-    return {
+    const cfg = {
         layers: {
             layer1: {
                 enabled: true,
@@ -564,6 +564,19 @@ export function createDefaultCoreConfig(): CoreConfig {
             enableProfiling: false,
             logSlowOperations: true,
             slowOperationThresholdMs: 1000,
+            // Optional external tooling preferences (gracefully ignored if unavailable)
+            tools: {
+                fileDiscovery: {
+                    // auto: prefer fd if available; fallback to rg --files (default)
+                    // values: 'auto' | 'rg' | 'fd'
+                    prefer: 'auto',
+                },
+                tree: {
+                    // auto: prefer eza -T if available; fallback to internal/ls-based tree
+                    // values: 'auto' | 'eza' | 'tree' | 'none'
+                    prefer: 'auto',
+                },
+            },
             // Smart Escalation v2 config surface (deterministic defaults)
             escalation: {
                 policy: 'auto',
@@ -579,7 +592,27 @@ export function createDefaultCoreConfig(): CoreConfig {
                 },
             },
         },
-    };
+    } as CoreConfig;
+
+    // Environment overrides for quick tuning
+    const env = process.env;
+    const esc = (cfg.performance as any).escalation || {};
+    if (env.ESCALATION_L2_BUDGET_MS && !isNaN(Number(env.ESCALATION_L2_BUDGET_MS))) {
+        esc.layer2 = esc.layer2 || {};
+        esc.layer2.budgetMs = Math.max(0, Number(env.ESCALATION_L2_BUDGET_MS));
+    }
+    if (env.ESCALATION_L1_CONFIDENCE_THRESHOLD && !isNaN(Number(env.ESCALATION_L1_CONFIDENCE_THRESHOLD))) {
+        esc.l1ConfidenceThreshold = Math.max(0, Math.min(1, Number(env.ESCALATION_L1_CONFIDENCE_THRESHOLD)));
+    }
+    if (env.ESCALATION_L1_AMBIGUITY_MAX_FILES && !isNaN(Number(env.ESCALATION_L1_AMBIGUITY_MAX_FILES))) {
+        esc.l1AmbiguityMaxFiles = Math.max(1, Number(env.ESCALATION_L1_AMBIGUITY_MAX_FILES));
+    }
+    if (env.ESCALATION_L1_REQUIRE_FILENAME_MATCH) {
+        const v = (env.ESCALATION_L1_REQUIRE_FILENAME_MATCH || '').toLowerCase();
+        esc.l1RequireFilenameMatch = v === '1' || v === 'true' || v === 'yes';
+    }
+    (cfg.performance as any).escalation = esc;
+    return cfg;
 }
 
 /**

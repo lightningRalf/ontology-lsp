@@ -101,7 +101,7 @@ performance:
   
   # Layer performance targets (milliseconds)
   layer_targets:
-    claude_tools: 5
+    layer1_fast: 5
     tree_sitter: 50
     ontology: 10
     patterns: 10

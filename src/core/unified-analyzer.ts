@@ -71,11 +71,13 @@ export class CodeAnalyzer {
         const l1Base = (this.config as any)?.layers?.layer1?.timeout ??
             (this.config as any)?.layers?.layer1?.grep?.defaultTimeout ?? 200;
         const l1Budget = Math.max(300, Math.min(10000, l1Base * 2));
+        const fileDiscoveryPrefer = ((this.config as any)?.performance?.tools?.fileDiscovery?.prefer) || 'auto';
         this.asyncSearchTools = new AsyncEnhancedGrep({
             maxProcesses: 4, // 4x parallel search capability
             cacheSize: 1000, // Large cache for frequent queries
             cacheTTL: 60000, // 1 minute cache TTL
             defaultTimeout: l1Budget,
+            fileDiscoveryPrefer,
         });
     }
 
@@ -217,13 +219,30 @@ export class CodeAnalyzer {
             // Smart Escalation v2 (configurable, deterministic)
             const policy = this.config.performance?.escalation?.policy ?? 'auto';
             const astOnly = !!(request as any)?.astOnly;
+            const shortSeed = ((request.identifier || '').length > 0 && (request.identifier || '').length < 6);
             if (policy !== 'never') {
                 const shouldEscalate =
                     policy === 'always' || preciseRequested || this.shouldEscalateDefinitionsAuto(definitions, request.identifier);
                 if (shouldEscalate) {
                     const base = this.config.performance?.escalation?.layer2?.budgetMs ?? 75;
-                    const budget = (astOnly || preciseRequested) ? Math.max(100, base) : base;
-                    const candidateFiles = new Set(definitions.map((d) => this.fileUriToPath(d.uri)));
+                    // Boost AST budget for short seeds or when precise requested
+                    let budget = base;
+                    if (shortSeed && preciseRequested) budget = Math.max(budget, 200);
+                    else if (shortSeed || preciseRequested || astOnly) budget = Math.max(budget, 150);
+
+                    // Prioritize candidate files whose basename includes the identifier (for short/ambiguous seeds)
+                    const allFiles = Array.from(new Set(definitions.map((d) => this.fileUriToPath(d.uri))));
+                    const idlc = (request.identifier || '').toLowerCase();
+                    const scoreFile = (fp: string) => {
+                        try {
+                            const base = path.basename(fp).toLowerCase();
+                            return base.includes(idlc) ? 2 : 1;
+                        } catch { return 1; }
+                    };
+                    const sorted = allFiles.sort((a, b) => scoreFile(b) - scoreFile(a));
+                    const maxCand = this.config.performance?.escalation?.layer2?.maxCandidateFiles ?? 10;
+                    const limit = shortSeed ? Math.min(maxCand, 8) : maxCand;
+                    const candidateFiles = new Set(sorted.slice(0, Math.max(1, limit)));
                     const escStart = Date.now();
                     try {
                         const escalatePromise = this.executeLayer2Analysis(
@@ -248,6 +267,10 @@ export class CodeAnalyzer {
                                 if (existing) {
                                     (existing as any).metadata = { ...(existing as any).metadata, astValidated: true };
                                     (existing as any).astValidated = true;
+                                    // Upgrade confidence to AST-derived score
+                                    existing.confidence = Math.max(existing.confidence || 0, d.confidence || 0);
+                                    // Prefer AST-derived kind if more specific
+                                    if (d.kind && d.kind !== existing.kind) existing.kind = d.kind;
                                 } else {
                                     (d as any).metadata = { ...(d as any).metadata, astValidated: true };
                                     (d as any).astValidated = true;

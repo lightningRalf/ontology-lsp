@@ -40,7 +40,7 @@ describe('Integration Tests', () => {
         cleanupTestDirectories();
     });
 
-    test('Claude Tools Layer - fuzzy search', async () => {
+    test('Fast Search Layer - fuzzy search', async () => {
         const claudeTools = new ClaudeToolsLayer({
             grep: {
                 defaultTimeout: 100,

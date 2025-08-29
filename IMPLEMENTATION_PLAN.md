@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-We're building a protocol-agnostic core that serves all clients through thin adapters, starting with the MCP adapter for Claude Code. This fixes the current duplicate implementation problem and establishes the foundation for the intelligent programming companion.
+We're building a protocol-agnostic core that serves all clients through thin adapters, starting with the MCP adapter for MCP-compatible IDEs/agents. This fixes the current duplicate implementation problem and establishes the foundation for the intelligent programming companion.
 
 ## Current State → Target State
 
@@ -31,7 +31,7 @@ core/
 │   └── learning.ts          # Pattern learning
 │
 adapters/
-├── mcp/                     # MCP for Claude Code
+├── mcp/                     # MCP adapter for clients
 │   ├── index.ts            # MCP server entry
 │   ├── tools.ts            # Tool definitions
 │   └── translator.ts       # MCP ↔ Core translation
@@ -265,10 +265,10 @@ describe('MCP Adapter', () => {
 # Start the MCP server
 just start-mcp
 
-# Test with Claude Code simulator
+# Test with an MCP client simulator
 just test-mcp-e2e
 
-# Manual test with actual Claude Code
+# Manual test with an MCP-compatible client
 # 1. Configure Claude Desktop
 # 2. Ask Claude to find definitions
 # 3. Verify responses
@@ -337,7 +337,7 @@ just cleanup-duplicates
 ### Week 1 Deliverables
 ✅ Unified core with single layer implementation
 ✅ MCP adapter connecting to core
-✅ All MCP tools working with Claude Code
+✅ All MCP tools working with MCP clients
 ✅ Tests passing for core and adapter
 
 ### Week 2 Deliverables
@@ -363,7 +363,7 @@ just cleanup-duplicates
 ### Risk 3: Data Loss
 **Mitigation**: Comprehensive backups, reversible migrations, data validation
 
-### Risk 4: Claude Code Compatibility
+### Risk 4: MCP Client Compatibility
 **Mitigation**: Early testing with Claude Desktop, maintain backwards compatibility
 
 ## Team Responsibilities

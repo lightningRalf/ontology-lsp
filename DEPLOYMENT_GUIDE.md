@@ -266,7 +266,7 @@ cache:
 ```yaml
 performance:
   layer_targets:
-    claude_tools: 5    # Target: <5ms
+    layer1_fast: 5    # Target: <5ms
     tree_sitter: 50    # Target: <50ms
     ontology: 10       # Target: <10ms
     patterns: 10       # Target: <10ms
@@ -329,7 +329,7 @@ http_requests_total
 http_request_duration_seconds
 
 # Layer performance
-layer_processing_duration_seconds{layer="claude_tools"}
+layer_processing_duration_seconds{layer="layer1_fast"}
 layer_processing_duration_seconds{layer="tree_sitter"}
 
 # Learning metrics

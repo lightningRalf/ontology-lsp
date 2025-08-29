@@ -9,7 +9,7 @@
  * 5. Enabling parallel searches
  */
 
-import { type ChildProcess, spawn } from 'node:child_process';
+import { type ChildProcess, spawn, execSync } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import * as fsSync from 'node:fs';
 import { createReadStream } from 'node:fs';
@@ -279,7 +279,9 @@ export class AsyncEnhancedGrep {
         cacheSize: number;
         cacheTTL: number;
         defaultTimeout: number;
+        fileDiscoveryPrefer?: 'auto' | 'rg' | 'fd';
     };
+    private fdAvailable: boolean | null = null;
 
     constructor(config?: Partial<AsyncEnhancedGrep['config']>) {
         this.config = {
@@ -287,6 +289,7 @@ export class AsyncEnhancedGrep {
             cacheSize: 1000,
             cacheTTL: 60000,
             defaultTimeout: 2000, // Default 2 second timeout for production performance
+            fileDiscoveryPrefer: 'auto',
             ...config
         };
 
@@ -329,6 +332,10 @@ export class AsyncEnhancedGrep {
      * This respects .gitignore by default and supports timeouts via process kill.
      */
     async listFiles(options: FileListOptions): Promise<string[]> {
+        const prefer = this.config.fileDiscoveryPrefer || 'auto';
+        if (prefer === 'fd' || (prefer === 'auto' && this.isFdAvailable())) {
+            return this.listFilesWithFd(options);
+        }
         const args: string[] = [];
         args.push('--files');
 
@@ -683,6 +690,10 @@ export class AsyncEnhancedGrep {
      * Cancellable file listing built on ripgrep --files, similar to listFiles() but exposes a cancel API.
      */
     listFilesCancellable(options: FileListOptions): { promise: Promise<string[]>; cancel: () => void } {
+        const prefer = this.config.fileDiscoveryPrefer || 'auto';
+        if (prefer === 'fd' || (prefer === 'auto' && this.isFdAvailable())) {
+            return this.listFilesCancellableWithFd(options);
+        }
         const args: string[] = [];
         args.push('--files');
         if (typeof options.maxDepth === 'number') args.push('--max-depth', String(options.maxDepth));
@@ -730,6 +741,78 @@ export class AsyncEnhancedGrep {
             try { proc?.kill('SIGTERM'); } catch {}
             if (timeout) clearTimeout(timeout);
         };
+        return { promise, cancel };
+    }
+
+    // ===== File discovery helpers =====
+    private isFdAvailable(): boolean {
+        if (this.fdAvailable !== null) return this.fdAvailable;
+        try {
+            execSync('fd --version', { stdio: 'pipe' });
+            this.fdAvailable = true;
+        } catch {
+            this.fdAvailable = false;
+        }
+        return this.fdAvailable;
+    }
+
+    private async listFilesWithFd(options: FileListOptions): Promise<string[]> {
+        const args: string[] = [];
+        args.push('-t', 'f');
+        if (typeof options.maxDepth === 'number') args.push('--max-depth', String(options.maxDepth));
+        if (options.includeHidden) args.push('--hidden');
+        const includes = options.includes || [];
+        for (const inc of includes) args.push('-g', inc);
+        const excludes = options.excludes || [];
+        for (const ex of excludes) args.push('--exclude', ex);
+        if (options.maxFiles && options.maxFiles > 0) args.push('-n', String(options.maxFiles));
+        args.push(options.path || '.');
+        const files: string[] = [];
+        const proc = await this.processPool.execute('fd', args);
+        let timeout: NodeJS.Timeout | null = null;
+        if (options.timeout && options.timeout > 0) {
+            timeout = setTimeout(() => { try { proc.kill('SIGTERM'); } catch {} }, options.timeout);
+        }
+        return new Promise<string[]>((resolve) => {
+            proc.stdout?.on('data', (data: Buffer) => {
+                const lines = data.toString('utf8').split(/\r?\n/).filter(Boolean);
+                for (const line of lines) files.push(line);
+            });
+            proc.on('close', () => { if (timeout) clearTimeout(timeout); resolve(files); });
+            proc.on('error', () => { if (timeout) clearTimeout(timeout); resolve([]); });
+        });
+    }
+
+    private listFilesCancellableWithFd(options: FileListOptions): { promise: Promise<string[]>; cancel: () => void } {
+        const args: string[] = [];
+        args.push('-t', 'f');
+        if (typeof options.maxDepth === 'number') args.push('--max-depth', String(options.maxDepth));
+        if (options.includeHidden) args.push('--hidden');
+        const includes = options.includes || [];
+        for (const inc of includes) args.push('-g', inc);
+        const excludes = options.excludes || [];
+        for (const ex of excludes) args.push('--exclude', ex);
+        if (options.maxFiles && options.maxFiles > 0) args.push('-n', String(options.maxFiles));
+        args.push(options.path || '.');
+        let proc: ChildProcess | null = null;
+        let timeout: NodeJS.Timeout | null = null;
+        const files: string[] = [];
+        const promise = (async () => {
+            proc = await this.processPool.execute('fd', args);
+            if (options.timeout && options.timeout > 0) {
+                timeout = setTimeout(() => { try { proc?.kill('SIGTERM'); } catch {} }, options.timeout);
+            }
+            return new Promise<string[]>((resolve) => {
+                proc!.stdout?.on('data', (data: Buffer) => {
+                    const lines = data.toString('utf8').split(/\r?\n/).filter(Boolean);
+                    for (const line of lines) files.push(line);
+                    if (options.maxFiles && files.length >= options.maxFiles) { try { proc?.kill('SIGTERM'); } catch {} }
+                });
+                proc!.on('close', () => { if (timeout) clearTimeout(timeout); resolve(files); });
+                proc!.on('error', () => { if (timeout) clearTimeout(timeout); resolve([]); });
+            });
+        })();
+        const cancel = () => { try { proc?.kill('SIGTERM'); } catch {} if (timeout) clearTimeout(timeout); };
         return { promise, cancel };
     }
 

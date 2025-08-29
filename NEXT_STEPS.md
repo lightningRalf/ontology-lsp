@@ -7,7 +7,7 @@
 See PROJECT_STATUS.md for achievements and historical context. -->
 
 
-## 🚀 Next Development Priorities (Updated 2025-08-28)
+## 🚀 Next Development Priorities (Updated 2025-08-29)
 
 ### 1. Execute Production Deployment ✅ DEPLOYMENT-READY  
 **Status**: All preparation complete, ready for immediate execution
@@ -32,15 +32,18 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 - **Memory Usage**: Further optimize from current 607MB baseline
 - **Cache Warming**: Implement intelligent pre-loading strategies
 
-### 2.1 Layer 1 Tuning (New)
-- **Confidence Gating**: Early‑return only when fast‑path yields 'likely‑definition' (improve precision)
-- **Config Toggles**: Expose race budget, per‑pattern timeouts, depth and file caps in config
-- **Race Merge Policy**: Optional merge of content + file discovery results when both finish within budget
+### 2.1 Layer 1 + AST Tuning (New)
+- **Short‑Seed Heuristics**: For identifiers < 6 chars, auto‑boost Layer 2 budget (150–200ms) and prioritize candidate files by basename match; cap candidates tightly (≤8) to ensure useful AST results under budget.
+- **Confidence Gating**: Early‑return only when fast‑path yields 'likely‑definition' (improve precision); raise thresholds in CI/local as needed.
+- **Config Toggles**: Expose race budget, per‑pattern timeouts, depth and file caps in config (done for env overrides; see below).
+- **Race Merge Policy**: Optional merge of content + file discovery results when both finish within budget.
+- **Env Overrides (Doc)**: Document quick‑tune vars: `ESCALATION_L2_BUDGET_MS`, `ESCALATION_L1_CONFIDENCE_THRESHOLD`, `ESCALATION_L1_AMBIGUITY_MAX_FILES`, `ESCALATION_L1_REQUIRE_FILENAME_MATCH`.
 
 ### 2.2 Output and UX (New)
-- **Summary Mode**: Add an explicit `--summary` flag (we default to concise; flag makes it explicit)
+- **Summary Mode**: Add an explicit `--summary` flag (done; keep enhancing examples)
 - **Deterministic Limits**: Enforce print caps consistently across commands
-- **Machine‑Readable**: Ensure `--json` outputs stable schemas for CI ingestion
+- **Stable CLI Formatting**: Keep pretty, relative path formatting in CLI wrapper; adapters return arrays for programmatic use; `--json` remains stable.
+- **Tree View**: `--tree` default depth 3; ensure this remains presentation‑only.
 
 ### 2.3 Test Infrastructure Hygiene (New)
 - **Biome, not ESLint**: Remove stray ESLint directives in tests; use Biome comments if suppression is needed (or avoid suppression entirely). Validate via `bun run lint`.
@@ -68,7 +71,7 @@ See PROJECT_STATUS.md for achievements and historical context. -->
   - Metrics: escalation rate, average AST files parsed, added precision, time spent per layer.
 - **Config Surface**:
   - `performance.escalation`: `{ policy, l1ConfidenceThreshold, l1AmbiguityMaxFiles, layer2: { budgetMs, maxCandidateFiles }, layer3: { budgetMs } }`.
-  - Env overrides for CI/local: `ESCALATION_POLICY`, `ESCALATION_L2_BUDGET_MS`, etc.
+  - Env overrides for CI/local: `ESCALATION_POLICY`, `ESCALATION_L2_BUDGET_MS`, `ESCALATION_L1_CONFIDENCE_THRESHOLD`, `ESCALATION_L1_AMBIGUITY_MAX_FILES`, `ESCALATION_L1_REQUIRE_FILENAME_MATCH`.
 - **Testing Plan**:
   - Unit: gating logic (hit/miss cases, thresholds); candidate selection from L1 output; budget enforcement and cancellation.
   - Integration: real repo fixture with ambiguous symbols (class/function same name); verify precision increases with bounded cost.
@@ -149,10 +152,14 @@ Timestamp: 2025-08-28T05:29:31Z
 - **Security Gates**: Fail PRs on high severity vulns from `security.yml`
 
 ### 11. Docs & DX (New)
-- **CLI Help**: Expand `--help` with realistic examples; add `--json` samples
+- **CLI Help**: Expand `--help` with realistic examples; add `--json` samples; show `--precise`/`--ast-only` patterns for short seeds.
 - **Playground**: Add small repo fixtures under `examples/` with guided tasks
 - **Troubleshooting**: Extend `docs/TROUBLESHOOTING.md` with common adapter errors
 - **OpenAPI**: Freeze and version the HTTP schemas; publish under `/openapi.json`
+- **Tools Preferences**: Document optional tooling prefs (`fd` file discovery; `eza -T` for tree in CLI only) and environment overrides (see above) in README with examples.
+
+### 12. Cleanup (New)
+- **Legacy Shims Removal**: After a stability period, remove compatibility shims for `claude-tools` imports and types; consolidate references to `layer1-fast-search`.
 
 ## 📊 Technical Debt to Address
 

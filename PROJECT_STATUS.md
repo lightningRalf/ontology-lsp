@@ -108,6 +108,34 @@ ontology-lsp/
 - 7002: LSP Server (TCP/stdio)
 - 8081: Monitoring Dashboard
 
+## 📅 Latest Updates (2025-08-29)
+
+### Layer 1 Rename + Tooling Integration
+- Renamed legacy “Claude Tools Layer” to vendor‑neutral “Fast Search Layer” (`src/layers/layer1-fast-search.ts`).
+- Kept compatibility shims in place for legacy imports (`src/layers/claude-tools.ts`, `src/types/claude-tools.ts`).
+- Optional tooling preferences added:
+  - File discovery: prefer `fd` when available; fallback to `rg --files` (respects .gitignore). Config: `performance.tools.fileDiscovery.prefer = auto|rg|fd`.
+  - CLI tree view: prefer `eza -T` when available; fallback to `tree`, else minimal FS listing. Config: `performance.tools.tree.prefer = auto|eza|tree|none`. CLI default tree depth is 3.
+
+### Async‑First + AST Tuning (Short Seeds)
+- Short seed (<6 chars) AST tuning:
+  - Auto‑boosted Layer 2 budget: ≥150ms (≥200ms when `--precise`).
+  - AST candidate files prioritized by basename match; capped to a tight set.
+- Confidence merging fixed: AST‑validated results upgrade L1 confidence (no more AST✓ with sub‑AST confidence values).
+- Environment overrides (no code change) for quick tuning:
+  - `ESCALATION_L2_BUDGET_MS=150` (AST budget, ms)
+  - `ESCALATION_L1_CONFIDENCE_THRESHOLD=0.8` (trip AST sooner)
+  - `ESCALATION_L1_AMBIGUITY_MAX_FILES=3` (treat ambiguity earlier)
+  - `ESCALATION_L1_REQUIRE_FILENAME_MATCH=1` (escalate when filename doesn’t include identifier)
+
+### CLI UX + Output Stability
+- Restored pretty CLI formatting (relative paths, kind, AST✓, confidence) while keeping programmatic returns as arrays and `--json` stable.
+- Explore supports `--tree` (default depth 3) for quick context; presentation‑only.
+
+### Docs + Naming
+- Replaced remaining vendor‑specific terminology with neutral language (e.g., “MCP client”).
+- Updated examples and config keys (`layer1_fast` instead of `claude_tools`).
+
 ## 📅 Latest Updates (2025-08-28)
 
 ### 🧪 Test Suite Validation (Local Run)
