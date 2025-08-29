@@ -53,6 +53,7 @@ export interface AsyncSearchOptions {
     fileType?: string;
     excludePaths?: string[];
     includeHidden?: boolean;
+    useRegex?: boolean; // if true, treat pattern as regex (omit -F)
 }
 
 export interface FileListOptions {
@@ -869,7 +870,7 @@ export class AsyncEnhancedGrep {
 
         // Options
         if (options.caseInsensitive) args.push('-i');
-        args.push('-F'); // Fixed-string match for speed
+        if (!options.useRegex) args.push('-F'); // Fixed-string for speed unless regex requested
         if (options.includeHidden) args.push('--hidden');
 
         // Pattern (already escaped if needed)

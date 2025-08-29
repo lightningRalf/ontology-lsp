@@ -153,7 +153,32 @@ export class CodeAnalyzer {
                 excludePaths: ['node_modules', 'dist', '.git', 'coverage', '.e2e-test-workspace', 'logs', 'out', 'build', 'tests', '__tests__', 'examples', 'vscode-client', 'test-output-*'],
             };
 
-            const streamingResultsAll = await this.asyncSearchTools.search(asyncOptions);
+            let streamingResultsAll = await this.asyncSearchTools.search(asyncOptions);
+
+            // Fallback: If no hits for imperfect/short seeds, try a subsequence regex (fuzzy-ish)
+            // Example: "AsyncEnhn" -> /A.*s.*y.*n.*c.*E.*n.*h.*n/ to catch "AsyncEnhancedGrep"
+            if (!streamingResultsAll || streamingResultsAll.length === 0) {
+                const id = (request.identifier || '').trim();
+                if (id.length >= 4) {
+                    const chars = [...id].map((ch) => this.escapeRegex(ch));
+                    const subseq = chars.join('.*?');
+                    const fuzzyPattern = `${subseq}`;
+                    try {
+                        streamingResultsAll = await this.asyncSearchTools.search({
+                            pattern: fuzzyPattern,
+                            path: this.extractDirectoryFromUri(request.uri),
+                            maxResults: request.maxResults ?? 50,
+                            timeout: Math.min(asyncOptions.timeout + 500, 5000),
+                            caseInsensitive: true,
+                            useRegex: true,
+                            fileType: this.getFileTypeFromUri(request.uri) || 'typescript',
+                            excludePaths: asyncOptions.excludePaths,
+                        });
+                    } catch {
+                        // ignore fuzzy fallback errors
+                    }
+                }
+            }
             const streamingResults = streamingResultsAll.slice(0, request.maxResults ?? 200);
 
             // Convert streaming results to Definition objects with full token expansion
@@ -435,7 +460,29 @@ export class CodeAnalyzer {
                 excludePaths: ['node_modules', 'dist', '.git', 'coverage', '.e2e-test-workspace', 'logs', 'out', 'build', 'tests', '__tests__', 'examples', 'vscode-client', 'test-output-*'],
             };
 
-            const streamingResultsAll = await this.asyncSearchTools.search(asyncOptions);
+            let streamingResultsAll = await this.asyncSearchTools.search(asyncOptions);
+
+            // Fuzzy subsequence fallback for partial/abbreviated seeds
+            if (!streamingResultsAll || streamingResultsAll.length === 0) {
+                const id = (request.identifier || '').trim();
+                if (id.length >= 4) {
+                    const chars = [...id].map((ch) => this.escapeRegex(ch));
+                    const subseq = chars.join('.*?');
+                    const fuzzyPattern = `${subseq}`;
+                    try {
+                        streamingResultsAll = await this.asyncSearchTools.search({
+                            pattern: fuzzyPattern,
+                            path: this.extractDirectoryFromUri(request.uri),
+                            maxResults: request.maxResults ?? 200,
+                            timeout: Math.min(asyncTimeout + 500, 5000),
+                            caseInsensitive: true,
+                            useRegex: true,
+                            fileType: this.getFileTypeFromUri(request.uri) || 'typescript',
+                            excludePaths: asyncOptions.excludePaths,
+                        });
+                    } catch {}
+                }
+            }
             const streamingResults = streamingResultsAll.slice(0, request.maxResults ?? 200);
 
             // Convert to Reference objects and de-duplicate by location

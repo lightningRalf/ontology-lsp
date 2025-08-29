@@ -29,7 +29,11 @@ default:
     @echo "🔍 CLI Tools:"
     @echo "  just find <symbol>             - Find symbol definitions"
     @echo "  just references <symbol>       - Find all references"
+    @echo "  just def <symbol>              - Alias: definitions (find)"
+    @echo "  just ref <symbol>              - Alias: references"
+    @echo "  just explore <symbol>          - Explore: defs + refs (combined)"
     @echo "  just symbol-map <symbol>       - Symbol: build symbol map"
+    @echo "  just symbol-map-graph <symbol> - Symbol: Mermaid graph output"
     @echo "  just plan-rename <old> <new>   - Refactor: plan rename (preview)"
     @echo ""
     @echo "Run 'just --list' for complete command list"
@@ -257,6 +261,17 @@ find identifier:
 references identifier:
     @just cli references {{identifier}}
 
+# Convenience aliases (restore short commands)
+def identifier:
+    @just cli def {{identifier}}
+
+ref identifier:
+    @just cli ref {{identifier}}
+
+# Explore: combined definitions + references
+explore identifier:
+    @just cli explore {{identifier}}
+
 # Rename a symbol with intelligent propagation
 rename old new:
     @just cli rename {{old}} {{new}}
@@ -268,6 +283,10 @@ cli-stats:
 # Build a targeted symbol map (Layer 3)
 symbol-map identifier:
     @just cli symbol-map {{identifier}}
+
+# Build a Mermaid graph from symbol map JSON
+symbol-map-graph identifier: build-cli
+    @bash -lc 'if command -v codex >/dev/null 2>&1; then if command -v bunx >/dev/null 2>&1; then codex exec "visualize the following: bunx --bun ./dist/cli/cli.js symbol-map-graph {{identifier}}" >/dev/null 2>&1 & else codex exec "visualize the following: bun run ./dist/cli/cli.js symbol-map-graph {{identifier}}" >/dev/null 2>&1 & fi; else echo "codex not found in PATH" 1>&2; fi'
 
 # Plan a rename (preview) (Layer 3)
 plan-rename old new:
@@ -1676,3 +1695,12 @@ demo-mcp-vhs:
         echo "Please install VHS: https://github.com/charmbracelet/vhs"; \
         exit 1; \
     fi
+build-cli:
+    @echo "🔨 Building CLI (ontology-lsp) ..."
+    {{bun}} build src/servers/cli.ts --target=bun --outdir=dist/cli --format=esm \
+        --external tree-sitter --external tree-sitter-typescript \
+        --external tree-sitter-javascript --external tree-sitter-python
+    @echo "✅ CLI built: dist/cli/cli.js"
+# Build and visualize symbol maps for related tokens discovered via explore
+symbol-map-graphs identifier: build-cli
+    @bash -lc 'if ! command -v codex >/dev/null 2>&1; then echo "codex not found in PATH" 1>&2; exit 0; fi; out=$(bun run ./dist/cli/cli.js explore {{identifier}} --json 2>/dev/null || true); echo "$out" | jq -r "[.definitions[].name, .references[].name] | map(select(. != null)) | unique[]" 2>/dev/null | awk -v seed="{{identifier}}" '"'"'NF && $0 != seed'"'"' | while read -r name; do if command -v bunx >/dev/null 2>&1; then codex exec "visualize the following: bunx --bun ./dist/cli/cli.js symbol-map-graph \"$name\"" >/dev/null 2>&1 & else codex exec "visualize the following: bun run ./dist/cli/cli.js symbol-map-graph \"$name\"" >/dev/null 2>&1 & fi; done'

@@ -12,6 +12,7 @@
  */
 
 import type { CodeAnalyzer } from '../core/unified-analyzer.js';
+import leven from 'leven';
 import {
     buildFindDefinitionRequest,
     buildFindReferencesRequest,
@@ -399,6 +400,88 @@ export class CLIAdapter {
             return lines.join('\n');
         } catch (error) {
             return this.formatError(`Symbol map failed: ${handleAdapterError(error, 'cli')}`);
+        }
+    }
+
+    /**
+     * Handle symbol-map-graph command (Mermaid output)
+     */
+    async handleSymbolMapGraph(
+        identifier: string,
+        options: { file?: string; maxFiles?: number; astOnly?: boolean }
+    ): Promise<string> {
+        try {
+            const res = await (this.coreAnalyzer as any).buildSymbolMap({
+                identifier,
+                uri: normalizeUri(options.file || 'file://workspace'),
+                maxFiles: Math.min(options.maxFiles ?? 10, 100),
+                astOnly: options.astOnly ?? true,
+            });
+
+            const bn = (uri: string) => {
+                if (!uri) return '';
+                const p = (uri || '').startsWith('file://') ? (uri as string).slice(7) : String(uri);
+                try {
+                    const rel = (p || '').replace(/\\/g, '/');
+                    const cwd = (process.cwd() + '/').replace(/\\/g, '/');
+                    return rel.startsWith(cwd) ? rel.slice(cwd.length) : rel;
+                } catch {
+                    return p;
+                }
+            };
+            const lc = (r: any) => {
+                const line = Number(r?.start?.line ?? 0) + 1;
+                const col = Number(r?.start?.character ?? 0) + 1;
+                return `${line}:${col}`;
+            };
+
+            const names: string[] = [];
+            const decls = Array.isArray(res?.declarations) ? res.declarations : [];
+            const refs = Array.isArray(res?.references) ? res.references : [];
+            for (const d of decls) if ((d as any).name) names.push(String((d as any).name));
+            for (const r of refs) if ((r as any).name) names.push(String((r as any).name));
+            // Fallback: consult Layer 1 async fast-path to infer canonical token if no names extracted
+            if (names.length === 0) {
+                try {
+                    const defProbe = await (this.coreAnalyzer as any).findDefinitionAsync({
+                        uri: normalizeUri(options.file || 'file://workspace'),
+                        position: createPosition(0, 0),
+                        identifier,
+                        includeDeclaration: true,
+                        maxResults: options.maxFiles ?? 20,
+                        precise: false,
+                    });
+                    for (const d of (defProbe?.data || [])) {
+                        if ((d as any).name) names.push(String((d as any).name));
+                    }
+                } catch {}
+            }
+            const canonical = (() => {
+                if (names.length === 0) return identifier;
+                // Pick most frequent name; tie-breaker by minimal Levenshtein distance to input
+                const freq = new Map<string, number>();
+                for (const n of names) freq.set(n, (freq.get(n) || 0) + 1);
+                const max = Math.max(...[...freq.values()]);
+                const candidates = [...freq.entries()].filter(([, c]) => c === max).map(([n]) => n);
+                candidates.sort((a, b) => leven(a, identifier) - leven(b, identifier));
+                return candidates[0] || identifier;
+            })();
+
+            const lines: string[] = [];
+            lines.push('graph TD');
+            lines.push(`  S["Symbol: ${canonical}"]`);
+            decls.forEach((d: any, i: number) => {
+                lines.push(`  D${i + 1}["Decl ${bn(d.uri)}:${lc(d.range)}"]`);
+                lines.push(`  S --> D${i + 1}`);
+            });
+            refs.forEach((r: any, i: number) => {
+                const kind = r.kind || 'ref';
+                lines.push(`  R${i + 1}["Ref ${kind} ${bn(r.uri)}:${lc(r.range)}"]`);
+                lines.push(`  S --> R${i + 1}`);
+            });
+            return lines.join('\n');
+        } catch (error) {
+            return this.formatError(`Symbol map graph failed: ${handleAdapterError(error, 'cli')}`);
         }
     }
 

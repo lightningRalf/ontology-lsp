@@ -158,6 +158,26 @@ class CLI {
                 process.exit(0);
             });
 
+        // Symbol: Mermaid Graph output
+        this.program
+            .command('symbol-map-graph <identifier>')
+            .description('Print Mermaid graph for the symbol map')
+            .option('-f, --file <path>', 'Optional file or directory context')
+            .option('--max-files <count>', 'Maximum files to analyze (default: 10)', '10')
+            .option('--ast-only', 'Prefer AST-validated results', true)
+            .option('--no-color', 'Disable colored output')
+            .action(async (identifier, options) => {
+                await this.ensureInitialized(options);
+                const result = await (this.cliAdapter as any).handleSymbolMapGraph(identifier, {
+                    file: options.file,
+                    maxFiles: parseInt(options.maxFiles),
+                    astOnly: options.astOnly !== false,
+                });
+                console.log(result);
+                await this.shutdown();
+                process.exit(0);
+            });
+
         // Rename command
         this.program
             .command('rename <identifier> <newName>')
