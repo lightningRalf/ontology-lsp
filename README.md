@@ -249,6 +249,33 @@ CLI example using tree view:
 ontology-lsp explore parseFile --file src --summary --tree --tree-depth 3
 ```
 
+## Monitoring & Metrics
+
+You can inspect system health and performance via an HTTP endpoint or the CLI.
+
+- HTTP metrics (defaults to port 7000):
+  - JSON: `GET /metrics?format=json` (consolidated Layer 1, 2, and 4 metrics)
+  - Prometheus: `GET /metrics?format=prometheus`
+  - Examples:
+    ```bash
+    curl -s http://localhost:7000/metrics?format=json | jq .
+    curl -s http://localhost:7000/metrics?format=prometheus
+    ```
+
+- CLI stats:
+  - Installed binary:
+    ```bash
+    ontology-lsp stats
+    ```
+  - Development (without build):
+    ```bash
+    bun run src/servers/cli.ts stats
+    ```
+
+- Performance env knobs (see CONFIG.md for details):
+  - `ENHANCED_GREP_DEFAULT_TIMEOUT_MS`, `ENHANCED_GREP_MAX_PROCESSES`
+  - `PERF_P95_TARGET_MS`, `PERF_P99_TARGET_MS`, `PERF_CONCURRENCY_P95_TARGET_MS`
+
 #### CLI Layer 3 (Symbol Map + Rename Planner)
 
 Build a targeted symbol map (declarations/references/imports/exports):
