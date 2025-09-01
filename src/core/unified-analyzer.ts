@@ -132,6 +132,72 @@ export class CodeAnalyzer {
     }
 
     /**
+     * Lightweight aggregate stats for monitoring/learning dashboards
+     * Kept intentionally small and fast. Safe to call in tests/E2E.
+     */
+    async getStats(): Promise<Record<string, any>> {
+        // Shared services stats (cache/db/monitoring)
+        const services = await this.sharedServices.getStats().catch(() => ({
+            database: {},
+            cache: {},
+            monitoring: {},
+            healthy: false,
+            initialized: this.initialized,
+        }));
+
+        // Layer metrics snapshot
+        let layerMetrics: any = {};
+        try {
+            const lm: any = (this as any).layerManager;
+            const l1: any = lm?.getLayer?.('layer1');
+            const l2: any = lm?.getLayer?.('layer2');
+            const l1m = typeof l1?.getMetrics === 'function' ? l1.getMetrics() : null;
+            const l2m = typeof l2?.getMetrics === 'function' ? l2.getMetrics() : null;
+            layerMetrics = { l1: l1m, l2: l2m };
+        } catch {}
+
+        // Ontology/storage metrics (L4)
+        const l4 = this.getLayer4StorageMetrics();
+
+        // Learning stats (L5)
+        let patternsCount = 0;
+        try {
+            if (this.learningOrchestrator && typeof (this.learningOrchestrator as any).getLearningStats === 'function') {
+                const ls = await (this.learningOrchestrator as any).getLearningStats();
+                patternsCount = Number(ls?.patterns?.totalPatterns || 0);
+            }
+        } catch {}
+
+        return {
+            timestamp: Date.now(),
+            initialized: this.initialized,
+            healthy: services.healthy === true,
+            services,
+            layers: layerMetrics,
+            l4,
+            patterns: patternsCount,
+        };
+    }
+
+    /**
+     * Optional detailed stats surface consumed by HTTP adapter's /monitoring
+     */
+    async getDetailedStats(): Promise<Record<string, any>> {
+        const stats = await this.getStats();
+        return {
+            summary: {
+                initialized: stats.initialized,
+                healthy: stats.healthy,
+                timestamp: stats.timestamp,
+            },
+            services: stats.services,
+            layers: stats.layers,
+            l4: stats.l4,
+            learning: { patterns: stats.patterns || 0 },
+        };
+    }
+
+    /**
      * Async streaming search with 0ms event loop blocking
      * This is the primary search method - use instead of synchronous findDefinition
      */

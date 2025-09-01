@@ -220,6 +220,21 @@ ontology-lsp/
 
 ## 📅 Latest Updates (2025-09-01)
 
+### ✅ Core Observability & DX Additions (2025‑09‑01)
+- Learning stats surface added:
+  - Core: lightweight `getStats()` + `getDetailedStats()` on `CodeAnalyzer`.
+  - HTTP: new `GET /api/v1/learning-stats` route (plus server-level fallback) for dashboards/automation.
+  - Justfile: `just learning-stats` to query stats from a running HTTP server.
+- E2E local runner utilities:
+  - `just start-test-http` / `just stop-test-http` manage a dedicated HTTP server on port 7050 for cross‑protocol E2E.
+  - `just e2e-local` starts the server, runs E2E with `E2E=1 USE_LOCAL_REPOS=true`, and shuts down.
+- CI enhancements:
+  - Perf batches gated behind dispatch input or repo var (`run_perf`/`RUN_PERF`).
+  - HTTP smoke step validates `/metrics?format=json` and `/api/v1/learning-stats` in CI.
+
+Notes:
+- Cross‑protocol E2E with local fixtures currently shows HTTP/MCP OK, LSP/CLI minimal stubs → lower reliability in the validator. Follow‑ups are tracked in NEXT_STEPS (implement minimal LSP/CLI ops used by validator; seed deterministic learning to ensure ≥1 pattern learned in local run).
+
 ### 🔧 Fix‑Bugs‑First Focus
 - Deferred: Postgres and Triple Store production adapters (no feature expansion now).
 - Kept: SQLite as the default L4 backend; verified k‑hop and import/export parity.

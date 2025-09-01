@@ -25,6 +25,7 @@ default:
     @echo "📊 Monitoring:"
     @echo "  just logs           - Tail server logs"
     @echo "  just stats          - Show system statistics"
+    @echo "  just learning-stats - Show learning (L5) stats via HTTP"
     @echo ""
     @echo "🔍 CLI Tools:"
     @echo "  just find <symbol>             - Find symbol definitions"
@@ -190,6 +191,29 @@ clean-ports-force:
 stats:
     @echo "📊 Server Statistics"
     @curl -s http://localhost:7000/stats | jq . || echo "Server not responding"
+
+# Learning stats (Layer 5 summary)
+learning-stats:
+    @echo "🧠 Learning (L5) Stats"
+    @curl -s http://localhost:7000/api/v1/learning-stats | jq . || echo "Server not responding"
+
+# === E2E LOCAL RUNNER ===
+
+# Start a dedicated HTTP server on port 7050 for E2E cross‑protocol tests
+start-test-http:
+    @echo "🚀 Starting test HTTP server (port 7050)..."
+    @sh -c 'HTTP_API_PORT=7050 ~/.bun/bin/bun run src/servers/http.ts > .e2e-http.log 2>&1 & echo $$! > .e2e-http.pid'
+    @sh -c 'for x in 1 2 3 4 5 6 7 8 9 10; do if curl -sf http://localhost:7050/health >/dev/null 2>&1; then echo "✅ Test HTTP ready"; exit 0; fi; sleep 1; done; echo "❌ HTTP did not start"; exit 1'
+
+stop-test-http:
+    @echo "🛑 Stopping test HTTP server..."
+    @sh -c 'if [ -f .e2e-http.pid ]; then kill `cat .e2e-http.pid` 2>/dev/null || true; fi; rm -f .e2e-http.pid'
+
+# Run E2E suite locally using local workspace, with the test HTTP server
+e2e-local: start-test-http
+    @echo "🧪 Running E2E (local workspace)"
+    @E2E=1 USE_LOCAL_REPOS=true BUN_JOBS=1 bun test tests/e2e/ --timeout 600000 || true
+    @just stop-test-http
 
 # === BUILD COMMANDS ===
 

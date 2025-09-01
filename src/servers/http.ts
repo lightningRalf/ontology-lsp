@@ -174,6 +174,22 @@ export class HTTPServer {
                         });
                     }
 
+                    // Lightweight learning stats (mirrors adapter API)
+                    if ((url.pathname === '/learning-stats' || url.pathname === '/api/v1/learning-stats') && request.method === 'GET') {
+                        try {
+                            const stats = await (this.coreAnalyzer as any).getStats?.();
+                            return new Response(JSON.stringify({ success: true, data: stats || {} }), {
+                                status: 200,
+                                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                            });
+                        } catch (err) {
+                            return new Response(JSON.stringify({ success: false, error: 'Failed to get learning stats' }), {
+                                status: 500,
+                                headers: { 'Content-Type': 'application/json' },
+                            });
+                        }
+                    }
+
                     // Convert Bun request to our HTTPRequest format
                     const httpRequest: HTTPRequest = {
                         method: request.method,

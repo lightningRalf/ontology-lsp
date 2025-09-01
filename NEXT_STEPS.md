@@ -33,6 +33,16 @@ Goal: Normalize optional inputs at layer boundaries to keep the core protocol‑
   - Add tiny fixture factories to produce model‑shaped examples/concepts.
   - Keep perf minimal, but include defaults where sensible; perf assertions remain unchanged.
 
+### 0.3 E2E Cross‑Protocol Wiring (Immediate)
+
+Goal: Ensure E2E cross‑protocol validator has reliable HTTP/MCP/LSP/CLI surfaces under local fixtures.
+
+- Start/stop test HTTP server within E2E harness or via justfile (added):
+  - Use `just start-test-http` before E2E and `just stop-test-http` after.
+- LSP/CLI: implement minimal handlers required by validator (findDefinition, findReferences, rename, suggestRefactoring) or route through unified core helpers; keep budgeted and cancellable.
+- Learning determinism: seed a tiny rename/feedback sequence in local fixture to guarantee ≥1 learned pattern so E2E “learning effectiveness” meets ≥1 pattern condition.
+- OpenAPI: ensure `/api/v1/learning-stats` appears in spec for discoverability; add to docs.
+
 ### 0. Architectural roadmap (New)
 
 Goal: make storage pluggable and strengthen observability + reliability
@@ -252,6 +262,9 @@ Proceed with staged rollout while storage adapters and type-safety improvements 
 - Focus layer1/error tests: `bun test test/layer1-*.test.ts test/error-handling.test.ts`
 - Generate JUnit report: `bun test --reporter=junit --reporter-outfile=report.xml`
 - Build CLI: `bun run build:cli`
+- Learning stats (HTTP): `just learning-stats`
+- Start/stop test HTTP for E2E: `just start-test-http` / `just stop-test-http`
+- Run E2E locally with local workspace: `just e2e-local`
 
 ### Code Quality
 - **JSDoc Documentation**: Add comprehensive inline documentation

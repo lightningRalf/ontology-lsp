@@ -149,6 +149,8 @@ export class HTTPAdapter {
                     return method === 'POST' ? this.handleAnalyze(request) : this.methodNotAllowed();
                 case '/stats':
                     return method === 'GET' ? this.handleStats() : this.methodNotAllowed();
+                case '/learning-stats':
+                    return method === 'GET' ? this.handleLearningStats() : this.methodNotAllowed();
                 case '/monitoring':
                     return method === 'GET' ? this.handleMonitoring() : this.methodNotAllowed();
                 // New streaming endpoints
@@ -529,6 +531,22 @@ export class HTTPAdapter {
                 },
             }),
         };
+    }
+
+    /**
+     * Handle GET /api/v1/learning-stats
+     */
+    private async handleLearningStats(): Promise<HTTPResponse> {
+        try {
+            const stats = await (this.coreAnalyzer as any).getStats?.();
+            return {
+                status: 200,
+                headers: {},
+                body: JSON.stringify({ success: true, data: stats || { patterns: 0, timestamp: Date.now() } }),
+            };
+        } catch (error) {
+            return this.createErrorResponse(500, 'Failed to get learning stats', error);
+        }
     }
 
     /**
@@ -990,6 +1008,17 @@ export class HTTPAdapter {
                     get: {
                         summary: 'Get system diagnostics and status',
                         responses: { '200': { description: 'Success', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiResponse' } } } } },
+                    },
+                },
+                [api('/learning-stats')]: {
+                    get: {
+                        summary: 'Get learning/pattern stats (Layer 5 summary)',
+                        responses: {
+                            '200': {
+                                description: 'Success',
+                                content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiResponse' } } },
+                            },
+                        },
                     },
                 },
                 [api('/monitoring')]: {
