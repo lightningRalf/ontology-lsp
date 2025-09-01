@@ -269,7 +269,7 @@ ontology-lsp/
 - Docs: `CONFIG.md` updated with metrics surfaces and perf envs; includes warm‑up guidance.
 
 ### 📋 Plan Stored for Perf Stabilization
-- Added implementation plan: `docs/IMPLEMENTATION_PLAN_PERF_STABILIZATION.md`.
+- Implementation plan delivered and archived: `docs/archive/IMPLEMENTATION_PLAN_PERF_STABILIZATION.md`.
 - Focus areas:
   - Pattern storage null‑safety and robust serialization
   - SQLite representation persistence guard
