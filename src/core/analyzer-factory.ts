@@ -7,6 +7,7 @@
 import { ClaudeToolsLayer } from '../layers/claude-tools';
 import { TreeSitterLayer, type TreeSitterResult } from '../layers/tree-sitter';
 import { OntologyEngine } from '../ontology/ontology-engine';
+import { PlannerLayer } from '../layers/planner-layer';
 import { PatternLearner } from '../patterns/pattern-learner';
 import { KnowledgeSpreader } from '../propagation/knowledge-spreader';
 import { DefaultEventBus, LayerManager } from './layer-manager';
@@ -104,10 +105,10 @@ class Layer2Adapter extends LayerAdapter {
 }
 
 /**
- * Adapter for existing OntologyEngine
+ * Adapter for existing OntologyEngine (Layer 4)
  */
 class Layer3Adapter extends LayerAdapter {
-    name = 'layer3';
+    name = 'layer4';
     version = '1.0.0';
     targetLatency = 10; // 10ms target
 
@@ -124,10 +125,10 @@ class Layer3Adapter extends LayerAdapter {
 }
 
 /**
- * Adapter for existing PatternLearner
+ * Adapter for existing PatternLearner (Layer 5)
  */
 class Layer4Adapter extends LayerAdapter {
-    name = 'layer4';
+    name = 'layer5';
     version = '1.0.0';
     targetLatency = 10; // 10ms target
 
@@ -145,9 +146,10 @@ class Layer4Adapter extends LayerAdapter {
 
 /**
  * Adapter for existing KnowledgeSpreader
+ * Note: remains Layer 5 (propagation) in the updated mapping.
  */
 class Layer5Adapter extends LayerAdapter {
-    name = 'layer5';
+    name = 'layer6';
     version = '1.0.0';
     targetLatency = 20; // 20ms target
 
@@ -200,13 +202,15 @@ export class AnalyzerFactory {
                 },
                 layer4: {
                     enabled: true,
+                    dbPath: '.ontology/ontology.db',
+                },
+                layer5: {
+                    enabled: true,
+                    dbPath: '.ontology/ontology.db',
                     learningThreshold: 3,
                     confidenceThreshold: 0.7,
                     maxPatterns: 1000,
                     decayRate: 0.95,
-                },
-                layer5: {
-                    enabled: true,
                     maxDepth: 3,
                     autoApplyThreshold: 0.9,
                     propagationTimeout: 40,
@@ -304,21 +308,21 @@ export class AnalyzerFactory {
             maxFileSize: fullConfig.layers.layer2.maxFileSize.toString(),
         });
 
-        const layer3 = new Layer3Adapter(fullConfig.layers.layer3.dbPath);
+        const ontologyDbPath = fullConfig.layers.layer4?.dbPath || fullConfig.layers.layer3.dbPath;
+        const layer3Planner = new PlannerLayer();
+        const layer4Ont = new Layer3Adapter(ontologyDbPath);
 
-        const layer4 = new Layer4Adapter(fullConfig.layers.layer3.dbPath, {
-            learningThreshold: fullConfig.layers.layer4.learningThreshold,
-            confidenceThreshold: fullConfig.layers.layer4.confidenceThreshold,
+        const layer5Pat = new Layer4Adapter(ontologyDbPath, {
+            learningThreshold: (fullConfig.layers as any).layer5?.learningThreshold ?? 3,
+            confidenceThreshold: (fullConfig.layers as any).layer5?.confidenceThreshold ?? 0.7,
         });
-
-        const layer5 = new Layer5Adapter(layer3.getOntologyEngine(), layer4.getPatternLearner());
 
         // Register all layers
         layerManager.registerLayer(layer1);
         layerManager.registerLayer(layer2);
-        layerManager.registerLayer(layer3);
-        layerManager.registerLayer(layer4);
-        layerManager.registerLayer(layer5);
+        layerManager.registerLayer(layer3Planner);
+        layerManager.registerLayer(layer4Ont);
+        layerManager.registerLayer(layer5Pat);
 
         // Create the unified analyzer
         const analyzer = new CodeAnalyzer(layerManager, sharedServices, fullConfig, eventBus);
@@ -350,6 +354,10 @@ export class AnalyzerFactory {
                 ...config?.layers,
                 layer3: {
                     ...config?.layers?.layer3,
+                    dbPath: `${workspacePath}/.ontology/ontology.db`,
+                },
+                layer4: {
+                    ...config?.layers?.layer4,
                     dbPath: `${workspacePath}/.ontology/ontology.db`,
                 },
             },
@@ -393,12 +401,19 @@ export class AnalyzerFactory {
                 },
                 layer4: {
                     enabled: true,
+                    dbPath: ':memory:',
+                },
+                layer5: {
+                    enabled: false,
+                    dbPath: ':memory:',
                     learningThreshold: 1,
                     confidenceThreshold: 0.5,
                     maxPatterns: 100,
                     decayRate: 0.9,
+                    maxDepth: 1,
+                    autoApplyThreshold: 0.9,
+                    propagationTimeout: 20,
                 },
-                layer5: { enabled: false, maxDepth: 1, autoApplyThreshold: 0.9, propagationTimeout: 20 },
             },
             cache: {
                 enabled: true,

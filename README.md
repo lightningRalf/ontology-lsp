@@ -8,7 +8,7 @@
 
 ### 🧠 **Unified Intelligence Core**
 - **Protocol-Agnostic**: Single core serves LSP, MCP, and HTTP with identical functionality
-- **5-Layer Processing**: Fast Search (2.4ms) → AST Analysis (6ms) → Semantic Graph (1.4ms) → Pattern Mining (2.7ms) → Knowledge Propagation (1.2ms)
+- **5-Layer Processing**: Fast Search (2.4ms) → AST Analysis (6ms) → Planner (1.0ms) → Semantic Graph (1.4ms) → Pattern Mining & Propagation (1.2–2.7ms)
 - **All Performance Targets Exceeded**: <100ms for 95% of requests, >90% cache hit rate
 - **Zero Code Duplication**: 83% code reduction through unified architecture
 
@@ -50,9 +50,9 @@
 │ ┌─────────────────────────┐ │
 │ │ Layer 1: Fast Search    │ │ ← Grep, Glob, LS (5ms)
 │ │ Layer 2: Tree-sitter    │ │ ← AST Analysis (50ms)
-│ │ Layer 3: Ontology       │ │ ← Concept Management (10ms)
-│ │ Layer 4: Patterns       │ │ ← Learning & Prediction (10ms)
-│ │ Layer 5: Propagation    │ │ ← Knowledge Spreading (20ms)
+│ │ Layer 3: Planner        │ │ ← Symbol Map & Rename (10ms)
+│ │ Layer 4: Ontology       │ │ ← Concept Management (10ms)
+│ │ Layer 5: Patterns       │ │ ← Learning & Propagation (20ms)
 │ └─────────────────────────┘ │
 └────────┬────────────────────┘
          │ Enhanced Results
@@ -557,9 +557,9 @@ curl http://localhost:7000/patterns
 |-------|--------|----------|-------------|
 | Layer 1: Enhanced Search | 5ms | **2.4ms** | 52% under target |
 | Layer 2: AST Analysis | 50ms | **6ms** | 88% under target |
-| Layer 3: Semantic Graph | 10ms | **1.4ms** | 86% under target |
-| Layer 4: Pattern Mining | 10ms | **2.7ms** | 73% under target |
-| Layer 5: Knowledge Propagation | 20ms | **1.2ms** | 94% under target |
+| Layer 3: Planner | 10ms | **1.0ms** | 90% under target |
+| Layer 4: Semantic Graph | 10ms | **1.4ms** | 86% under target |
+| Layer 5: Pattern Mining & Propagation | 20ms | **1.2–2.7ms** | 86–94% under target |
 | **Total Pipeline** | **95ms** | **13.7ms** | **86% under target** |
 
 ### Real-World Operations

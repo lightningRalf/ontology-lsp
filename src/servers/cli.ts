@@ -138,7 +138,7 @@ class CLI {
                 process.exit(0);
             });
 
-        // Symbol: Build Symbol Map (Layer 3)
+        // Symbol: Build Symbol Map (Layer 3 - Planner)
         this.program
             .command('symbol-map <identifier>')
             .description('Build a targeted symbol map (declarations/references/imports/exports)')

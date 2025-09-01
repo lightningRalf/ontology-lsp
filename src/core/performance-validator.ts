@@ -11,9 +11,9 @@ import { CoreError, type EventBus, type LayerPerformance, PerformanceMetrics } f
 const PERFORMANCE_TARGETS = {
     layer1: 5, // Fast search with bloom filters - ~5ms
     layer2: 50, // AST analysis with tree-sitter - ~50ms
-    layer3: 10, // Ontology concept lookup - ~10ms
-    layer4: 10, // Pattern matching - ~10ms
-    layer5: 20, // Knowledge propagation - ~20ms
+    layer3: 10, // Symbol map & planner - ~10ms
+    layer4: 10, // Ontology / semantic graph - ~10ms
+    layer5: 20, // Pattern learning & propagation - ~20ms
     total: 100, // Total target for 95% of requests - <100ms
 } as const;
 
@@ -480,19 +480,19 @@ export class PerformanceOptimizer {
 
             case 'layer3':
                 suggestions.push(
-                    'Add database indexes on frequently queried columns',
-                    'Optimize concept similarity calculations',
-                    'Increase concept cache size',
-                    'Use connection pooling'
+                    'Reduce planner scope (limit files/symbols)',
+                    'Cache symbol maps for hot modules',
+                    'Apply time-bounded planning heuristics',
+                    'Defer non-critical rename checks'
                 );
                 break;
 
             case 'layer4':
                 suggestions.push(
-                    'Limit pattern matching to high-confidence patterns',
-                    'Optimize pattern storage and retrieval',
-                    'Use pattern caching',
-                    'Reduce learning threshold temporarily'
+                    'Add database indexes on frequently queried columns',
+                    'Optimize concept similarity calculations',
+                    'Increase concept cache size',
+                    'Use connection pooling'
                 );
                 break;
 

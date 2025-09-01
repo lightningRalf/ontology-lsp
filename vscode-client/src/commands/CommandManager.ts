@@ -382,44 +382,58 @@ export class CommandManager {
     }
     
     private async suggestRefactoring(): Promise<void> {
-        if (!this.client) {
-            vscode.window.showErrorMessage('Language server not running');
-            return;
-        }
-        
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
             vscode.window.showWarningMessage('No active editor');
             return;
         }
-        
+
         const document = editor.document;
-        const position = editor.selection.active;
-        
-        const suggestions = await this.client.sendRequest('ontology/suggestRefactoring', {
-            uri: document.uri.toString(),
-            position: { line: position.line, character: position.character }
-        });
-        
-        const suggestionsArray = Array.isArray(suggestions) ? suggestions : [];
-        if (suggestionsArray.length === 0) {
-            vscode.window.showInformationMessage('No refactoring suggestions available');
-            return;
-        }
-        
-        const items = suggestionsArray.map((s: any) => ({
-            label: s.title,
-            description: s.description,
-            detail: `Confidence: ${Math.round((s.confidence || 0) * 100)}%`,
-            suggestion: s
-        }));
-        
-        const selected = await vscode.window.showQuickPick(items, {
-            placeHolder: 'Select a refactoring suggestion'
-        });
-        
-        if (selected) {
-            await this.applyRefactoring(selected.suggestion);
+        const selection = editor.selection;
+        const range = selection.isEmpty
+            ? (document.getWordRangeAtPosition(selection.active) || new vscode.Range(selection.active, selection.active))
+            : selection;
+
+        try {
+            const actions = await vscode.commands.executeCommand<(vscode.CodeAction | vscode.Command)[]>(
+                'vscode.executeCodeActionProvider',
+                document.uri,
+                range,
+                'refactor'
+            );
+
+            const list = Array.isArray(actions) ? actions : [];
+            if (list.length === 0) {
+                vscode.window.showInformationMessage('No refactoring suggestions available');
+                return;
+            }
+
+            const picks = list.map((a, idx) => {
+                const isCA = (a as vscode.CodeAction).title !== undefined;
+                const title = isCA ? (a as vscode.CodeAction).title : (a as vscode.Command).title;
+                const kind = isCA && (a as vscode.CodeAction).kind ? String((a as vscode.CodeAction).kind) : 'refactor';
+                return { label: title, description: kind, action: a, index: idx };
+            });
+
+            const selected = await vscode.window.showQuickPick(picks, { placeHolder: 'Select a refactoring' });
+            if (!selected) return;
+
+            const chosen = selected.action as vscode.CodeAction | vscode.Command;
+            if ((chosen as vscode.CodeAction).edit) {
+                const edit = (chosen as vscode.CodeAction).edit!;
+                await vscode.workspace.applyEdit(edit);
+            }
+            if ((chosen as vscode.CodeAction).command) {
+                const cmd = (chosen as vscode.CodeAction).command!;
+                await vscode.commands.executeCommand(cmd.command, ...(cmd.arguments || []));
+            } else if ((chosen as vscode.Command).command) {
+                const cmd = chosen as vscode.Command;
+                await vscode.commands.executeCommand(cmd.command, ...(cmd.arguments || []));
+            }
+
+            vscode.window.showInformationMessage('Refactoring applied');
+        } catch (err: any) {
+            vscode.window.showErrorMessage(`Failed to get refactorings: ${err?.message || String(err)}`);
         }
     }
     

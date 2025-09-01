@@ -315,17 +315,11 @@ export class SharedServices {
     }
 
     private resolveDatabasePath(config: CoreConfig): string {
-        // Default database path based on layer 3 config or fallback
-        if (
-            config?.layers?.layer3 &&
-            typeof (config as any).layers.layer3 === 'object' &&
-            'dbPath' in (config as any).layers.layer3
-        ) {
-            return (
-                ((config as any).layers.layer3.dbPath as string) ?? path.join(process.cwd(), '.ontology', 'ontology.db')
-            );
+        // Use Layer 4 (Ontology) dbPath; no legacy fallback required
+        const l4 = (config as any)?.layers?.layer4;
+        if (l4 && typeof l4 === 'object' && 'dbPath' in l4 && l4.dbPath) {
+            return l4.dbPath as string;
         }
-
         // Fallback to default location
         return path.join(process.cwd(), '.ontology', 'ontology.db');
     }

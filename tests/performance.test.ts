@@ -73,7 +73,7 @@ const createPerformanceTestContext = async (): Promise<PerformanceTestContext> =
         layers: {
             layer1: { enabled: true, timeout: 200 }, // Fast search - 50ms target, 200ms timeout (4x buffer)
             layer2: { enabled: true, timeout: 100 }, // AST - 50ms target
-            layer3: { enabled: true, timeout: 50 }, // Ontology - 10ms target
+            layer3: { enabled: true, timeout: 50 }, // Planner - 10ms target
             layer4: { enabled: true, timeout: 50 }, // Patterns - 10ms target
             layer5: { enabled: true, timeout: 100 }, // Propagation - 20ms target
         },
@@ -228,36 +228,7 @@ maybeDescribe('Performance Benchmarks', () => {
             expect(metrics.mean).toBeLessThan(100); // Full operation should still be fast
         });
 
-        test('Layer 3 (Ontology) should meet 10ms target', async () => {
-            const iterations = 100;
-            const layer3Times: number[] = [];
-
-            for (let i = 0; i < iterations; i++) {
-                const symbol = largeCodebase.symbols[i % largeCodebase.symbols.length];
-                const request: FindDefinitionRequest = {
-                    identifier: symbol.name,
-                    uri: symbol.file,
-                    position: { line: symbol.line, character: symbol.character },
-                    includeDeclaration: true,
-                };
-
-                const result = await context.codeAnalyzer.findDefinition(request);
-                layer3Times.push(result.performance.layer3);
-            }
-
-            const metrics = calculateMetrics(layer3Times);
-
-            console.log('Layer 3 Performance Metrics:', {
-                mean: `${metrics.mean.toFixed(2)}ms`,
-                p95: `${metrics.p95.toFixed(2)}ms`,
-                p99: `${metrics.p99.toFixed(2)}ms`,
-            });
-
-            expect(metrics.mean).toBeLessThan(15); // Allow some overhead
-            expect(metrics.p95).toBeLessThan(20);
-        });
-
-        test('Layer 4 (Pattern Learning) should meet 10ms target', async () => {
+        test('Layer 4 (Ontology) should meet 10ms target', async () => {
             const iterations = 100;
             const layer4Times: number[] = [];
 
@@ -277,6 +248,35 @@ maybeDescribe('Performance Benchmarks', () => {
             const metrics = calculateMetrics(layer4Times);
 
             console.log('Layer 4 Performance Metrics:', {
+                mean: `${metrics.mean.toFixed(2)}ms`,
+                p95: `${metrics.p95.toFixed(2)}ms`,
+                p99: `${metrics.p99.toFixed(2)}ms`,
+            });
+
+            expect(metrics.mean).toBeLessThan(15); // Allow some overhead
+            expect(metrics.p95).toBeLessThan(20);
+        });
+
+        test('Layer 5 (Pattern Learning) should meet 10ms target', async () => {
+            const iterations = 100;
+            const layer5Times: number[] = [];
+
+            for (let i = 0; i < iterations; i++) {
+                const symbol = largeCodebase.symbols[i % largeCodebase.symbols.length];
+                const request: FindDefinitionRequest = {
+                    identifier: symbol.name,
+                    uri: symbol.file,
+                    position: { line: symbol.line, character: symbol.character },
+                    includeDeclaration: true,
+                };
+
+                const result = await context.codeAnalyzer.findDefinition(request);
+                layer5Times.push(result.performance.layer5);
+            }
+
+            const metrics = calculateMetrics(layer5Times);
+
+            console.log('Layer 5 Performance Metrics:', {
                 mean: `${metrics.mean.toFixed(2)}ms`,
                 p95: `${metrics.p95.toFixed(2)}ms`,
                 p99: `${metrics.p99.toFixed(2)}ms`,

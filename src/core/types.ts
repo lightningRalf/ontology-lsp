@@ -322,9 +322,9 @@ export interface CoreConfig {
 export interface LayerConfigs {
     layer1: Layer1Config; // Claude tools - fast search
     layer2: Layer2Config; // Tree-sitter - AST analysis
-    layer3: Layer3Config; // Ontology - concept management
-    layer4: Layer4Config; // Pattern learner
-    layer5: Layer5Config; // Knowledge spreader
+    layer3: Layer3Config; // Symbol map & planner
+    layer4: Layer4Config; // Ontology - concept management
+    layer5: Layer5Config; // Pattern learning & propagation
 }
 
 export interface Layer1Config {
@@ -357,14 +357,19 @@ export interface Layer3Config {
 
 export interface Layer4Config {
     enabled: boolean;
-    learningThreshold: number;
-    confidenceThreshold: number;
-    maxPatterns: number;
-    decayRate: number;
+    // Preferred ontology DB path (for Layer 4 ontology storage)
+    dbPath?: string;
 }
 
 export interface Layer5Config {
     enabled: boolean;
+    // Pattern learning config
+    dbPath?: string;
+    learningThreshold: number;
+    confidenceThreshold: number;
+    maxPatterns: number;
+    decayRate: number;
+    // Propagation config
     maxDepth: number;
     autoApplyThreshold: number;
     propagationTimeout: number;

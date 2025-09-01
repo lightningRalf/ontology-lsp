@@ -280,7 +280,7 @@ rename old new:
 cli-stats:
     @just cli stats
 
-# Build a targeted symbol map (Layer 3)
+# Build a targeted symbol map (Layer 3 - Planner)
 symbol-map identifier:
     @just cli symbol-map {{identifier}}
 
@@ -288,7 +288,7 @@ symbol-map identifier:
 symbol-map-graph identifier: build-cli
     @bash -lc 'if command -v codex >/dev/null 2>&1; then if command -v bunx >/dev/null 2>&1; then codex exec "visualize the following: bunx --bun ./dist/cli/cli.js symbol-map-graph {{identifier}}" >/dev/null 2>&1 & else codex exec "visualize the following: bun run ./dist/cli/cli.js symbol-map-graph {{identifier}}" >/dev/null 2>&1 & fi; else echo "codex not found in PATH" 1>&2; fi'
 
-# Plan a rename (preview) (Layer 3)
+# Plan a rename (preview) (Layer 3 - Planner)
 plan-rename old new:
     @just cli plan-rename {{old}} {{new}}
 

@@ -315,9 +315,8 @@ OpenTelemetry traces show request flow through all layers:
 1. **HTTP Request** → API Gateway
 2. **Layer 1** → Claude Tools (5ms target)
 3. **Layer 2** → Tree-sitter parsing (50ms target)
-4. **Layer 3** → Ontology engine (10ms target)
-5. **Layer 4** → Pattern learning (10ms target)
-6. **Layer 5** → Knowledge propagation (20ms target)
+4. **Layer 4** → Ontology engine (10ms target)
+5. **Layer 5** → Pattern learning & propagation (20ms target)
 
 ### Prometheus Metrics
 

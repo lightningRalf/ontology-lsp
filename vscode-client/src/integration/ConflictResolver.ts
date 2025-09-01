@@ -13,21 +13,18 @@ export class ConflictResolver {
         const tsExtension = vscode.extensions.getExtension('vscode.typescript-language-features');
         
         if (tsExtension && tsExtension.isActive) {
-            // Notify user about potential conflicts
-            const config = vscode.workspace.getConfiguration('typescript');
-            const tsServerEnabled = config.get<boolean>('tsserver.enable', true);
-            
-            if (tsServerEnabled) {
-                const choice = await vscode.window.showInformationMessage(
-                    'Ontology LSP works best with TypeScript server disabled. Disable it?',
-                    'Yes', 'No', 'Don\'t ask again'
-                );
-                
-                if (choice === 'Yes') {
-                    await config.update('tsserver.enable', false, vscode.ConfigurationTarget.Workspace);
-                } else if (choice === 'Don\'t ask again') {
-                    await this.context.globalState.update('ontology.skipTsConflict', true);
-                }
+            // In augment mode, keep the TS server enabled to leverage native features
+            // like implementations, refactorings, etc. Just log for visibility.
+            const skip = await this.context.globalState.get<boolean>('ontology.skipTsConflict');
+            if (!skip) {
+                vscode.window.showInformationMessage(
+                    'Ontology LSP will augment the built-in TypeScript features. You can change this behavior in settings.',
+                    'OK', 'Don\'t show again'
+                ).then(async (choice) => {
+                    if (choice === "Don't show again") {
+                        await this.context.globalState.update('ontology.skipTsConflict', true);
+                    }
+                });
             }
         }
         

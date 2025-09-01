@@ -30,9 +30,9 @@ graph TB
     subgraph LAYERS["Processing Layers"]
       L1["Layer 1: Fast Search<br/>Bloom filters, indexes<br/>~5ms"]
       L2["Layer 2: AST Analysis<br/>Tree-sitter parsing<br/>~50ms"]
-      L3["Layer 3: Semantic Graph<br/>Concept relationships<br/>~10ms"]
-      L4["Layer 4: Pattern Mining<br/>Learn from usage<br/>~10ms"]
-      L5["Layer 5: Knowledge Propagation<br/>Spread insights<br/>~20ms"]
+      L3["Layer 3: Planner<br/>Symbol map & rename<br/>~10ms"]
+      L4["Layer 4: Semantic Graph<br/>Ontology / concepts<br/>~10ms"]
+      L5["Layer 5: Pattern Learning & Propagation<br/>Learn & spread insights<br/>~20ms"]
     end
     
     subgraph SHARED["Shared Services"]
@@ -136,8 +136,12 @@ interface CodeAnalyzer {
 Each layer adds sophistication while maintaining speed targets:
 - **Layer 1** (5ms): Bloom filters, inverted indexes - instant results
 - **Layer 2** (50ms): AST parsing - structural understanding
-- **Layer 3** (10ms): Concept graph - semantic relationships
-- **Layer 4** (10ms): Pattern mining - usage intelligence
+- **Layer 3** (10ms): Symbol map & planner
+  
+- **Layer 4** (10ms): Concept graph - semantic relationships
+- **Layer 4** (10ms): Semantic graph - ontology concepts
+  
+- **Layer 5** (20ms): Pattern learning & propagation
 - **Layer 5** (20ms): Knowledge spreading - insight propagation
 
 ### 3. Learning-First Architecture

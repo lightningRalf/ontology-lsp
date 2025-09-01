@@ -47,8 +47,8 @@ export async function basicExample() {
         console.log(`Layer breakdown:`);
         console.log(`  Layer 1 (Fast Search): ${definitions.performance.layer1}ms`);
         console.log(`  Layer 2 (AST): ${definitions.performance.layer2}ms`);
-        console.log(`  Layer 3 (Ontology): ${definitions.performance.layer3}ms`);
-        console.log(`  Layer 4 (Patterns): ${definitions.performance.layer4}ms`);
+        console.log(`  Layer 4 (Ontology): ${definitions.performance.layer4}ms`);
+        console.log(`  Layer 5 (Patterns): ${definitions.performance.layer5}ms`);
         console.log(`  Layer 5 (Propagation): ${definitions.performance.layer5}ms`);
         console.log(`Cache hit: ${definitions.cacheHit}`);
 
@@ -108,13 +108,14 @@ export async function advancedExample() {
             },
             layer4: {
                 enabled: true,
+                dbPath: ':memory:',
+            },
+            layer5: {
+                enabled: true,
                 learningThreshold: 2, // Learn faster
                 confidenceThreshold: 0.6,
                 maxPatterns: 500,
                 decayRate: 0.95,
-            },
-            layer5: {
-                enabled: true,
                 maxDepth: 2, // Reduced propagation depth
                 autoApplyThreshold: 0.85,
                 propagationTimeout: 15,
@@ -167,12 +168,10 @@ export async function advancedExample() {
 
         // Show layer performance
         const performance = renameResult.performance;
-        if (performance.layer4 > 0) {
+        if (performance.layer5 > 0) {
             console.log('Pattern learning engaged!');
         }
-        if (performance.layer5 > 0) {
-            console.log('Knowledge propagation applied!');
-        }
+        // In the updated mapping, propagation may be included with pattern learning
     } finally {
         await analyzer.dispose();
     }

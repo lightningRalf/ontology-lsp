@@ -608,9 +608,9 @@ export class HTTPAdapter {
         const layerNames = {
             layer1: 'Fast Search',
             layer2: 'AST Analysis',
-            layer3: 'Semantic Graph',
-            layer4: 'Pattern Mining',
-            layer5: 'Knowledge Spread',
+            layer3: 'Planner',
+            layer4: 'Semantic Graph',
+            layer5: 'Pattern Learning / Spread',
         };
 
         const formatted: Record<string, any> = {};

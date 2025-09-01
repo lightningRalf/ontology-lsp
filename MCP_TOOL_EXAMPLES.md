@@ -151,7 +151,7 @@ Analyze code complexity metrics.
 }
 ```
 
-### Layer 3: Ontology Tools
+### Layer 4: Ontology Tools
 
 #### find_related_concepts
 Find concepts related to a given symbol.
@@ -206,7 +206,7 @@ Analyze dependency graph and detect issues.
 }
 ```
 
-### Layer 4: Pattern Detection Tools
+### Layer 5: Pattern Detection Tools
 
 #### detect_patterns
 Detect design patterns in code.

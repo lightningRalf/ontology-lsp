@@ -83,7 +83,7 @@ Extend or replace existing processing layers (Layer 1-5):
 - Better fuzzy matching algorithms for Layer 1
 - Advanced AST analysis for specific languages in Layer 2
 - Custom concept relationship algorithms for Layer 3
-- Novel pattern learning approaches for Layer 4
+- Novel pattern learning approaches for Layer 5
 - Enhanced knowledge propagation for Layer 5
 
 **API Surface:**

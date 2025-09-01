@@ -59,8 +59,9 @@ export class LSPAdapter {
         this.coreAnalyzer = coreAnalyzer;
         this.config = {
             enableDiagnostics: true,
-            enableCodeLens: true,
-            enableFolding: true,
+            // Default to off unless we implement handlers
+            enableCodeLens: false,
+            enableFolding: false,
             maxResults: 50,
             timeout: 30000,
             ...config,

@@ -25,6 +25,13 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
   import { createDefaultCoreConfig } from '../adapters/utils.js';
   import { createCodeAnalyzer } from '../core/index.js';
   import type { CodeAnalyzer } from '../core/unified-analyzer.js';
+  import type { Location } from 'vscode-languageserver/node';
+  import {
+      buildFindDefinitionRequest,
+      buildFindReferencesRequest,
+      definitionToLspLocation,
+      referenceToLspLocation,
+  } from '../adapters/utils.js';
 
 export class LSPServer {
     private connection = createConnection(ProposedFeatures.all);
@@ -127,6 +134,67 @@ export class LSPServer {
             return await this.lspAdapter.handleRename(params);
         });
 
+        // Graceful no-op handlers for features we don't implement yet but
+        // some clients may probe regardless of advertised capabilities
+        this.connection.onFoldingRanges?.(async () => {
+            // Return empty list instead of -32601 to avoid noisy errors
+            return [] as any;
+        });
+        this.connection.onCodeLens?.(async () => {
+            return [] as any;
+        });
+        this.connection.onImplementation?.(async () => {
+            return [] as any;
+        });
+
+        // Custom precise references request
+        const PreciseReferencesRequest = new RequestType<
+            { uri: string; position?: { line: number; character: number }; symbol?: string; maxResults?: number; includeDeclaration?: boolean },
+            { locations: Location[]; count: number },
+            void
+        >('ontology/preciseReferences');
+
+        this.connection.onRequest(PreciseReferencesRequest, async (params) => {
+            if (!this.initialized) throw new Error('Server not initialized');
+            const uri = params.uri;
+            const position = params.position || { line: 0, character: 0 };
+            const identifier = params.symbol || this.lspAdapter.extractIdentifierAtPosition(uri, position);
+            const req = buildFindReferencesRequest({
+                uri,
+                position,
+                identifier,
+                maxResults: params.maxResults ?? (this.lspAdapter as any)['config'].maxResults,
+                includeDeclaration: params.includeDeclaration ?? false,
+                precise: true,
+            } as any);
+            const result = await (this.coreAnalyzer as any).findReferencesAsync(req);
+            return { locations: result.data.map((r: any) => referenceToLspLocation(r)), count: result.data.length } as any;
+        });
+
+        // Custom precise definition request
+        const PreciseDefinitionRequest = new RequestType<
+            { uri: string; position?: { line: number; character: number }; symbol?: string; maxResults?: number },
+            { locations: Location[]; count: number },
+            void
+        >('ontology/preciseDefinition');
+
+        this.connection.onRequest(PreciseDefinitionRequest, async (params) => {
+            if (!this.initialized) throw new Error('Server not initialized');
+            const uri = params.uri;
+            const position = params.position || { line: 0, character: 0 };
+            const identifier = params.symbol || this.lspAdapter.extractIdentifierAtPosition(uri, position);
+            const req = buildFindDefinitionRequest({
+                uri,
+                position,
+                identifier,
+                maxResults: params.maxResults ?? (this.lspAdapter as any)['config'].maxResults,
+                includeDeclaration: true,
+                precise: true,
+            } as any);
+            const result = await (this.coreAnalyzer as any).findDefinitionAsync(req);
+            return { locations: result.data.map((d: any) => definitionToLspLocation(d)), count: result.data.length } as any;
+        });
+
         this.connection.onCompletion(async (params) => {
             if (!this.initialized) {
                 return [];
@@ -191,6 +259,17 @@ export class LSPServer {
             return { changes, summary: { filesAffected: files, totalEdits: total } } as any;
         });
 
+        // Lightweight: Refactoring suggestions (stub)
+        // VS Code extension will use native CodeAction provider; this avoids -32601
+        const SuggestRefactorRequest = new RequestType<
+            { uri: string; position: { line: number; character: number } },
+            Array<{ title: string; description?: string; confidence?: number; changes: any[] }>,
+            void
+        >('ontology/suggestRefactoring');
+        this.connection.onRequest(SuggestRefactorRequest, async () => {
+            return [];
+        });
+
         // Configuration changes
         this.connection.onDidChangeConfiguration(() => {
             log('Configuration changed - reloading...');
@@ -229,50 +308,3 @@ export const server = new LSPServer();
 if (import.meta.main) {
     server.start().catch(console.error);
 }
-        // Custom precise references request
-        const PreciseReferencesRequest = new RequestType<
-            { uri: string; position?: { line: number; character: number }; symbol?: string; maxResults?: number; includeDeclaration?: boolean },
-            { locations: Location[]; count: number },
-            void
-        >('ontology/preciseReferences');
-
-        this.connection.onRequest(PreciseReferencesRequest, async (params) => {
-            if (!this.initialized) throw new Error('Server not initialized');
-            const uri = params.uri;
-            const position = params.position || { line: 0, character: 0 };
-            const identifier = params.symbol || this.lspAdapter.extractIdentifierAtPosition(uri, position);
-            const req = buildFindReferencesRequest({
-                uri,
-                position,
-                identifier,
-                maxResults: params.maxResults ?? this.lspAdapter['config'].maxResults,
-                includeDeclaration: params.includeDeclaration ?? false,
-                precise: true,
-            } as any);
-            const result = await (this.coreAnalyzer as any).findReferencesAsync(req);
-            return { locations: result.data.map((r:any)=> referenceToLspLocation(r)), count: result.data.length };
-        });
-
-        // Custom precise definition request
-        const PreciseDefinitionRequest = new RequestType<
-            { uri: string; position?: { line: number; character: number }; symbol?: string; maxResults?: number },
-            { locations: Location[]; count: number },
-            void
-        >('ontology/preciseDefinition');
-
-        this.connection.onRequest(PreciseDefinitionRequest, async (params) => {
-            if (!this.initialized) throw new Error('Server not initialized');
-            const uri = params.uri;
-            const position = params.position || { line: 0, character: 0 };
-            const identifier = params.symbol || this.lspAdapter.extractIdentifierAtPosition(uri, position);
-            const req = buildFindDefinitionRequest({
-                uri,
-                position,
-                identifier,
-                maxResults: params.maxResults ?? this.lspAdapter['config'].maxResults,
-                includeDeclaration: true,
-                precise: true,
-            } as any);
-            const result = await (this.coreAnalyzer as any).findDefinitionAsync(req);
-            return { locations: result.data.map((d:any)=> definitionToLspLocation(d)), count: result.data.length };
-        });

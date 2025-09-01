@@ -47,9 +47,9 @@ import {
  * The unified code analyzer that orchestrates all 5 layers
  * - Layer 1: Fast search (Claude tools) - ~5ms
  * - Layer 2: AST analysis (Tree-sitter) - ~50ms
- * - Layer 3: Ontology concepts - ~10ms
- * - Layer 4: Pattern learning - ~10ms
- * - Layer 5: Knowledge propagation - ~20ms
+ * - Layer 3: Symbol map & planner - ~10ms
+ * - Layer 4: Ontology / semantic graph - ~10ms
+ * - Layer 5: Pattern learning & propagation - ~20ms
  */
 export class CodeAnalyzer {
     private layerManager: LayerManager;
@@ -99,7 +99,7 @@ export class CodeAnalyzer {
         // Initialize learning orchestrator
         this.learningOrchestrator = new LearningOrchestrator(this.sharedServices, this.eventBus, {
             enabledComponents: {
-                patternLearning: this.config.layers.layer4?.enabled || true,
+                patternLearning: this.config.layers.layer5?.enabled || true,
                 feedbackLoop: true,
                 evolutionTracking: true,
                 teamKnowledge: true,
@@ -1002,17 +1002,25 @@ export class CodeAnalyzer {
             const layerTimes: Record<string, number> = {};
 
             // Phase 1: Find all instances to rename (Layer 1 + 2)
-            const instances = await this.findRenameInstances(request, requestMetadata);
+            // Plan rename under Layer 3 metrics
+            let instances: any[] = [];
+            const l3Start = Date.now();
+            await this.layerManager.executeWithLayer('layer3', 'planRename', requestMetadata, async () => {
+                instances = await this.findRenameInstances(request, requestMetadata);
+                return instances;
+            });
+            layerTimes.layer3 = Date.now() - l3Start;
             layerTimes.layer1 = 30; // Estimated from findRenameInstances
             layerTimes.layer2 = 20;
 
-            // Phase 2: Learn from this rename (Layer 4)
-            if (this.config.layers.layer4.enabled) {
-                const layer4Start = Date.now();
-                await this.layerManager.executeWithLayer('layer4', 'learnRename', requestMetadata, async () => {
+            // Phase 2: Learn from this rename (Layer 5)
+            if (this.config.layers.layer5.enabled && !request.dryRun) {
+                const layer5LearnStart = Date.now();
+                await this.layerManager.executeWithLayer('layer5', 'learnRename', requestMetadata, async () => {
                     return await this.learnFromRename(request);
                 });
-                layerTimes.layer4 = Date.now() - layer4Start;
+                const dt = Date.now() - layer5LearnStart;
+                layerTimes.layer5 = (layerTimes.layer5 || 0) + dt;
             }
 
             // Phase 3: Propagate to related concepts (Layer 5)
@@ -1027,7 +1035,7 @@ export class CodeAnalyzer {
                         return await this.propagateRename(request, instances);
                     }
                 );
-                layerTimes.layer5 = Date.now() - layer5Start;
+                layerTimes.layer5 = (layerTimes.layer5 || 0) + (Date.now() - layer5Start);
             }
 
             // Merge all changes (instances already encoded into edits)
@@ -1077,11 +1085,11 @@ export class CodeAnalyzer {
             const completions: Completion[] = [];
             const layerTimes: Record<string, number> = {};
 
-            // Layer 4: Pattern-based completions (primary for completions)
-            if (this.config.layers.layer4.enabled) {
-                const layer4Start = Date.now();
+            // Layer 5: Pattern-based completions (primary for completions)
+            if (this.config.layers.layer5.enabled) {
+                const layer5Start = Date.now();
                 const patternCompletions = await this.layerManager.executeWithLayer(
-                    'layer4',
+                    'layer5',
                     'getCompletions',
                     requestMetadata,
                     async () => {
@@ -1089,14 +1097,14 @@ export class CodeAnalyzer {
                     }
                 );
                 completions.push(...patternCompletions);
-                layerTimes.layer4 = Date.now() - layer4Start;
+                layerTimes.layer5 = Date.now() - layer5Start;
             }
 
-            // Layer 3: Ontology-based completions
-            if (this.config.layers.layer3.enabled) {
-                const layer3Start = Date.now();
+            // Layer 4: Ontology-based completions
+            if (this.config.layers.layer4.enabled) {
+                const layer4Start = Date.now();
                 const conceptCompletions = await this.layerManager.executeWithLayer(
-                    'layer3',
+                    'layer4',
                     'getCompletions',
                     requestMetadata,
                     async () => {
@@ -1104,7 +1112,7 @@ export class CodeAnalyzer {
                     }
                 );
                 completions.push(...conceptCompletions);
-                layerTimes.layer3 = Date.now() - layer3Start;
+                layerTimes.layer4 = Date.now() - layer4Start;
             }
 
             // Rank and deduplicate
@@ -1824,6 +1832,17 @@ export class CodeAnalyzer {
      * Returns declarations and references limited to candidate files.
      */
     async buildSymbolMap(params: { identifier: string; uri?: string; maxFiles?: number; astOnly?: boolean }) {
+        const requestId = uuidv4();
+        const requestMetadata: RequestMetadata = { id: requestId, startTime: Date.now(), source: 'unified' };
+        let res: any = null;
+        await this.layerManager.executeWithLayer('layer3', 'buildSymbolMap', requestMetadata, async () => {
+            res = await this.buildSymbolMapCore(params);
+            return res;
+        });
+        return res;
+    }
+
+    private async buildSymbolMapCore(params: { identifier: string; uri?: string; maxFiles?: number; astOnly?: boolean }) {
         const id = (params.identifier || '').trim();
         if (!id) return { identifier: id, files: 0, declarations: [], references: [], imports: [], exports: [] };
 
@@ -1904,7 +1923,7 @@ export class CodeAnalyzer {
                 insertText: 'conceptual_completion()',
                 confidence: 0.7,
                 source: 'conceptual',
-                layer: 'layer3',
+                layer: 'layer4',
             },
         ];
     }

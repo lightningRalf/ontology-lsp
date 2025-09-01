@@ -348,7 +348,7 @@ ontology-lsp/
 - Fast initial categorization (Layer 1)
 - Smart escalation decisions (Layer 1→2 handoff)  
 - Optimized deep analysis (Layer 2 candidate filtering)
-- Semantic understanding (Layer 3 database integration)
+- Semantic understanding (Layer 4 database integration)
 - Continuous learning (Layers 4-5 operational)
 
 ### Previous Smart Categorization Implementation
@@ -473,7 +473,6 @@ For detailed implementation history, see git commit history.
   - Layer 2: AST Analysis
   - Layer 3: Symbol Map + Rename Planner (new)
   - Layer 4: Ontology/Semantic Graph (was Layer 3)
-  - Layer 5: Pattern Mining/Learning (was Layer 4)
-  - Layer 6: Knowledge Propagation (was Layer 5)
+  - Layer 5: Pattern Learning & Propagation (was Layers 4–5)
 
-Metrics and docs now reflect the new numbering; stable keys are retained in telemetry for continuity.
+Metrics and docs now reflect the new numbering.

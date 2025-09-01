@@ -26,9 +26,9 @@ import {
 const LAYER_TARGETS = {
     layer1: 50, // Fast search with ripgrep/enhanced tools (increased from 5ms)
     layer2: 50, // AST analysis with tree-sitter
-    layer3: 10, // Ontology concept lookup
-    layer4: 10, // Pattern matching
-    layer5: 20, // Knowledge propagation
+    layer3: 10, // Symbol map & planner
+    layer4: 10, // Ontology / semantic graph
+    layer5: 20, // Pattern learning & propagation
 } as const;
 
 const TOTAL_TARGET = 100; // 95% of requests < 100ms

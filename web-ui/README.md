@@ -116,9 +116,10 @@ Testing Monitoring (/api/v1/monitoring)...
 - **5 Processing Layers**: Individual metrics for each processing layer
   - Layer 1: Fast Search (target: <5ms)
   - Layer 2: AST Analysis (target: <50ms)
-  - Layer 3: Semantic Graph (target: <10ms)
-  - Layer 4: Pattern Mining (target: <10ms)
-  - Layer 5: Knowledge Spread (target: <20ms)
+  - Layer 3: Planner (target: <10ms)
+  - Layer 4: Semantic Graph (target: <10ms)
+  - Layer 4: Semantic Graph (target: <10ms)
+  - Layer 5: Pattern Learning & Spread (target: <20ms)
 - **Health Indicators**: Visual status for each layer
 - **Request Counts**: Number of requests processed per layer
 

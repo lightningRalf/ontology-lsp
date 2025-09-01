@@ -58,9 +58,9 @@ The main entry point that provides all core functionality:
 Orchestrates the 5 performance layers:
 - **Layer 1**: Fast search (~5ms target)
 - **Layer 2**: AST analysis (~50ms target)
-- **Layer 3**: Ontology concepts (~10ms target)
-- **Layer 4**: Pattern learning (~10ms target)
-- **Layer 5**: Knowledge propagation (~20ms target)
+ - **Layer 3**: Planner (~10ms target)
+ - **Layer 4**: Ontology concepts (~10ms target)
+ - **Layer 5**: Pattern learning & propagation (~20ms target)
 - **Total**: <100ms for 95% of requests
 
 ### 3. SharedServices (`services/`)
@@ -248,9 +248,9 @@ The system is designed to meet these performance targets from VISION.md:
 |-------|--------|---------|
 | Layer 1 | ~5ms | Fast search with bloom filters and indexes |
 | Layer 2 | ~50ms | AST analysis with tree-sitter |
-| Layer 3 | ~10ms | Ontology concept lookup |
-| Layer 4 | ~10ms | Pattern matching and learning |
-| Layer 5 | ~20ms | Knowledge propagation |
+| Layer 3 | ~10ms | Symbol map & planner |
+| Layer 4 | ~10ms | Ontology / semantic graph |
+| Layer 5 | ~20ms | Pattern learning & propagation |
 | **Total** | **<100ms** | **95% of requests** |
 
 ## Error Handling

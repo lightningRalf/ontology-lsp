@@ -159,7 +159,7 @@ Timestamp: 2025-08-28T05:29:31Z
 - **OpenAPI**: Freeze and version the HTTP schemas; publish under `/openapi.json`
 - **Tools Preferences**: Document optional tooling prefs (`fd` file discovery; `eza -T` for tree in CLI only) and environment overrides (see above) in README with examples.
 - **VS Code Palette Labels**: Use “Symbol: Build Symbol Map” and “Refactor: Plan Rename (Preview)” (avoid “Ontology:” prefix).
- - **Layer Numbering**: Normalize all docs to use the new L1–L6 mapping (Ontology now Layer 4; Planner now Layer 3).
+ - **Layer Numbering**: Normalize all docs to use the new L1–L5 mapping (Planner = L3, Ontology = L4, Pattern Learning & Propagation = L5).
 
 ### 12. Cleanup (New)
 - **Legacy Shims Removal**: After a stability period, remove compatibility shims for `claude-tools` imports and types; consolidate references to `layer1-fast-search`.

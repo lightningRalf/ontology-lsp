@@ -17,8 +17,9 @@ This directory contains comprehensive integration tests for the Ontology-LSP uni
 **Performance Targets Verified**:
 - Layer 1 (Fast Search): ~5ms
 - Layer 2 (AST Analysis): ~50ms
-- Layer 3 (Ontology): ~10ms
-- Layer 4 (Pattern Learning): ~10ms
+- Layer 3 (Planner): ~10ms
+- Layer 4 (Ontology): ~10ms
+- Layer 5 (Pattern Learning): ~10ms
 - Layer 5 (Knowledge Propagation): ~20ms
 
 ### 2. Adapter Integration Tests (`adapters.test.ts`)

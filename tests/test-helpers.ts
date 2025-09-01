@@ -324,7 +324,7 @@ export async function createRealLayers(config: any): Promise<any[]> {
         timeout: config.layers.layer2.timeout || 100,
     };
 
-    // Create Pattern Learner Layer (Layer 4) configuration
+    // Create Pattern Learner Layer (Layer 5) configuration
     const patternLearnerConfig = {
         dbPath: ':memory:', // Use in-memory database for tests
         learningThreshold: 2, // Lower threshold for testing
@@ -409,7 +409,7 @@ export async function createRealLayers(config: any): Promise<any[]> {
         layers.push(layer2);
     }
 
-    // Layer 3: Placeholder for ontology concepts (stub until implemented)
+    // Layer 3: Placeholder for planner (stub until implemented)
     if (config.layers.layer3.enabled) {
         layers.push({
             name: 'layer3',
@@ -441,7 +441,7 @@ export async function createRealLayers(config: any): Promise<any[]> {
         });
     }
 
-    // Layer 4: Pattern Learner Layer (Real implementation!)
+    // Layer 5: Pattern Learner Layer (Real implementation!)
     if (config.layers.layer4.enabled) {
         const layer4 = new PatternLearnerLayer(patternLearnerConfig);
         await layer4.initialize(); // Initialize the layer

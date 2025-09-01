@@ -1,5 +1,5 @@
 /**
- * Pattern Learner Layer (Layer 4) - Learns and applies refactoring patterns
+ * Pattern Learner Layer (Layer 5) - Learns and applies refactoring patterns
  * Wraps the PatternLearner class to provide Layer interface compatibility
  */
 
@@ -37,7 +37,7 @@ export interface PatternLearnerLayerConfig {
 }
 
 export class PatternLearnerLayer {
-    name = 'layer4';
+    name = 'layer5';
     version = '1.0.0';
     targetLatency = 10; // 10ms target for pattern operations
 
