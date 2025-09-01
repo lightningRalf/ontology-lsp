@@ -141,7 +141,9 @@ describe('Learning Concurrency Performance', () => {
         const duration = Date.now() - startTime;
 
         // This is intentionally a performance assertion; tolerate modest variance
-        expect(duration).toBeLessThan(250);
+        const envVal = parseInt(process.env.PERF_CONCURRENCY_P95_TARGET_MS || '', 10);
+        const target = Number.isFinite(envVal) && envVal > 0 ? envVal : 250;
+        expect(duration).toBeLessThan(target);
 
         results.forEach((result) => {
             expect(result.success).toBe(true);

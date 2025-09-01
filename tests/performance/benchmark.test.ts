@@ -57,6 +57,11 @@ perfDescribe('Performance Benchmarks', () => {
         } catch {}
     });
 
+    const envNum = (name: string, def: number): number => {
+        const v = parseInt(process.env[name] || '', 10);
+        return Number.isFinite(v) && v > 0 ? v : def;
+    };
+
     test('Find Definition - Performance', async () => {
         const iterations = 100;
         const start = performance.now();
@@ -73,7 +78,8 @@ perfDescribe('Performance Benchmarks', () => {
         const avgTime = (end - start) / iterations;
 
         console.log(`Find Definition: ${avgTime.toFixed(2)}ms avg (${iterations} iterations)`);
-        expect(avgTime).toBeLessThan(200); // Should be under 200ms
+        const p95Target = envNum('PERF_P95_TARGET_MS', 200);
+        expect(avgTime).toBeLessThan(p95Target);
     });
 
     test('Find References - Performance', async () => {
@@ -92,7 +98,8 @@ perfDescribe('Performance Benchmarks', () => {
         const avgTime = (end - start) / iterations;
 
         console.log(`Find References: ${avgTime.toFixed(2)}ms avg (${iterations} iterations)`);
-        expect(avgTime).toBeLessThan(500); // Should be under 500ms
+        const p99Target = envNum('PERF_P99_TARGET_MS', 500);
+        expect(avgTime).toBeLessThan(p99Target);
     });
 
     test('Pattern Learning - Performance', async () => {
@@ -223,7 +230,8 @@ perfDescribe('Performance Benchmarks', () => {
         const totalTime = end - start;
 
         console.log(`Concurrent Operations (${concurrentOps}): ${totalTime.toFixed(2)}ms total`);
-        expect(totalTime).toBeLessThan(5000); // Should handle 50 ops in under 5s
+        const concTarget = envNum('PERF_CONCURRENCY_P95_TARGET_MS', 5000);
+        expect(totalTime).toBeLessThan(concTarget);
     });
 
     test('Large File Handling', async () => {
