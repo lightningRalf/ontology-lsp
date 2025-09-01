@@ -226,6 +226,15 @@ ontology-lsp/
 - Added: L4 storage metrics surface and `/metrics` endpoint for observability.
 - Action: Run and monitor L1–L4 (SQLite) targeted tests; gate perf/PG/triple tests.
 
+### 📋 Plan Stored for Perf Stabilization
+- Added implementation plan: `docs/IMPLEMENTATION_PLAN_PERF_STABILIZATION.md`.
+- Focus areas:
+  - Pattern storage null‑safety and robust serialization
+  - SQLite representation persistence guard
+  - Perf env thresholds + warm‑up + deterministic fixtures
+  - Lightweight L1/L2 counters; enhanced observability
+- See NEXT_STEPS.md (0.1) for immediate actionable items.
+
 ### ✅ Layer 4 StoragePort Abstraction Delivered
 - Implemented protocol-agnostic `StoragePort` interface for Ontology (L4): `src/ontology/storage-port.ts`.
 - Refactored `OntologyEngine` to depend on `StoragePort` (constructor DI) instead of concrete SQLite class.

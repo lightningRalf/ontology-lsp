@@ -9,22 +9,45 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 
 ## 🚀 Next Development Priorities (Updated 2025-08-29)
 
+### 0.1 Fix‑Bugs‑First: Perf stabilization (Immediate)
+
+Goal: stabilize perf/bench suites by fixing concrete bugs and making
+thresholds deterministic without widening scope.
+
+- A1: Pattern storage robustness
+  - Guard optional `example.context` and `timestamp`. Default timestamp
+    to `new Date(0)` when missing. Prune undefined fields.
+  - Add a unit test for pattern promotion with missing context.
+- A2: SQLite representation persistence
+  - Validate `representation.location`; skip malformed entries with a
+    warning to avoid crashes. Add a test covering skip behavior.
+- B1: Async search reliability
+  - Add env `ENHANCED_GREP_DEFAULT_TIMEOUT_MS` override; pre‑warm cache
+    in perf tests; ensure process pool aligns with CPU cores.
+- C1: Perf test determinism
+  - Add env thresholds: `PERF_P95_TARGET_MS`, `PERF_P99_TARGET_MS`,
+    `PERF_CONCURRENCY_P95_TARGET_MS`. Update tests to consume them.
+  - Provide deterministic large‑tree fixture for 10k‑files scenarios.
+- D1: Observability
+  - Count L1 timeouts/fallbacks; surface minimal counters in metrics.
+- E1: Docs
+  - Update CONFIG.md with perf envs and warm‑up guidance.
+
 ### 0. Architectural roadmap (New)
 
 Goal: make storage pluggable and strengthen observability + reliability
 before scale-out. Treat these as gating milestones for adoption.
 
 - StoragePort abstraction for Ontology (L4):
-  - Define a `StoragePort` interface (load/save/query concepts,
-    relations, representations, evolution; stats; maintenance).
-  - Adapters:
-    - SQLiteAdapter (existing; extract into adapter form).
+  - Adapters to implement:
     - PostgresAdapter (relational schema, indexes, transactions).
     - TripleStoreAdapter (SPARQL; typed predicates; pagination).
   - Acceptance:
-    - Parity on findConcept, related k-hop, import/export.
-    - L4 p95 ≤ 10ms on 50k files with warm cache.
-    - Backpressure + retry on transient errors.
+    - Parity on findConcept, related k-hop, import/export (add k‑hop parity tests).
+    - L4 p95 ≤ 10ms on 50k files with warm cache (add metrics + budgets).
+    - Backpressure + retry on transient errors; instrument adapter-level telemetry.
+  - DevX:
+    - Document `layers.layer4.adapter` and update CLI init to include `adapter: sqlite`.
   - Risks (2nd–5th order):
     - Network variance → caching + bounded queries.
     - Contention → pooling + tuned isolation.
@@ -163,7 +186,8 @@ storage adapters and type-safety improvements land.
   - Implement proper handlers or route through `workspace/executeCommand` with a stable result schema.
   - Restore stricter test assertions that verify a real `result` payload structure.
 - **E2E Gating**: Entire E2E suite is gated behind `E2E=1` to avoid environment flakiness. Run with `bun run test:e2e` when local repos/services are available.
-- **Perf Gating**: Perf/benchmarks are gated behind `PERF=1`. Use `bun run test:perf` to execute them.
+ - **Perf Gating**: Perf/benchmarks are gated behind `PERF=1`. Use `bun run test:perf` to execute them.
+ - **Red Tests Gating**: File-URI resolution red tests gated behind `FILE_URI_FIX=1`.
 
 ### 9.2 Async‑First Cascade (Complete)
 - Core `findDefinition` / `findReferences` now delegate to async fast‑path only (legacy cascade removed from hot path).
@@ -192,6 +216,7 @@ Timestamp: 2025-08-28T05:29:31Z
 - **Tools Preferences**: Document optional tooling prefs (`fd` file discovery; `eza -T` for tree in CLI only) and environment overrides (see above) in README with examples.
 - **VS Code Palette Labels**: Use “Symbol: Build Symbol Map” and “Refactor: Plan Rename (Preview)” (avoid “Ontology:” prefix).
  - **Layer Numbering**: Normalize all docs to use the new L1–L5 mapping (Planner = L3, Ontology = L4, Pattern Learning & Propagation = L5).
+ - **StoragePort**: Link to `docs/STORAGE_PORT.md`; show adapter config examples.
 
 ### 12. Cleanup (New)
 - **Legacy Shims Removal**: After a stability period, remove compatibility shims for `claude-tools` imports and types; consolidate references to `layer1-fast-search`.

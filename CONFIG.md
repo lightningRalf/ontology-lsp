@@ -217,6 +217,26 @@ Notes:
 
 - Grafana dashboard: see `config/grafana/dashboards/layer4-storage-metrics.json` (basic timeseries panels for counts, errors, p95/p99).
 
+## Performance Testing Overrides (Perf Suite)
+
+These environment variables are used to tune and stabilize perf tests
+on different hosts. Defaults target typical developer machines; CI may
+override as needed.
+
+- Async search timeout override:
+  - `ENHANCED_GREP_DEFAULT_TIMEOUT_MS` (number, optional)
+
+- Perf thresholds (consumed by perf tests):
+  - `PERF_P95_TARGET_MS` (default 150)
+  - `PERF_P99_TARGET_MS` (default 200)
+  - `PERF_CONCURRENCY_P95_TARGET_MS` (default 200)
+
+Guidance:
+- Run a warm‑up iteration in perf tests to pre‑warm caches and minimize
+  cold‑start noise.
+- Prefer deterministic, synthetic fixtures for “large codebase”
+  scenarios to reduce I/O variance.
+
 ## Configuration API Reference
 
 ### `getEnvironmentConfig()`
