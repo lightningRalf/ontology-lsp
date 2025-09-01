@@ -23,6 +23,7 @@ import {
     type SearchQuery,
 } from './types';
 import { CodeAnalyzer } from './unified-analyzer';
+import { createStorageAdapter } from '../ontology/storage-factory';
 
 /**
  * Layer adapter interface to wrap existing implementations
@@ -114,9 +115,9 @@ class Layer3Adapter extends LayerAdapter {
 
     private ontology: OntologyEngine;
 
-    constructor(dbPath: string) {
+    constructor(storage: any) {
         super();
-        this.ontology = new OntologyEngine(dbPath);
+        this.ontology = new OntologyEngine(storage);
     }
 
     getOntologyEngine(): OntologyEngine {
@@ -202,6 +203,7 @@ export class AnalyzerFactory {
                 },
                 layer4: {
                     enabled: true,
+                    adapter: 'sqlite',
                     dbPath: '.ontology/ontology.db',
                 },
                 layer5: {
@@ -310,7 +312,12 @@ export class AnalyzerFactory {
 
         const ontologyDbPath = fullConfig.layers.layer4?.dbPath || fullConfig.layers.layer3.dbPath;
         const layer3Planner = new PlannerLayer();
-        const layer4Ont = new Layer3Adapter(ontologyDbPath);
+        const storage = createStorageAdapter({
+            enabled: fullConfig.layers.layer4?.enabled ?? true,
+            adapter: fullConfig.layers.layer4?.adapter ?? 'sqlite',
+            dbPath: ontologyDbPath,
+        } as any);
+        const layer4Ont = new Layer3Adapter(storage);
 
         const layer5Pat = new Layer4Adapter(ontologyDbPath, {
             learningThreshold: (fullConfig.layers as any).layer5?.learningThreshold ?? 3,
@@ -358,6 +365,7 @@ export class AnalyzerFactory {
                 },
                 layer4: {
                     ...config?.layers?.layer4,
+                    adapter: (config?.layers as any)?.layer4?.adapter ?? 'sqlite',
                     dbPath: `${workspacePath}/.ontology/ontology.db`,
                 },
             },
@@ -401,6 +409,7 @@ export class AnalyzerFactory {
                 },
                 layer4: {
                     enabled: true,
+                    adapter: 'sqlite',
                     dbPath: ':memory:',
                 },
                 layer5: {

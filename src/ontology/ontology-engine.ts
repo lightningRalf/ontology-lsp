@@ -18,6 +18,7 @@ import { ConceptBuilder } from './concept-builder';
 import { SimilarityCalculator } from './similarity-calculator';
 import type { StoragePort } from './storage-port';
 import { InstrumentedStoragePort, type L4StorageMetrics } from './instrumented-storage';
+import { isValidLocation, normalizeUri as normUri } from './location-utils';
 
 export interface RelatedConcept {
     concept: Concept;
@@ -293,9 +294,17 @@ export class OntologyEngine extends EventEmitter {
 
             case 'move':
                 if (change.location) {
-                    // Update location information for all representations
-                    for (const [_, rep] of concept.representations) {
-                        rep.location.uri = change.location;
+                    const normalized = normUri(change.location);
+                    if (normalized && typeof normalized === 'string') {
+                        // Update location information for all representations
+                        for (const [_, rep] of concept.representations) {
+                            const candidate = { uri: normalized, range: rep.location?.range } as any;
+                            if (isValidLocation(candidate)) {
+                                rep.location.uri = normalized;
+                            }
+                        }
+                    } else {
+                        console.warn(`Skipping move for concept ${concept.id}: invalid location "${change.location}"`);
                     }
                 }
                 break;
@@ -312,17 +321,18 @@ export class OntologyEngine extends EventEmitter {
         const oldCanonical = concept.canonicalName;
         concept.canonicalName = newName;
 
-        // Add new representation
-        concept.representations.set(newName, {
-            name: newName,
-            location: concept.representations.values().next().value?.location || {
-                uri: '',
-                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
-            },
-            firstSeen: new Date(),
-            lastSeen: new Date(),
-            occurrences: 1,
-        });
+        // Add new representation only if there is a valid location to clone
+        const firstRep = concept.representations.values().next().value as any;
+        const locToClone = firstRep?.location && isValidLocation(firstRep.location) ? firstRep.location : null;
+        if (locToClone) {
+            concept.representations.set(newName, {
+                name: newName,
+                location: locToClone,
+                firstSeen: new Date(),
+                lastSeen: new Date(),
+                occurrences: 1,
+            });
+        }
 
         // Update name mappings
         this.addToNameMapping(newName, concept.id);
@@ -623,10 +633,22 @@ export class OntologyEngine extends EventEmitter {
     }
 
     async importConcept(conceptData: any): Promise<void> {
+        // Sanitize incoming representations
+        const rawReps: Array<[string, any]> = Array.isArray(conceptData.representations)
+            ? conceptData.representations
+            : [];
+        const cleanReps: Array<[string, any]> = [];
+        for (const [name, rep] of rawReps) {
+            const loc = rep?.location ? { uri: normUri(rep.location.uri), range: rep.location.range } : null;
+            if (loc && isValidLocation(loc)) {
+                cleanReps.push([name, { ...rep, location: loc }]);
+            }
+        }
+
         const concept: Concept = {
             id: conceptData.id || uuidv4(),
             canonicalName: conceptData.canonicalName,
-            representations: new Map(conceptData.representations || []),
+            representations: new Map(cleanReps),
             relations: new Map(conceptData.relations || []),
             confidence: conceptData.confidence || 0.5,
             signature: conceptData.signature,

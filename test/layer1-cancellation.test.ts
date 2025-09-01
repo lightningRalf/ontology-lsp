@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import path from "node:path";
 import { AsyncEnhancedGrep } from "../src/layers/enhanced-search-tools-async";
 
 describe("AsyncEnhancedGrep cancellable operations", () => {
@@ -6,7 +7,7 @@ describe("AsyncEnhancedGrep cancellable operations", () => {
     const grep = new AsyncEnhancedGrep();
     const ctrl = grep.searchCancellable({
       pattern: "CodeAnalyzer",
-      path: process.cwd(),
+      path: path.join(process.cwd(), "tests/fixtures"),
       timeout: 5000,
       maxResults: 1000,
       caseInsensitive: true,
@@ -26,7 +27,7 @@ describe("AsyncEnhancedGrep cancellable operations", () => {
     const ctrl = grep.listFilesCancellable({
       includes: ["**/*CodeAnalyzer*.{ts,tsx,js,jsx,md}"] ,
       excludes: ["node_modules","dist",".git","coverage"],
-      path: process.cwd(),
+      path: path.join(process.cwd(), "tests/fixtures"),
       maxDepth: 8,
       timeout: 5000,
       maxFiles: 5000,
@@ -39,4 +40,3 @@ describe("AsyncEnhancedGrep cancellable operations", () => {
     expect(Array.isArray(files)).toBe(true);
   });
 });
-

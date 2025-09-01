@@ -70,15 +70,12 @@ export class CodeAnalyzer {
         this.eventBus = eventBus;
 
         // Initialize async search tools with budgets derived from config
-        const l1Base = (this.config as any)?.layers?.layer1?.timeout ??
-            (this.config as any)?.layers?.layer1?.grep?.defaultTimeout ?? 200;
-        const l1Budget = Math.max(300, Math.min(10000, l1Base * 2));
         const fileDiscoveryPrefer = ((this.config as any)?.performance?.tools?.fileDiscovery?.prefer) || 'auto';
+        // Let AsyncEnhancedGrep derive maxProcesses and defaultTimeout from CPU/env;
+        // provide cache tuning and discovery preference only.
         this.asyncSearchTools = new AsyncEnhancedGrep({
-            maxProcesses: 4, // 4x parallel search capability
-            cacheSize: 1000, // Large cache for frequent queries
-            cacheTTL: 60000, // 1 minute cache TTL
-            defaultTimeout: l1Budget,
+            cacheSize: 1000,
+            cacheTTL: 60000,
             fileDiscoveryPrefer,
         });
     }

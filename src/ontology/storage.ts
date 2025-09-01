@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { type Concept, Relation } from '../types/core';
 import type { StoragePort } from './storage-port';
+import { isValidLocation } from './location-utils';
 
 // Database row type interfaces
 interface ConceptRow {
@@ -67,6 +68,9 @@ interface StatsRow {
 // SQLite-backed implementation of StoragePort
 export class OntologyStorage implements StoragePort {
     private db: Database;
+    // Counters for observability (malformed entries)
+    private skippedRepsSave = 0;
+    private skippedRepsLoad = 0;
 
     constructor(private dbPath: string) {
         // Ensure directory exists
@@ -82,6 +86,7 @@ export class OntologyStorage implements StoragePort {
     async initialize(): Promise<void> {
         this.createTables();
         this.createIndices();
+        this.cleanupMalformedRepresentations();
     }
 
     private createTables(): void {
@@ -202,7 +207,14 @@ export class OntologyStorage implements StoragePort {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             `);
 
+            let skipped = 0;
             for (const [name, rep] of concept.representations) {
+                // Validate location; skip malformed entries with a warning (NEXT_STEPS A2)
+                if (!isValidLocation(rep?.location)) {
+                    skipped++;
+                    continue;
+                }
+
                 repStmt.run(
                     concept.id,
                     name,
@@ -213,6 +225,10 @@ export class OntologyStorage implements StoragePort {
                     rep.occurrences,
                     rep.context || null
                 );
+            }
+            if (skipped > 0) {
+                this.skippedRepsSave += skipped;
+                console.warn(`Skipped ${skipped} malformed representations (concept=${concept.id})`);
             }
 
             // Save relations
@@ -389,19 +405,36 @@ export class OntologyStorage implements StoragePort {
                 .all(row.id);
 
             const representations = new Map();
+            let skipped = 0;
             for (const repRow of repRows) {
-                const row = repRow as RepresentationRow;
-                representations.set(row.name, {
-                    name: row.name,
-                    location: {
-                        uri: row.location_uri,
-                        range: JSON.parse(row.location_range),
-                    },
-                    firstSeen: new Date(row.first_seen),
-                    lastSeen: new Date(row.last_seen),
-                    occurrences: row.occurrences,
-                    context: row.context,
+                const r = repRow as RepresentationRow;
+                // Defensive parse of range JSON
+                let range: any;
+                try {
+                    range = JSON.parse(r.location_range);
+                } catch (e) {
+                    skipped++;
+                    continue;
+                }
+
+                const loc = { uri: r.location_uri, range } as any;
+                if (!isValidLocation(loc)) {
+                    skipped++;
+                    continue;
+                }
+
+                representations.set(r.name, {
+                    name: r.name,
+                    location: loc,
+                    firstSeen: new Date(r.first_seen),
+                    lastSeen: new Date(r.last_seen),
+                    occurrences: r.occurrences,
+                    context: r.context,
                 });
+            }
+            if (skipped > 0) {
+                this.skippedRepsLoad += skipped;
+                console.warn(`Skipped ${skipped} malformed representations during load (concept=${row.id})`);
             }
 
             // Load relations
@@ -491,6 +524,11 @@ export class OntologyStorage implements StoragePort {
         };
     }
 
+    // Expose internal counters (queried by instrumented wrapper if available)
+    getSkipCounts?(): { save: number; load: number } {
+        return { save: this.skippedRepsSave, load: this.skippedRepsLoad };
+    }
+
     async close(): Promise<void> {
         this.db.close();
     }
@@ -506,5 +544,48 @@ export class OntologyStorage implements StoragePort {
 
     async backup(backupPath: string): Promise<void> {
         await this.db.backup(backupPath);
+    }
+
+    // Remove legacy/bad rows from previous versions (no CLI required)
+    private cleanupMalformedRepresentations(): void {
+        try {
+            // Ensure JSON1 is available; use guardable cleanup
+            const totalBefore = (this.db.prepare(`SELECT COUNT(*) as c FROM representations`).get() as any)?.c || 0;
+            const del = this.db.prepare(`
+                DELETE FROM representations
+                WHERE location_uri IS NULL OR TRIM(location_uri) = ''
+                   OR (CASE WHEN (SELECT 1) THEN (json_valid(location_range) = 0) ELSE 0 END)
+            `);
+            const res = del.run();
+            const changes = (res as any)?.changes || 0;
+            if (changes > 0) {
+                console.warn(`Cleaned ${changes} malformed representations from DB`);
+            }
+            // Optional deeper validation: drop rows with missing numeric fields when JSON1 available
+            try {
+                const del2 = this.db.prepare(`
+                    DELETE FROM representations
+                    WHERE json_valid(location_range) = 1 AND (
+                      json_type(json_extract(location_range,'$.start.line')) NOT IN ('integer') OR
+                      json_type(json_extract(location_range,'$.start.character')) NOT IN ('integer') OR
+                      json_type(json_extract(location_range,'$.end.line')) NOT IN ('integer') OR
+                      json_type(json_extract(location_range,'$.end.character')) NOT IN ('integer')
+                    )
+                `);
+                const res2 = del2.run();
+                const changes2 = (res2 as any)?.changes || 0;
+                if (changes2 > 0) {
+                    console.warn(`Cleaned ${changes2} malformed representation ranges from DB`);
+                }
+            } catch {}
+            const totalAfter = (this.db.prepare(`SELECT COUNT(*) as c FROM representations`).get() as any)?.c || 0;
+            // Update counters for visibility
+            const cleaned = totalBefore - totalAfter;
+            if (cleaned > 0) {
+                this.skippedRepsLoad += cleaned;
+            }
+        } catch (e) {
+            console.warn('Failed to cleanup malformed representations:', e);
+        }
     }
 }

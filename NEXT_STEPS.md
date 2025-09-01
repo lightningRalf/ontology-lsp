@@ -14,16 +14,6 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 Goal: stabilize perf/bench suites by fixing concrete bugs and making
 thresholds deterministic without widening scope.
 
-- A1: Pattern storage robustness
-  - Guard optional `example.context` and `timestamp`. Default timestamp
-    to `new Date(0)` when missing. Prune undefined fields.
-  - Add a unit test for pattern promotion with missing context.
-- A2: SQLite representation persistence
-  - Validate `representation.location`; skip malformed entries with a
-    warning to avoid crashes. Add a test covering skip behavior.
-- B1: Async search reliability
-  - Add env `ENHANCED_GREP_DEFAULT_TIMEOUT_MS` override; pre‑warm cache
-    in perf tests; ensure process pool aligns with CPU cores.
 - C1: Perf test determinism
   - Add env thresholds: `PERF_P95_TARGET_MS`, `PERF_P99_TARGET_MS`,
     `PERF_CONCURRENCY_P95_TARGET_MS`. Update tests to consume them.

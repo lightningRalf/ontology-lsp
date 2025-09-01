@@ -4,6 +4,15 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Example, Pattern, PatternCategory, TokenPattern } from '../types/core';
 
+// Helper to remove undefined fields from an object
+function pruneUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined) cleaned[key] = value;
+    }
+    return cleaned as Partial<T>;
+}
+
 // Database row type interfaces
 interface PatternRow {
     id: string;
@@ -176,17 +185,33 @@ export class PatternStorage {
             `);
 
             for (const example of pattern.examples) {
+                // Guard optional context/timestamp per NEXT_STEPS A1
+                const ctx = (example as Partial<Example>).context as
+                    | Partial<Example['context']>
+                    | undefined;
+                const timestampISO = (ctx?.timestamp instanceof Date
+                    ? ctx.timestamp
+                    : undefined)?.toISOString() || new Date(0).toISOString();
+
+                const contextPayload = pruneUndefined({
+                    file: typeof ctx?.file === 'string' ? ctx.file : undefined,
+                    concept: ctx?.concept?.id,
+                    surroundingSymbols: Array.isArray(ctx?.surroundingSymbols)
+                        ? ctx!.surroundingSymbols
+                        : undefined,
+                    timestamp: timestampISO,
+                });
+
+                const contextJSON = Object.keys(contextPayload).length
+                    ? JSON.stringify(contextPayload)
+                    : null;
+
                 exampleStmt.run(
                     pattern.id,
                     example.oldName,
                     example.newName,
                     example.confidence,
-                    JSON.stringify({
-                        file: example.context.file,
-                        concept: example.context.concept?.id,
-                        surroundingSymbols: example.context.surroundingSymbols,
-                        timestamp: example.context.timestamp.toISOString(),
-                    })
+                    contextJSON
                 );
             }
 
@@ -423,7 +448,8 @@ export class PatternStorage {
 
             const examples: Example[] = exampleRows.map((exRow) => {
                 const typedExRow = exRow as PatternExampleRow;
-                const contextData = JSON.parse(typedExRow.context_data || '{}');
+                const contextData = JSON.parse(typedExRow.context_data || '{}') || {};
+                const ts = contextData.timestamp ? new Date(contextData.timestamp) : new Date(0);
 
                 return {
                     oldName: typedExRow.old_name,
@@ -433,7 +459,8 @@ export class PatternStorage {
                         file: contextData.file || '',
                         concept: contextData.concept ? { id: contextData.concept } : undefined,
                         surroundingSymbols: contextData.surroundingSymbols || [],
-                        timestamp: new Date(contextData.timestamp || typedExRow.created_at),
+                        // Default to epoch when missing to satisfy determinism
+                        timestamp: ts,
                     },
                 } as Example;
             });

@@ -19,7 +19,7 @@ import {
     SmartSearchCache,
 } from '../src/layers/enhanced-search-tools-async';
 
-describe('Async Enhanced Search Performance', () => {
+perfDescribe('Async Enhanced Search Performance', () => {
     let grep: AsyncEnhancedGrep;
 
     beforeAll(() => {

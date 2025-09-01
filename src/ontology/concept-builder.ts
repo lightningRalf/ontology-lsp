@@ -10,6 +10,7 @@ import {
     type EnhancedMatches,
     SymbolRepresentation,
 } from '../types/core';
+import { isValidLocation, normalizeUri as normUri, sanitizeRange } from './location-utils';
 
 export interface BuildContext {
     identifier?: string;
@@ -49,14 +50,23 @@ export class ConceptBuilder {
 
         // Add primary representation
         if (context.location) {
-            concept.representations.set(identifier, {
-                name: identifier,
-                location: context.location,
-                firstSeen: new Date(),
-                lastSeen: new Date(),
-                occurrences: 1,
-                context: this.extractContextString(context),
-            });
+            const safeLoc = {
+                uri: normUri(context.location.uri),
+                range: sanitizeRange(context.location.range) || {
+                    start: { line: 0, character: 0 },
+                    end: { line: 0, character: 0 },
+                },
+            };
+            if (isValidLocation(safeLoc)) {
+                concept.representations.set(identifier, {
+                    name: identifier,
+                    location: safeLoc,
+                    firstSeen: new Date(),
+                    lastSeen: new Date(),
+                    occurrences: 1,
+                    context: this.extractContextString(context),
+                });
+            }
         }
 
         // Add alternative representations from matches
@@ -212,20 +222,23 @@ export class ConceptBuilder {
 
         for (const match of allMatches) {
             if (!concept.representations.has(match.text)) {
-                concept.representations.set(match.text, {
-                    name: match.text,
-                    location: {
-                        uri: `file://${match.file}`,
-                        range: {
-                            start: { line: match.line, character: match.column },
-                            end: { line: match.line, character: match.column + match.length },
-                        },
+                const loc = {
+                    uri: normUri(`file://${match.file}`),
+                    range: {
+                        start: { line: match.line, character: match.column },
+                        end: { line: match.line, character: match.column + match.length },
                     },
-                    firstSeen: new Date(),
-                    lastSeen: new Date(),
-                    occurrences: 1,
-                    context: match.context,
-                });
+                };
+                if (isValidLocation(loc)) {
+                    concept.representations.set(match.text, {
+                        name: match.text,
+                        location: loc,
+                        firstSeen: new Date(),
+                        lastSeen: new Date(),
+                        occurrences: 1,
+                        context: match.context,
+                    });
+                }
             }
         }
     }

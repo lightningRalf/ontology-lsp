@@ -288,6 +288,9 @@ export class TeamKnowledgeSystem {
             this.sharedPatterns.set(pattern.id, sharedPattern);
             await this.storeSharedPatternToDatabase(sharedPattern);
 
+            // Keep knowledge graph patterns in sync
+            this.knowledgeGraph.patterns.set(pattern.id, sharedPattern);
+
             // Update contributor stats
             const contributor = this.teamMembers.get(contributorId);
             if (contributor) {
@@ -368,6 +371,9 @@ export class TeamKnowledgeSystem {
                 await this.updateTeamMemberStats(validatorId, validator.stats);
             }
 
+            // Recompute connections (validations can introduce mentoring links)
+            this.knowledgeGraph.connections = this.inferConnections();
+
             this.eventBus.emit('pattern:validated', {
                 patternId,
                 validatorId,
@@ -444,6 +450,9 @@ export class TeamKnowledgeSystem {
                 context: adoption.context,
                 timestamp: Date.now(),
             });
+
+            // Recompute connections (adoptions can introduce collaboration links)
+            this.knowledgeGraph.connections = this.inferConnections();
         } catch (error) {
             console.error('Failed to record pattern adoption:', error);
             throw error;
@@ -1221,7 +1230,7 @@ export class TeamKnowledgeSystem {
                             confidence: 0.6,
                             impact: 'medium',
                             actionable: true,
-                            recommendedAction: 'Encourage pair programming or pattern reviews',
+                            recommendedAction: 'Encourage collaboration via pair programming or pattern reviews',
                             evidence: [
                                 `Shared: ${sharedExpertise.join(', ')}`,
                                 `Complementary: ${complementaryExpertise.join(', ')}`,

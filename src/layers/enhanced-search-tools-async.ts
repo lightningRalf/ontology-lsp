@@ -10,6 +10,7 @@
  */
 
 import { type ChildProcess, spawn, execSync } from 'node:child_process';
+import * as os from 'node:os';
 import { EventEmitter } from 'node:events';
 import * as fsSync from 'node:fs';
 import { createReadStream } from 'node:fs';
@@ -285,11 +286,16 @@ export class AsyncEnhancedGrep {
     private fdAvailable: boolean | null = null;
 
     constructor(config?: Partial<AsyncEnhancedGrep['config']>) {
+        const cpuCount = Math.max(1, (os.cpus?.() || []).length || 1);
+        const envMax = Number.parseInt(process.env.ENHANCED_GREP_MAX_PROCESSES || '0', 10);
+        const maxProc = Number.isFinite(envMax) && envMax > 0 ? envMax : Math.min(Math.max(cpuCount, 2), 8);
+        const envDefaultTimeout = Number.parseInt(process.env.ENHANCED_GREP_DEFAULT_TIMEOUT_MS || '0', 10);
+        const defTimeout = Number.isFinite(envDefaultTimeout) && envDefaultTimeout > 0 ? envDefaultTimeout : 2000;
         this.config = {
-            maxProcesses: 4,
+            maxProcesses: maxProc,
             cacheSize: 1000,
             cacheTTL: 60000,
-            defaultTimeout: 2000, // Default 2 second timeout for production performance
+            defaultTimeout: defTimeout, // Default timeout (overridable via env)
             fileDiscoveryPrefer: 'auto',
             ...config
         };
@@ -313,6 +319,10 @@ export class AsyncEnhancedGrep {
      * Async search with streaming support
      */
     async search(options: AsyncSearchOptions): Promise<StreamingGrepResult[]> {
+        // Apply default timeout if none provided
+        if (!options.timeout || options.timeout <= 0) {
+            options = { ...options, timeout: this.config.defaultTimeout };
+        }
         // Check cache first
         const cached = this.cache.get(options);
         if (cached) {
@@ -333,6 +343,10 @@ export class AsyncEnhancedGrep {
      * This respects .gitignore by default and supports timeouts via process kill.
      */
     async listFiles(options: FileListOptions): Promise<string[]> {
+        // Apply default timeout if none provided
+        if (!options.timeout || options.timeout <= 0) {
+            options = { ...options, timeout: this.config.defaultTimeout } as FileListOptions;
+        }
         const prefer = this.config.fileDiscoveryPrefer || 'auto';
         if (prefer === 'fd' || (prefer === 'auto' && this.isFdAvailable())) {
             return this.listFilesWithFd(options);
@@ -931,7 +945,7 @@ export class AsyncEnhancedGrep {
                 timer = setTimeout(() => {
                     if (!settled) {
                         settled = true;
-                        reject(new Error(`Operation timed out after ${options.timeout}ms`));
+                        reject(new Error(`Operation timeout after ${options.timeout}ms`));
                         try { stream.cancel(); } catch {}
                     }
                 }, options.timeout);

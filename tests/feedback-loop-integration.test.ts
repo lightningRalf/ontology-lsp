@@ -22,7 +22,7 @@ const mockConfig: CoreConfig = {
         layer1: { enabled: true, timeout: 5000, maxResults: 100 },
         layer2: { enabled: true, timeout: 50000, languages: ['typescript', 'javascript'] },
         layer3: { enabled: true, dbPath: TEST_DB_PATH, cacheSize: 1000 },
-        layer4: { enabled: true, learningThreshold: 3, confidenceThreshold: 0.7 },
+        layer4: { enabled: true, dbPath: TEST_DB_PATH },
         layer5: { enabled: true, maxDepth: 3, autoApplyThreshold: 0.8 },
     },
     cache: {
@@ -351,7 +351,11 @@ describe('FeedbackLoopSystem Integration', () => {
 
             const emptyConfig = {
                 ...mockConfig,
-                layers: { ...mockConfig.layers, layer3: { ...mockConfig.layers.layer3, dbPath: emptyDbPath } },
+                layers: { 
+                    ...mockConfig.layers, 
+                    layer3: { ...mockConfig.layers.layer3, dbPath: emptyDbPath },
+                    layer4: { enabled: true, dbPath: emptyDbPath },
+                },
             };
             const emptyEventBus = new EventBusService();
             const emptyServices = new SharedServices(emptyConfig, emptyEventBus);

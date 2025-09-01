@@ -32,4 +32,17 @@ describe('Step 4: PatternLearner', () => {
         expect(updated.occurrences).toBeGreaterThanOrEqual(prevOccurrences);
         expect(updated.confidence).toBeGreaterThanOrEqual(existing.confidence);
     });
+
+    test('promotes candidate to pattern with missing context', async () => {
+        const tmp = new PatternLearner(':memory:', { learningThreshold: 2 });
+        // wait for internal initialize
+        await new Promise((res) => setTimeout(res, 50));
+        await tmp.learnFromRename('getUser', 'fetchUser', undefined as any);
+        const result = await tmp.learnFromRename('getData', 'fetchData', undefined as any);
+        expect(result.pattern).toBeDefined();
+        // ensure it persisted without crashing (context/timestamp guarded)
+        const patternsMap = (tmp as any).patterns as Map<string, any>;
+        expect(patternsMap.size).toBeGreaterThan(0);
+        await tmp.dispose();
+    });
 });

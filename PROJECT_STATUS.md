@@ -226,6 +226,35 @@ ontology-lsp/
 - Added: L4 storage metrics surface and `/metrics` endpoint for observability.
 - Action: Run and monitor L1–L4 (SQLite) targeted tests; gate perf/PG/triple tests.
 
+### ✅ Perf Stabilization A-Items Delivered
+- A1 Pattern Storage Robustness (COMPLETED)
+  - `src/patterns/pattern-storage.ts`: optional-safe `example.context` and `timestamp`; default to epoch when missing; prune undefined.
+  - Tests: `tests/step4_pattern-learner.test.ts` includes missing-context promotion case.
+
+- A2 SQLite Representation Persistence (COMPLETED)
+  - Central validation utilities: `src/ontology/location-utils.ts` (`normalizeUri`, `sanitizeRange`, `isValidLocation`).
+  - ConceptBuilder: add reps only with valid locations; sanitize matches.
+  - OntologyEngine:
+    - `rename`: only clone location when valid; otherwise skip creating a new rep.
+    - `move`: normalize/validate; skip invalid target; avoid corrupting existing reps.
+    - `importConcept`: sanitize/deduplicate; drop invalid reps before persisting.
+  - Storage (`src/ontology/storage.ts`): save/load skip malformed reps and aggregate a single warning per concept; track skip counters.
+  - Metrics: `InstrumentedStoragePort.getMetrics().extras` exposes `skippedRepresentationsSave/Load`.
+  - Auto-clean: initialization removes legacy malformed rows (no CLI needed) and logs a cleanup summary.
+  - Adapter hygiene: `src/adapters/utils.ts` normalizes URIs and ranges for LSP/MCP mappers.
+  - Tests added:
+    - `tests/layer4-representation-skip.test.ts`
+    - `tests/layer4-engine-validation.test.ts` (rename/import/move)
+    - `tests/layer4-db-cleanup.test.ts`
+
+### ✅ B1 Async Search Reliability (COMPLETED)
+- Env override for async grep default timeout: `ENHANCED_GREP_DEFAULT_TIMEOUT_MS`.
+- CPU-aligned process pool with optional override: `ENHANCED_GREP_MAX_PROCESSES`.
+- Defaults now applied when no timeout provided (search + file listing).
+- Unified Analyzer and Layer 1 defer pool/timeout tuning to async grep (no hardcoded values).
+- Perf warm-up added to perf suite to reduce cold-start variance.
+- Tests: `PERF=1 bun test tests/enhanced-search-async.test.ts` green locally.
+
 ### 📋 Plan Stored for Perf Stabilization
 - Added implementation plan: `docs/IMPLEMENTATION_PLAN_PERF_STABILIZATION.md`.
 - Focus areas:
@@ -251,6 +280,7 @@ ontology-lsp/
   - `FILE_URI_FIX=1` enables file-URI “red” tests.
 - Scoped ripgrep-heavy cancellation tests to `tests/fixtures` to reduce I/O and flakiness.
 - Unified-core and bloom perf tests now respect env gating to avoid host timing variance.
+ - Layer 4 validation: new tests cover skip behavior, engine guards, and DB cleanup; all passing locally.
 
 ### 👥 TeamKnowledgeSystem Enhancements
 - Keep knowledge graph in sync:

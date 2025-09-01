@@ -391,6 +391,8 @@ layers:
   layer4:
     enabled: true
     timeout: 10000
+    adapter: sqlite
+    dbPath: .ontology/ontology.db
   layer5:
     enabled: true
     timeout: 20000

@@ -21,7 +21,7 @@ const mockConfig: CoreConfig = {
         layer1: { enabled: true, timeout: 5000, maxResults: 100 },
         layer2: { enabled: true, timeout: 50000, languages: ['typescript', 'javascript'] },
         layer3: { enabled: true, dbPath: TEST_DB_PATH, cacheSize: 1000 },
-        layer4: { enabled: true, learningThreshold: 3, confidenceThreshold: 0.7 },
+        layer4: { enabled: true, dbPath: TEST_DB_PATH },
         layer5: { enabled: true, maxDepth: 3, autoApplyThreshold: 0.8 },
     },
     cache: { enabled: true, maxSize: 1000, ttl: 300 },
@@ -650,6 +650,7 @@ describe('TeamKnowledgeSystem', () => {
 
             // Add some validated patterns
             const contributor = createTestTeamMember('sync-contributor', 'senior');
+            contributor.preferences.autoSyncPatterns = false; // Contributor not counted in auto-sync
             const contributorId = await teamKnowledge.registerTeamMember(contributor);
 
             const testPattern = createTestPattern('sync-test-pattern');
@@ -1017,7 +1018,7 @@ describe('TeamKnowledgeSystem', () => {
 
         test('should handle duplicate patterns during import', async () => {
             const importer = createTestTeamMember('importer2', 'developer');
-            const importerId = await teamKnowledge.registerTeamMember(importer2);
+            const importerId = await teamKnowledge.registerTeamMember(importer);
 
             // Try to import existing pattern
             const patternsToImport = [
@@ -1049,7 +1050,7 @@ describe('TeamKnowledgeSystem', () => {
             });
 
             const importer = createTestTeamMember('importer3', 'developer');
-            const importerId = await teamKnowledge.registerTeamMember(importer3);
+            const importerId = await teamKnowledge.registerTeamMember(importer);
 
             const patternsToImport = [
                 {

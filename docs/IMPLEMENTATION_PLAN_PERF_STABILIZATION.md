@@ -29,22 +29,25 @@
 
 ### A. Core Bug Fixes (High Priority)
 
+Status: COMPLETED (2025-09-01)
+
 - Pattern storage robustness
-  - Guard optional fields in `pattern-storage.ts`:
-    - Allow `example.context` and `timestamp` to be optional.
-    - When missing, inject default timestamp `new Date(0)` and omit
-      `surroundingSymbols`.
-  - Add safe serializer for `example.context` that prunes undefined.
-  - Tests: add unit covering missing context/timestamp during promotion.
+  - Implemented guards in `src/patterns/pattern-storage.ts`:
+    - `example.context` and `timestamp` are optional-safe; default timestamp to epoch (`new Date(0)`).
+    - Serializer prunes undefined fields before JSON.
+  - Tests: `tests/step4_pattern-learner.test.ts` includes missing-context promotion; suite passes.
 
 - SQLite representation serialization
-  - In `OntologyStorage.saveConcept`:
-    - Validate each representation has `location.uri` and `location.range`.
-    - If missing, skip the malformed representation and emit a single
-      warning per concept (avoid crash); alternatively fill safe default
-      (empty uri and zeroed range) if skipping would break invariants.
-  - Tests: add a storage test that includes one malformed representation
-    and asserts DB integrity + warning behavior.
+  - Centralized validation in `src/ontology/location-utils.ts` (`normalizeUri`, `sanitizeRange`, `isValidLocation`).
+  - Builder/Engine use these guards (rename/move/import avoid creating invalid reps; import drops/normalizes bad reps).
+  - Storage (`src/ontology/storage.ts`):
+    - Save/Load skip malformed reps; aggregate one warning per concept and maintain skip counters.
+    - Automatic DB cleanup on initialization removes legacy malformed rows (no CLI needed).
+  - Metrics: `InstrumentedStoragePort.getMetrics().extras` surfaces `skippedRepresentationsSave/Load`.
+  - Tests: added
+    - `tests/layer4-representation-skip.test.ts` (skip behavior + warning)
+    - `tests/layer4-engine-validation.test.ts` (rename/import/move guards)
+    - `tests/layer4-db-cleanup.test.ts` (init-time cleanup)
 
 ### B. Async Search Reliability (L1/L2 Budgets)
 
@@ -98,7 +101,7 @@
 
 - Non‑perf suites: green (adapters, unified‑core, integration, L4 parity).
 - Perf benchmarks:
-  - No TypeErrors during pattern learning or ontology persistence.
+- No TypeErrors during pattern learning or ontology persistence. (Met with A1/A2 fixes.)
   - Large codebase and concurrency tests satisfy defaults on typical
     dev hosts; env overrides available for constrained CI.
   - Reduced async→sync fallback warnings; count below threshold.
@@ -112,8 +115,8 @@
 
 ## Execution Plan (Sequenced)
 
-1) Implement A: pattern‑storage guards + tests.
-2) Implement A: SQLite representation guard + tests.
+1) Implement A: pattern‑storage guards + tests. (DONE)
+2) Implement A: SQLite representation guard + tests. (DONE)
 3) Implement B/C: perf env knobs + warm‑up + deterministic fixture.
 4) Implement D: L1/L2 counters; log in perf context.
 5) Run targeted suites (non‑perf → perf); tune thresholds only if
@@ -141,4 +144,3 @@
 - No productionization of Postgres/TripleStore in this cycle.
 - No new features beyond guards, env knobs, and metrics needed for
   stabilization.
-

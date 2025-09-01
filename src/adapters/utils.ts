@@ -229,20 +229,17 @@ export function buildCompletionRequest(params: {
  * Convert Definition to LSP Location format
  */
 export function definitionToLspLocation(definition: Definition) {
-    return {
-        uri: definition.uri,
-        range: definition.range,
-    };
+    // Lightweight guard to avoid malformed ranges in adapter layer
+    const range = normalizeRange(definition.range as any);
+    return { uri: normalizeUri(definition.uri), range };
 }
 
 /**
  * Convert Reference to LSP Location format
  */
 export function referenceToLspLocation(reference: Reference) {
-    return {
-        uri: reference.uri,
-        range: reference.range,
-    };
+    const range = normalizeRange(reference.range as any);
+    return { uri: normalizeUri(reference.uri), range };
 }
 
 /**

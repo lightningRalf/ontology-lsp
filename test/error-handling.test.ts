@@ -411,7 +411,7 @@ describe('Integration Tests', () => {
         attempts++;
         return scenario();
       },
-      { maxRetries: 3 }
+      { maxRetries: 3, baseDelay: 10, jitterMs: 0, exponentialBackoff: true }
     );
 
     expect(result).toBe('recovered');

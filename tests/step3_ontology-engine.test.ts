@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { OntologyEngine } from '../src/ontology/ontology-engine';
+import { OntologyStorage } from '../src/ontology/storage';
 import { type Concept, RelationType, type SymbolRepresentation } from '../src/types/core';
 
 describe('Step 3: OntologyEngine', () => {
@@ -17,7 +18,7 @@ describe('Step 3: OntologyEngine', () => {
     const baseSignature = { parameters: [], sideEffects: [], complexity: 1, fingerprint: 'fp' };
 
     beforeAll(async () => {
-        engine = new OntologyEngine(':memory:');
+        engine = new OntologyEngine(new OntologyStorage(':memory:'));
         await new Promise((res) => setTimeout(res, 50));
         const concept: Concept = {
             id: '1',

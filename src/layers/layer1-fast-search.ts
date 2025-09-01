@@ -60,10 +60,9 @@ const searchTools = new EnhancedSearchTools({
 
 // Create async search tools instance with performance optimizations
 const asyncSearchTools = new AsyncEnhancedGrep({
-    maxProcesses: 4, // 4x parallel search
+    // Let maxProcesses and defaultTimeout be derived from CPU/env; only tune cache here
     cacheSize: 1000, // Large cache for frequent queries
     cacheTTL: 60000, // 1 minute cache TTL
-    defaultTimeout: 2000, // 2 second timeout for production performance
 });
 
 // Wrapper functions to maintain compatibility with existing code

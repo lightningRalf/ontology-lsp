@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { ClaudeToolsLayer } from '../src/layers/claude-tools';
 import { TreeSitterLayer } from '../src/layers/tree-sitter';
 import { OntologyEngine } from '../src/ontology/ontology-engine';
+import { OntologyStorage } from '../src/ontology/storage';
 import { PatternLearner } from '../src/patterns/pattern-learner';
 import { KnowledgeSpreader } from '../src/propagation/knowledge-spreader';
 import {
@@ -112,7 +113,7 @@ describe('Integration Tests', () => {
     });
 
     test('Ontology Engine - concept management', async () => {
-        const engine = new OntologyEngine(':memory:');
+        const engine = new OntologyEngine(new OntologyStorage(':memory:'));
         await new Promise((res) => setTimeout(res, 50));
 
         const concept = {
@@ -180,7 +181,7 @@ describe('Integration Tests', () => {
     });
 
     test('Knowledge Spreader - propagation analysis', async () => {
-        const engine = new OntologyEngine(':memory:');
+        const engine = new OntologyEngine(new OntologyStorage(':memory:'));
         const learner = new PatternLearner(':memory:');
         await new Promise((res) => setTimeout(res, 100));
 
@@ -309,7 +310,7 @@ describe('Performance Tests', () => {
     });
 
     test('handles concurrent operations', async () => {
-        const engine = new OntologyEngine(':memory:');
+        const engine = new OntologyEngine(new OntologyStorage(':memory:'));
         await new Promise((res) => setTimeout(res, 50));
 
         const promises = [];
@@ -345,7 +346,7 @@ describe('Performance Tests', () => {
     });
 
     test('memory usage stays bounded', async () => {
-        const engine = new OntologyEngine(':memory:');
+        const engine = new OntologyEngine(new OntologyStorage(':memory:'));
         await new Promise((res) => setTimeout(res, 50));
 
         // Add many concepts

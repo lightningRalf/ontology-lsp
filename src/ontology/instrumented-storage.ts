@@ -30,6 +30,10 @@ export interface L4StorageMetrics {
   updatedAt: number;
   totals: { count: number; errors: number };
   operations: Record<OpName, (OpStats & { p50: number; p95: number; p99: number }) | undefined>;
+  extras?: {
+    skippedRepresentationsSave?: number;
+    skippedRepresentationsLoad?: number;
+  };
 }
 
 export class InstrumentedStoragePort implements StoragePort {
@@ -93,7 +97,16 @@ export class InstrumentedStoragePort implements StoragePort {
       totalCount += s.count;
       totalErrors += s.errors;
     }
-    return { startedAt: this.startedAt, updatedAt: this.updatedAt, totals: { count: totalCount, errors: totalErrors }, operations };
+    const extras: any = {};
+    const innerAny: any = this.inner as any;
+    if (typeof innerAny.getSkipCounts === 'function') {
+      try {
+        const sc = innerAny.getSkipCounts();
+        extras.skippedRepresentationsSave = sc?.save ?? 0;
+        extras.skippedRepresentationsLoad = sc?.load ?? 0;
+      } catch {}
+    }
+    return { startedAt: this.startedAt, updatedAt: this.updatedAt, totals: { count: totalCount, errors: totalErrors }, operations, extras };
   }
 
   // Lifecycle
@@ -150,4 +163,3 @@ export class InstrumentedStoragePort implements StoragePort {
     return this.timed('backup', () => this.inner.backup!(backupPath));
   }
 }
-

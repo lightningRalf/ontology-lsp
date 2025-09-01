@@ -357,7 +357,9 @@ export interface Layer3Config {
 
 export interface Layer4Config {
     enabled: boolean;
-    // Preferred ontology DB path (for Layer 4 ontology storage)
+    // Storage adapter selection (default: 'sqlite')
+    adapter?: 'sqlite' | 'postgres' | 'triplestore';
+    // Preferred ontology DB path (for sqlite adapter)
     dbPath?: string;
 }
 
