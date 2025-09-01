@@ -175,6 +175,48 @@ LOG_LEVEL=debug bun run start
 4. **Monitor circuit breaker** - Adjust thresholds based on network conditions
 5. **Tune cache settings** - Balance freshness vs performance
 
+## Layer 4 StoragePort (Ontology) Configuration
+
+Layer 4 persists concepts and relations through a pluggable StoragePort. Select the backend via config or environment.
+
+- Adapter selection (default: sqlite):
+  - `layers.layer4.adapter: 'sqlite' | 'postgres' | 'triplestore'`
+
+- SQLite options:
+  - `layers.layer4.dbPath`: path to the SQLite DB file (default: `.ontology/ontology.db`)
+
+- Postgres options:
+  - Install the `pg` package in your environment.
+  - Provide a connection string using one of:
+    - `ONTOLOGY_PG_URL`
+    - `DATABASE_URL`
+    - `PG_URL` or `PGURL`
+  - Example:
+    - `export ONTOLOGY_PG_URL=postgres://user:pass@localhost:5432/ontology`
+  - Set adapter:
+    - `layers.layer4.adapter: postgres`
+
+- Triple Store options:
+  - Adapter is scaffolded but CRUD is not implemented yet.
+
+Notes:
+- If Postgres is not configured, the adapter’s `initialize()` will no-op and related tests are skipped.
+- For production deployments, use managed Postgres with pooling and SSL; configure timeouts and budgets per SLOs.
+
+### Metrics & Dashboards
+
+- HTTP metrics endpoints (HTTP adapter):
+  - JSON: `GET /metrics/l4` → Layer 4 storage metrics (counts, errors, p50/p95/p99)
+  - Prometheus: `GET /metrics?format=prometheus` → text exposition format with metrics:
+    - `ontology_l4_operation_count{op}`
+    - `ontology_l4_operation_errors{op}`
+    - `ontology_l4_operation_duration_ms{op,quantile="p50|p95|p99"}`
+    - `ontology_l4_started_at_seconds`, `ontology_l4_updated_at_seconds`
+
+- Prometheus scrape config is provided at `config/prometheus/prometheus.yml` (HTTP job at port 7000, path `/metrics`).
+
+- Grafana dashboard: see `config/grafana/dashboards/layer4-storage-metrics.json` (basic timeseries panels for counts, errors, p95/p99).
+
 ## Configuration API Reference
 
 ### `getEnvironmentConfig()`

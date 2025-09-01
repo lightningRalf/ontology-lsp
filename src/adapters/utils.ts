@@ -540,6 +540,9 @@ export function createDefaultCoreConfig(): CoreConfig {
             },
             layer4: {
                 enabled: true,
+                // Pluggable storage adapter for Layer 4 (Ontology)
+                // Default to sqlite; other options: 'postgres', 'triplestore'
+                adapter: 'sqlite',
                 dbPath: '.ontology/ontology.db',
                 timeout: 10000,
             },

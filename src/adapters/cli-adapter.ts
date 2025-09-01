@@ -254,6 +254,7 @@ export class CLIAdapter {
     async handleStats(): Promise<string> {
         try {
             const diagnostics = this.coreAnalyzer.getDiagnostics();
+            const l4 = (this.coreAnalyzer as any).getLayer4StorageMetrics?.();
 
             const output = [
                 this.formatHeader('Ontology LSP Statistics'),
@@ -268,8 +269,29 @@ export class CLIAdapter {
                 `Cache enabled: ${diagnostics.sharedServices?.cache?.enabled ?? 'Unknown'}`,
                 `Learning enabled: ${diagnostics.learningCapabilities?.patternLearning ?? 'Unknown'}`,
                 '',
-                `Timestamp: ${new Date(diagnostics.timestamp).toISOString()}`,
+                this.formatHeader('Layer 4 Storage Metrics (recent):'),
             ];
+
+            if (l4?.operations) {
+                const ops = l4.operations as any;
+                const opNames = Object.keys(ops);
+                for (const name of opNames) {
+                    const s = ops[name];
+                    if (!s || !s.count) continue;
+                    output.push(
+                        `  ${name}: count=${s.count}, errors=${s.errors}, p50=${Math.round(s.p50)}ms, p95=${Math.round(
+                            s.p95
+                        )}ms, p99=${Math.round(s.p99)}ms`
+                    );
+                }
+            } else {
+                output.push('  (no metrics yet)');
+            }
+
+            output.push(
+                '',
+                `Timestamp: ${new Date(diagnostics.timestamp).toISOString()}`,
+            );
 
             return output.join('\n');
         } catch (error) {

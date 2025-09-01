@@ -120,6 +120,20 @@ export class CodeAnalyzer {
         });
     }
 
+    // Layer 4 storage metrics surface (dashboard-friendly JSON)
+    getLayer4StorageMetrics(): any | null {
+        try {
+            const layer: any = (this as any).layerManager?.getLayer('layer4');
+            const engine = layer && typeof layer.getOntologyEngine === 'function' ? layer.getOntologyEngine() : null;
+            if (engine && typeof engine.getStorageMetrics === 'function') {
+                return engine.getStorageMetrics();
+            }
+        } catch {
+            // ignore
+        }
+        return null;
+    }
+
     /**
      * Async streaming search with 0ms event loop blocking
      * This is the primary search method - use instead of synchronous findDefinition

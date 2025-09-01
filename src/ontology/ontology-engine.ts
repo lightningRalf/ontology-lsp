@@ -16,7 +16,8 @@ import {
 } from '../types/core';
 import { ConceptBuilder } from './concept-builder';
 import { SimilarityCalculator } from './similarity-calculator';
-import { OntologyStorage } from './storage';
+import type { StoragePort } from './storage-port';
+import { InstrumentedStoragePort, type L4StorageMetrics } from './instrumented-storage';
 
 export interface RelatedConcept {
     concept: Concept;
@@ -42,15 +43,17 @@ export class OntologyEngine extends EventEmitter {
     private nameToConceptMap = new Map<string, string[]>(); // name -> concept IDs
     private similarityCalculator: SimilarityCalculator;
     private conceptBuilder: ConceptBuilder;
-    private storage: OntologyStorage;
+    private storage: StoragePort;
     private initPromise: Promise<void> | null = null;
 
-    constructor(dbPath: string) {
+    constructor(storage: StoragePort) {
         super();
         this.conceptGraph = new Graph({ directed: true, multigraph: true });
         this.similarityCalculator = new SimilarityCalculator();
         this.conceptBuilder = new ConceptBuilder();
-        this.storage = new OntologyStorage(dbPath);
+        // Ensure storage is instrumented for metrics
+        const s: any = storage as any;
+        this.storage = s && typeof s.getMetrics === 'function' ? storage : new InstrumentedStoragePort(storage);
 
         // Store initialization promise for later awaiting
         this.initPromise = this.initialize();
@@ -61,6 +64,18 @@ export class OntologyEngine extends EventEmitter {
             await this.initPromise;
             this.initPromise = null;
         }
+    }
+
+    getStorageMetrics(): L4StorageMetrics | null {
+        const s: any = this.storage as any;
+        if (s && typeof s.getMetrics === 'function') {
+            try {
+                return s.getMetrics();
+            } catch {
+                return null;
+            }
+        }
+        return null;
     }
 
     private async initialize(): Promise<void> {

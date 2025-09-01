@@ -88,6 +88,56 @@ export class HTTPServer {
                     //   return await this.handleSSEStream(request, url.pathname);
                     // }
 
+                    // Small built-in metrics endpoint for Layer 4 storage
+                    if (url.pathname === '/metrics/l4' && request.method === 'GET') {
+                        const metrics = (this.coreAnalyzer as any).getLayer4StorageMetrics?.();
+                        return new Response(JSON.stringify(metrics || { error: 'unavailable' }), {
+                            status: metrics ? 200 : 503,
+                            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                        });
+                    }
+
+                    if (url.pathname === '/metrics' && request.method === 'GET') {
+                        const fmt = (url.searchParams.get('format') || 'prometheus').toLowerCase();
+                        const l4 = (this.coreAnalyzer as any).getLayer4StorageMetrics?.();
+                        if (fmt !== 'prometheus') {
+                            return new Response(JSON.stringify({ l4: l4 || null }), {
+                                status: l4 ? 200 : 503,
+                                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                            });
+                        }
+                        let text = '';
+                        const nowSec = Math.floor(Date.now() / 1000);
+                        text += '# HELP ontology_l4_started_at_seconds L4 storage metrics start time.\n';
+                        text += '# TYPE ontology_l4_started_at_seconds gauge\n';
+                        if (l4?.startedAt) text += `ontology_l4_started_at_seconds ${Math.floor(l4.startedAt / 1000)}\n`;
+                        text += '# HELP ontology_l4_updated_at_seconds L4 storage metrics last update time.\n';
+                        text += '# TYPE ontology_l4_updated_at_seconds gauge\n';
+                        if (l4?.updatedAt) text += `ontology_l4_updated_at_seconds ${Math.floor(l4.updatedAt / 1000)}\n`;
+                        text += '# HELP ontology_l4_operation_count Total operations per op.\n';
+                        text += '# TYPE ontology_l4_operation_count counter\n';
+                        text += '# HELP ontology_l4_operation_errors Total errors per op.\n';
+                        text += '# TYPE ontology_l4_operation_errors counter\n';
+                        text += '# HELP ontology_l4_operation_duration_ms Quantiles of op duration in ms.\n';
+                        text += '# TYPE ontology_l4_operation_duration_ms gauge\n';
+                        if (l4?.operations) {
+                            for (const [op, s] of Object.entries(l4.operations)) {
+                                if (!s || !s.count) continue;
+                                text += `ontology_l4_operation_count{op="${op}"} ${s.count}\n`;
+                                text += `ontology_l4_operation_errors{op="${op}"} ${s.errors}\n`;
+                                text += `ontology_l4_operation_duration_ms{op="${op}",quantile="p50"} ${Math.round((s as any).p50)}\n`;
+                                text += `ontology_l4_operation_duration_ms{op="${op}",quantile="p95"} ${Math.round((s as any).p95)}\n`;
+                                text += `ontology_l4_operation_duration_ms{op="${op}",quantile="p99"} ${Math.round((s as any).p99)}\n`;
+                            }
+                        }
+                        // Always end with a newline
+                        if (!text.endsWith('\n')) text += '\n';
+                        return new Response(text, {
+                            status: 200,
+                            headers: { 'Content-Type': 'text/plain; version=0.0.4', 'Cache-Control': 'no-cache' },
+                        });
+                    }
+
                     // Convert Bun request to our HTTPRequest format
                     const httpRequest: HTTPRequest = {
                         method: request.method,

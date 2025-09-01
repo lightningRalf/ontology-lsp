@@ -3,13 +3,14 @@ import { Database } from 'bun:sqlite';
 import * as fs from 'fs';
 import * as path from 'path';
 import { type Concept, Relation } from '../types/core';
+import type { StoragePort } from './storage-port';
 
 // Database row type interfaces
 interface ConceptRow {
     id: string;
     canonical_name: string;
     confidence: number;
-    data: string;
+    metadata: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -63,7 +64,8 @@ interface StatsRow {
     total_relations: number;
 }
 
-export class OntologyStorage {
+// SQLite-backed implementation of StoragePort
+export class OntologyStorage implements StoragePort {
     private db: Database;
 
     constructor(private dbPath: string) {
@@ -377,7 +379,7 @@ export class OntologyStorage {
 
     private async deserializeConcept(row: ConceptRow): Promise<Concept | null> {
         try {
-            const data = JSON.parse(row.data);
+            const meta = row.metadata ? JSON.parse(row.metadata) : {};
 
             // Load representations
             const repRows = this.db
@@ -466,7 +468,7 @@ export class OntologyStorage {
                 canonicalName: row.canonical_name,
                 representations,
                 relations,
-                signature: data.signature || {
+                signature: meta.signature || {
                     parameters: [],
                     sideEffects: [],
                     complexity: 0,
