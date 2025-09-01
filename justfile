@@ -222,19 +222,24 @@ build:
     @echo "🔨 Building server components..."
     {{bun}} build src/servers/lsp.ts --target=bun --outdir=dist/lsp --format=esm \
         --external tree-sitter --external tree-sitter-typescript \
-        --external tree-sitter-javascript --external tree-sitter-python
+        --external tree-sitter-javascript --external tree-sitter-python \
+        --external pg --external bun:sqlite --external express --external cors
     {{bun}} build src/servers/http.ts --target=bun --outdir=dist/api --format=esm \
         --external tree-sitter --external tree-sitter-typescript \
-        --external tree-sitter-javascript --external tree-sitter-python
+        --external tree-sitter-javascript --external tree-sitter-python \
+        --external pg --external bun:sqlite --external express --external cors
     {{bun}} build src/servers/mcp-http.ts --target=bun --outdir=dist/mcp-http --format=esm \
         --external tree-sitter --external tree-sitter-typescript \
-        --external tree-sitter-javascript --external tree-sitter-python
+        --external tree-sitter-javascript --external tree-sitter-python \
+        --external pg --external bun:sqlite --external express --external cors
     {{bun}} build src/servers/mcp-fast.ts --target=bun --outfile=dist/mcp-fast/mcp-fast.js --format=esm \
         --external tree-sitter --external tree-sitter-typescript \
-        --external tree-sitter-javascript --external tree-sitter-python
+        --external tree-sitter-javascript --external tree-sitter-python \
+        --external pg --external bun:sqlite --external express --external cors
     {{bun}} build src/servers/cli.ts --target=bun --outdir=dist/cli --format=esm \
         --external tree-sitter --external tree-sitter-typescript \
-        --external tree-sitter-javascript --external tree-sitter-python
+        --external tree-sitter-javascript --external tree-sitter-python \
+        --external pg --external bun:sqlite --external express --external cors
     @echo "✅ Build complete"
 
 # Build only the MCP fast server (no minification to preserve symbol names for find_definition)

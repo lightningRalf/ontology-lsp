@@ -171,7 +171,24 @@ ontology-lsp/
 ### Plans Archive
 - Moved `IMPLEMENTATION_PLAN_LAYER3_SYMBOL_MAP.md` to `docs/archive/` (completed).
 
-## 📅 Latest Updates (2025-08-28)
+## 📅 Latest Updates (2025-09-02)
+
+### 🚀 Developer Experience & UI
+- One‑click UI: HTTP serves web UI at `/ui`; OpenAPI at `/openapi.json`.
+- Live MCP monitoring: MCP HTTP server exposes `/mcp-events` (SSE); UI stream card added.
+- Snapshots: list and clean via HTTP + UI; overlay now materializes diffs and runs checks in snapshot cwd.
+- Default SQLite: builds mark `pg` external; Postgres is opt‑in; no PG required for default runs.
+- Codex MCP config: added `ontology-lsp` MCP (stdio) to `~/.codex/config.toml` for easy use from Codex CLI.
+
+### Quick Commands
+- Build: `just build` (or `bun run build:all`)
+- Start: `just start` → HTTP:7000, MCP:7001
+- UI: open `http://localhost:7000/ui`
+- Live events: `http://localhost:7001/mcp-events`
+
+---
+
+## 📅 Earlier Snapshot (2025-08-28)
 
 ### 🧪 Test Suite Validation (Local Run)
 - Environment: Bun 1.2.20, Node v24.6.0

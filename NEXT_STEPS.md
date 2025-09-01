@@ -437,6 +437,12 @@ Goal: Ship LLM‑friendly, snapshot‑aware tool surface with hybrid routing.
 - Snapshots: list/clean (done). Add inputs for maxKeep/maxAgeDays and show materialized snapshot directories.
 - Docs: link `/ui` in README and add basic troubleshooting for dashboards.
 
+### 0.10 Dev Ergonomics (New)
+
+- Ensure default SQLite paths documented and Postgres remains opt‑in.
+- Add a “Getting Started” block to README: `just build`, `just start`, `/ui` links.
+- Provide Codex CLI setup snippet for MCP stdio in `~/.codex/config.toml`.
+
 ### 0.7 File Watcher Strategy (Updated)
 
 - Default: Node watcher via `chokidar` (fs.watch + fsevents) with debounce/coalesce; gitignore‑aware.

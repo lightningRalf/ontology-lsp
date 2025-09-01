@@ -1,7 +1,7 @@
 import Parser, { Query } from 'tree-sitter';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import glob from 'glob';
+import { glob } from 'glob';
 
 function findModulePath(moduleName: string): string {
   const candidates = [
@@ -51,7 +51,7 @@ export async function runAstQuery(inp: AstQueryInput) {
     inp.paths.forEach((p) => fileSet.add(path.resolve(p)));
   }
   if (inp.glob) {
-    const matches = glob.sync(inp.glob, { ignore: ['**/node_modules/**','**/dist/**','**/.git/**','**/coverage/**'], nodir: true });
+    const matches = glob.sync(inp.glob, { ignore: ['**/node_modules/**','**/dist/**','**/.git/**','**/coverage/**'], nodir: true } as any);
     matches.slice(0, 2000).forEach((m) => fileSet.add(path.resolve(m)));
   }
   const files = Array.from(fileSet).slice(0, Math.min(inp.limit || 100, 1000));
@@ -77,4 +77,3 @@ export async function runAstQuery(inp: AstQueryInput) {
   }
   return { count: results.length, results };
 }
-
