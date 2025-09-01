@@ -338,14 +338,14 @@ export class CLIAdapter {
             lines.push(`Context: ${uri}`);
             lines.push('');
             lines.push(this.formatHeader(`Definitions (showing ${defs.length} of ${result.definitions.length}):`));
-            defs.forEach((def) => {
+            defs.forEach((def: any) => {
                 lines.push(
                     `  ${def.uri}:${def.range.start.line + 1}:${def.range.start.character + 1} [${def.kind}] (${Math.round(def.confidence * 100)}%)`
                 );
             });
             lines.push('');
             lines.push(this.formatHeader(`References (showing ${refs.length} of ${result.references.length}):`));
-            refs.forEach((ref) => {
+            refs.forEach((ref: any) => {
                 lines.push(
                     `  ${ref.uri}:${ref.range.start.line + 1}:${ref.range.start.character + 1} [${ref.kind}] (${Math.round(ref.confidence * 100)}%)`
                 );

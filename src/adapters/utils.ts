@@ -197,7 +197,7 @@ export function buildRenameRequest(params: {
     return {
         uri: normalizeUri(params.uri),
         position: params.position,
-        identifier: params.identifier,
+        oldName: params.identifier,
         newName: params.newName,
         dryRun: params.dryRun ?? false,
     };
@@ -212,12 +212,15 @@ export function buildCompletionRequest(params: {
     triggerCharacter?: string;
     maxResults?: number;
 }): CompletionRequest {
-    return {
+    const req: CompletionRequest = {
         uri: normalizeUri(params.uri),
         position: params.position,
-        triggerCharacter: params.triggerCharacter,
         maxResults: params.maxResults ?? 20,
+        context: params.triggerCharacter
+            ? { triggerKind: 2, triggerCharacter: params.triggerCharacter }
+            : { triggerKind: 1 },
     };
+    return req;
 }
 
 // ===== RESPONSE CONVERTERS =====

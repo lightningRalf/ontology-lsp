@@ -540,9 +540,10 @@ export class HTTPAdapter {
             const monitoring = diagnostics.monitoring || {};
 
             // Get detailed monitoring stats if available
-            let detailedStats = {};
-            if (this.coreAnalyzer.getDetailedStats) {
-                detailedStats = await this.coreAnalyzer.getDetailedStats();
+            let detailedStats = {} as any;
+            const getStats = (this.coreAnalyzer as any).getDetailedStats;
+            if (typeof getStats === 'function') {
+                detailedStats = await getStats.call(this.coreAnalyzer);
             }
 
             return {

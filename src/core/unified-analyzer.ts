@@ -1906,7 +1906,6 @@ export class CodeAnalyzer {
                 insertText: 'pattern_completion()',
                 confidence: 0.8,
                 source: 'pattern',
-                layer: 'layer4',
             },
         ];
     }
@@ -1923,7 +1922,6 @@ export class CodeAnalyzer {
                 insertText: 'conceptual_completion()',
                 confidence: 0.7,
                 source: 'conceptual',
-                layer: 'layer4',
             },
         ];
     }
