@@ -1508,12 +1508,15 @@ export class FastSearchLayer implements Layer<SearchQuery, EnhancedMatches> {
 
     // Get performance metrics and tool health
     getMetrics() {
+        const rt = (asyncSearchTools as any)?.getRuntimeInfo?.() || {};
         return {
             layer: this.performanceMetrics,
             tools: searchTools.getMetrics(),
             asyncTools: {
                 enabled: true,
                 cacheSize: 1000,
+                processPoolSize: rt.maxProcesses ?? undefined,
+                defaultTimeout: rt.defaultTimeout ?? undefined,
             },
             cacheStats: {
                 size: this.cache.size,

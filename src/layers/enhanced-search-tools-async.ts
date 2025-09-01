@@ -994,6 +994,19 @@ export class AsyncEnhancedGrep {
         this.processPool.destroy();
         this.cache.clear();
     }
+
+    /**
+     * Runtime info for metrics/diagnostics
+     */
+    getRuntimeInfo(): { maxProcesses: number; defaultTimeout: number; cacheSize: number; cacheTTL: number; fileDiscoveryPrefer: string } {
+        return {
+            maxProcesses: this.config.maxProcesses,
+            defaultTimeout: this.config.defaultTimeout,
+            cacheSize: this.config.cacheSize,
+            cacheTTL: this.config.cacheTTL,
+            fileDiscoveryPrefer: String(this.config.fileDiscoveryPrefer || 'auto'),
+        };
+    }
 }
 
 /**

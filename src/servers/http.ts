@@ -99,38 +99,74 @@ export class HTTPServer {
 
                     if (url.pathname === '/metrics' && request.method === 'GET') {
                         const fmt = (url.searchParams.get('format') || 'prometheus').toLowerCase();
+                        const lm: any = (this.coreAnalyzer as any).layerManager;
+                        const l1: any = lm?.getLayer?.('layer1');
+                        const l2: any = lm?.getLayer?.('layer2');
+                        const l1m = typeof l1?.getMetrics === 'function' ? l1.getMetrics() : null;
+                        const l2m = typeof l2?.getMetrics === 'function' ? l2.getMetrics() : null;
                         const l4 = (this.coreAnalyzer as any).getLayer4StorageMetrics?.();
+
                         if (fmt !== 'prometheus') {
-                            return new Response(JSON.stringify({ l4: l4 || null }), {
-                                status: l4 ? 200 : 503,
+                            return new Response(JSON.stringify({ l1: l1m, l2: l2m, l4: l4 || null }), {
+                                status: l4 || l1m || l2m ? 200 : 503,
                                 headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
                             });
                         }
+
                         let text = '';
-                        const nowSec = Math.floor(Date.now() / 1000);
-                        text += '# HELP ontology_l4_started_at_seconds L4 storage metrics start time.\n';
-                        text += '# TYPE ontology_l4_started_at_seconds gauge\n';
-                        if (l4?.startedAt) text += `ontology_l4_started_at_seconds ${Math.floor(l4.startedAt / 1000)}\n`;
-                        text += '# HELP ontology_l4_updated_at_seconds L4 storage metrics last update time.\n';
-                        text += '# TYPE ontology_l4_updated_at_seconds gauge\n';
-                        if (l4?.updatedAt) text += `ontology_l4_updated_at_seconds ${Math.floor(l4.updatedAt / 1000)}\n`;
-                        text += '# HELP ontology_l4_operation_count Total operations per op.\n';
-                        text += '# TYPE ontology_l4_operation_count counter\n';
-                        text += '# HELP ontology_l4_operation_errors Total errors per op.\n';
-                        text += '# TYPE ontology_l4_operation_errors counter\n';
-                        text += '# HELP ontology_l4_operation_duration_ms Quantiles of op duration in ms.\n';
-                        text += '# TYPE ontology_l4_operation_duration_ms gauge\n';
-                        if (l4?.operations) {
-                            for (const [op, s] of Object.entries(l4.operations)) {
-                                if (!s || !s.count) continue;
-                                text += `ontology_l4_operation_count{op="${op}"} ${s.count}\n`;
-                                text += `ontology_l4_operation_errors{op="${op}"} ${s.errors}\n`;
-                                text += `ontology_l4_operation_duration_ms{op="${op}",quantile="p50"} ${Math.round((s as any).p50)}\n`;
-                                text += `ontology_l4_operation_duration_ms{op="${op}",quantile="p95"} ${Math.round((s as any).p95)}\n`;
-                                text += `ontology_l4_operation_duration_ms{op="${op}",quantile="p99"} ${Math.round((s as any).p99)}\n`;
+                        // L1 metrics
+                        if (l1m?.layer) {
+                            text += '# HELP ontology_l1_timeouts_total L1 async search timeouts.\n';
+                            text += '# TYPE ontology_l1_timeouts_total counter\n';
+                            text += `ontology_l1_timeouts_total ${l1m.layer.timeouts || 0}\n`;
+                            text += '# HELP ontology_l1_fallbacks_total L1 async->sync fallbacks.\n';
+                            text += '# TYPE ontology_l1_fallbacks_total counter\n';
+                            text += `ontology_l1_fallbacks_total ${l1m.layer.fallbacks || 0}\n`;
+                            text += '# HELP ontology_l1_avg_response_ms Average L1 response time.\n';
+                            text += '# TYPE ontology_l1_avg_response_ms gauge\n';
+                            text += `ontology_l1_avg_response_ms ${Math.round(l1m.layer.avgResponseTime || 0)}\n`;
+                        }
+
+                        // L2 metrics
+                        if (l2m) {
+                            text += '# HELP ontology_l2_parse_count Total parsed files.\n';
+                            text += '# TYPE ontology_l2_parse_count counter\n';
+                            text += `ontology_l2_parse_count ${l2m.count || 0}\n`;
+                            text += '# HELP ontology_l2_parse_errors Total parse errors.\n';
+                            text += '# TYPE ontology_l2_parse_errors counter\n';
+                            text += `ontology_l2_parse_errors ${l2m.errors || 0}\n`;
+                            text += '# HELP ontology_l2_parse_duration_ms Parse duration quantiles.\n';
+                            text += '# TYPE ontology_l2_parse_duration_ms summary\n';
+                            text += `ontology_l2_parse_duration_ms{quantile=\"p50\"} ${Math.round(l2m.p50 || 0)}\n`;
+                            text += `ontology_l2_parse_duration_ms{quantile=\"p95\"} ${Math.round(l2m.p95 || 0)}\n`;
+                            text += `ontology_l2_parse_duration_ms{quantile=\"p99\"} ${Math.round(l2m.p99 || 0)}\n`;
+                        }
+
+                        // L4 storage metrics
+                        if (l4) {
+                            text += '# HELP ontology_l4_started_at_seconds L4 storage metrics start time.\n';
+                            text += '# TYPE ontology_l4_started_at_seconds gauge\n';
+                            if (l4?.startedAt) text += `ontology_l4_started_at_seconds ${Math.floor(l4.startedAt / 1000)}\n`;
+                            text += '# HELP ontology_l4_updated_at_seconds L4 storage metrics last update time.\n';
+                            text += '# TYPE ontology_l4_updated_at_seconds gauge\n';
+                            if (l4?.updatedAt) text += `ontology_l4_updated_at_seconds ${Math.floor(l4.updatedAt / 1000)}\n`;
+                            if (l4?.operations) {
+                                for (const [op, s] of Object.entries(l4.operations)) {
+                                    if (!s || !(s as any).count) continue;
+                                    text += `# HELP ontology_l4_operation_count Total operations per op.\n`;
+                                    text += '# TYPE ontology_l4_operation_count counter\n';
+                                    text += `ontology_l4_operation_count{op=\"${op}\"} ${(s as any).count}\n`;
+                                    text += `# HELP ontology_l4_operation_errors Total errors per op.\n`;
+                                    text += '# TYPE ontology_l4_operation_errors counter\n';
+                                    text += `ontology_l4_operation_errors{op=\"${op}\"} ${(s as any).errors}\n`;
+                                    text += '# HELP ontology_l4_operation_duration_ms Quantiles of op duration in ms.\n';
+                                    text += '# TYPE ontology_l4_operation_duration_ms gauge\n';
+                                    text += `ontology_l4_operation_duration_ms{op=\"${op}\",quantile=\"p50\"} ${Math.round((s as any).p50)}\n`;
+                                    text += `ontology_l4_operation_duration_ms{op=\"${op}\",quantile=\"p95\"} ${Math.round((s as any).p95)}\n`;
+                                    text += `ontology_l4_operation_duration_ms{op=\"${op}\",quantile=\"p99\"} ${Math.round((s as any).p99)}\n`;
+                                }
                             }
                         }
-                        // Always end with a newline
                         if (!text.endsWith('\n')) text += '\n';
                         return new Response(text, {
                             status: 200,

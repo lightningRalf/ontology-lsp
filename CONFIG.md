@@ -205,13 +205,15 @@ Notes:
 
 ### Metrics & Dashboards
 
-- HTTP metrics endpoints (HTTP adapter):
-  - JSON: `GET /metrics/l4` → Layer 4 storage metrics (counts, errors, p50/p95/p99)
-  - Prometheus: `GET /metrics?format=prometheus` → text exposition format with metrics:
-    - `ontology_l4_operation_count{op}`
-    - `ontology_l4_operation_errors{op}`
-    - `ontology_l4_operation_duration_ms{op,quantile="p50|p95|p99"}`
-    - `ontology_l4_started_at_seconds`, `ontology_l4_updated_at_seconds`
+- HTTP metrics endpoints:
+  - JSON: `GET /metrics` → consolidated metrics for L1, L2, and L4.
+    - L1 (Fast Search): `{ searches, cacheHits, fallbacks, timeouts, avgResponseTime, asyncTools: { processPoolSize, defaultTimeout } }`
+    - L2 (AST Parser): `{ count, errors, p50, p95, p99 }`
+    - L4 (Storage): `{ startedAt, updatedAt, operations: { op -> { count, errors, p50, p95, p99 } }, extras: { skippedRepresentationsSave, skippedRepresentationsLoad } }`
+  - Prometheus: `GET /metrics?format=prometheus` → text exposition format with series for L1/L2/L4.
+    - L1: `ontology_l1_timeouts_total`, `ontology_l1_fallbacks_total`, `ontology_l1_avg_response_ms`
+    - L2: `ontology_l2_parse_count`, `ontology_l2_parse_errors`, `ontology_l2_parse_duration_ms{quantile="p50|p95|p99"}`
+    - L4: `ontology_l4_operation_count{op}`, `ontology_l4_operation_errors{op}`, `ontology_l4_operation_duration_ms{op,quantile="p50|p95|p99"}`, `ontology_l4_started_at_seconds`, `ontology_l4_updated_at_seconds`
 
 - Prometheus scrape config is provided at `config/prometheus/prometheus.yml` (HTTP job at port 7000, path `/metrics`).
 
@@ -225,6 +227,7 @@ override as needed.
 
 - Async search timeout override:
   - `ENHANCED_GREP_DEFAULT_TIMEOUT_MS` (number, optional)
+  - `ENHANCED_GREP_MAX_PROCESSES` (number, optional) — align async process pool with host cores or override explicitly
 
 - Perf thresholds (consumed by perf tests):
   - `PERF_P95_TARGET_MS` (default 150)
@@ -236,6 +239,14 @@ Guidance:
   cold‑start noise.
 - Prefer deterministic, synthetic fixtures for “large codebase”
   scenarios to reduce I/O variance.
+
+## CLI Stats
+
+- `ontology-lsp stats` prints a concise per-layer metrics summary:
+  - L1 searches/cache hits/fallbacks/timeouts/average latency, plus async pool size and default timeout
+  - L2 parse counts/errors and p50/p95
+  - L4 storage operation counts/errors and duration quantiles
+
 
 ## Configuration API Reference
 

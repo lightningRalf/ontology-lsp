@@ -255,6 +255,11 @@ export class CLIAdapter {
         try {
             const diagnostics = this.coreAnalyzer.getDiagnostics();
             const l4 = (this.coreAnalyzer as any).getLayer4StorageMetrics?.();
+            const lm: any = (this.coreAnalyzer as any).layerManager;
+            const l1: any = lm?.getLayer?.('layer1');
+            const l2: any = lm?.getLayer?.('layer2');
+            const l1m = l1 && l1.name === 'FastSearchLayer' && typeof l1.getMetrics === 'function' ? l1.getMetrics() : null;
+            const l2m = l2 && l2.name === 'TreeSitterLayer' && typeof l2.getMetrics === 'function' ? l2.getMetrics() : null;
 
             const output = [
                 this.formatHeader('Ontology LSP Statistics'),
@@ -264,6 +269,21 @@ export class CLIAdapter {
                 ...Object.entries(diagnostics.layerManager?.layers || {}).map(
                     ([layer, status]) => `  ${layer}: ${status ? 'Active' : 'Inactive'}`
                 ),
+                '',
+                this.formatHeader('Layer 1 (Fast Search):'),
+                l1m
+                    ? `  searches=${l1m.layer.searches} cacheHits=${l1m.layer.cacheHits} fallbacks=${l1m.layer.fallbacks} timeouts=${l1m.layer.timeouts} avgMs=${Math.round(l1m.layer.avgResponseTime)}`
+                    : '  (no metrics)'
+                      ,
+                l1m?.asyncTools
+                    ? `  async: pool=${l1m.asyncTools.processPoolSize ?? 'auto'} defaultTimeout=${l1m.asyncTools.defaultTimeout ?? 'auto'}ms`
+                    : '',
+                '',
+                this.formatHeader('Layer 2 (AST Parser):'),
+                l2m
+                    ? `  parses=${l2m.count} errors=${l2m.errors} p50=${Math.round(l2m.p50)}ms p95=${Math.round(l2m.p95)}ms`
+                    : '  (no metrics)'
+                      ,
                 '',
                 this.formatHeader('Performance:'),
                 `Cache enabled: ${diagnostics.sharedServices?.cache?.enabled ?? 'Unknown'}`,
