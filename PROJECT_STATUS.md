@@ -255,6 +255,19 @@ ontology-lsp/
 - Perf warm-up added to perf suite to reduce cold-start variance.
 - Tests: `PERF=1 bun test tests/enhanced-search-async.test.ts` green locally.
 
+### ✅ C1 Perf Test Determinism (COMPLETED)
+- Env thresholds consumed by perf tests: `PERF_P95_TARGET_MS`, `PERF_P99_TARGET_MS`, `PERF_CONCURRENCY_P95_TARGET_MS`.
+- Deterministic large‑tree fixture for 10k‑file scenarios: `tests/performance/utils/large_tree.ts` with gated test `tests/performance/large-tree.test.ts` (enable via `PERF=1 PERF_LARGE_TREE=1`).
+- Warm‑up added to `tests/performance/benchmark.test.ts` to reduce cold‑start variance.
+
+### ✅ D1 Observability & SLOs (COMPLETED)
+- L1 (Fast Search): counts async→sync fallbacks and timeouts; surfaced via `getMetrics()` and exposed in `/metrics` and CLI stats.
+- L2 (Tree‑sitter): tracked parse durations with p50/p95/p99 and errors; exposed via `getMetrics()` and `/metrics`.
+- L4 (Storage): metrics already present; extras now include skipped rep counters from A2.
+- HTTP `/metrics`: consolidated JSON `{ l1, l2, l4 }` and Prometheus text across L1/L2/L4.
+- CLI: `ontology-lsp stats` prints concise L1/L2/L4 summaries.
+- Docs: `CONFIG.md` updated with metrics surfaces and perf envs; includes warm‑up guidance.
+
 ### 📋 Plan Stored for Perf Stabilization
 - Added implementation plan: `docs/IMPLEMENTATION_PLAN_PERF_STABILIZATION.md`.
 - Focus areas:

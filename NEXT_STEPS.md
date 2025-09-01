@@ -11,17 +11,7 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 
 ### 0.1 Fix‑Bugs‑First: Perf stabilization (Immediate)
 
-Goal: stabilize perf/bench suites by fixing concrete bugs and making
-thresholds deterministic without widening scope.
-
-- C1: Perf test determinism
-  - Add env thresholds: `PERF_P95_TARGET_MS`, `PERF_P99_TARGET_MS`,
-    `PERF_CONCURRENCY_P95_TARGET_MS`. Update tests to consume them.
-  - Provide deterministic large‑tree fixture for 10k‑files scenarios.
-- D1: Observability
-  - Count L1 timeouts/fallbacks; surface minimal counters in metrics.
-- E1: Docs
-  - Update CONFIG.md with perf envs and warm‑up guidance.
+Status: A1/A2/B1/C1/D1/E1 completed. Monitoring perf and metrics; continue to gate perf/benchmarks behind env and iterate if regressions are observed.
 
 ### 0. Architectural roadmap (New)
 
