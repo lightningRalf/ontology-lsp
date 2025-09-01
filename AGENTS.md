@@ -30,6 +30,9 @@ layer mapping, safety rules, and delivery expectations.
   - Layer 5: Pattern Learning & Propagation
 - Ontology DB path comes from `layers.layer4.dbPath`.
 - Pattern learner config is under `layers.layer5.*`.
+- Use Drizzle ORM for TypeScript data access when adding new
+  persistence modules; align choices with the tech stack document
+  referenced below.
 
 4) Pluggable storage mindset
 - Treat Layer 4 storage behind a StoragePort with adapters (SQLite,
@@ -69,6 +72,12 @@ layer mapping, safety rules, and delivery expectations.
   - 🐛 fix(adapter): correct completion request shape
   - 📝 docs(vision): align storage adapters roadmap
 - Note breaking changes in the commit body; update docs accordingly.
+
+@docs/tech-stack-ts.md
+
+<context: folderstructure and filenames>
+Run: eza -T -L 3 --git-ignore .
+</context:folderstructure and filenames>
 
 ## Protocol Adapter Notes
 
@@ -110,4 +119,3 @@ layer mapping, safety rules, and delivery expectations.
 
 For additional context, read VISION.md (system concept and roadmap),
 PROJECT_STATUS.md (current state), and NEXT_STEPS.md (near‑term work).
-
