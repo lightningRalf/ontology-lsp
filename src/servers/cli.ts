@@ -213,6 +213,180 @@ class CLI {
                 process.exit(0);
             });
 
+        // Text search (ripgrep-backed)
+        this.program
+            .command('text-search <query>')
+            .description('Fast bounded content search (ripgrep-backed)')
+            .option('-p, --path <path>', 'Search path (default: cwd)')
+            .option('-k, --kind <kind>', 'literal|regex|word', 'literal')
+            .option('-i, --ignore-case', 'Case insensitive match')
+            .option('-n, --max-results <count>', 'Limit results (<=1000)', '200')
+            .option('-j, --json', 'JSON output')
+            .action(async (query, options) => {
+                await this.ensureInitialized(options);
+                const out = await this.cliAdapter.handleTextSearch(query, {
+                    kind: options.kind,
+                    caseInsensitive: !!options.ignoreCase,
+                    path: options.path,
+                    maxResults: parseInt(options.maxResults),
+                    json: !!options.json,
+                });
+                console.log(out);
+                await this.shutdown();
+                process.exit(0);
+            });
+
+        // Symbol search (AST-only)
+        this.program
+            .command('symbol-search <query>')
+            .description('Search symbols by name (AST-only map)')
+            .option('-n, --max-results <count>', 'Limit results', '50')
+            .option('-j, --json', 'JSON output')
+            .action(async (query, options) => {
+                await this.ensureInitialized(options);
+                const out = await this.cliAdapter.handleSymbolSearch(query, {
+                    maxResults: parseInt(options.maxResults),
+                    json: !!options.json,
+                });
+                console.log(out);
+                await this.shutdown();
+                process.exit(0);
+            });
+
+        // Snapshot management
+        this.program
+            .command('get-snapshot')
+            .description('Create or return the latest snapshot id')
+            .option('--prefer-existing', 'Return existing snapshot when available')
+            .option('-j, --json', 'JSON output')
+            .action(async (options) => {
+                await this.ensureInitialized(options);
+                const out = await this.cliAdapter.handleGetSnapshot({ preferExisting: !!options.preferExisting, json: !!options.json });
+                console.log(out);
+                await this.shutdown();
+                process.exit(0);
+            });
+
+        // Propose patch
+        this.program
+            .command('propose-patch')
+            .description('Validate and stage a unified diff against a snapshot')
+            .option('-s, --snapshot <id>', 'Snapshot id (default: reuse/create)')
+            .option('-f, --file <path>', 'Read patch from file (unified diff)')
+            .option('--run-checks', 'Run checks after staging patch')
+            .option('--cmd <command...>', 'Commands to run (multiple allowed)')
+            .option('-t, --timeout <sec>', 'Timeout for run-checks', '120')
+            .option('-j, --json', 'JSON output')
+            .action(async (options) => {
+                await this.ensureInitialized(options);
+                let patch = '';
+                if (options.file) {
+                    patch = fs.readFileSync(path.resolve(options.file), 'utf8');
+                } else {
+                    patch = fs.readFileSync(0, 'utf8'); // stdin
+                }
+                const out = await this.cliAdapter.handleProposePatch(patch, {
+                    snapshot: options.snapshot,
+                    runChecks: !!options.runChecks,
+                    commands: Array.isArray(options.cmd) ? options.cmd : (options.cmd ? [options.cmd] : []),
+                    timeoutSec: parseInt(options.timeout),
+                    json: !!options.json,
+                });
+                console.log(out);
+                await this.shutdown();
+                process.exit(0);
+            });
+
+        // Run checks for snapshot
+        this.program
+            .command('run-checks')
+            .description('Run checks for a snapshot (format/lint/typecheck/tests)')
+            .option('-s, --snapshot <id>', 'Snapshot id', '')
+            .option('--cmd <command...>', 'Commands to run (multiple allowed)')
+            .option('-t, --timeout <sec>', 'Timeout in seconds', '120')
+            .option('-j, --json', 'JSON output')
+            .action(async (options) => {
+                await this.ensureInitialized(options);
+                const out = await this.cliAdapter.handleRunChecks({
+                    snapshot: options.snapshot,
+                    commands: Array.isArray(options.cmd) ? options.cmd : (options.cmd ? [options.cmd] : []),
+                    timeoutSec: parseInt(options.timeout),
+                    json: !!options.json,
+                });
+                console.log(out);
+                await this.shutdown();
+                process.exit(0);
+            });
+
+        // AST Query
+        this.program
+            .command('ast-query <language> <query>')
+            .description('Run a Tree-sitter s-expression query over selected files')
+            .option('--paths <paths...>', 'Specific files to include')
+            .option('--glob <pattern>', 'Glob to include files')
+            .option('-l, --limit <n>', 'Limit files/results', '2000')
+            .option('-j, --json', 'JSON output')
+            .action(async (language, query, options) => {
+                await this.ensureInitialized(options);
+                const out = await this.cliAdapter.handleAstQuery({
+                    language,
+                    query,
+                    paths: options.paths,
+                    glob: options.glob,
+                    limit: parseInt(options.limit),
+                    json: !!options.json,
+                } as any);
+                console.log(out);
+                await this.shutdown();
+                process.exit(0);
+            });
+
+        // Graph Expand
+        this.program
+            .command('graph-expand')
+            .description('Expand neighbors for a file or symbol (imports/exports; callers/callees best-effort)')
+            .option('-f, --file <path>', 'File path to analyze')
+            .option('-s, --symbol <name>', 'Symbol name to expand')
+            .option('-e, --edges <edges...>', 'Edges to include (imports exports callers callees)')
+            .option('--seed-only', 'Restrict callers search to seeded directories (from buildSymbolMap)')
+            .option('-d, --depth <n>', 'Depth', '1')
+            .option('-l, --limit <n>', 'Limit', '50')
+            .option('-j, --json', 'JSON output')
+            .action(async (options) => {
+                await this.ensureInitialized(options);
+                const out = await this.cliAdapter.handleGraphExpand({
+                    file: options.file,
+                    symbol: options.symbol,
+                    edges: options.edges || ['imports','exports'],
+                    seedOnly: !!options.seedOnly,
+                    depth: parseInt(options.depth),
+                    limit: parseInt(options.limit),
+                    json: !!options.json,
+                } as any);
+                console.log(out);
+                await this.shutdown();
+                process.exit(0);
+            });
+
+        // Snapshots clean
+        this.program
+            .command('snapshots')
+            .description('Manage snapshots')
+            .command('clean')
+            .description('Cleanup materialized snapshots under .ontology/snapshots')
+            .option('--max-keep <n>', 'Maximum snapshots to retain (default 10)', '10')
+            .option('--max-age-days <d>', 'Delete snapshots older than N days (default 3)', '3')
+            .action(async (options) => {
+                await this.ensureInitialized(options);
+                const out = await this.cliAdapter.handleSnapshotsClean({
+                    maxKeep: parseInt(options.maxKeep),
+                    maxAgeDays: parseInt(options.maxAgeDays),
+                } as any);
+                console.log(out);
+                await this.shutdown();
+                process.exit(0);
+            });
+
         // Stats command
         this.program
             .command('stats')

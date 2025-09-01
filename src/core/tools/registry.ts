@@ -19,6 +19,75 @@ export interface ToolSpec {
 export class ToolRegistry {
   private static tools: ToolSpec[] = [
     {
+      name: 'get_snapshot',
+      description: 'Create or return a snapshot id for consistent reads/edits',
+      inputSchema: { type: 'object', properties: { preferExisting: { type: 'boolean' } } },
+    },
+    {
+      name: 'ast_query',
+      description: 'Run a Tree-sitter s-expression query over selected files',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          language: { type: 'string', enum: ['typescript', 'javascript', 'python'] },
+          query: { type: 'string' },
+          paths: { type: 'array', items: { type: 'string' } },
+          glob: { type: 'string' },
+          limit: { type: 'number' },
+        },
+        required: ['language', 'query'],
+      },
+    },
+    {
+      name: 'graph_expand',
+      description: 'Expand neighbors for a file or symbol (imports/exports; callers/callees best-effort)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          file: { type: 'string' },
+          symbol: { type: 'string' },
+          edges: {
+            type: 'array',
+            items: { type: 'string', enum: ['imports', 'exports', 'callers', 'callees'] },
+            default: ['imports', 'exports'],
+          },
+          depth: { type: 'number', default: 1 },
+          limit: { type: 'number', default: 50 },
+        },
+        anyOf: [
+          { required: ['file'] },
+          { required: ['symbol'] },
+        ],
+      },
+    },
+    {
+      name: 'propose_patch',
+      description: 'Validate and stage a patch against a snapshot (diff-only, no write to disk)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          patch: { type: 'string' },
+          format: { type: 'string', enum: ['unified'], default: 'unified' },
+          snapshot: { type: 'string' },
+          runChecks: { type: 'boolean', default: true },
+        },
+        required: ['patch'],
+      },
+    },
+    {
+      name: 'run_checks',
+      description: 'Run format/lint/typecheck/tests for a snapshot (guarded)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          snapshot: { type: 'string' },
+          commands: { type: 'array', items: { type: 'string' } },
+          timeoutSec: { type: 'number', default: 120 },
+        },
+        required: ['snapshot'],
+      },
+    },
+    {
       name: 'find_definition',
       description: 'Find symbol definition with fuzzy/AST validation',
       inputSchema: {
@@ -117,17 +186,32 @@ export class ToolRegistry {
       },
     },
     {
-      name: 'grep_content',
-      description: 'Fast content search (bounded, repo-aware)',
+      name: 'text_search',
+      description: 'Fast content search (bounded, repo-aware, ripgrep-backed)',
       inputSchema: {
         type: 'object',
         properties: {
-          pattern: { type: 'string' },
+          query: { type: 'string' },
           path: { type: 'string' },
           maxResults: { type: 'number' },
           caseInsensitive: { type: 'boolean' },
+          kind: { type: 'string', enum: ['literal', 'regex', 'word'], default: 'literal' },
+          context: { type: 'number', default: 2 },
         },
-        required: ['pattern'],
+        required: ['query'],
+      },
+    },
+    {
+      name: 'symbol_search',
+      description: 'Search for symbols by name with AST/Planner validation',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+          maxResults: { type: 'number' },
+          fileHint: { type: 'string' },
+        },
+        required: ['query'],
       },
     },
     {

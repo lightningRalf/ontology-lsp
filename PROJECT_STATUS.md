@@ -4,7 +4,15 @@
 
 The unified core architecture is fully implemented and operational with all critical issues resolved.
 
-## 📊 Current Status: Production‑ready core; async‑first finalized; test suite stabilized (perf tuning pending)
+## 📊 Current Status: Core stable; Hybrid Code Brain rollout in progress
+
+Hybrid plan summary (2025‑09‑01):
+- Default router: AST + graph for read/nav; optional SCIP/LSIF for offline precision; LSP limited to typed rename/impl under flags.
+- Surfaces aligned (MCP/HTTP/CLI): snapshot‑aware tools (get_snapshot, propose_patch, run_checks); search tools (text_search, symbol_search); symbol map + plan_rename exposed.
+- Overlay store: materializes snapshots into .ontology/snapshots/<id>, applies overlay diffs (git apply/patch), runs checks in snapshot cwd; retention cleanup (maxKeep/maxAgeDays).
+- HTTP API: added AST Query and Graph Expand endpoints; snapshot list/clean; OpenAPI extended with AstQueryResult/GraphExpandResult.
+- Web UI: served at /ui; added MCP Live Events (SSE at /mcp-events) and snapshot list/clean controls.
+- Graph neighbors: file‑level callees via AST; symbol‑based callers via grep + AST confirmation; callers seeded from buildSymbolMap; CLI supports --seed-only.
 
 ### What Was Accomplished
 1. **Eliminated Duplicate Implementations** ✅
@@ -50,11 +58,14 @@ The unified core architecture is fully implemented and operational with all crit
 - **LSP Adapter**: Fully operational (stdio); custom methods (Layer 3)
   - `symbol/buildSymbolMap` (Planner)
   - `refactor/planRename` (Planner)
-- **MCP Adapter**: Running on port 7001 with SSE
+- **MCP Adapter**: Running on port 7001 with SSE (/mcp-events)
+  - Tools: text_search, symbol_search, ast_query, graph_expand, get_snapshot, propose_patch, run_checks, build_symbol_map, plan_rename
 - **HTTP Adapter**: Running on port 7000, all endpoints working
+  - Endpoints: /api/v1/ast-query, /api/v1/graph-expand, /api/v1/snapshots, /api/v1/snapshots/clean
 - **CLI Adapter**: Commands exposed for Layer 3 features:
   - `symbol-map <identifier>` (Symbol)
   - `plan-rename <old> <new>` (Refactor)
+  - New: `text-search`, `symbol-search`, `ast-query`, `graph-expand [--seed-only]`, `snapshots clean`
 - **VS Code Extension**: Command Palette entries aligned with namespaces:
   - “Symbol: Build Symbol Map”
   - “Refactor: Plan Rename (Preview)”
@@ -78,7 +89,7 @@ The unified core architecture is fully implemented and operational with all crit
   - Metrics: L4 storage instrumentation (p50/p95/p99, counts, errors) exposed via CLI `stats` and HTTP `/metrics`.
   - Decision (Fix‑Bugs‑First): Defer Postgres and Triple Store feature work; keep adapters stubbed/in‑memory for parity only. Focus on L1–L4 with SQLite stability.
 - Observability and SLOs per layer (p95/p99, error rates, budgets):
-  - Emit layer-specific metrics; dashboards for L3/L4/L5 decisions
+  - Emit layer-specific metrics; dashboards for L3/L4/L5 decisions; live MCP events stream integrated in web UI.
 - CI reliability and type safety:
   - Resolve outstanding tsc errors in adapters; enable strict mode
   - Reduce flaky perf tests; fix deterministic budgets in CI

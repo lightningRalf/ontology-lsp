@@ -123,6 +123,20 @@ export class MCPAdapter {
                 let result: any;
 
                 switch (name) {
+                    case 'get_snapshot':
+                        return this.handleGetSnapshot(arguments_);
+                    case 'propose_patch':
+                        return this.handleProposePatch(arguments_);
+                    case 'run_checks':
+                        return this.handleRunChecks(arguments_);
+                    case 'text_search':
+                        return this.handleTextSearch(arguments_);
+                    case 'symbol_search':
+                        return this.handleSymbolSearch(arguments_);
+                    case 'ast_query':
+                        return this.handleAstQuery(arguments_);
+                    case 'graph_expand':
+                        return this.handleGraphExpand(arguments_);
                     case 'find_definition':
                         result = await this.handleFindDefinition(arguments_, context);
                         break;
@@ -180,6 +194,93 @@ export class MCPAdapter {
             // Always return structured MCP error payload instead of throwing
             return handleAdapterError(error, 'mcp');
         }
+    }
+
+    // --- New handlers: snapshots/patches/checks ---
+    private async handleGetSnapshot(args: Record<string, any>) {
+        const snap = overlayStore.createSnapshot(!!args?.preferExisting);
+        return { content: [{ type: 'text', text: JSON.stringify({ snapshot: snap.id }, null, 2) }], isError: false };
+    }
+
+    private async handleProposePatch(args: Record<string, any>) {
+        const patch = String(args?.patch || '');
+        const snapshot = String(args?.snapshot || '');
+        if (!patch) {
+            return { content: [{ type: 'text', text: 'Missing patch' }], isError: true };
+        }
+        const snap = overlayStore.ensureSnapshot(snapshot);
+        const res = overlayStore.stagePatch(snap.id, patch);
+        const payload = { accepted: res.accepted, snapshot: snap.id, message: res.message };
+        return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }], isError: !res.accepted };
+    }
+
+    private async handleRunChecks(args: Record<string, any>) {
+        const snapshot = String(args?.snapshot || '');
+        if (!snapshot) {
+            return { content: [{ type: 'text', text: 'Missing snapshot' }], isError: true };
+        }
+        const cmds = Array.isArray(args?.commands) ? (args?.commands as string[]) : [];
+        const timeoutSec = typeof args?.timeoutSec === 'number' ? args.timeoutSec : 120;
+        const res = await overlayStore.runChecks(snapshot, cmds, timeoutSec);
+        return {
+            content: [{ type: 'text', text: JSON.stringify({ snapshot, ok: res.ok, elapsedMs: res.elapsedMs, output: res.output.slice(-4000) }, null, 2) }],
+            isError: !res.ok,
+        };
+    }
+
+    // --- New handlers: search ---
+    private async handleTextSearch(args: Record<string, any>) {
+        const query = String(args?.query || '').trim();
+        if (!query) return { content: [{ type: 'text', text: 'query required' }], isError: true };
+        const kind = (args?.kind as string) || 'literal';
+        const caseInsensitive = !!args?.caseInsensitive;
+        const maxResults = Math.min(Number(args?.maxResults || 200), 1000);
+        const path = String(args?.path || process.cwd());
+        const asyncGrep = new AsyncEnhancedGrep({ cacheSize: 500, cacheTTL: 30000 });
+        const pattern = kind === 'word' ? `\\b${escapeRegex(query)}\\b` : kind === 'literal' ? escapeRegex(query) : query;
+        const results = await asyncGrep.search({ pattern, path, maxResults, timeout: 2000, caseInsensitive });
+        const normalized = results.map((r) => ({ file: r.file, line: r.line ?? 0, column: r.column ?? 0, text: r.text }));
+        return { content: [{ type: 'text', text: JSON.stringify({ count: normalized.length, results: normalized }, null, 2) }], isError: false };
+    }
+
+    private async handleSymbolSearch(args: Record<string, any>) {
+        const query = String(args?.query || '').trim();
+        if (!query) return { content: [{ type: 'text', text: 'query required' }], isError: true };
+        const maxResults = Math.min(Number(args?.maxResults || 50), 200);
+        const res = await (this.coreAnalyzer as any).buildSymbolMap({ identifier: query, maxFiles: maxResults, astOnly: true });
+        const out = (res?.declarations || []).slice(0, maxResults).map((d: any) => ({ uri: d.uri, range: d.range, kind: d.kind, name: d.name || query }));
+        return { content: [{ type: 'text', text: JSON.stringify({ query, count: out.length, symbols: out }, null, 2) }], isError: false };
+    }
+
+    private async handleAstQuery(args: Record<string, any>) {
+        const language = String(args?.language || '').trim();
+        const query = String(args?.query || '').trim();
+        if (!language || !query) return { content: [{ type: 'text', text: 'language and query required' }], isError: true };
+        const paths = Array.isArray(args?.paths) ? (args.paths as string[]) : undefined;
+        const glob = typeof args?.glob === 'string' ? (args.glob as string) : undefined;
+        const limit = typeof args?.limit === 'number' ? args.limit : undefined;
+        const { runAstQuery } = await import('../core/ast-query.js');
+        const out = await runAstQuery({ language: language as any, query, paths, glob, limit });
+        return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: false };
+    }
+
+    private async handleGraphExpand(args: Record<string, any>) {
+        const edges = Array.isArray(args?.edges) ? (args.edges as string[]) : ['imports','exports'];
+        const file = typeof args?.file === 'string' ? (args.file as string) : undefined;
+        const symbol = typeof args?.symbol === 'string' ? (args.symbol as string) : undefined;
+        if (!file && !symbol) return { content: [{ type: 'text', text: 'file or symbol required' }], isError: true };
+        const { expandNeighbors } = await import('../core/code-graph.js');
+        let seedFiles: string[] | undefined = undefined;
+        if (symbol) {
+            try {
+                const sm = await (this.coreAnalyzer as any).buildSymbolMap({ identifier: symbol, maxFiles: 50, astOnly: true });
+                seedFiles = Array.from(new Set((sm?.declarations || []).map((d: any) => {
+                    try { return new URL(d.uri).pathname; } catch { return d.uri.replace(/^file:\/\//, ''); }
+                })));
+            } catch {}
+        }
+        const out = await expandNeighbors({ file, symbol, edges, depth: args?.depth, limit: args?.limit, seedFiles });
+        return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: false };
     }
 
     /**
@@ -839,6 +940,8 @@ export class MCPAdapter {
     }
 
     /**
+import { overlayStore } from '../core/overlay-store.js';
+import { AsyncEnhancedGrep } from '../layers/enhanced-search-tools-async.js';
      * Execute MCP tool call (alias for handleToolCall for consistency)
      */
     async executeTool(request: { name: string; arguments: Record<string, any> }): Promise<any> {
@@ -904,4 +1007,8 @@ export class MCPAdapter {
             timestamp: Date.now(),
         };
     }
+}
+
+function escapeRegex(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

@@ -157,7 +157,7 @@ VS Code extension specifics (when in proxy mode):
 Repo reality check:
 - Dependencies present: `vscode-languageserver` (server). Lockfile contains `vscode-jsonrpc` and `vscode-languageserver-protocol`; we should add them explicitly for client roles.
 - Execution environment: Bun + Node 18+ (OK for spawning child processes and ESM modules).
-- Existing Go project `mcp-language-server/` proves feasibility of an LSP→MCP bridge, which we can conceptually replicate in Node for the core.
+- Existing Go project `legacy/mcp-language-server/` proves feasibility of an LSP→MCP bridge (now archived); we conceptually replicate this in Node for the core.
 
 ## 10. Observability & Reliability
 
@@ -273,7 +273,7 @@ This plan aligns with VISION.md: one brain, many interfaces. We unify semantics 
 
 - We have our own thin LSP server: `src/servers/lsp.ts:13`, with an adapter: `src/adapters/lsp-adapter.ts:20`. Currently only a subset of features is implemented (defs/refs/rename/completion) and others should not be advertised to avoid -32601.
 - MCP adapter exists and is robust: `src/adapters/mcp-adapter.ts:1`. It’s a good surface to add LS-backed tools (implementations, code actions, symbols, folding).
-- A separate Go bridge `mcp-language-server/` demonstrates LSP→MCP feasibility; we will apply the same concept in Node for uniformity.
+- A separate Go bridge `legacy/mcp-language-server/` demonstrates LSP→MCP feasibility (archived); we apply the same concept in Node for uniformity.
 - Dependencies: project already includes `vscode-languageserver` (server). Lockfile shows `vscode-jsonrpc` and `vscode-languageserver-protocol` available—add explicitly for client usage.
 - Environment: Bun (ESM) + Node 18+ are compatible with JSON-RPC and child processes.
 - Document events currently reach the core without content snapshots; for headless accuracy we will optionally add a Document Store to push unsaved buffers when needed.

@@ -12,6 +12,8 @@
  */
 
 import type { CodeAnalyzer } from '../core/unified-analyzer.js';
+import { overlayStore } from '../core/overlay-store.js';
+import { AsyncEnhancedGrep } from '../layers/enhanced-search-tools-async.js';
 import leven from 'leven';
 import {
     buildFindDefinitionRequest,
@@ -246,6 +248,112 @@ export class CLIAdapter {
         } catch (error) {
             return this.formatError(`Plan rename failed: ${handleAdapterError(error, 'cli')}`);
         }
+    }
+
+    /**
+     * Text search (ripgrep-backed, bounded)
+     */
+    async handleTextSearch(
+        query: string,
+        options: { kind?: 'literal' | 'regex' | 'word'; caseInsensitive?: boolean; path?: string; maxResults?: number; json?: boolean }
+    ): Promise<string> {
+        const kind = options.kind || 'literal';
+        const caseInsensitive = !!options.caseInsensitive;
+        const maxResults = Math.min(options.maxResults || this.config.maxResults || 200, 1000);
+        const path = options.path || process.cwd();
+        const asyncGrep = new AsyncEnhancedGrep({ cacheSize: 500, cacheTTL: 30000 });
+        const pattern = kind === 'word' ? `\\b${escapeRegex(query)}\\b` : kind === 'literal' ? escapeRegex(query) : query;
+        const results = await asyncGrep.search({ pattern, path, maxResults, timeout: 2000, caseInsensitive });
+        const normalized = results.map((r) => ({ file: r.file, line: r.line ?? 0, column: r.column ?? 0, text: r.text }));
+        return options.json
+            ? JSON.stringify({ count: normalized.length, results: normalized }, null, 2)
+            : normalized.map((r) => `${r.file}:${r.line}:${r.column}: ${r.text}`).join('\n');
+    }
+
+    /**
+     * Symbol search using L3 buildSymbolMap (AST-only)
+     */
+    async handleSymbolSearch(query: string, options: { maxResults?: number; json?: boolean }): Promise<string> {
+        const maxResults = Math.min(options.maxResults || 50, 200);
+        const res = await (this.coreAnalyzer as any).buildSymbolMap({ identifier: query, maxFiles: maxResults, astOnly: true });
+        const out = (res?.declarations || []).slice(0, maxResults).map((d: any) => ({ uri: d.uri, range: d.range, kind: d.kind, name: d.name || query }));
+        return options.json ? JSON.stringify({ query, count: out.length, symbols: out }, null, 2) : out.map((s) => `${s.kind || 'symbol'} ${s.name} @ ${s.uri}:${s.range?.start?.line ?? 0}`).join('\n');
+    }
+
+    /**
+     * Snapshot creation
+     */
+    async handleGetSnapshot(options?: { preferExisting?: boolean; json?: boolean }): Promise<string> {
+        const snap = overlayStore.createSnapshot(!!options?.preferExisting);
+        return options?.json ? JSON.stringify({ snapshot: snap.id }, null, 2) : snap.id;
+    }
+
+    /**
+     * Propose patch against snapshot; optionally run checks
+     */
+    async handleProposePatch(
+        patch: string,
+        options: { snapshot?: string; runChecks?: boolean; commands?: string[]; timeoutSec?: number; json?: boolean }
+    ): Promise<string> {
+        const snap = overlayStore.ensureSnapshot(options.snapshot);
+        const res = overlayStore.stagePatch(snap.id, patch);
+        if (!res.accepted) return this.formatError(res.message || 'Patch rejected');
+        if (options.runChecks) {
+            const r = await overlayStore.runChecks(snap.id, options.commands || [], options.timeoutSec || 120);
+            const payload = { snapshot: snap.id, accepted: true, checks: { ok: r.ok, elapsedMs: r.elapsedMs, output: r.output.slice(-4000) } };
+            return options.json ? JSON.stringify(payload, null, 2) : `${snap.id} ${r.ok ? 'OK' : 'FAIL'} (${r.elapsedMs}ms)`;
+        }
+        const payload = { snapshot: snap.id, accepted: true };
+        return options.json ? JSON.stringify(payload, null, 2) : snap.id;
+    }
+
+    /**
+     * Run checks for snapshot
+     */
+    async handleRunChecks(options: { snapshot: string; commands?: string[]; timeoutSec?: number; json?: boolean }): Promise<string> {
+        const snapId = options.snapshot;
+        if (!snapId) return this.formatError('snapshot required');
+        const r = await overlayStore.runChecks(snapId, options.commands || [], options.timeoutSec || 120);
+        const payload = { snapshot: snapId, ok: r.ok, elapsedMs: r.elapsedMs, output: r.output.slice(-4000) };
+        return options.json ? JSON.stringify(payload, null, 2) : `${snapId} ${r.ok ? 'OK' : 'FAIL'} (${r.elapsedMs}ms)`;
+    }
+
+    /**
+     * Snapshots cleanup
+     */
+    async handleSnapshotsClean(options: { maxKeep?: number; maxAgeDays?: number }): Promise<string> {
+        const maxKeep = typeof options.maxKeep === 'number' ? options.maxKeep : 10;
+        const days = typeof options.maxAgeDays === 'number' ? options.maxAgeDays : 3;
+        const maxAgeMs = Math.max(0, days) * 24 * 60 * 60 * 1000;
+        await overlayStore.cleanup(maxKeep, maxAgeMs);
+        return `Cleaned snapshots (maxKeep=${maxKeep}, maxAgeDays=${days})`;
+    }
+
+    /**
+     * AST query via Tree-sitter
+     */
+    async handleAstQuery(options: { language: 'typescript'|'javascript'|'python'; query: string; paths?: string[]; glob?: string; limit?: number; json?: boolean }): Promise<string> {
+        const { runAstQuery } = await import('../core/ast-query.js');
+        const out = await runAstQuery({ language: options.language, query: options.query, paths: options.paths, glob: options.glob, limit: options.limit });
+        return options.json ? JSON.stringify(out, null, 2) : String(out.count);
+    }
+
+    /**
+     * Graph expand (imports/exports for file; callers/callees stub)
+     */
+    async handleGraphExpand(options: { file?: string; symbol?: string; edges: string[]; depth?: number; limit?: number; json?: boolean; seedOnly?: boolean }): Promise<string> {
+        const { expandNeighbors } = await import('../core/code-graph.js');
+        let seedFiles: string[] | undefined = undefined;
+        if (options.symbol) {
+            try {
+                const sm = await (this.coreAnalyzer as any).buildSymbolMap({ identifier: options.symbol, maxFiles: 50, astOnly: true });
+                seedFiles = Array.from(new Set((sm?.declarations || []).map((d: any) => {
+                    try { return new URL(d.uri).pathname; } catch { return d.uri.replace(/^file:\/\//, ''); }
+                })));
+            } catch {}
+        }
+        const out = await expandNeighbors({ file: options.file, symbol: options.symbol, edges: options.edges || ['imports','exports'], depth: options.depth, limit: options.limit, seedFiles, seedStrict: !!options.seedOnly });
+        return options.json ? JSON.stringify(out, null, 2) : (out.file || out.symbol || '') + ` -> ` + Object.keys(out.neighbors || {}).join(',');
     }
 
     /**
@@ -671,4 +779,8 @@ export class CLIAdapter {
 
         return this.formatInfo(`Performance: ${timings} (total: ${performance.total}ms)`);
     }
+}
+
+function escapeRegex(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

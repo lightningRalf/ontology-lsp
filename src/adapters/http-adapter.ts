@@ -696,6 +696,86 @@ export class HTTPAdapter {
             servers: [{ url: 'http://localhost:7000' }],
             components: {
                 schemas: {
+                    AstQueryResult: {
+                        type: 'object',
+                        properties: {
+                            count: { type: 'integer' },
+                            results: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        file: { type: 'string' },
+                                        capture: { type: 'string' },
+                                        start: { $ref: '#/components/schemas/Position' },
+                                        end: { $ref: '#/components/schemas/Position' },
+                                        snippet: { type: 'string' },
+                                    },
+                                    required: ['file', 'capture', 'start', 'end'],
+                                },
+                            },
+                        },
+                        required: ['count', 'results'],
+                    },
+                    GraphNeighbors: {
+                        type: 'object',
+                        properties: {
+                            imports: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        capture: { type: 'string' },
+                                        text: { type: 'string' },
+                                        start: { $ref: '#/components/schemas/Position' },
+                                        end: { $ref: '#/components/schemas/Position' },
+                                    },
+                                },
+                            },
+                            exports: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        capture: { type: 'string' },
+                                        text: { type: 'string' },
+                                        start: { $ref: '#/components/schemas/Position' },
+                                        end: { $ref: '#/components/schemas/Position' },
+                                    },
+                                },
+                            },
+                            callees: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        name: { type: 'string' },
+                                        start: { $ref: '#/components/schemas/Position' },
+                                    },
+                                },
+                            },
+                            callers: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        file: { type: 'string' },
+                                        start: { $ref: '#/components/schemas/Position' },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    GraphExpandResult: {
+                        type: 'object',
+                        properties: {
+                            file: { type: 'string' },
+                            symbol: { type: 'string' },
+                            neighbors: { $ref: '#/components/schemas/GraphNeighbors' },
+                            note: { type: 'string' },
+                        },
+                        anyOf: [ { required: ['file'] }, { required: ['symbol'] } ],
+                    },
                     Position: {
                         type: 'object',
                         properties: { line: { type: 'integer' }, character: { type: 'integer' } },
@@ -849,6 +929,135 @@ export class HTTPAdapter {
                             },
                             '400': { description: 'Bad Request', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
                         },
+                    },
+                },
+                [api('/ast-query')]: {
+                    post: {
+                        summary: 'Run a Tree-sitter s-expression query over selected files',
+                        requestBody: {
+                            required: true,
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        required: ['language', 'query'],
+                                        properties: {
+                                            language: { type: 'string', enum: ['typescript','javascript','python'] },
+                                            query: { type: 'string' },
+                                            paths: { type: 'array', items: { type: 'string' } },
+                                            glob: { type: 'string' },
+                                            limit: { type: 'integer' },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        responses: {
+                            '200': {
+                                description: 'OK',
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            allOf: [
+                                                { $ref: '#/components/schemas/ApiResponse' },
+                                                { type: 'object', properties: { data: { $ref: '#/components/schemas/AstQueryResult' } } },
+                                            ],
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+                [api('/graph-expand')]: {
+                    post: {
+                        summary: 'Expand neighbors for a file or symbol (imports/exports; callers/callees best-effort)',
+                        requestBody: {
+                            required: true,
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        anyOf: [ { required: ['file'] }, { required: ['symbol'] } ],
+                                        properties: {
+                                            file: { type: 'string' },
+                                            symbol: { type: 'string' },
+                                            edges: { type: 'array', items: { type: 'string', enum: ['imports','exports','callers','callees'] } },
+                                            depth: { type: 'integer' },
+                                            limit: { type: 'integer' },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        responses: {
+                            '200': {
+                                description: 'OK',
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            allOf: [
+                                                { $ref: '#/components/schemas/ApiResponse' },
+                                                { type: 'object', properties: { data: { $ref: '#/components/schemas/GraphExpandResult' } } },
+                                            ],
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+                [api('/snapshots')]: {
+                    get: {
+                        summary: 'List snapshots (id, createdAt, diffCount)',
+                        responses: {
+                            '200': {
+                                description: 'OK',
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            allOf: [
+                                                { $ref: '#/components/schemas/ApiResponse' },
+                                                {
+                                                    type: 'object',
+                                                    properties: {
+                                                        data: {
+                                                            type: 'array',
+                                                            items: {
+                                                                type: 'object',
+                                                                properties: {
+                                                                    id: { type: 'string' },
+                                                                    createdAt: { type: 'integer' },
+                                                                    diffCount: { type: 'integer' },
+                                                                },
+                                                                required: ['id', 'createdAt'],
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+                [api('/snapshots/clean')]: {
+                    post: {
+                        summary: 'Cleanup materialized snapshots (.ontology/snapshots) with retention limits',
+                        requestBody: {
+                            required: false,
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        properties: { maxKeep: { type: 'integer' }, maxAgeDays: { type: 'integer' } },
+                                    },
+                                },
+                            },
+                        },
+                        responses: { '200': { description: 'OK', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiResponse' } } } } },
                     },
                 },
                 [api('/references')]: {

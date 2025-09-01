@@ -82,6 +82,17 @@ export class HTTPServer {
                 try {
                     const url = new URL(request.url);
 
+                    // Serve static web UI from web-ui/dist under /ui
+                    if (url.pathname === '/ui' || url.pathname === '/ui/') {
+                        return await this.serveStaticFile('web-ui/dist/index.html', 'text/html');
+                    }
+                    if (url.pathname.startsWith('/ui/')) {
+                        const rel = url.pathname.replace(/^\/ui\//, '');
+                        const filePath = `web-ui/dist/${rel}`;
+                        const contentType = this.contentTypeFor(filePath);
+                        return await this.serveStaticFile(filePath, contentType);
+                    }
+
                     // Let adapter handle streaming endpoints for now
                     // TODO: Implement proper server-level SSE streaming
                     // if (url.pathname.includes('/stream/') && request.method === 'POST') {
@@ -174,6 +185,69 @@ export class HTTPServer {
                         });
                     }
 
+                    // AST Query endpoint
+                    if ((url.pathname === '/api/v1/ast-query') && request.method === 'POST') {
+                        try {
+                            const body = await this.getRequestBody(request);
+                            const { runAstQuery } = await import('../core/ast-query.js');
+                            const out = await runAstQuery({
+                                language: body.language,
+                                query: body.query,
+                                paths: body.paths,
+                                glob: body.glob,
+                                limit: body.limit,
+                            });
+                            return new Response(JSON.stringify({ success: true, data: out }), {
+                                status: 200,
+                                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                            });
+                        } catch (err) {
+                            return new Response(JSON.stringify({ success: false, error: 'AST query failed' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+                        }
+                    }
+
+                    // Graph Expand endpoint
+                    if ((url.pathname === '/api/v1/graph-expand') && request.method === 'POST') {
+                        try {
+                            const body = await this.getRequestBody(request);
+                            const { expandNeighbors } = await import('../core/code-graph.js');
+                            const out = await expandNeighbors({ file: body.file, symbol: body.symbol, edges: body.edges || ['imports','exports'], depth: body.depth, limit: body.limit });
+                            return new Response(JSON.stringify({ success: true, data: out }), {
+                                status: 200,
+                                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                            });
+                        } catch (err) {
+                            return new Response(JSON.stringify({ success: false, error: 'Graph expand failed' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+                        }
+                    }
+
+                    // Snapshots - list
+                    if ((url.pathname === '/api/v1/snapshots') && request.method === 'GET') {
+                        const { overlayStore } = await import('../core/overlay-store.js');
+                        const snaps = overlayStore.list().map((s) => ({ id: s.id, createdAt: s.createdAt, diffCount: s.diffs.length }));
+                        return new Response(JSON.stringify({ success: true, data: snaps }), {
+                            status: 200,
+                            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                        });
+                    }
+
+                    // Snapshots - clean
+                    if ((url.pathname === '/api/v1/snapshots/clean') && request.method === 'POST') {
+                        try {
+                            const body = await this.getRequestBody(request);
+                            const { overlayStore } = await import('../core/overlay-store.js');
+                            const maxKeep = typeof body.maxKeep === 'number' ? body.maxKeep : 10;
+                            const days = typeof body.maxAgeDays === 'number' ? body.maxAgeDays : 3;
+                            await overlayStore.cleanup(maxKeep, days * 24 * 60 * 60 * 1000);
+                            return new Response(JSON.stringify({ success: true }), {
+                                status: 200,
+                                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                            });
+                        } catch {
+                            return new Response(JSON.stringify({ success: false, error: 'Cleanup failed' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+                        }
+                    }
+
                     // Lightweight learning stats (mirrors adapter API)
                     if ((url.pathname === '/learning-stats' || url.pathname === '/api/v1/learning-stats') && request.method === 'GET') {
                         try {
@@ -226,6 +300,7 @@ export class HTTPServer {
 
         console.log(`[HTTP Server] Started at http://${this.config.host}:${this.config.port}`);
         console.log(`[HTTP Server] OpenAPI spec: http://${this.config.host}:${this.config.port}/openapi.json`);
+        console.log(`[HTTP Server] Web UI: http://${this.config.host}:${this.config.port}/ui`);
         console.log(`[HTTP Server] Health check: http://${this.config.host}:${this.config.port}/health`);
     }
 
@@ -252,6 +327,26 @@ export class HTTPServer {
             adapter: this.httpAdapter?.getDiagnostics() || null,
             timestamp: Date.now(),
         };
+    }
+
+    private contentTypeFor(p: string): string {
+        if (p.endsWith('.html')) return 'text/html';
+        if (p.endsWith('.js')) return 'application/javascript';
+        if (p.endsWith('.css')) return 'text/css';
+        if (p.endsWith('.svg')) return 'image/svg+xml';
+        if (p.endsWith('.png')) return 'image/png';
+        if (p.endsWith('.ico')) return 'image/x-icon';
+        return 'application/octet-stream';
+    }
+
+    private async serveStaticFile(relPath: string, contentType: string): Promise<Response> {
+        try {
+            const file = Bun.file(relPath);
+            if (!(await file.exists())) return new Response('Not found', { status: 404 });
+            return new Response(file, { status: 200, headers: { 'Content-Type': contentType, 'Cache-Control': 'no-cache' } });
+        } catch {
+            return new Response('Not found', { status: 404 });
+        }
     }
 
     /**

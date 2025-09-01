@@ -118,6 +118,67 @@ graph TB
   class ECOSYSTEM pink
 ```
 
+## Refined Path Forward (AST+SCIP default, LSP as booster)
+
+We keep the protocol‑agnostic core and adopt a hybrid strategy tailored to LLM workflows:
+
+- Default router: AST + symbol/xref graph for read/nav/plan; p95 < 100ms.
+- Offline precision: optional SCIP/LSIF indices for TS/Py to answer defs/refs without a running server.
+- LSP booster: narrow, feature‑flagged use for typed rename/implementations when inference is required; strict budgets and circuit‑breakers.
+- Snapshot‑aware MCP HTTP tools: all reads/searches/edits reference a snapshot (git HEAD + overlay); all edits are diffs that pass format/lint/typecheck/tests before acceptance.
+
+### LLM‑Friendly Tool Surface (MCP HTTP)
+- get_snapshot → snapshot id
+- text_search(query, glob?, kind=literal|regex|word, case?, limit?, context?, snapshot)
+- symbol_search(query, lang?, path_hint?, limit?, snapshot)
+- ast_query(language, query, paths?, glob?, snapshot)
+- graph_expand(symbol|file, edges=[callers|callees|imports|exports], depth?, limit?, snapshot)
+- read_file(path, range?, snapshot)
+- find_definition / find_references(symbol?, path?, snapshot)
+- propose_patch(diff, format="unified", run_checks?, snapshot) and run_checks(commands?, snapshot)
+
+These replace ad‑hoc shelling to grep/ls/sed with bounded, deterministic operations.
+
+## Layer Salvage Summary (What we reuse today)
+
+- Layer 1: Fast Search
+  - Keep `src/layers/layer1-fast-search.ts` (ripgrep‑backed, async streaming grep, glob/ls, bloom‑filter hints, caching, budgets).
+  - Expose via `text_search` + default ignore sets; maintain confidence scoring and result caps.
+
+- Layer 2: AST Analysis (Tree‑sitter)
+  - Keep `src/layers/tree-sitter.ts` and `core/unified-analyzer.ts` AST passes (queries for identifiers/functions/classes/imports/calls; file budget + relevance ranking).
+  - Expose via `ast_query` and `list_symbols`; use to validate defs/refs and rename plans.
+
+- Layer 3: Planner (Symbol Map + Rename Planning)
+  - Keep `core/unified-analyzer.ts:buildSymbolMap(...)` and promote to a first‑class API.
+  - Maintain a small `PlannerLayer` for metrics/health; time `buildSymbolMap` and `planRename` with LayerManager.
+
+- Layer 4: Ontology / Semantic Graph
+  - Keep `core/services/ontology-engine.ts` and `core/services/storage.ts` behind StoragePort; gate enrichment by config and budgets.
+  - Use for concept lookups/relations when helpful; do not place on hot read/nav paths.
+
+- Layer 5: Pattern Learning & Propagation
+  - Keep `core/services/pattern-learner.ts`, `confidence-calculator.ts`, `propagation-rules.ts`, `knowledge-spreader.ts`.
+  - Use to learn rename/token patterns and propose suggestions; gate by config; attribute time to L5.
+
+## Implementation Phases (Updated)
+
+1) Phase A: Code Brain + MCP (1–2 weeks)
+   - Implement the MCP HTTP tool surface above with OpenAPI, backed by L1/L2/L3.
+   - Add snapshot/overlay store; all calls require snapshot after the first.
+   - Metrics: p50/p95/p99 by op and backend; error budgets; routing ratios.
+
+2) Phase B: Offline SCIP/LSIF (1–2 weeks)
+   - Add `scip-typescript` and `scip-python` in CI; prefer for defs/refs when fresh; mark staleness; overlay deltas per branch.
+
+3) Phase C: LSP Booster (TS typed‑rename) (1 week)
+   - Pool server per (lang, root, config); TTL; strict timeouts; circuit‑breaker; AST/SCIP post‑validation before accepting edits.
+
+## Why This Delivers
+- Serves LM needs first (precise reads, scoped nav, safe edits) without keeping heavy servers in the hot path.
+- Retains your investments in L1–L5 while narrowing their usage to maximize latency/cost/accuracy trade‑offs.
+- Keeps adapters thin and contracts explicit; StoragePort ensures pluggable persistence for L4.
+
 ## System Design Principles
 
 ### 1. Protocol-Agnostic Core

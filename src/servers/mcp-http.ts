@@ -10,6 +10,7 @@
  */
 
 import express from 'express';
+import { EventEmitter } from 'events';
 import cors from 'cors';
 import { randomUUID } from 'node:crypto';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -45,6 +46,7 @@ app.use(
 
 // In-memory session map
 const sessions: Record<string, SessionRecord> = {};
+const mcpEvents = new EventEmitter();
 
 async function createMcpServer(): Promise<SessionRecord> {
   // Initialize core analyzer
@@ -66,8 +68,12 @@ async function createMcpServer(): Promise<SessionRecord> {
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
     try {
+      const sid = transport.sessionId || 'unknown';
+      mcpEvents.emit('toolCall', { sessionId: sid, name, args, ts: Date.now() });
       return await adapter.handleToolCall(name, args || {});
     } catch (error) {
+      const sid = transport.sessionId || 'unknown';
+      mcpEvents.emit('toolError', { sessionId: sid, name, error: error instanceof Error ? error.message : String(error), ts: Date.now() });
       throw new McpError(
         ErrorCode.InternalError,
         `Tool ${name} failed: ${error instanceof Error ? error.message : String(error)}`
@@ -132,6 +138,35 @@ app.get('/mcp', async (req, res) => {
     return;
   }
   await sessions[sessionId].transport.handleRequest(req as any, res as any);
+});
+
+// SSE stream of MCP tool events for live monitoring
+app.get('/mcp-events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  const send = (event: string, data: any) => {
+    res.write(`event: ${event}\n`);
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  const onCall = (payload: any) => send('toolCall', payload);
+  const onErr = (payload: any) => send('toolError', payload);
+
+  mcpEvents.on('toolCall', onCall);
+  mcpEvents.on('toolError', onErr);
+
+  // heartbeat
+  const hb = setInterval(() => send('heartbeat', { ts: Date.now() }), 15000);
+
+  req.on('close', () => {
+    clearInterval(hb);
+    mcpEvents.off('toolCall', onCall);
+    mcpEvents.off('toolError', onErr);
+    res.end();
+  });
 });
 
 // DELETE /mcp - end session

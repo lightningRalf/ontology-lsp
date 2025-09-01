@@ -415,3 +415,38 @@ bun test tests/categorization.test.ts --verbose
 
 ### H. Telemetry
 - Emit counters for escalation rate, dedupe kept/dropped, and average confidence per mode; add debug toggle for dedupe decisions.
+### 0.5 Hybrid Code Brain (New)
+
+Goal: Ship LLM‑friendly, snapshot‑aware tool surface with hybrid routing.
+
+- MCP/HTTP/CLI Tools: get_snapshot, text_search, symbol_search, ast_query, graph_expand, find_{definition,references}, propose_patch, run_checks (aligned across surfaces).
+- Overlay Store: materialize snapshots by applying staged diffs into a temp workspace (`.ontology/snapshots/<id>`), run checks there; retention cleanup shipped (maxKeep/maxAgeDays).
+- Router: AST default; prefer SCIP when fresh; LSP booster for TS typed‑rename behind flag; add kill‑switches.
+- Metrics: emit routing ratios, rename safety, index freshness; alert on p95 breaches.
+
+### 0.6 Offline SCIP/LSIF Integration (Optional)
+
+- CI: add steps to run `scip-typescript` and `scip-python` on hot packages; cache artifacts.
+- Query: add lightweight reader to consult SCIP for defs/refs when fresh; mark stale and fall back.
+- Budgets: cap per‑package index time; provide `--packages` include list for large repos.
+
+### 0.8 Web UI & Live Monitoring (New)
+
+- Serve web UI at `/ui` from the HTTP server (done). Add controls to run ast-query and graph-expand from the UI and render results.
+- MCP SSE telemetry: `/mcp-events` (done). Extend UI to filter by session/tool and to pause/resume stream.
+- Snapshots: list/clean (done). Add inputs for maxKeep/maxAgeDays and show materialized snapshot directories.
+- Docs: link `/ui` in README and add basic troubleshooting for dashboards.
+
+### 0.7 File Watcher Strategy (Updated)
+
+- Default: Node watcher via `chokidar` (fs.watch + fsevents) with debounce/coalesce; gitignore‑aware.
+- Optional: Watchman bridge when available (better scale/monorepos). If an org already runs Watchman, inject a transport adapter (per‑workspace) and reuse that daemon.
+- Architect’s approach:
+  - Abstract a WatchPort: implementations for `chokidar` and `watchman`.
+  - Config driven selection; health/metrics per backend; fall back automatically.
+  - Overlay precedence: open buffers (from MCP/LSP) override FS events.
+
+### 0.9 Precise Callers/Callees (Planned)
+
+- Integrate SCIP callers/callees where available; for non-SCIP repos, add a lightweight project graph seeded from declarations/import graph.
+- Validate against goldens; switch to SCIP by default when fresh; keep grep+AST as fallback.
