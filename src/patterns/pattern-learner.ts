@@ -89,6 +89,17 @@ export class PatternLearner extends EventEmitter {
             return {}; // No change, nothing to learn
         }
 
+        // Normalize context to ensure required fields
+        const normalizedContext: RenameContext = {
+            file: (context as any)?.file ?? 'unknown',
+            concept: (context as any)?.concept,
+            surroundingSymbols: Array.isArray((context as any)?.surroundingSymbols)
+                ? (context as any).surroundingSymbols
+                : [],
+            timestamp:
+                (context as any)?.timestamp instanceof Date ? (context as any).timestamp : new Date(0),
+        };
+
         // Extract pattern from the rename
         const patternKey = this.extractPatternKey(oldName, newName);
 
@@ -97,7 +108,7 @@ export class PatternLearner extends EventEmitter {
 
         if (existingPattern) {
             // Strengthen existing pattern
-            return this.strengthenPattern(existingPattern, oldName, newName, context);
+            return this.strengthenPattern(existingPattern, oldName, newName, normalizedContext);
         }
 
         // Check if candidate exists
@@ -110,7 +121,7 @@ export class PatternLearner extends EventEmitter {
             existingCandidate.examples.push({
                 oldName,
                 newName,
-                context,
+                context: normalizedContext,
                 confidence: 0.8,
             });
 
@@ -125,7 +136,7 @@ export class PatternLearner extends EventEmitter {
         }
 
         // Create new candidate
-        const newCandidate = this.createPatternCandidate(oldName, newName, context);
+        const newCandidate = this.createPatternCandidate(oldName, newName, normalizedContext);
         this.candidates.set(candidateKey, newCandidate);
 
         console.log(`Created new pattern candidate: ${oldName} -> ${newName}`);
@@ -143,7 +154,15 @@ export class PatternLearner extends EventEmitter {
         pattern.examples.push({
             oldName,
             newName,
-            context,
+            context: {
+                file: (context as any)?.file ?? 'unknown',
+                concept: (context as any)?.concept,
+                surroundingSymbols: Array.isArray((context as any)?.surroundingSymbols)
+                    ? (context as any).surroundingSymbols
+                    : [],
+                timestamp:
+                    (context as any)?.timestamp instanceof Date ? (context as any).timestamp : new Date(0),
+            },
             confidence: 0.9,
         });
 
@@ -181,7 +200,17 @@ export class PatternLearner extends EventEmitter {
                 {
                     oldName,
                     newName,
-                    context,
+                    context: {
+                        file: (context as any)?.file ?? 'unknown',
+                        concept: (context as any)?.concept,
+                        surroundingSymbols: Array.isArray((context as any)?.surroundingSymbols)
+                            ? (context as any).surroundingSymbols
+                            : [],
+                        timestamp:
+                            (context as any)?.timestamp instanceof Date
+                                ? (context as any).timestamp
+                                : new Date(0),
+                    },
                     confidence: 0.7,
                 },
             ],

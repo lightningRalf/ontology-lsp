@@ -731,6 +731,8 @@ export class AsyncEnhancedGrep {
         let proc: ChildProcess | null = null;
         let timeout: NodeJS.Timeout | null = null;
         const files: string[] = [];
+        let settled = false;
+        let resolveFn: (v: string[]) => void = () => {};
 
         const promise = (async () => {
             proc = await this.processPool.execute('rg', args);
@@ -738,6 +740,9 @@ export class AsyncEnhancedGrep {
                 timeout = setTimeout(() => { try { proc?.kill('SIGTERM'); } catch {} }, options.timeout);
             }
             return new Promise<string[]>((resolve) => {
+                resolveFn = (v: string[]) => {
+                    if (!settled) { settled = true; resolve(v); }
+                };
                 proc!.stdout?.on('data', (data: Buffer) => {
                     const lines = data.toString('utf8').split(/\r?\n/).filter(Boolean);
                     for (const line of lines) {
@@ -749,11 +754,12 @@ export class AsyncEnhancedGrep {
                 });
                 proc!.on('close', () => {
                     if (timeout) clearTimeout(timeout);
-                    resolve(options.maxFiles && files.length > options.maxFiles ? files.slice(0, options.maxFiles) : files);
+                    const out = options.maxFiles && files.length > options.maxFiles ? files.slice(0, options.maxFiles) : files;
+                    resolveFn(out);
                 });
                 proc!.on('error', () => {
                     if (timeout) clearTimeout(timeout);
-                    resolve([]);
+                    resolveFn([]);
                 });
             });
         })();
@@ -761,6 +767,9 @@ export class AsyncEnhancedGrep {
         const cancel = () => {
             try { proc?.kill('SIGTERM'); } catch {}
             if (timeout) clearTimeout(timeout);
+            // Resolve immediately with partial results on cancel
+            const out = options.maxFiles && files.length > options.maxFiles ? files.slice(0, options.maxFiles) : files;
+            resolveFn(out);
         };
         return { promise, cancel };
     }
@@ -818,22 +827,25 @@ export class AsyncEnhancedGrep {
         let proc: ChildProcess | null = null;
         let timeout: NodeJS.Timeout | null = null;
         const files: string[] = [];
+        let settled = false;
+        let resolveFn: (v: string[]) => void = () => {};
         const promise = (async () => {
             proc = await this.processPool.execute('fd', args);
             if (options.timeout && options.timeout > 0) {
                 timeout = setTimeout(() => { try { proc?.kill('SIGTERM'); } catch {} }, options.timeout);
             }
             return new Promise<string[]>((resolve) => {
+                resolveFn = (v: string[]) => { if (!settled) { settled = true; resolve(v); } };
                 proc!.stdout?.on('data', (data: Buffer) => {
                     const lines = data.toString('utf8').split(/\r?\n/).filter(Boolean);
                     for (const line of lines) files.push(line);
                     if (options.maxFiles && files.length >= options.maxFiles) { try { proc?.kill('SIGTERM'); } catch {} }
                 });
-                proc!.on('close', () => { if (timeout) clearTimeout(timeout); resolve(files); });
-                proc!.on('error', () => { if (timeout) clearTimeout(timeout); resolve([]); });
+                proc!.on('close', () => { if (timeout) clearTimeout(timeout); resolveFn(files); });
+                proc!.on('error', () => { if (timeout) clearTimeout(timeout); resolveFn([]); });
             });
         })();
-        const cancel = () => { try { proc?.kill('SIGTERM'); } catch {} if (timeout) clearTimeout(timeout); };
+        const cancel = () => { try { proc?.kill('SIGTERM'); } catch {} if (timeout) clearTimeout(timeout); resolveFn(files); };
         return { promise, cancel };
     }
 

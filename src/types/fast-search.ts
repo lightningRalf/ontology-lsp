@@ -7,6 +7,9 @@ export interface ClaudeGrepParams {
     output_mode?: 'content' | 'files_with_matches' | 'count';
     type?: string;
     glob?: string;
+    // Optional per-invocation timeout in milliseconds. When provided,
+    // both async and sync grep paths should respect this budget.
+    timeout?: number;
     '-i'?: boolean; // case insensitive
     '-n'?: boolean; // line numbers
     '-A'?: number; // after context

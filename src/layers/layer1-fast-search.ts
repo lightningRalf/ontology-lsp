@@ -74,7 +74,17 @@ const Grep = async (params: ClaudeGrepParams): Promise<ClaudeGrepResult[] | stri
             pattern: params.pattern,
             path: params.path,
             maxResults: params.head_limit,
-            timeout: 1500, // 1.5 seconds for production performance
+            // Respect explicit per-call timeout if provided; otherwise allow env override, then fallback.
+            timeout:
+                typeof params.timeout === 'number' && params.timeout > 0
+                    ? params.timeout
+                    : ((): number => {
+                          const env = Number.parseInt(
+                              process.env.FAST_SEARCH_GREP_TIMEOUT_MS || process.env.ENHANCED_GREP_DEFAULT_TIMEOUT_MS || '0',
+                              10
+                          );
+                          return Number.isFinite(env) && env > 0 ? env : 1500; // default 1.5s
+                      })(),
             caseInsensitive: params['-i'],
             fileType: params.type,
             excludePaths: ['node_modules', 'dist', '.git', 'coverage'],
@@ -97,48 +107,18 @@ const Grep = async (params: ClaudeGrepParams): Promise<ClaudeGrepResult[] | stri
         // This fallback code should only be reached if async search throws an exception
         // Empty results are not a failure - they indicate no matches were found
     } catch (error: any) {
-        // Count timeouts and mark fallback path
+        // Async-only: record timeouts and return empty on error (no sync fallback)
         try {
-            (globalThis as any).__FAST_SEARCH_METRICS__ = (globalThis as any).__FAST_SEARCH_METRICS__ || { timeouts: 0, fallbacks: 0 };
+            (globalThis as any).__FAST_SEARCH_METRICS__ = (globalThis as any).__FAST_SEARCH_METRICS__ || { timeouts: 0 };
             const msg = String(error?.message || error || '');
             if (msg.toLowerCase().includes('timeout')) {
                 (globalThis as any).__FAST_SEARCH_METRICS__.timeouts++;
             }
-            (globalThis as any).__FAST_SEARCH_METRICS__.fallbacks++;
         } catch {}
-        console.warn('Async search failed, falling back to sync search:', error);
-
-        try {
-            // Fallback: Use legacy sync search only when async fails with an error
-            const enhancedParams: EnhancedGrepParams = {
-                pattern: params.pattern,
-                path: params.path,
-                outputMode: params.output_mode || 'content',
-                type: params.type,
-                caseInsensitive: params['-i'],
-                lineNumbers: params['-n'],
-                contextBefore: params['-B'],
-                contextAfter: params['-A'],
-                contextAround: params['-C'],
-                multiline: params.multiline,
-                headLimit: params.head_limit,
-            };
-
-            const syncResults = await searchTools.grep.search(enhancedParams);
-
-            // Convert to Claude-compatible format
-            return syncResults.map((result) => ({
-                file: result.file,
-                line: result.line,
-                column: result.column,
-                text: result.text,
-                match: result.match,
-                context: result.context,
-            }));
-        } catch (syncError) {
-            console.warn('Both async and sync enhanced grep failed, returning empty results:', syncError);
-            return [];
+        if (process.env.DEBUG && !process.env.SILENT_MODE) {
+            console.warn('Async search failed (no sync fallback):', error);
         }
+        return [];
     }
 };
 
@@ -1112,10 +1092,9 @@ export class FastSearchLayer implements Layer<SearchQuery, EnhancedMatches> {
 
     private async executeGrepStrategy(strategy: GrepSearchStrategy) {
         try {
-            const results = await this.executeWithTimeout(
-                () => Grep(strategy.params),
-                strategy.timeout || this.config.grep.defaultTimeout
-            );
+            // Ensure the internal grep respects the intended timeout budget as well
+            const timeoutMs = strategy.timeout || this.config.grep.defaultTimeout;
+            const results = await this.executeWithTimeout(() => Grep({ ...strategy.params, timeout: timeoutMs }), timeoutMs);
 
             return {
                 strategy,

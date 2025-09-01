@@ -155,18 +155,22 @@ export class ConfidenceCalculator {
         let qualityScore = 0;
 
         // Average confidence of examples
-        const avgConfidence = examples.reduce((sum, ex) => sum + ex.confidence, 0) / examples.length;
+        const avgConfidence = examples.reduce((sum, ex) => sum + (Number.isFinite(ex.confidence) ? ex.confidence : 0), 0) / examples.length;
         qualityScore += avgConfidence * 0.1;
 
         // Bonus for having examples from different contexts
-        const uniqueFiles = new Set(examples.map((ex) => ex.context.file));
+        const uniqueFiles = new Set(
+            examples.map((ex, i) => (ex as any)?.context?.file ?? `unknown-${i}`)
+        );
         const contextDiversity = uniqueFiles.size / examples.length;
         qualityScore += contextDiversity * 0.05;
 
         // Bonus for having recent examples
         const recentExamples = examples.filter((ex) => {
-            const daysSince = (Date.now() - ex.context.timestamp.getTime()) / (1000 * 60 * 60 * 24);
-            return daysSince <= 30;
+            const ts = (ex as any)?.context?.timestamp;
+            const t = ts instanceof Date ? ts.getTime() : 0;
+            const daysSince = (Date.now() - t) / (1000 * 60 * 60 * 24);
+            return daysSince <= 30 && t > 0;
         });
 
         if (recentExamples.length > 0) {

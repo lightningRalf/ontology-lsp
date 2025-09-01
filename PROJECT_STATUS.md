@@ -518,6 +518,33 @@ The Ontology-LSP system has a **production-ready core** with **HYBRID INTELLIGEN
 ## 🚀 Production Deployment Status ✅
 
 ### Deployment Verification Completed (2025-08-25)
+
+## 📅 Latest Updates (2025-09-01) — Async‑Only + Robustness
+
+### Async‑Only Fast Search (Layer 1)
+- Removed legacy sync grep fallback to guarantee non‑blocking, cancellable searches.
+- Streaming grep via spawn with strict budgets; losers in races are cancelled.
+- Added developer toggle `FAST_SEARCH_DISABLE_SYNC_FALLBACK=1` for CI runs (default path is async‑only).
+
+### Tree‑sitter Queries (Layer 2)
+- Fixed JavaScript `classes` query to avoid TS‑only nodes; added compile sanity test.
+
+### Test Progress & Analytics
+- Added `bin/test-progress.sh` (per‑file), `bin/test-progress-batch.sh` (per‑batch) for long runs.
+- Added `bin/test-run-and-analyze.sh` and `bin/test-run-perf-and-analyze.sh` to emit JSONL/CSV/Summary artifacts post‑run.
+
+### Stable Suite Status
+- All stable tests green locally with full logs (sequential).
+
+### Perf Suite (PERF=1)
+- Benchmarks complete. Identified robustness gaps in perf harness shapes:
+  - L5 Pattern Learning: examples sometimes lack `context.timestamp`.
+  - L4 Ontology: concepts sometimes omit `evolution`.
+
+### In‑Flight (Aligns with VISION.md)
+- Normalize at boundaries (L4/L5) to keep protocol‑agnostic core robust to sparse inputs.
+- Treat missing optionals as neutral (no crash) to maintain learning and throughput.
+- Add low‑noise metrics for missing optionals in L4/L5; keep stdio clean.
 - ✅ **Production builds**: All services built successfully (0.57MB - 0.74MB optimized bundles)
 - ✅ **Health endpoints**: HTTP API (7000) and MCP HTTP (7001) responding correctly
 - ✅ **Performance targets**: All 5 layers meeting or exceeding production targets

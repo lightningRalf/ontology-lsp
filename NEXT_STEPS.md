@@ -13,6 +13,26 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 
 Monitoring perf and metrics; continue to gate perf/benchmarks behind env and iterate if regressions are observed.
 
+### 0.2 L4/L5 Robustness (Immediate)
+
+Goal: Normalize optional inputs at layer boundaries to keep the core protocol‑agnostic, performant, and resilient to sparse data used by perf harnesses.
+
+- Layer 5 (Pattern Learning):
+  - Normalize examples at the boundary: ensure `example.context` exists and `context.timestamp` defaults to epoch when absent.
+  - Confidence Calculator: make `exampleQualityScore` robust to missing `context.file`/`timestamp` (neutral scoring, no crash).
+
+- Layer 4 (Ontology / Storage):
+  - Engine: default `concept.evolution` to `[]` in `addConcept()` when absent.
+  - Storage: iterate `Array.isArray(concept.evolution) ? concept.evolution : []` when persisting.
+
+- Observability:
+  - L5: count `missingExampleContextTimestamp` in PatternLearner metrics surface.
+  - L4: add `evolutionMissing` to storage metrics extras (`getMetrics().extras`).
+
+- Tests/Perf:
+  - Add tiny fixture factories to produce model‑shaped examples/concepts.
+  - Keep perf minimal, but include defaults where sensible; perf assertions remain unchanged.
+
 ### 0. Architectural roadmap (New)
 
 Goal: make storage pluggable and strengthen observability + reliability

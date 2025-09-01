@@ -2,7 +2,7 @@
 // These tools provide advanced functionality without relying on Claude CLI
 // Now with smart caching that handles file changes intelligently
 
-import { execSync } from 'child_process';
+import { spawn } from 'child_process';
 // Import Dirent from fs for TypeScript compatibility
 import type { Dirent } from 'fs';
 import * as fsSync from 'fs';
@@ -363,91 +363,82 @@ export class EnhancedGrep {
     }
 
     private async searchWithRipgrep(params: EnhancedGrepParams): Promise<EnhancedGrepResult[]> {
-        const args = this.buildRipgrepArgs(params);
-        const command = `rg ${args.join(' ')}`;
+        // Prefer async spawn-based execution (non-blocking) unless explicitly disabled
+        if (process.env.FAST_SEARCH_PREFER_ASYNC_FALLBACK !== '0') {
+            const args = this.buildRipgrepArgsForSpawn(params);
+            return await new Promise<EnhancedGrepResult[]>((resolve, reject) => {
+                const proc = spawn('rg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+                const chunks: string[] = [];
+                let stderr = '';
+                let timedOut = false;
+                const to = setTimeout(() => {
+                    timedOut = true;
+                    try { proc.kill('SIGTERM'); } catch {}
+                }, params.timeout || 5000);
 
-        try {
-            const output = execSync(command, {
-                encoding: 'utf8',
-                maxBuffer: 50 * 1024 * 1024, // 50MB
-                timeout: params.timeout || 5000, // Use param timeout if provided
+                proc.stdout.on('data', (d) => chunks.push(d.toString('utf8')));
+                proc.stderr.on('data', (d) => (stderr += d.toString('utf8')));
+                proc.on('error', (err) => {
+                    clearTimeout(to);
+                    reject(new Error(`Ripgrep spawn failed: ${err.message}`));
+                });
+                proc.on('close', (code) => {
+                    clearTimeout(to);
+                    if (timedOut) {
+                        return reject(new Error(`Ripgrep timeout after ${params.timeout || 5000}ms`));
+                    }
+                    // rg exit codes: 0 = matches, 1 = no matches, >1 = error
+                    if (code === 0) {
+                        resolve(this.parseRipgrepOutput(chunks.join(''), params));
+                    } else if (code === 1) {
+                        resolve([]);
+                    } else {
+                        reject(new Error(`Ripgrep failed with code ${code}: ${stderr.trim()}`));
+                    }
+                });
             });
-
-            return this.parseRipgrepOutput(output, params);
-        } catch (error: any) {
-            // If ripgrep is not found or fails, throw to trigger fallback
-            throw new Error(`Ripgrep failed: ${error.message}`);
         }
+
+        // No legacy sync fallback; prefer async-only architecture
+        throw new Error('Ripgrep spawn disabled or unavailable');
     }
 
-    private buildRipgrepArgs(params: EnhancedGrepParams): string[] {
-        const args = [];
-
-        // Basic pattern and options
-        args.push(`"${this.escapeShellArg(params.pattern)}"`);
-
-        // CRITICAL: Add default exclusions and respect .gitignore
-        args.push('--no-ignore-parent'); // Don't search parent .gitignore files
-        args.push('--glob');
-        args.push('"!node_modules/**"');
-        args.push('--glob');
-        args.push('"!dist/**"');
-        args.push('--glob');
-        args.push('"!.git/**"');
-        args.push('--glob');
-        args.push('"!coverage/**"');
-        args.push('--glob');
-        args.push('"!*.min.js"');
-        args.push('--glob');
-        args.push('"!package-lock.json"');
-        args.push('--max-depth');
-        args.push('5'); // Limit search depth
+    // Spawn-friendly args (no embedded quotes)
+    private buildRipgrepArgsForSpawn(params: EnhancedGrepParams): string[] {
+        const args: string[] = [];
+        // Basic pattern first (compatible with previous layout)
+        args.push(params.pattern);
+        // Respect project ignores and add defaults
+        args.push('--no-ignore-parent');
+        args.push('--glob', '!node_modules/**');
+        args.push('--glob', '!dist/**');
+        args.push('--glob', '!.git/**');
+        args.push('--glob', '!coverage/**');
+        args.push('--glob', '!*\.min\.js');
+        args.push('--glob', '!package-lock.json');
+        args.push('--max-depth', '5');
 
         if (params.caseInsensitive) args.push('-i');
         if (params.lineNumbers) args.push('-n');
         if (params.multiline) args.push('-U', '--multiline-dotall');
+        if (typeof params.contextBefore === 'number') args.push('-B', String(params.contextBefore));
+        if (typeof params.contextAfter === 'number') args.push('-A', String(params.contextAfter));
+        if (typeof params.contextAround === 'number') args.push('-C', String(params.contextAround));
+        if (params.outputMode === 'files_with_matches') args.push('-l');
+        else if (params.outputMode === 'count') args.push('-c');
 
-        // Context
-        if (params.contextBefore) args.push(`-B ${params.contextBefore}`);
-        if (params.contextAfter) args.push(`-A ${params.contextAfter}`);
-        if (params.contextAround) args.push(`-C ${params.contextAround}`);
-
-        // Output format
-        if (params.outputMode === 'files_with_matches') {
-            args.push('-l');
-        } else if (params.outputMode === 'count') {
-            args.push('-c');
-        }
-        // Note: We don't use --json for compatibility with older ripgrep versions
-
-        // File type filtering - map common types to ripgrep types
         if (params.type) {
-            // Map common type names to ripgrep types
-            const typeMap: Record<string, string> = {
-                javascript: 'js',
-                typescript: 'ts',
-                python: 'py',
-                rust: 'rust',
-                go: 'go',
-                java: 'java',
-            };
-            const rgType = typeMap[params.type.toLowerCase()] || params.type;
-            args.push(`--type ${rgType}`);
+            const map: Record<string, string> = { javascript: 'js', typescript: 'ts', python: 'py', rust: 'rust', go: 'go', java: 'java' };
+            args.push('--type', map[(params.type || '').toLowerCase()] || params.type);
         }
 
-        // Path
-        if (params.path) {
-            args.push(`"${this.escapeShellArg(params.path)}"`);
-        }
-
-        // Limits - only add if explicitly requested
-        if (params.headLimit) {
-            args.push(`-m ${params.headLimit}`);
-        }
-        // Don't add a default limit - let ripgrep return naturally
-
+        if (typeof params.headLimit === 'number') args.push('-m', String(params.headLimit));
+        if (params.path) args.push(params.path);
+        else args.push(process.cwd());
         return args;
     }
+
+    // Legacy buildRipgrepArgs removed in favor of spawn-friendly version
 
     private parseRipgrepOutput(output: string, params: EnhancedGrepParams): EnhancedGrepResult[] {
         if (!output.trim()) return [];

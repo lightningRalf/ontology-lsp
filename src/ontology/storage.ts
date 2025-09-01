@@ -71,6 +71,7 @@ export class OntologyStorage implements StoragePort {
     // Counters for observability (malformed entries)
     private skippedRepsSave = 0;
     private skippedRepsLoad = 0;
+    private missingEvolution = 0;
 
     constructor(private dbPath: string) {
         // Ensure directory exists
@@ -267,7 +268,11 @@ export class OntologyStorage implements StoragePort {
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             `);
 
-            for (const evolution of concept.evolution) {
+            const evolutions = Array.isArray((concept as any).evolution) ? (concept as any).evolution : [];
+            if (!Array.isArray((concept as any).evolution)) {
+                this.missingEvolution++;
+            }
+            for (const evolution of evolutions) {
                 evolutionStmt.run(
                     concept.id,
                     evolution.timestamp.toISOString(),
@@ -527,6 +532,11 @@ export class OntologyStorage implements StoragePort {
     // Expose internal counters (queried by instrumented wrapper if available)
     getSkipCounts?(): { save: number; load: number } {
         return { save: this.skippedRepsSave, load: this.skippedRepsLoad };
+    }
+
+    // Additional missing-data counters (queried opportunistically)
+    getMissingDataCounters?(): { evolutionMissing: number } {
+        return { evolutionMissing: this.missingEvolution };
     }
 
     async close(): Promise<void> {

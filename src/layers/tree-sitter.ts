@@ -339,12 +339,11 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
                     body: (statement_block) @method.body)
             `,
 
+            // Keep JS class query minimal to avoid TS-only nodes like 'extends_clause'/'type_identifier'
+            // Some JS grammar versions do not expose 'extends_clause' as a separate node
             classes: `
                 (class_declaration
                     name: (identifier) @class.name
-                    (class_heritage
-                        (extends_clause
-                            (identifier) @class.extends))?
                     body: (class_body) @class.body)
             `,
 

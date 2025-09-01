@@ -106,6 +106,12 @@ export class InstrumentedStoragePort implements StoragePort {
         extras.skippedRepresentationsLoad = sc?.load ?? 0;
       } catch {}
     }
+    if (typeof innerAny.getMissingDataCounters === 'function') {
+      try {
+        const md = innerAny.getMissingDataCounters();
+        extras.evolutionMissing = md?.evolutionMissing ?? 0;
+      } catch {}
+    }
     return { startedAt: this.startedAt, updatedAt: this.updatedAt, totals: { count: totalCount, errors: totalErrors }, operations, extras };
   }
 

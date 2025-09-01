@@ -219,6 +219,11 @@ export class OntologyEngine extends EventEmitter {
             throw new Error('Invalid concept: missing id or canonicalName');
         }
 
+        // Normalize optional fields to keep storage robust
+        if (!Array.isArray((concept as any).evolution)) {
+            (concept as any).evolution = [];
+        }
+
         // Add to maps
         this.concepts.set(concept.id, concept);
         this.conceptGraph.setNode(concept.id, concept);
