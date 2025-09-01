@@ -1,0 +1,2 @@
+Repository,TotalOperations,PatternsLearned,LearningRate,ConfidenceImprovement,SuggestionAccuracy,Effectiveness
+local-test-workspace,15,0,0.000,0.000,0.200,poor

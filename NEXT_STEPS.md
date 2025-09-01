@@ -7,7 +7,7 @@
 See PROJECT_STATUS.md for achievements and historical context. -->
 
 
-## 🚀 Next Development Priorities (Updated 2025-08-29)
+## 🚀 Next Development Priorities (Updated 2025-09-01)
 
 ### 0.1 Fix‑Bugs‑First: Perf stabilization (Immediate)
 
@@ -68,9 +68,18 @@ before scale-out. Treat these as gating milestones for adoption.
   - Dashboards for L3/L4/L5; alert on p95 breaches, error spikes.
 
 - Type safety & CI stability:
-  - Resolve current `tsc` errors in adapters; enable `strict`.
+  - Keep `tsconfig.build.json` as core type-check target in CI; expand gradually.
+  - Enable `strict` and gate new modules behind the incremental include.
   - Stabilize perf tests with deterministic budgets in CI.
   - Pre-commit hooks: format, lint, typecheck, unit tests.
+
+### 0.4 CI & Spec Compliance (Immediate)
+- CI: add jobs to
+  - run `tsc -p tsconfig.build.json`,
+  - build adapters/servers with externals (`bun:sqlite`, `pg`, `express`, `cors`, tree-sitter),
+  - run SQLite-only suites (Layer 4, adapters, unified-core, integration slice).
+- LSP spec audit: ensure no non-spec fields in any LSP responses beyond Completion (done for completion items); document any custom executeCommand payloads.
+- Env gating: document Postgres/Triple tests (run only when `PG_URL`/`TRIPLESTORE_URL` set). Keep default SQLite.
 
 ### 1. Execute Production Deployment
 
@@ -186,6 +195,10 @@ Proceed with staged rollout while storage adapters and type-safety improvements 
 - **Cross‑Protocol Consistency**: Monitor in CI; ensure MCP/LSP/HTTP/CLI parity remains stable under deterministic budgets. Repro: `bun test tests/consistency.test.ts --timeout 180000`.
  - **Enhanced Search Caps**: Enforce result cap in async aggregator or adjust test threshold to configured cap. Repro: `bun test tests/enhanced-search-async.test.ts` (fails large result set efficiency).
   - **Layer 1 Timeouts**: Increase LS directory analysis timeout and Layer 1 budget in perf suite or gate by env. Repro: `bun test tests/performance.test.ts --timeout 300000`.
+
+### 9.3 Ontology & Storage
+- Keep SQLite default; continue running Layer 4 suites in CI by default.
+- Postgres/Triple adapters: maintain parity tests behind env flags; add smoke doc for local DB runs (no containers).
 
 ### 9.1 Temporary Stubs and Relaxed Assertions (Documented)
 - **LSP Custom Methods (stubs)**: `ontology/getStatistics` and `ontology/getConceptGraph` are minimally stubbed in `src/servers/lsp.ts` to avoid timeouts. Tests were relaxed to accept any defined response. Follow‑ups:

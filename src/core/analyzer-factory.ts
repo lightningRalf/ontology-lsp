@@ -12,16 +12,8 @@ import { PatternLearner } from '../patterns/pattern-learner';
 import { KnowledgeSpreader } from '../propagation/knowledge-spreader';
 import { DefaultEventBus, LayerManager } from './layer-manager';
 import { SharedServices } from './services/index';
-import {
-    CacheConfig,
-    type CoreConfig,
-    type EnhancedMatches,
-    type Layer,
-    LayerConfigs,
-    MonitoringConfig,
-    PerformanceConfig,
-    type SearchQuery,
-} from './types';
+import { CacheConfig, type CoreConfig, type Layer, LayerConfigs, MonitoringConfig, PerformanceConfig } from './types';
+import type { EnhancedMatches, SearchQuery } from '../types/core';
 import { CodeAnalyzer } from './unified-analyzer';
 import { createStorageAdapter } from '../ontology/storage-factory';
 

@@ -1,0 +1,453 @@
+{
+  "repository": "local-test-workspace",
+  "testCases": [
+    {
+      "testCase": {
+        "name": "find_definition_import_sample.ts",
+        "description": "Find definition of import statement in /home/lightningralf/programming/ontology-lsp/test-workspace/sample.ts",
+        "operation": "findDefinition",
+        "file": "/home/lightningralf/programming/ontology-lsp/test-workspace/sample.ts",
+        "input": {
+          "line": 1,
+          "character": 15
+        },
+        "expectedResultType": "array",
+        "expectedMinResults": 0,
+        "expectedMaxResults": 5
+      },
+      "results": [
+        {
+          "protocol": "lsp",
+          "success": false,
+          "result": null,
+          "duration": 1.0036549999999806,
+          "error": "adapter.findDefinition is not a function. (In 'adapter.findDefinition(testCase.file, testCase.input)', 'adapter.findDefinition' is undefined)",
+          "metadata": {
+            "resultType": "object",
+            "resultCount": 0,
+            "resultSize": 4
+          }
+        },
+        {
+          "protocol": "mcp",
+          "success": true,
+          "result": [],
+          "duration": 5.509028000000001,
+          "metadata": {
+            "resultType": "array",
+            "resultCount": 0,
+            "resultSize": 2
+          }
+        },
+        {
+          "protocol": "http",
+          "success": true,
+          "result": [],
+          "duration": 15.790265000000034,
+          "metadata": {
+            "resultType": "array",
+            "resultCount": 0,
+            "resultSize": 2
+          }
+        },
+        {
+          "protocol": "cli",
+          "success": false,
+          "result": null,
+          "duration": 0.20985899999999447,
+          "error": "adapter.findDefinition is not a function. (In 'adapter.findDefinition(testCase.file, testCase.input)', 'adapter.findDefinition' is undefined)",
+          "metadata": {
+            "resultType": "object",
+            "resultCount": 0,
+            "resultSize": 4
+          }
+        }
+      ],
+      "consistency": {
+        "allSucceeded": false,
+        "similarResults": true,
+        "similarPerformance": true,
+        "similarity": 1,
+        "performanceVariance": 0.482703205219066
+      },
+      "analysis": "Test case \"find_definition_import_sample.ts\": ❌ 2/4 protocols failed (lsp: adapter, cli: adapter). Result counts: [0, 0], Durations: [6, 16ms]"
+    },
+    {
+      "testCase": {
+        "name": "find_definition_function_sample.ts",
+        "description": "Find definition of function call in /home/lightningralf/programming/ontology-lsp/test-workspace/sample.ts",
+        "operation": "findDefinition",
+        "file": "/home/lightningralf/programming/ontology-lsp/test-workspace/sample.ts",
+        "input": {
+          "line": 10,
+          "character": 12
+        },
+        "expectedResultType": "array",
+        "expectedMinResults": 0,
+        "expectedMaxResults": 3
+      },
+      "results": [
+        {
+          "protocol": "lsp",
+          "success": false,
+          "result": null,
+          "duration": 0.10360700000001088,
+          "error": "adapter.findDefinition is not a function. (In 'adapter.findDefinition(testCase.file, testCase.input)', 'adapter.findDefinition' is undefined)",
+          "metadata": {
+            "resultType": "object",
+            "resultCount": 0,
+            "resultSize": 4
+          }
+        },
+        {
+          "protocol": "mcp",
+          "success": true,
+          "result": [],
+          "duration": 0.8584109999999896,
+          "metadata": {
+            "resultType": "array",
+            "resultCount": 0,
+            "resultSize": 2
+          }
+        },
+        {
+          "protocol": "http",
+          "success": true,
+          "result": [],
+          "duration": 2.0969049999999925,
+          "metadata": {
+            "resultType": "array",
+            "resultCount": 0,
+            "resultSize": 2
+          }
+        },
+        {
+          "protocol": "cli",
+          "success": false,
+          "result": null,
+          "duration": 0.22731199999998353,
+          "error": "adapter.findDefinition is not a function. (In 'adapter.findDefinition(testCase.file, testCase.input)', 'adapter.findDefinition' is undefined)",
+          "metadata": {
+            "resultType": "object",
+            "resultCount": 0,
+            "resultSize": 4
+          }
+        }
+      ],
+      "consistency": {
+        "allSucceeded": false,
+        "similarResults": true,
+        "similarPerformance": true,
+        "similarity": 1,
+        "performanceVariance": 0.41907329030127755
+      },
+      "analysis": "Test case \"find_definition_function_sample.ts\": ❌ 2/4 protocols failed (lsp: adapter, cli: adapter). Result counts: [0, 0], Durations: [1, 2ms]"
+    },
+    {
+      "testCase": {
+        "name": "find_references_common_sample.ts",
+        "description": "Find references to common symbols in /home/lightningralf/programming/ontology-lsp/test-workspace/sample.ts",
+        "operation": "findReferences",
+        "file": "/home/lightningralf/programming/ontology-lsp/test-workspace/sample.ts",
+        "input": {
+          "symbol": "function"
+        },
+        "expectedResultType": "array",
+        "expectedMinResults": 0,
+        "expectedMaxResults": 50
+      },
+      "results": [
+        {
+          "protocol": "lsp",
+          "success": false,
+          "result": null,
+          "duration": 0.06038499999999658,
+          "error": "adapter.findReferences is not a function. (In 'adapter.findReferences(testCase.file, testCase.input.symbol)', 'adapter.findReferences' is undefined)",
+          "metadata": {
+            "resultType": "object",
+            "resultCount": 0,
+            "resultSize": 4
+          }
+        },
+        {
+          "protocol": "mcp",
+          "success": true,
+          "result": [],
+          "duration": 0.93193100000002,
+          "metadata": {
+            "resultType": "array",
+            "resultCount": 0,
+            "resultSize": 2
+          }
+        },
+        {
+          "protocol": "http",
+          "success": true,
+          "result": [],
+          "duration": 2.4950979999999845,
+          "metadata": {
+            "resultType": "array",
+            "resultCount": 0,
+            "resultSize": 2
+          }
+        },
+        {
+          "protocol": "cli",
+          "success": false,
+          "result": null,
+          "duration": 0.16504399999996622,
+          "error": "adapter.findReferences is not a function. (In 'adapter.findReferences(testCase.file, testCase.input.symbol)', 'adapter.findReferences' is undefined)",
+          "metadata": {
+            "resultType": "object",
+            "resultCount": 0,
+            "resultSize": 4
+          }
+        }
+      ],
+      "consistency": {
+        "allSucceeded": false,
+        "similarResults": true,
+        "similarPerformance": true,
+        "similarity": 1,
+        "performanceVariance": 0.4561289093264056
+      },
+      "analysis": "Test case \"find_references_common_sample.ts\": ❌ 2/4 protocols failed (lsp: adapter, cli: adapter). Result counts: [0, 0], Durations: [1, 2ms]"
+    },
+    {
+      "testCase": {
+        "name": "find_references_variable_sample.ts",
+        "description": "Find references to variables in /home/lightningralf/programming/ontology-lsp/test-workspace/sample.ts",
+        "operation": "findReferences",
+        "file": "/home/lightningralf/programming/ontology-lsp/test-workspace/sample.ts",
+        "input": {
+          "symbol": "const"
+        },
+        "expectedResultType": "array",
+        "expectedMinResults": 0,
+        "expectedMaxResults": 30
+      },
+      "results": [
+        {
+          "protocol": "lsp",
+          "success": false,
+          "result": null,
+          "duration": 0.04770100000001776,
+          "error": "adapter.findReferences is not a function. (In 'adapter.findReferences(testCase.file, testCase.input.symbol)', 'adapter.findReferences' is undefined)",
+          "metadata": {
+            "resultType": "object",
+            "resultCount": 0,
+            "resultSize": 4
+          }
+        },
+        {
+          "protocol": "mcp",
+          "success": true,
+          "result": [],
+          "duration": 1.0061320000000364,
+          "metadata": {
+            "resultType": "array",
+            "resultCount": 0,
+            "resultSize": 2
+          }
+        },
+        {
+          "protocol": "http",
+          "success": true,
+          "result": [],
+          "duration": 1.5333870000000047,
+          "metadata": {
+            "resultType": "array",
+            "resultCount": 0,
+            "resultSize": 2
+          }
+        },
+        {
+          "protocol": "cli",
+          "success": false,
+          "result": null,
+          "duration": 0.09686400000003914,
+          "error": "adapter.findReferences is not a function. (In 'adapter.findReferences(testCase.file, testCase.input.symbol)', 'adapter.findReferences' is undefined)",
+          "metadata": {
+            "resultType": "object",
+            "resultCount": 0,
+            "resultSize": 4
+          }
+        }
+      ],
+      "consistency": {
+        "allSucceeded": false,
+        "similarResults": true,
+        "similarPerformance": true,
+        "similarity": 1,
+        "performanceVariance": 0.2076200256820129
+      },
+      "analysis": "Test case \"find_references_variable_sample.ts\": ❌ 2/4 protocols failed (lsp: adapter, cli: adapter). Result counts: [0, 0], Durations: [1, 2ms]"
+    },
+    {
+      "testCase": {
+        "name": "suggest_refactoring_sample.ts",
+        "description": "Get refactoring suggestions for /home/lightningralf/programming/ontology-lsp/test-workspace/sample.ts",
+        "operation": "suggestRefactoring",
+        "file": "/home/lightningralf/programming/ontology-lsp/test-workspace/sample.ts",
+        "input": {},
+        "expectedResultType": "object",
+        "expectedMinResults": 0,
+        "expectedMaxResults": 10
+      },
+      "results": [
+        {
+          "protocol": "lsp",
+          "success": false,
+          "result": null,
+          "duration": 0.06493299999999635,
+          "error": "adapter.suggestRefactoring is not a function. (In 'adapter.suggestRefactoring(testCase.file)', 'adapter.suggestRefactoring' is undefined)",
+          "metadata": {
+            "resultType": "object",
+            "resultCount": 0,
+            "resultSize": 4
+          }
+        },
+        {
+          "protocol": "mcp",
+          "success": true,
+          "result": {},
+          "duration": 0.8568179999999757,
+          "metadata": {
+            "resultType": "object",
+            "resultCount": 0,
+            "resultSize": 2
+          }
+        },
+        {
+          "protocol": "http",
+          "success": true,
+          "result": {},
+          "duration": 3.7561280000000465,
+          "metadata": {
+            "resultType": "object",
+            "resultCount": 0,
+            "resultSize": 2
+          }
+        },
+        {
+          "protocol": "cli",
+          "success": false,
+          "result": null,
+          "duration": 0.09709399999997004,
+          "error": "adapter.suggestRefactoring is not a function. (In 'adapter.suggestRefactoring(testCase.file)', 'adapter.suggestRefactoring' is undefined)",
+          "metadata": {
+            "resultType": "object",
+            "resultCount": 0,
+            "resultSize": 4
+          }
+        }
+      ],
+      "consistency": {
+        "allSucceeded": false,
+        "similarResults": true,
+        "similarPerformance": false,
+        "similarity": 1,
+        "performanceVariance": 0.6285159201950461
+      },
+      "analysis": "Test case \"suggest_refactoring_sample.ts\": ❌ 2/4 protocols failed (lsp: adapter, cli: adapter). Result counts: [0, 0], Durations: [1, 4ms]"
+    },
+    {
+      "testCase": {
+        "name": "rename_variable_sample.ts",
+        "description": "Rename variable in /home/lightningralf/programming/ontology-lsp/test-workspace/sample.ts",
+        "operation": "rename",
+        "file": "/home/lightningralf/programming/ontology-lsp/test-workspace/sample.ts",
+        "input": {
+          "position": {
+            "line": 5,
+            "character": 10
+          },
+          "newName": "renamedVariable"
+        },
+        "expectedResultType": "object",
+        "expectedMinResults": 0,
+        "expectedMaxResults": 20
+      },
+      "results": [
+        {
+          "protocol": "lsp",
+          "success": false,
+          "result": null,
+          "duration": 0.03953599999999824,
+          "error": "adapter.rename is not a function. (In 'adapter.rename(testCase.file, testCase.input.position, testCase.input.newName)', 'adapter.rename' is undefined)",
+          "metadata": {
+            "resultType": "object",
+            "resultCount": 0,
+            "resultSize": 4
+          }
+        },
+        {
+          "protocol": "mcp",
+          "success": true,
+          "result": {},
+          "duration": 0.8872259999999983,
+          "metadata": {
+            "resultType": "object",
+            "resultCount": 0,
+            "resultSize": 2
+          }
+        },
+        {
+          "protocol": "http",
+          "success": true,
+          "result": {},
+          "duration": 3.373549999999966,
+          "metadata": {
+            "resultType": "object",
+            "resultCount": 0,
+            "resultSize": 2
+          }
+        },
+        {
+          "protocol": "cli",
+          "success": false,
+          "result": null,
+          "duration": 0.11779400000000351,
+          "error": "adapter.rename is not a function. (In 'adapter.rename(testCase.file, testCase.input.position, testCase.input.newName)', 'adapter.rename' is undefined)",
+          "metadata": {
+            "resultType": "object",
+            "resultCount": 0,
+            "resultSize": 4
+          }
+        }
+      ],
+      "consistency": {
+        "allSucceeded": false,
+        "similarResults": true,
+        "similarPerformance": false,
+        "similarity": 1,
+        "performanceVariance": 0.5835378344226471
+      },
+      "analysis": "Test case \"rename_variable_sample.ts\": ❌ 2/4 protocols failed (lsp: adapter, cli: adapter). Result counts: [0, 0], Durations: [1, 3ms]"
+    }
+  ],
+  "summary": {
+    "totalTestCases": 6,
+    "consistentCases": 0,
+    "inconsistentCases": 6,
+    "averageSimilarity": 1,
+    "averagePerformanceVariance": 0.4629298641910759,
+    "protocolReliability": {
+      "lsp": 0,
+      "mcp": 1,
+      "http": 1,
+      "cli": 0
+    },
+    "commonFailures": [
+      "adapter.findDefinition is not a function. (In 'adapter.findDefinition(testCase.file, testCase.input)', 'adapter.findDefinition' is undefined) (4 occurrences)",
+      "adapter.findReferences is not a function. (In 'adapter.findReferences(testCase.file, testCase.input.symbol)', 'adapter.findReferences' is undefined) (4 occurrences)",
+      "adapter.suggestRefactoring is not a function. (In 'adapter.suggestRefactoring(testCase.file)', 'adapter.suggestRefactoring' is undefined) (2 occurrences)",
+      "adapter.rename is not a function. (In 'adapter.rename(testCase.file, testCase.input.position, testCase.input.newName)', 'adapter.rename' is undefined) (2 occurrences)"
+    ],
+    "recommendations": [
+      "Investigate performance differences between protocol adapters",
+      "Address reliability issues in underperforming protocols",
+      "Focus on resolving common failure types: adapter.findDefinition is not a function."
+    ]
+  }
+}

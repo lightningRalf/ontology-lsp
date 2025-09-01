@@ -19,12 +19,28 @@ import type {
     PrepareRenameParams,
     ReferenceParams,
     RenameParams,
-    ResponseError,
     TextDocumentPositionParams,
     WorkspaceEdit,
+    ServerCapabilities,
 } from 'vscode-languageserver';
+import { ResponseError, TextDocumentSyncKind } from 'vscode-languageserver';
 
-import type { CodeAnalyzer } from '../core/unified-analyzer.js';
+// Minimal core analyzer surface required by the LSP adapter
+type CoreAnalyzer = {
+    prepareRename: (req: any) => Promise<{ data: any }>;
+    rename: (req: any) => Promise<{ data: any }>;
+    getCompletions: (req: any) => Promise<{ data: any }>;
+    findDefinitionAsync?: (req: any) => Promise<{ data: any[] }>;
+    findReferencesAsync?: (req: any) => Promise<{ data: any[] }>;
+    trackFileChange: (
+        uri: string,
+        changeType: string,
+        before?: string | undefined,
+        after?: string | undefined,
+        metadata?: Record<string, any>
+    ) => Promise<void>;
+    getDiagnostics: () => any;
+};
 import {
     buildCompletionRequest,
     buildFindDefinitionRequest,
@@ -52,10 +68,10 @@ export interface LSPAdapterConfig {
  * LSP Protocol Adapter - converts LSP messages to core analyzer calls
  */
 export class LSPAdapter {
-    private coreAnalyzer: CodeAnalyzer;
+    private coreAnalyzer: CoreAnalyzer;
     private config: LSPAdapterConfig;
 
-    constructor(coreAnalyzer: CodeAnalyzer, config: LSPAdapterConfig = {}) {
+    constructor(coreAnalyzer: CoreAnalyzer, config: LSPAdapterConfig = {}) {
         this.coreAnalyzer = coreAnalyzer;
         this.config = {
             enableDiagnostics: true,
@@ -71,11 +87,11 @@ export class LSPAdapter {
     /**
      * Get LSP server capabilities based on core analyzer features
      */
-    getCapabilities() {
+    getCapabilities(): ServerCapabilities<any> {
         return {
             textDocumentSync: {
                 openClose: true,
-                change: 2, // Incremental
+                change: TextDocumentSyncKind.Incremental,
                 willSave: false,
                 willSaveWaitUntil: false,
                 save: { includeText: false },
@@ -115,7 +131,7 @@ export class LSPAdapter {
 
             const result = await (this.coreAnalyzer as any).findDefinitionAsync(request);
 
-            return result.data.map((def) => definitionToLspLocation(def));
+            return result.data.map((def: any) => definitionToLspLocation(def));
         } catch (error) {
             throw this.createLspError(-32603, 'Definition request failed', error);
         }
@@ -138,7 +154,7 @@ export class LSPAdapter {
 
             const result = await (this.coreAnalyzer as any).findReferencesAsync(request);
 
-            return result.data.map((ref) => referenceToLspLocation(ref));
+            return result.data.map((ref: any) => referenceToLspLocation(ref));
         } catch (error) {
             throw this.createLspError(-32603, 'References request failed', error);
         }
@@ -209,7 +225,7 @@ export class LSPAdapter {
 
             const result = await this.coreAnalyzer.getCompletions(request);
 
-            return result.data.map((comp) => completionToLspItem(comp));
+            return result.data.map((comp: any) => completionToLspItem(comp));
         } catch (error) {
             throw this.createLspError(-32603, 'Completion request failed', error);
         }
@@ -296,12 +312,8 @@ export class LSPAdapter {
     /**
      * Create LSP-compatible error response
      */
-    private createLspError(code: number, message: string, cause?: any): ResponseError {
-        const error = handleAdapterError(cause, 'lsp');
-        return {
-            code: error.code || code,
-            message: `${message}: ${error.message}`,
-            data: error.data,
-        };
+    private createLspError<T>(code: number, message: string, cause?: any): ResponseError<T> {
+        const error = handleAdapterError(cause, 'lsp') as any;
+        return new ResponseError<T>(error.code || code, `${message}: ${error.message}`, error.data);
     }
 }

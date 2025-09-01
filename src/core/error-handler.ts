@@ -437,9 +437,17 @@ export class HealthChecker {
 
         for (const [name, layer] of layers.entries()) {
             const layerHealth = {
-                healthy: layer.isHealthy() && errorHandler.isLayerHealthy(name),
+                healthy: (layer.isHealthy?.() ?? true) && errorHandler.isLayerHealthy(name),
                 circuitBreakerState: errorHandler.getCircuitBreakerStats()[name]?.state,
-                metrics: layer.getMetrics(),
+                metrics:
+                    layer.getMetrics?.() || {
+                        name,
+                        requestCount: 0,
+                        averageLatency: 0,
+                        p95Latency: 0,
+                        errorCount: 0,
+                        cacheHitRate: 0,
+                    },
             };
 
             healthReport.layers[name] = layerHealth;

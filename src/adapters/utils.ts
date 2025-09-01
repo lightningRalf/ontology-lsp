@@ -3,7 +3,8 @@
  * These utilities eliminate duplicate code between LSP, MCP, HTTP, and CLI adapters
  */
 
-import type { Position, Range, URI } from 'vscode-languageserver';
+import type { Position, Range } from 'vscode-languageserver';
+import { CompletionItemKind } from 'vscode-languageserver';
 import * as nodePath from 'path';
 import { pathToFileURL, fileURLToPath } from 'url';
 import type {
@@ -253,7 +254,6 @@ export function completionToLspItem(completion: Completion) {
         documentation: completion.documentation,
         sortText: completion.sortText || completion.label,
         insertText: completion.insertText || completion.label,
-        confidence: completion.confidence,
     };
 }
 
@@ -455,29 +455,35 @@ export function handleAdapterError(error: any, protocol: 'lsp' | 'mcp' | 'http' 
 /**
  * Map completion kinds between different protocol formats
  */
-function mapCompletionKind(kind: string): number {
-    const kindMap: Record<string, number> = {
-        text: 1,
-        method: 2,
-        function: 3,
-        constructor: 4,
-        field: 5,
-        variable: 6,
-        class: 7,
-        interface: 8,
-        module: 9,
-        property: 10,
-        unit: 11,
-        value: 12,
-        enum: 13,
-        keyword: 14,
-        snippet: 15,
-        color: 16,
-        file: 17,
-        reference: 18,
+function mapCompletionKind(kind: string): CompletionItemKind {
+    const map: Record<string, CompletionItemKind> = {
+        text: CompletionItemKind.Text,
+        method: CompletionItemKind.Method,
+        function: CompletionItemKind.Function,
+        constructor: CompletionItemKind.Constructor,
+        field: CompletionItemKind.Field,
+        variable: CompletionItemKind.Variable,
+        class: CompletionItemKind.Class,
+        interface: CompletionItemKind.Interface,
+        module: CompletionItemKind.Module,
+        property: CompletionItemKind.Property,
+        unit: CompletionItemKind.Unit,
+        value: CompletionItemKind.Value,
+        enum: CompletionItemKind.Enum,
+        keyword: CompletionItemKind.Keyword,
+        snippet: CompletionItemKind.Snippet,
+        color: CompletionItemKind.Color,
+        file: CompletionItemKind.File,
+        reference: CompletionItemKind.Reference,
+        folder: CompletionItemKind.Folder,
+        enumMember: CompletionItemKind.EnumMember,
+        constant: CompletionItemKind.Constant,
+        struct: CompletionItemKind.Struct,
+        event: CompletionItemKind.Event,
+        operator: CompletionItemKind.Operator,
+        typeParameter: CompletionItemKind.TypeParameter,
     };
-
-    return kindMap[kind] || 1; // Default to text
+    return map[kind] ?? CompletionItemKind.Text;
 }
 
 /**
@@ -512,7 +518,7 @@ export function createDefaultCoreConfig(): CoreConfig {
                 optimization: {
                     bloomFilter: false, // DISABLED - bloom filter is preventing legitimate searches
                     frequencyCache: true,
-                    parallelSearch: true,
+                    negativeLookup: false,
                 },
                 caching: {
                     enabled: true,
@@ -595,6 +601,16 @@ export function createDefaultCoreConfig(): CoreConfig {
                 layer3: {
                     budgetMs: 50,
                 },
+            },
+        },
+        monitoring: {
+            enabled: true,
+            metricsInterval: 60000,
+            logLevel: 'info',
+            tracing: {
+                enabled: false,
+                endpoint: undefined,
+                sampleRate: 0.1,
             },
         },
     } as CoreConfig;

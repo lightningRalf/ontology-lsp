@@ -102,7 +102,7 @@ export class LayerManager implements ILayerManager {
 
         // Dispose all layers
         const disposePromises = Array.from(this.layers.values()).map((layer) =>
-            layer.dispose().catch((error) => {
+            (layer.dispose?.() || Promise.resolve()).catch((error) => {
                 console.error(`Error disposing layer ${layer.name}:`, error);
             })
         );
@@ -148,7 +148,7 @@ export class LayerManager implements ILayerManager {
     unregisterLayer(layerName: string): void {
         const layer = this.layers.get(layerName);
         if (layer) {
-            layer.dispose().catch((error) => {
+            layer.dispose?.().catch((error) => {
                 console.error(`Error disposing layer ${layerName}:`, error);
             });
             this.layers.delete(layerName);
@@ -173,7 +173,7 @@ export class LayerManager implements ILayerManager {
         // 2. Overall performance is within targets
         // 3. Error rate is below threshold
 
-        const healthyLayers = Array.from(this.layers.values()).filter((layer) => layer.isHealthy()).length;
+        const healthyLayers = Array.from(this.layers.values()).filter((layer) => (layer.isHealthy?.() ?? true)).length;
 
         const totalLayers = this.layers.size;
         const healthyRatio = totalLayers > 0 ? healthyLayers / totalLayers : 0;
@@ -242,7 +242,7 @@ export class LayerManager implements ILayerManager {
 
         for (const [name, layer] of this.layers.entries()) {
             const metrics = this.metrics.get(name);
-            const isHealthy = layer.isHealthy();
+            const isHealthy = layer.isHealthy?.() ?? true;
 
             layerHealthStatuses[name] = {
                 name,
@@ -286,7 +286,7 @@ export class LayerManager implements ILayerManager {
             throw new LayerUnavailableError(layerName, 'Layer not registered', requestMetadata.id);
         }
 
-        if (!layer.isHealthy()) {
+        if (!(layer.isHealthy?.() ?? true)) {
             throw new LayerUnavailableError(layerName, 'Layer is unhealthy', requestMetadata.id);
         }
 
@@ -445,6 +445,7 @@ export class LayerManager implements ILayerManager {
     private registerMockLayers(): void {
         const layerNames = ['layer1', 'layer2', 'layer3', 'layer4', 'layer5'];
 
+        const self = this;
         for (const layerName of layerNames) {
             // Only register mock if no real layer exists and it's enabled
             if (
@@ -495,8 +496,9 @@ export class LayerManager implements ILayerManager {
                     },
 
                     getMetrics(): LayerMetrics {
+                        const m = self.metrics.get(layerName);
                         return (
-                            this.metrics.get(layerName) || {
+                            m || {
                                 name: layerName,
                                 requestCount: 0,
                                 averageLatency: 0,
@@ -517,20 +519,22 @@ export class LayerManager implements ILayerManager {
 /**
  * Create a default event bus implementation
  */
-export class DefaultEventBus extends EventEmitter implements EventBus {
+export class DefaultEventBus implements EventBus {
+    private emitter = new EventEmitter();
+
     emit<T>(event: string, data: T): void {
-        super.emit(event, data);
+        this.emitter.emit(event, data);
     }
 
     on<T>(event: string, handler: (data: T) => void): void {
-        super.on(event, handler);
+        this.emitter.on(event, handler);
     }
 
     off<T>(event: string, handler: (data: T) => void): void {
-        super.off(event, handler);
+        this.emitter.off(event, handler);
     }
 
     once<T>(event: string, handler: (data: T) => void): void {
-        super.once(event, handler);
+        this.emitter.once(event, handler);
     }
 }

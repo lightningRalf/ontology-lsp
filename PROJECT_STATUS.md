@@ -567,6 +567,32 @@ The Ontology-LSP system has a **production-ready core** with **HYBRID INTELLIGEN
 - ✅ **Process management**: Robust startup and cleanup verified
 - ✅ **Documentation**: Complete deployment guides created
 
+### Type Safety + LSP Compliance + Ontology TS Coverage (2025‑09‑01)
+- Type-check consolidation via `tsconfig.build.json` with incremental expansion:
+  - Adapters (LSP + MCP) compile cleanly.
+  - Core services included: event‑bus, cache, monitoring, database, shared‑services; layer‑manager and core utils.
+  - Ontology modules included: `src/ontology/**/*` (engine, storage port, adapters, utils).
+- Event bus refactor: `EventBusService` now composes a private `EventEmitter` (no subclass override issues).
+- LSP compliance tightened:
+  - Proper `ResponseError` and `TextDocumentSyncKind` usage.
+  - `CompletionItemKind` mapping; removed non‑spec `confidence` field from `CompletionItem`.
+- Build scripts updated to use PATH `bun` and externalize native/optional deps (`bun:sqlite`, `pg`, `express`, `cors`, tree‑sitter). All servers build successfully.
+- SQLite‑only validation: Layer 4 storage + ontology flows verified locally using Bun’s native SQLite (no containers).
+
+### Local Test Snapshot (non‑perf)
+- Adapters integration: 31/31 pass
+- Unified core: 23/23 pass
+- Integration: 5 pass, 4 perf‑gated skips
+- Layer 4 (SQLite): storage‑adapters (1 pass, 2 env‑skips), db‑cleanup (1), engine‑validation (3), import‑export (1), k‑hop parity (2), metrics‑surface (1), representation‑skip (1)
+- Smart escalation: unit 26/26, integration 25/25 pass
+- Layer 1 categorization: 40/40 pass
+- Enhanced search async: 3 pass, 2 perf‑skips
+- Tree‑sitter query compile: 2/2 pass
+
+Open Items:
+- Postgres/Triple tests remain env‑gated (skipped without credentials).
+- Perf/benchmarks remain gated and environment‑sensitive.
+
 ### Ready for Production
 - **Container Registry**: Ready for push to GitHub Container Registry, Docker Hub, or private registry
 - **Kubernetes**: Complete K8s manifests available in `k8s/` directory  

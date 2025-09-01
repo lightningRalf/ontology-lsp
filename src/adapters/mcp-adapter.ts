@@ -10,8 +10,8 @@
  * All actual analysis work is delegated to the unified core analyzer.
  */
 
-import type { CodeAnalyzer } from '../core/unified-analyzer.js';
 import { ToolRegistry } from '../core/tools/registry.js';
+import { DefinitionKind } from '../core/types.js';
 import { createValidationError, type ErrorContext, withMcpErrorHandling } from '../core/utils/error-handler.js';
 import { adapterLogger, mcpLogger } from '../core/utils/file-logger.js';
 import {
@@ -28,6 +28,18 @@ import {
     validateRequired,
 } from './utils.js';
 
+// Minimal core analyzer surface required by MCP adapter
+type CoreAnalyzer = {
+    rename: (req: any) => Promise<{ data: any; performance: any; requestId?: string }>;
+    getCompletions?: (req: any) => Promise<{ data: any }>;
+    findDefinitionAsync?: (req: any) => Promise<{ data: any[]; performance: any; requestId?: string }>;
+    findReferencesAsync?: (req: any) => Promise<{ data: any[]; performance: any; requestId?: string }>;
+    buildSymbolMap?: (req: any) => Promise<any>;
+    exploreCodebase?: (req: any) => Promise<any>;
+    getDiagnostics?: () => any;
+    config?: any;
+};
+
 export interface MCPAdapterConfig {
     maxResults?: number;
     timeout?: number;
@@ -39,10 +51,10 @@ export interface MCPAdapterConfig {
  * MCP Protocol Adapter - converts MCP tool calls to core analyzer calls
  */
 export class MCPAdapter {
-    private coreAnalyzer: CodeAnalyzer;
+    private coreAnalyzer: CoreAnalyzer;
     private config: MCPAdapterConfig;
 
-    constructor(coreAnalyzer: CodeAnalyzer, config: MCPAdapterConfig = {}) {
+    constructor(coreAnalyzer: CoreAnalyzer, config: MCPAdapterConfig = {}) {
         this.coreAnalyzer = coreAnalyzer;
         this.config = {
             maxResults: 100,
@@ -204,7 +216,7 @@ export class MCPAdapter {
                                 type: 'text',
                                 text: JSON.stringify(
                                     {
-                                        definitions: [definitionToMcpResponse(explicit)],
+                                        definitions: [definitionToMcpResponse(explicit as any)],
                                         performance: {
                                             layer1: 0,
                                             layer2: 0,
@@ -331,7 +343,7 @@ export class MCPAdapter {
                             type: 'text',
                             text: JSON.stringify(
                                 {
-                                    definitions: fallbackDefs.map((def) => definitionToMcpResponse(def)),
+                                    definitions: fallbackDefs.map((def: any) => definitionToMcpResponse(def)),
                                     performance: { layer1: 0, layer2: 0, layer3: 0, layer4: 0, layer5: 0, total: 0 },
                                     requestId: undefined,
                                     count: fallbackDefs.length,
@@ -434,6 +446,7 @@ export class MCPAdapter {
                         for (let i = 0; i < lines.length; i++) {
                             if (re.test(lines[i])) {
                                 results.push({
+                                    identifier: symbol,
                                     uri: `file://${p}`,
                                     range: {
                                         start: { line: i, character: Math.max(0, lines[i].indexOf(symbol)) },
@@ -442,9 +455,9 @@ export class MCPAdapter {
                                             character: Math.max(0, lines[i].indexOf(symbol)) + symbol.length,
                                         },
                                     },
-                                    kind: 'class',
+                                    kind: DefinitionKind.Class,
                                     name: symbol,
-                                    source: 'fallback',
+                                    source: 'exact',
                                     confidence: 0.5,
                                     layer: 'async-layer1',
                                 });
@@ -492,20 +505,21 @@ export class MCPAdapter {
                             if (declRe.test(line)) {
                                 const col = Math.max(0, line.indexOf(symbol));
                                 return {
+                                    identifier: symbol,
                                     uri: `file://${p}`,
                                     range: {
                                         start: { line: i, character: col },
                                         end: { line: i, character: col + symbol.length },
                                     },
                                     kind: /class\s+/.test(line)
-                                        ? 'class'
+                                        ? DefinitionKind.Class
                                         : /function\s+/.test(line)
-                                          ? 'function'
+                                          ? DefinitionKind.Function
                                           : /interface\s+/.test(line)
-                                            ? 'interface'
-                                            : 'variable',
+                                            ? DefinitionKind.Interface
+                                            : DefinitionKind.Variable,
                                     name: symbol,
-                                    source: 'explicit-scan',
+                                    source: 'exact',
                                     confidence: 0.95,
                                     layer: 'async-layer1',
                                 };
@@ -542,7 +556,7 @@ export class MCPAdapter {
                     type: 'text',
                     text: JSON.stringify(
                         {
-                            references: result.data.map((ref) => referenceToMcpResponse(ref)),
+                            references: result.data.map((ref: any) => referenceToMcpResponse(ref)),
                             performance: result.performance,
                             requestId: result.requestId,
                             count: result.data.length,
@@ -575,7 +589,7 @@ export class MCPAdapter {
 
         const changes = Object.entries(result.data.changes || {}).map(([uri, edits]) => ({
             file: uri,
-            edits: edits.map((edit: any) => ({
+            edits: (edits as any[]).map((edit: any) => ({
                 range: {
                     start: { line: edit.range.start.line, character: edit.range.start.character },
                     end: { line: edit.range.end.line, character: edit.range.end.character },
@@ -791,8 +805,8 @@ export class MCPAdapter {
         const mapped = {
             symbol: coreResult.symbol,
             contextUri: coreResult.contextUri,
-            definitions: coreResult.definitions.map((def) => definitionToMcpResponse(def)),
-            references: coreResult.references.map((ref) => referenceToMcpResponse(ref)),
+            definitions: coreResult.definitions.map((def: any) => definitionToMcpResponse(def)),
+            references: coreResult.references.map((ref: any) => referenceToMcpResponse(ref)),
             performance: coreResult.performance,
             diagnostics: coreResult.diagnostics,
             timestamp: coreResult.timestamp,
@@ -886,7 +900,7 @@ export class MCPAdapter {
             adapter: 'mcp',
             config: this.config,
             availableTools: this.getTools().map((t) => t.name),
-            coreAnalyzer: this.coreAnalyzer.getDiagnostics(),
+            coreAnalyzer: this.coreAnalyzer.getDiagnostics ? this.coreAnalyzer.getDiagnostics() : {},
             timestamp: Date.now(),
         };
     }

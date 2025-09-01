@@ -1,5 +1,5 @@
 file,duration_ms,exit_code
-tests/benchmarks/tool-comparison.test.ts,71627,0
-tests/performance/benchmark.test.ts,13968,0
-tests/performance/large-tree.test.ts,42,0
-tests/performance/learning-concurrency.test.ts,176,0
+tests/benchmarks/tool-comparison.test.ts,78031,0
+tests/performance/benchmark.test.ts,21769,0
+tests/performance/large-tree.test.ts,53,0
+tests/performance/learning-concurrency.test.ts,248,0

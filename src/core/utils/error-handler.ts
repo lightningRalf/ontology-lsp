@@ -58,7 +58,11 @@ export class ErrorHandler {
         operation: () => Promise<T>,
         options?: Partial<RecoveryOptions>
     ): Promise<T> {
-        const effectiveOptions = { ...this.options, ...options };
+        const effectiveOptions: RecoveryOptions = {
+            ...this.defaultOptions,
+            ...(this.options as RecoveryOptions),
+            ...(options || {}),
+        } as RecoveryOptions;
         const operationKey = `${context.component}:${context.operation}`;
 
         // Check circuit breaker
@@ -69,7 +73,7 @@ export class ErrorHandler {
         }
 
         let lastError: Error | undefined;
-        const maxAttempts = effectiveOptions.maxRetries + 1; // +1 for initial attempt
+        const maxAttempts = (effectiveOptions.maxRetries ?? this.defaultOptions.maxRetries) + 1; // +1 for initial attempt
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
@@ -376,11 +380,12 @@ export class ErrorHandler {
         state.failures++;
         state.lastFailure = Date.now();
 
-        if (state.failures >= this.options.circuitBreakerThreshold!) {
+        const threshold = this.options.circuitBreakerThreshold ?? this.defaultOptions.circuitBreakerThreshold;
+        if (state.failures >= threshold) {
             state.isOpen = true;
             mcpLogger.warn(`Circuit breaker opened for ${operationKey}`, {
                 failures: state.failures,
-                threshold: this.options.circuitBreakerThreshold,
+                threshold,
             });
         }
     }

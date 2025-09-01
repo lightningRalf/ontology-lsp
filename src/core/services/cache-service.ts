@@ -176,6 +176,7 @@ export class CacheService {
     constructor(config: CacheConfig, eventBus: EventBus) {
         // Normalize potentially partial configs passed by tests or older callers
         const normalized: CacheConfig = {
+            enabled: (config as any)?.enabled ?? true,
             strategy: (config as any)?.strategy ?? 'memory',
             memory: {
                 maxSize: (config as any)?.memory?.maxSize ?? 100 * 1024 * 1024, // 100MB default

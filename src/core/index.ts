@@ -5,6 +5,7 @@
 
 // Import for internal use
 import { AnalyzerFactory } from './analyzer-factory';
+import { createLearningSystem } from '../learning/index';
 
 // Learning system types
 export type * from '../learning/types';
@@ -19,7 +20,7 @@ export { AnalyzerFactory };
 // Learning system components
 export {
     CodeEvolutionTracker,
-    createLearningSystem,
+    createLearningSystem as createLearningSystemExport,
     FeedbackLoopSystem,
     LEARNING_SYSTEM_METADATA,
     LEARNING_SYSTEM_VERSION,
@@ -56,10 +57,11 @@ export async function createLearningEnabledAnalyzer(
     learningSystem: import('../learning/learning-orchestrator').LearningOrchestrator;
 }> {
     // Create the unified analyzer
-    const analyzer = await createUnifiedAnalyzer(workspacePath, config);
+    const created = await createUnifiedAnalyzer(workspacePath, config);
+    const analyzer = created.analyzer;
 
     // Extract shared services from the analyzer
-    const sharedServices = (analyzer as any).sharedServices;
+    const sharedServices = (created as any).sharedServices;
     if (!sharedServices) {
         throw new Error('Shared services not available in analyzer');
     }

@@ -1,0 +1,7 @@
+TestCase,LSP_Success,MCP_Success,HTTP_Success,CLI_Success,Similarity,PerformanceVariance
+find_definition_import_sample.ts,false,true,true,false,1.000,0.483
+find_definition_function_sample.ts,false,true,true,false,1.000,0.419
+find_references_common_sample.ts,false,true,true,false,1.000,0.456
+find_references_variable_sample.ts,false,true,true,false,1.000,0.208
+suggest_refactoring_sample.ts,false,true,true,false,1.000,0.629
+rename_variable_sample.ts,false,true,true,false,1.000,0.584

@@ -9,50 +9,55 @@ import type { EventBus } from '../types.js';
 /**
  * Default event bus implementation using Node.js EventEmitter
  */
-export class EventBusService extends EventEmitter implements EventBus {
+export class EventBusService implements EventBus {
+    private emitter: EventEmitter;
     private maxListeners: number;
 
     constructor(maxListeners: number = 100) {
-        super();
+        this.emitter = new EventEmitter();
         this.maxListeners = maxListeners;
-        this.setMaxListeners(maxListeners);
+        this.emitter.setMaxListeners(maxListeners);
     }
 
     emit<T>(event: string, data: T): void {
-        super.emit(event, data);
+        this.emitter.emit(event, data);
     }
 
     on<T>(event: string, handler: (data: T) => void): void {
-        super.on(event, handler);
+        this.emitter.on(event, handler);
     }
 
     off<T>(event: string, handler: (data: T) => void): void {
-        super.off(event, handler);
+        this.emitter.off(event, handler);
     }
 
     once<T>(event: string, handler: (data: T) => void): void {
-        super.once(event, handler);
+        this.emitter.once(event, handler);
     }
 
     /**
      * Get current listener count for an event
      */
     getListenerCount(event: string): number {
-        return this.listenerCount(event);
+        return this.emitter.listenerCount(event);
     }
 
     /**
      * Get all registered event names
      */
     getEventNames(): (string | symbol)[] {
-        return this.eventNames();
+        return this.emitter.eventNames();
     }
 
     /**
      * Remove all listeners
      */
     removeAllListeners(event?: string): void {
-        super.removeAllListeners(event);
+        if (event) {
+            this.emitter.removeAllListeners(event);
+        } else {
+            this.emitter.removeAllListeners();
+        }
     }
 
     /**

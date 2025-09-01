@@ -1,0 +1,357 @@
+{
+  "repository": "local-test-workspace",
+  "session": {
+    "sessionId": "learning_local-test-workspace_1756741627296",
+    "startTime": 405.594658,
+    "operations": [
+      {
+        "operationId": "op_1",
+        "type": "definition",
+        "file": "sample.ts",
+        "input": {
+          "line": 3,
+          "character": 10
+        },
+        "result": {
+          "error": "undefined is not an object (evaluating 'this.eventBus.emit')"
+        },
+        "timestamp": 407.517572,
+        "duration": 1.5461979999999471,
+        "patternsTrigered": [],
+        "patternsLearned": [],
+        "confidence": 0.1,
+        "success": false
+      },
+      {
+        "operationId": "op_2",
+        "type": "references",
+        "file": "sample.ts",
+        "input": {
+          "symbol": "function"
+        },
+        "result": {
+          "error": "CodeAnalyzer not initialized"
+        },
+        "timestamp": 410.79535,
+        "duration": 1.689188999999999,
+        "patternsTrigered": [],
+        "patternsLearned": [],
+        "confidence": 0.1,
+        "success": false
+      },
+      {
+        "operationId": "op_3",
+        "type": "refactor",
+        "file": "sample.ts",
+        "input": {},
+        "result": {
+          "error": "this.analyzer.suggestRefactoring is not a function. (In 'this.analyzer.suggestRefactoring(file)', 'this.analyzer.suggestRefactoring' is undefined)"
+        },
+        "timestamp": 415.416041,
+        "duration": 1.6953220000000329,
+        "patternsTrigered": [],
+        "patternsLearned": [],
+        "confidence": 0.1,
+        "success": false
+      },
+      {
+        "operationId": "op_4",
+        "type": "rename",
+        "file": "sample.ts",
+        "input": {
+          "position": {
+            "line": 5,
+            "character": 8
+          },
+          "newName": "renamedVar"
+        },
+        "result": {
+          "error": "CodeAnalyzer not initialized"
+        },
+        "timestamp": 418.468091,
+        "duration": 1.6887389999999982,
+        "patternsTrigered": [],
+        "patternsLearned": [],
+        "confidence": 0.1,
+        "success": false
+      },
+      {
+        "operationId": "op_5",
+        "type": "feedback",
+        "file": "sample.ts",
+        "input": {
+          "type": "accept_suggestion",
+          "confidence": 0.8026521262626308
+        },
+        "result": {
+          "type": "new_pattern",
+          "file": "/home/lightningralf/programming/ontology-lsp/test-workspace/sample.ts",
+          "confidence": 0.7096766387364138,
+          "applied": true
+        },
+        "timestamp": 426.051351,
+        "duration": 0.8135260000000244,
+        "patternsTrigered": [],
+        "patternsLearned": [],
+        "confidence": 0.8,
+        "success": true
+      },
+      {
+        "operationId": "op_6",
+        "type": "definition",
+        "file": "sample.ts",
+        "input": {
+          "line": 3,
+          "character": 10
+        },
+        "result": {
+          "error": "undefined is not an object (evaluating 'this.eventBus.emit')"
+        },
+        "timestamp": 427.625122,
+        "duration": 0.6545739999999682,
+        "patternsTrigered": [],
+        "patternsLearned": [],
+        "confidence": 0.1,
+        "success": false
+      },
+      {
+        "operationId": "op_7",
+        "type": "references",
+        "file": "sample.ts",
+        "input": {
+          "symbol": "function"
+        },
+        "result": {
+          "error": "CodeAnalyzer not initialized"
+        },
+        "timestamp": 428.973725,
+        "duration": 0.6331729999999993,
+        "patternsTrigered": [],
+        "patternsLearned": [],
+        "confidence": 0.1,
+        "success": false
+      },
+      {
+        "operationId": "op_8",
+        "type": "refactor",
+        "file": "sample.ts",
+        "input": {},
+        "result": {
+          "error": "this.analyzer.suggestRefactoring is not a function. (In 'this.analyzer.suggestRefactoring(file)', 'this.analyzer.suggestRefactoring' is undefined)"
+        },
+        "timestamp": 430.001788,
+        "duration": 0.5349369999999567,
+        "patternsTrigered": [],
+        "patternsLearned": [],
+        "confidence": 0.1,
+        "success": false
+      },
+      {
+        "operationId": "op_9",
+        "type": "rename",
+        "file": "sample.ts",
+        "input": {
+          "position": {
+            "line": 5,
+            "character": 8
+          },
+          "newName": "renamedVar"
+        },
+        "result": {
+          "error": "CodeAnalyzer not initialized"
+        },
+        "timestamp": 431.083693,
+        "duration": 0.45158799999995836,
+        "patternsTrigered": [],
+        "patternsLearned": [],
+        "confidence": 0.1,
+        "success": false
+      },
+      {
+        "operationId": "op_10",
+        "type": "feedback",
+        "file": "sample.ts",
+        "input": {
+          "type": "accept_suggestion",
+          "confidence": 0.9189104663850658
+        },
+        "result": {
+          "type": "accept_suggestion",
+          "file": "/home/lightningralf/programming/ontology-lsp/test-workspace/sample.ts",
+          "confidence": 0.9754102643182787,
+          "applied": true
+        },
+        "timestamp": 434.282171,
+        "duration": 0.9362889999999879,
+        "patternsTrigered": [],
+        "patternsLearned": [],
+        "confidence": 0.8,
+        "success": true
+      },
+      {
+        "operationId": "op_11",
+        "type": "definition",
+        "file": "sample.ts",
+        "input": {
+          "line": 3,
+          "character": 10
+        },
+        "result": {
+          "error": "undefined is not an object (evaluating 'this.eventBus.emit')"
+        },
+        "timestamp": 436.178264,
+        "duration": 0.9774070000000279,
+        "patternsTrigered": [],
+        "patternsLearned": [],
+        "confidence": 0.1,
+        "success": false
+      },
+      {
+        "operationId": "op_12",
+        "type": "references",
+        "file": "sample.ts",
+        "input": {
+          "symbol": "function"
+        },
+        "result": {
+          "error": "CodeAnalyzer not initialized"
+        },
+        "timestamp": 438.183885,
+        "duration": 1.2706739999999854,
+        "patternsTrigered": [],
+        "patternsLearned": [],
+        "confidence": 0.1,
+        "success": false
+      },
+      {
+        "operationId": "op_13",
+        "type": "refactor",
+        "file": "sample.ts",
+        "input": {},
+        "result": {
+          "error": "this.analyzer.suggestRefactoring is not a function. (In 'this.analyzer.suggestRefactoring(file)', 'this.analyzer.suggestRefactoring' is undefined)"
+        },
+        "timestamp": 439.936386,
+        "duration": 0.8727390000000241,
+        "patternsTrigered": [],
+        "patternsLearned": [],
+        "confidence": 0.1,
+        "success": false
+      },
+      {
+        "operationId": "op_14",
+        "type": "rename",
+        "file": "sample.ts",
+        "input": {
+          "position": {
+            "line": 5,
+            "character": 8
+          },
+          "newName": "renamedVar"
+        },
+        "result": {
+          "error": "CodeAnalyzer not initialized"
+        },
+        "timestamp": 442.193866,
+        "duration": 1.5572900000000232,
+        "patternsTrigered": [],
+        "patternsLearned": [],
+        "confidence": 0.1,
+        "success": false
+      },
+      {
+        "operationId": "op_15",
+        "type": "feedback",
+        "file": "sample.ts",
+        "input": {
+          "type": "accept_suggestion",
+          "confidence": 0.9183513256871635
+        },
+        "result": {
+          "type": "new_pattern",
+          "file": "/home/lightningralf/programming/ontology-lsp/test-workspace/sample.ts",
+          "confidence": 0.6650012374865317,
+          "applied": true
+        },
+        "timestamp": 443.568418,
+        "duration": 0.6127539999999954,
+        "patternsTrigered": [],
+        "patternsLearned": [],
+        "confidence": 0.8,
+        "success": true
+      }
+    ],
+    "initialState": {
+      "timestamp": 405.584339,
+      "totalPatterns": 0,
+      "confidenceDistribution": {
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "patternTypes": {
+        "function_calls": 0,
+        "imports": 0,
+        "variable_usage": 0,
+        "class_patterns": 0,
+        "other": 0
+      },
+      "recentActivity": {
+        "operationsLast1h": 0,
+        "patternsLearnedLast1h": 0,
+        "avgConfidenceChange": 0.02
+      }
+    },
+    "endTime": 445.522602,
+    "finalState": {
+      "timestamp": 445.513564,
+      "totalPatterns": 0,
+      "confidenceDistribution": {
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "patternTypes": {
+        "function_calls": 0,
+        "imports": 0,
+        "variable_usage": 0,
+        "class_patterns": 0,
+        "other": 0
+      },
+      "recentActivity": {
+        "operationsLast1h": 15,
+        "patternsLearnedLast1h": 0,
+        "avgConfidenceChange": 0.02
+      }
+    }
+  },
+  "metrics": {
+    "totalOperations": 15,
+    "patternsLearned": 0,
+    "patternsImproved": 0,
+    "learningRate": 0,
+    "confidenceImprovement": 0,
+    "patternRetention": 0.85,
+    "adaptationSpeed": 0,
+    "suggestionAccuracy": 0.2
+  },
+  "patterns": {
+    "mostFrequent": [],
+    "mostImproved": [],
+    "emergingPatterns": []
+  },
+  "insights": {
+    "learningEffectiveness": "poor",
+    "strongAreas": [],
+    "improvementAreas": [
+      "Learning rate - system could learn patterns more quickly",
+      "Suggestion accuracy - improve reliability of recommendations",
+      "Pattern diversity - system may not be detecting enough unique patterns"
+    ],
+    "recommendations": [
+      "Increase pattern recognition sensitivity or provide more training examples",
+      "Refine pattern matching algorithms or increase confidence thresholds",
+      "Enhance pattern detection algorithms to identify more diverse code patterns"
+    ]
+  }
+}
