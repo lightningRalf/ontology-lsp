@@ -9,6 +9,36 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 
 ## 🚀 Next Development Priorities (Updated 2025-08-29)
 
+### 0. Architectural roadmap (New)
+
+Goal: make storage pluggable and strengthen observability + reliability
+before scale-out. Treat these as gating milestones for adoption.
+
+- StoragePort abstraction for Ontology (L4):
+  - Define a `StoragePort` interface (load/save/query concepts,
+    relations, representations, evolution; stats; maintenance).
+  - Adapters:
+    - SQLiteAdapter (existing; extract into adapter form).
+    - PostgresAdapter (relational schema, indexes, transactions).
+    - TripleStoreAdapter (SPARQL; typed predicates; pagination).
+  - Acceptance:
+    - Parity on findConcept, related k-hop, import/export.
+    - L4 p95 ≤ 10ms on 50k files with warm cache.
+    - Backpressure + retry on transient errors.
+  - Risks (2nd–5th order):
+    - Network variance → caching + bounded queries.
+    - Contention → pooling + tuned isolation.
+    - Model drift → versioned schema + migrations.
+
+- Observability & SLOs (all layers):
+  - Emit per-layer budgets/latency; escalation decisions (L1→L2/L3).
+  - Dashboards for L3/L4/L5; alert on p95 breaches, error spikes.
+
+- Type safety & CI stability:
+  - Resolve current `tsc` errors in adapters; enable `strict`.
+  - Stabilize perf tests with deterministic budgets in CI.
+  - Pre-commit hooks: format, lint, typecheck, unit tests.
+
 ### 1. Execute Production Deployment ✅ DEPLOYMENT-READY  
 **Status**: All preparation complete, ready for immediate execution
 
@@ -22,8 +52,10 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 - **Monitoring**: Enable production monitoring and alerting
 - **Load Testing**: Validate production performance under load
 
-**Verification Complete**: ✅ Builds, ✅ Health Endpoints, ✅ Performance, ✅ Docker Config, ✅ Hybrid Intelligence, ✅ Layer 4 Ontology
-**Ready**: System is 100% production ready with all major features implemented
+**Verification Complete**: ✅ Builds, ✅ Health Endpoints, ✅ Performance,
+✅ Docker Config, ✅ Hybrid Intelligence, ✅ Layer 4 Ontology
+**Ready**: Core is production ready; proceed with staged rollout while
+storage adapters and type-safety improvements land.
 
 ### 2. Advanced Performance Optimization
 - **Startup Time**: Reduce cold start latency (currently ~2s)
@@ -278,6 +310,36 @@ bun test tests/categorization.test.ts --verbose
 - **Support**: GitHub Issues for bug reports
 
 ---
+
+## 🧭 Storage adapters plan (New)
+
+### A. Postgres Adapter
+- Schema: concepts, representations, relations, evolution; FKs +
+  composite indexes (canonical_name, (from_concept_id,to_concept_id,relation_type)).
+- Queries: name lookup, neighbors (k-hop via CTEs), stats.
+- Migrations: sqldiff + version table; rollback path.
+- Operational: pool size, timeouts, retries, metrics; VACUUM/ANALYZE.
+
+### B. Triple Store Adapter
+- Model: ex:Concept, ex:relatedTo (typed), ex:hasRepresentation,
+  ex:hasSignature, ex:hasEvolution.
+- SPARQL: find by label/altLabel, typed relations, k-hops.
+- Operational: HTTP timeouts, paging, retry/backoff, provenance.
+
+### C. Cutover & Sync
+- One-time ETL from SQLite → target; validation checksums.
+- Optional dual-write period; dark read-through for confidence.
+- Feature flag to switch active backend per workspace.
+
+## 🛡️ Security & multi-tenancy (New)
+- Capability-based plugin sandbox; least privilege for file, network.
+- Workspace isolation for storage; per-tenant quotas & limits.
+- Audit events for admin operations; PII policy if applicable.
+
+## 📚 DX & API surface (New)
+- Stabilize HTTP/LSP error shapes; add pagination and rate limits.
+- Consistent CLI/HTTP/LSP semantics for planner (L3), ontology (L4),
+  and learning (L5) operations.
 
 ## 🎯 New Items (CLI + AST Behavior) — 2025‑08‑28
 

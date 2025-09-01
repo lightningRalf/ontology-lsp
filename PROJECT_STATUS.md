@@ -26,14 +26,13 @@ The unified core architecture is fully implemented and operational with all crit
 ## 🔄 Current State
 
 ### Unified Core System ✅
-- Protocol-agnostic `CodeAnalyzer` class
-- All layers operational and optimized (layer keys renumbered):
-  - Layer 1 (Fast Search): 0.20ms response time (99.75% under target) 🚀
-  - Layer 2 (AST Analysis): 1.8ms response time (96.4% under target) 🚀
-  - Layer 3 (Symbol Map + Rename Planner): integrated; used by LSP/HTTP/CLI
-  - Layer 4 (Ontology/Semantic Graph): 1.4ms response time (86% under target) ✅ **FULLY IMPLEMENTED**
-  - Layer 5 (Pattern Mining/Learning): 2.7ms response time (73% under target)
-  - Layer 6 (Knowledge Propagation): 1.2ms response time (94% under target)
+- Protocol-agnostic `CodeAnalyzer` with explicit layer metrics
+- Layers (renumbered and aligned):
+  - Layer 1 (Fast Search): 0.20ms response time (target 5ms)
+  - Layer 2 (AST Analysis): 1.8ms response time (target 50ms)
+  - Layer 3 (Planner: symbol map + rename planning): metrics exposed, used by LSP/HTTP/CLI
+  - Layer 4 (Ontology/Semantic Graph): 1.4ms response time (target 10ms) ✅
+  - Layer 5 (Pattern Learning & Propagation): 2.7ms learning; propagation aggregated (target 20ms)
 
 ### Testing Infrastructure ✅
 - **Across suites**: 257/267 passing (~96%) as of 2025-08-28
@@ -48,9 +47,9 @@ The unified core architecture is fully implemented and operational with all crit
 - **Performance tests**: 7/13 passing (54%)
 
 ### Protocol Adapters ✅
-- **LSP Adapter**: Fully operational with stdio; custom methods aligned to layers:
-  - `symbol/buildSymbolMap` (Layer 3)
-  - `refactor/planRename` (Layer 3)
+- **LSP Adapter**: Fully operational (stdio); custom methods (Layer 3)
+  - `symbol/buildSymbolMap` (Planner)
+  - `refactor/planRename` (Planner)
 - **MCP Adapter**: Running on port 7001 with SSE
 - **HTTP Adapter**: Running on port 7000, all endpoints working
 - **CLI Adapter**: Commands exposed for Layer 3 features:
@@ -72,6 +71,16 @@ The unified core architecture is fully implemented and operational with all crit
 - CI/CD pipeline defined
 - System fully operational and deployable
  - Cache layer planned for Valkey (Redis-compatible)
+
+### Architectural Priorities (In Progress)
+- Storage abstraction for Ontology (StoragePort) with pluggable backends:
+  - SQLite (current), Postgres (relational), Triple Store (RDF/SPARQL)
+  - Goals: operational parity, predictable latency, strong indexing
+- Observability and SLOs per layer (p95/p99, error rates, budgets):
+  - Emit layer-specific metrics; dashboards for L3/L4/L5 decisions
+- CI reliability and type safety:
+  - Resolve outstanding tsc errors in adapters; enable strict mode
+  - Reduce flaky perf tests; fix deterministic budgets in CI
 
 ## 📁 Clean Architecture
 
@@ -435,7 +444,8 @@ The Ontology-LSP system has a **production-ready core** with **HYBRID INTELLIGEN
 - **Scaling**: Horizontal Pod Autoscaler ready for production load
 
 ### Next Steps
-The system is now **100% feature-complete** and ready for production deployment. See `NEXT_STEPS.md` for deployment execution and future enhancements.
+Core is production-ready; storage adapters and type-safety work are the
+next milestones prior to broad rollout. See `NEXT_STEPS.md`.
 
 ## 🏆 IMPLEMENTATION COMPLETE SUMMARY
 

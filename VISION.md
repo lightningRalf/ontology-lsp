@@ -37,7 +37,7 @@ graph TB
     
     subgraph SHARED["Shared Services"]
       CACHE["Distributed Cache<br/>Redis/Valkey"]
-      DB["Knowledge Base<br/>PostgreSQL + Vector DB"]
+      DB["Knowledge Storage<br/>Adapters (SQLite/PG/Triple)"]
       QUEUE["Task Queue<br/>BullMQ"]
       EVENTS["Event Bus<br/>Change streams"]
     end
@@ -179,6 +179,35 @@ deploy:
     kubectl apply -f k8s/production.yaml
 ```
 
+### 2. Pluggable Knowledge Storage (StoragePort)
+The ontology layer (L4) persists concepts, relations, representations,
+and evolution via a storage abstraction:
+
+- A `StoragePort` interface defines required operations (load/save/query,
+  stats, maintenance).
+- Interchangeable adapters enable operational flexibility:
+  - SQLite: local, embedded storage (current baseline).
+  - Postgres: relational backend with strong indexing and transactions.
+  - Triple Store: RDF/OWL with SPARQL for typed relations and k-hops.
+- Benefits: portability, predictable performance, and clean migrations.
+
+Adoption paths:
+- Path A: Live adapter over existing ontology DB (no migration).
+- Path B: One-time ETL + optional dual-write until cutover.
+
+### 3. Layer SLOs & Observability
+Each layer has target budgets and emits signals for performance and
+quality. Dashboards visualize p95/p99 latency, escalation decisions,
+cache hit rate, and error rates:
+
+- L3 (Planner): symbol map & rename planning SLOs and coverage.
+- L4 (Ontology): k-hop queries and name lookup latency SLOs.
+- L5 (Learning & Propagation): learning throughput and propagation
+  depth/latency, with gating.
+
+Alerts trigger on SLO breaches; events provide reasoning for decisions
+(e.g., escalation).
+
 ### Daily Workflow
 
 #### Morning Startup
@@ -294,6 +323,10 @@ Enable team features:
 - Distributed caching
 - Pattern sharing
 - Team analytics
+
+Add pluggable storage:
+- Extract SQLite adapter; add Postgres and Triple Store adapters.
+- Migrations, versioning, observability, and SLO dashboards.
 
 ### Phase 4: Ecosystem (Weeks 7-8)
 Build community:
