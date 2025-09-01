@@ -96,7 +96,16 @@ const Grep = async (params: ClaudeGrepParams): Promise<ClaudeGrepResult[] | stri
         return claudeResults;
         // This fallback code should only be reached if async search throws an exception
         // Empty results are not a failure - they indicate no matches were found
-    } catch (error) {
+    } catch (error: any) {
+        // Count timeouts and mark fallback path
+        try {
+            (globalThis as any).__FAST_SEARCH_METRICS__ = (globalThis as any).__FAST_SEARCH_METRICS__ || { timeouts: 0, fallbacks: 0 };
+            const msg = String(error?.message || error || '');
+            if (msg.toLowerCase().includes('timeout')) {
+                (globalThis as any).__FAST_SEARCH_METRICS__.timeouts++;
+            }
+            (globalThis as any).__FAST_SEARCH_METRICS__.fallbacks++;
+        } catch {}
         console.warn('Async search failed, falling back to sync search:', error);
 
         try {
@@ -187,6 +196,8 @@ export class FastSearchLayer implements Layer<SearchQuery, EnhancedMatches> {
         cacheHits: 0,
         errors: 0,
         avgResponseTime: 0,
+        timeouts: 0,
+        fallbacks: 0,
     };
 
     private getErrorMessage(error: unknown): string {
@@ -1482,6 +1493,17 @@ export class FastSearchLayer implements Layer<SearchQuery, EnhancedMatches> {
         const totalTime =
             this.performanceMetrics.avgResponseTime * (this.performanceMetrics.searches - 1) + responseTime;
         this.performanceMetrics.avgResponseTime = totalTime / this.performanceMetrics.searches;
+        // Merge global counters from Grep wrapper
+        try {
+            const g = (globalThis as any).__FAST_SEARCH_METRICS__;
+            if (g) {
+                this.performanceMetrics.timeouts += g.timeouts || 0;
+                this.performanceMetrics.fallbacks += g.fallbacks || 0;
+                // reset to avoid double counting across requests
+                g.timeouts = 0;
+                g.fallbacks = 0;
+            }
+        } catch {}
     }
 
     // Get performance metrics and tool health
@@ -1490,10 +1512,8 @@ export class FastSearchLayer implements Layer<SearchQuery, EnhancedMatches> {
             layer: this.performanceMetrics,
             tools: searchTools.getMetrics(),
             asyncTools: {
-                // Async tools metrics would be added here when available
                 enabled: true,
-                processPoolSize: 4,
-                cacheSize: asyncSearchTools ? 1000 : 0,
+                cacheSize: 1000,
             },
             cacheStats: {
                 size: this.cache.size,

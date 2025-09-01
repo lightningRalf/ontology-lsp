@@ -172,6 +172,9 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
     private queries = new Map<string, Map<string, Query>>();
     private cache = new Map<string, { tree: Tree; timestamp: number }>();
     private ontologyEngine?: OntologyEngine;
+    private parseSamples: number[] = [];
+    private readonly maxSamples: number = 512;
+    private parseStats = { count: 0, lastMs: 0, p50: 0, p95: 0, p99: 0, errors: 0 };
 
     constructor(
         private config: TreeSitterConfig,
@@ -519,6 +522,11 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
         result.patterns = this.findDesignPatterns(result.nodes);
 
         result.parseTime = Date.now() - startTime;
+        if (process.env.PERF === '1' && !process.env.SILENT_MODE) {
+            try {
+                console.log(`L2(TreeSitter) parse metrics: count=${this.parseStats.count} p95=${this.parseStats.p95}ms p50=${this.parseStats.p50}ms`);
+            } catch {}
+        }
         return result;
     }
 
@@ -552,7 +560,10 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
             // Parse file (set bufferSize explicitly to avoid native binding 'Invalid argument' on large inputs)
             const content = await fs.readFile(filePath, 'utf-8');
             const BUFFER_SIZE = Math.max(1 << 20, 262144); // at least 1MB
+            const t0 = Date.now();
             const tree = (parser as any).parse(content, undefined, { bufferSize: BUFFER_SIZE });
+            const dt = Date.now() - t0;
+            this.recordParseDuration(dt);
 
             // Cache result
             this.cache.set(filePath, {
@@ -565,6 +576,7 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
             if (!process.env.SILENT_MODE) {
                 console.warn(`Failed to parse file: ${filePath}`, error);
             }
+            this.parseStats.errors++;
             return null;
         }
     }
@@ -615,6 +627,25 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
             filePath,
             result
         );
+    }
+
+    private recordParseDuration(ms: number): void {
+        this.parseStats.count++;
+        this.parseStats.lastMs = ms;
+        if (this.parseSamples.length < this.maxSamples) this.parseSamples.push(ms);
+        else {
+            const idx = Math.floor(Math.random() * this.maxSamples);
+            this.parseSamples[idx] = ms;
+        }
+        const sorted = [...this.parseSamples].sort((a, b) => a - b);
+        const pick = (q: number) => (sorted.length ? sorted[Math.floor(q * (sorted.length - 1))] : 0);
+        this.parseStats.p50 = pick(0.5);
+        this.parseStats.p95 = pick(0.95);
+        this.parseStats.p99 = pick(0.99);
+    }
+
+    getMetrics(): any {
+        return { ...this.parseStats };
     }
 
     private async processIdentifiers(
