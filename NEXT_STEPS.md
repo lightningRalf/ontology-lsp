@@ -11,7 +11,7 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 
 ### 0.1 Fix‑Bugs‑First: Perf stabilization (Immediate)
 
-Status: A1/A2/B1/C1/D1/E1 completed. Monitoring perf and metrics; continue to gate perf/benchmarks behind env and iterate if regressions are observed.
+Monitoring perf and metrics; continue to gate perf/benchmarks behind env and iterate if regressions are observed.
 
 ### 0. Architectural roadmap (New)
 
@@ -42,8 +42,7 @@ before scale-out. Treat these as gating milestones for adoption.
   - Stabilize perf tests with deterministic budgets in CI.
   - Pre-commit hooks: format, lint, typecheck, unit tests.
 
-### 1. Execute Production Deployment ✅ DEPLOYMENT-READY  
-**Status**: All preparation complete, ready for immediate execution
+### 1. Execute Production Deployment
 
 **Requirements**: Docker/Kubernetes permissions to complete deployment
 **Documentation**: See `DEPLOYMENT_GUIDE.md` for complete instructions
@@ -55,10 +54,7 @@ before scale-out. Treat these as gating milestones for adoption.
 - **Monitoring**: Enable production monitoring and alerting
 - **Load Testing**: Validate production performance under load
 
-**Verification Complete**: ✅ Builds, ✅ Health Endpoints, ✅ Performance,
-✅ Docker Config, ✅ Hybrid Intelligence, ✅ Layer 4 Ontology
-**Ready**: Core is production ready; proceed with staged rollout while
-storage adapters and type-safety improvements land.
+Proceed with staged rollout while storage adapters and type-safety improvements land.
 
 ### 2. Advanced Performance Optimization
 - **Startup Time**: Reduce cold start latency (currently ~2s)
@@ -75,7 +71,7 @@ storage adapters and type-safety improvements land.
 - **Env Overrides (Doc)**: Document quick‑tune vars: `ESCALATION_L2_BUDGET_MS`, `ESCALATION_L1_CONFIDENCE_THRESHOLD`, `ESCALATION_L1_AMBIGUITY_MAX_FILES`, `ESCALATION_L1_REQUIRE_FILENAME_MATCH`.
 
 ### 2.2 Output and UX (New)
-- **Summary Mode**: Add an explicit `--summary` flag (done; keep enhancing examples)
+- **Summary Mode**: Keep enhancing examples and consistency
 - **Deterministic Limits**: Enforce print caps consistently across commands
 - **Stable CLI Formatting**: Keep pretty, relative path formatting in CLI wrapper; adapters return arrays for programmatic use; `--json` remains stable.
 - **Tree View**: `--tree` default depth 3; ensure this remains presentation‑only.
@@ -150,7 +146,7 @@ storage adapters and type-safety improvements land.
 - **Cache Metrics**: Export hit/miss and eviction metrics to monitoring dashboard
 
 ### 8. Error Handling Alignment
-- (Complete) Message format normalized across adapters
+- Message format normalized across adapters (maintain alignment in future changes)
 - (Follow-up) Document adapter error shapes + examples in docs
 
 ### 9. Test Suite Stabilization
@@ -169,18 +165,12 @@ storage adapters and type-safety improvements land.
  - **Perf Gating**: Perf/benchmarks are gated behind `PERF=1`. Use `bun run test:perf` to execute them.
  - **Red Tests Gating**: File-URI resolution red tests gated behind `FILE_URI_FIX=1`.
 
-### 9.2 Async‑First Cascade (Complete)
-- Core `findDefinition` / `findReferences` now delegate to async fast‑path only (legacy cascade removed from hot path).
-- Removed LayerManager gating timeouts; budgets/cancellation enforced by async search.
-- CLI + adapters benefit automatically; CLI explicitly uses async methods.
+### 9.2 Async‑First Cascade
 - Follow‑ups:
   - Optionally delete unreachable legacy cascade blocks in `unified-analyzer.ts` once suites remain green.
   - Centralize async budgets under config (e.g., `layers.layer1.grep.defaultTimeout` + a global cap).
 
-#### Failing Tests (non-performance snapshot)
-Timestamp: 2025-08-28T05:29:31Z
-
-- `tests/learning-system.test.ts:??`: should facilitate knowledge sharing between team members
+<!-- Intentionally no current failing tests snapshot here; NEXT_STEPS focuses on forward-looking items only. -->
 
 ### 10. Release & CI/CD (New)
 - **Semantic Versioning**: Adopt conventional commits + automated release notes
