@@ -14,6 +14,7 @@ import { HTTPAdapter, type HTTPRequest } from '../adapters/http-adapter.js';
 import { createDefaultCoreConfig } from '../adapters/utils.js';
 import { getEnvironmentConfig, type ServerConfig } from '../core/config/server-config.js';
 import { createCodeAnalyzer } from '../core/index';
+import { PortRegistry } from '../utils/port-registry.js';
 import type { CodeAnalyzer } from '../core/unified-analyzer';
 import type { FastSearchLayer } from '../layers/layer1-fast-search.js';
 import type { SearchQuery } from '../types/core.js';
@@ -32,6 +33,7 @@ export class HTTPServer {
     private config: HTTPServerConfig;
     private serverConfig: ServerConfig;
     private server: any = null;
+    private reservedPort: number | null = null;
 
     constructor(config: HTTPServerConfig = {}) {
         this.serverConfig = getEnvironmentConfig();
@@ -75,9 +77,20 @@ export class HTTPServer {
             await this.initialize();
         }
 
+        // Determine port: respect env HTTP_PORT, otherwise reserve near configured port
+        let listenPort = Number(process.env.HTTP_PORT || this.config.port || 7000);
+        try {
+            if (!process.env.HTTP_PORT) {
+                listenPort = await PortRegistry.reserve('http-api', listenPort, this.config.host);
+                this.reservedPort = listenPort;
+            }
+        } catch {
+            listenPort = 0; // OS choose
+        }
+
         this.server = serve({
             hostname: this.config.host,
-            port: this.config.port,
+            port: listenPort,
             fetch: async (request) => {
                 try {
                     const url = new URL(request.url);
@@ -120,17 +133,21 @@ export class HTTPServer {
                         if (fmt !== 'prometheus') {
                             // JSON variant for dashboards: include L4 storage extras for richer panels
                             const storageExtras = l4 && (l4 as any).extras ? (l4 as any).extras : {};
-                            const storageTotals = l4 && (l4 as any).totals ? (l4 as any).totals : { count: 0, errors: 0 };
-                            return new Response(JSON.stringify({
-                                l1: l1m,
-                                l2: l2m,
-                                l4: l4 || null,
-                                storageExtras,
-                                storageTotals,
-                            }), {
-                                status: l4 || l1m || l2m ? 200 : 503,
-                                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-                            });
+                            const storageTotals =
+                                l4 && (l4 as any).totals ? (l4 as any).totals : { count: 0, errors: 0 };
+                            return new Response(
+                                JSON.stringify({
+                                    l1: l1m,
+                                    l2: l2m,
+                                    l4: l4 || null,
+                                    storageExtras,
+                                    storageTotals,
+                                }),
+                                {
+                                    status: l4 || l1m || l2m ? 200 : 503,
+                                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                                }
+                            );
                         }
 
                         let text = '';
@@ -157,33 +174,36 @@ export class HTTPServer {
                             text += `ontology_l2_parse_errors ${l2m.errors || 0}\n`;
                             text += '# HELP ontology_l2_parse_duration_ms Parse duration quantiles.\n';
                             text += '# TYPE ontology_l2_parse_duration_ms summary\n';
-                            text += `ontology_l2_parse_duration_ms{quantile=\"p50\"} ${Math.round(l2m.p50 || 0)}\n`;
-                            text += `ontology_l2_parse_duration_ms{quantile=\"p95\"} ${Math.round(l2m.p95 || 0)}\n`;
-                            text += `ontology_l2_parse_duration_ms{quantile=\"p99\"} ${Math.round(l2m.p99 || 0)}\n`;
+                            text += `ontology_l2_parse_duration_ms{quantile="p50"} ${Math.round(l2m.p50 || 0)}\n`;
+                            text += `ontology_l2_parse_duration_ms{quantile="p95"} ${Math.round(l2m.p95 || 0)}\n`;
+                            text += `ontology_l2_parse_duration_ms{quantile="p99"} ${Math.round(l2m.p99 || 0)}\n`;
                         }
 
                         // L4 storage metrics
                         if (l4) {
                             text += '# HELP ontology_l4_started_at_seconds L4 storage metrics start time.\n';
                             text += '# TYPE ontology_l4_started_at_seconds gauge\n';
-                            if (l4?.startedAt) text += `ontology_l4_started_at_seconds ${Math.floor(l4.startedAt / 1000)}\n`;
+                            if (l4?.startedAt)
+                                text += `ontology_l4_started_at_seconds ${Math.floor(l4.startedAt / 1000)}\n`;
                             text += '# HELP ontology_l4_updated_at_seconds L4 storage metrics last update time.\n';
                             text += '# TYPE ontology_l4_updated_at_seconds gauge\n';
-                            if (l4?.updatedAt) text += `ontology_l4_updated_at_seconds ${Math.floor(l4.updatedAt / 1000)}\n`;
+                            if (l4?.updatedAt)
+                                text += `ontology_l4_updated_at_seconds ${Math.floor(l4.updatedAt / 1000)}\n`;
                             if (l4?.operations) {
                                 for (const [op, s] of Object.entries(l4.operations)) {
                                     if (!s || !(s as any).count) continue;
                                     text += `# HELP ontology_l4_operation_count Total operations per op.\n`;
                                     text += '# TYPE ontology_l4_operation_count counter\n';
-                                    text += `ontology_l4_operation_count{op=\"${op}\"} ${(s as any).count}\n`;
+                                    text += `ontology_l4_operation_count{op="${op}"} ${(s as any).count}\n`;
                                     text += `# HELP ontology_l4_operation_errors Total errors per op.\n`;
                                     text += '# TYPE ontology_l4_operation_errors counter\n';
-                                    text += `ontology_l4_operation_errors{op=\"${op}\"} ${(s as any).errors}\n`;
-                                    text += '# HELP ontology_l4_operation_duration_ms Quantiles of op duration in ms.\n';
+                                    text += `ontology_l4_operation_errors{op="${op}"} ${(s as any).errors}\n`;
+                                    text +=
+                                        '# HELP ontology_l4_operation_duration_ms Quantiles of op duration in ms.\n';
                                     text += '# TYPE ontology_l4_operation_duration_ms gauge\n';
-                                    text += `ontology_l4_operation_duration_ms{op=\"${op}\",quantile=\"p50\"} ${Math.round((s as any).p50)}\n`;
-                                    text += `ontology_l4_operation_duration_ms{op=\"${op}\",quantile=\"p95\"} ${Math.round((s as any).p95)}\n`;
-                                    text += `ontology_l4_operation_duration_ms{op=\"${op}\",quantile=\"p99\"} ${Math.round((s as any).p99)}\n`;
+                                    text += `ontology_l4_operation_duration_ms{op="${op}",quantile="p50"} ${Math.round((s as any).p50)}\n`;
+                                    text += `ontology_l4_operation_duration_ms{op="${op}",quantile="p95"} ${Math.round((s as any).p95)}\n`;
+                                    text += `ontology_l4_operation_duration_ms{op="${op}",quantile="p99"} ${Math.round((s as any).p99)}\n`;
                                 }
                             }
                         }
@@ -209,7 +229,7 @@ export class HTTPServer {
                     }
 
                     // AST Query endpoint
-                    if ((url.pathname === '/api/v1/ast-query') && request.method === 'POST') {
+                    if (url.pathname === '/api/v1/ast-query' && request.method === 'POST') {
                         try {
                             const body = await this.getRequestBody(request);
                             const { runAstQuery } = await import('../core/ast-query.js');
@@ -225,37 +245,94 @@ export class HTTPServer {
                                 headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
                             });
                         } catch (err) {
-                            return new Response(JSON.stringify({ success: false, error: 'AST query failed' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+                            return new Response(JSON.stringify({ success: false, error: 'AST query failed' }), {
+                                status: 500,
+                                headers: { 'Content-Type': 'application/json' },
+                            });
                         }
                     }
 
                     // Graph Expand endpoint
-                    if ((url.pathname === '/api/v1/graph-expand') && request.method === 'POST') {
+                    if (url.pathname === '/api/v1/graph-expand' && request.method === 'POST') {
                         try {
                             const body = await this.getRequestBody(request);
                             const { expandNeighbors } = await import('../core/code-graph.js');
-                            const out = await expandNeighbors({ file: body.file, symbol: body.symbol, edges: body.edges || ['imports','exports'], depth: body.depth, limit: body.limit });
+                            const out = await expandNeighbors({
+                                file: body.file,
+                                symbol: body.symbol,
+                                edges: body.edges || ['imports', 'exports'],
+                                depth: body.depth,
+                                limit: body.limit,
+                            });
                             return new Response(JSON.stringify({ success: true, data: out }), {
                                 status: 200,
                                 headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
                             });
                         } catch (err) {
-                            return new Response(JSON.stringify({ success: false, error: 'Graph expand failed' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+                            return new Response(JSON.stringify({ success: false, error: 'Graph expand failed' }), {
+                                status: 500,
+                                headers: { 'Content-Type': 'application/json' },
+                            });
                         }
                     }
 
                     // Snapshots - list
-                    if ((url.pathname === '/api/v1/snapshots') && request.method === 'GET') {
+                    if (url.pathname === '/api/v1/snapshots' && request.method === 'GET') {
                         const { overlayStore } = await import('../core/overlay-store.js');
-                        const snaps = overlayStore.list().map((s) => ({ id: s.id, createdAt: s.createdAt, diffCount: s.diffs.length }));
+                        const snaps = overlayStore
+                            .list()
+                            .map((s) => ({ id: s.id, createdAt: s.createdAt, diffCount: s.diffs.length }));
                         return new Response(JSON.stringify({ success: true, data: snaps }), {
                             status: 200,
                             headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
                         });
                     }
 
+                    // Snapshots - diff
+                    if (
+                        url.pathname.startsWith('/api/v1/snapshots/') &&
+                        url.pathname.endsWith('/diff') &&
+                        request.method === 'GET'
+                    ) {
+                        try {
+                            const m = url.pathname.match(/^\/api\/v1\/snapshots\/([^/]+)\/diff$/);
+                            const id = m && m[1];
+                            if (!id)
+                                return new Response(JSON.stringify({ success: false, error: 'Invalid snapshot id' }), {
+                                    status: 400,
+                                    headers: { 'Content-Type': 'application/json' },
+                                });
+                            const { overlayStore } = await import('../core/overlay-store.js');
+                            const ensure = (overlayStore as any).ensureMaterialized?.bind(overlayStore);
+                            const dir = ensure ? await ensure(id) : null;
+                            if (!dir)
+                                return new Response(JSON.stringify({ success: false, error: 'Snapshot not found' }), {
+                                    status: 404,
+                                    headers: { 'Content-Type': 'application/json' },
+                                });
+                            const diffPath = `${dir}/overlay.diff`;
+                            const file = Bun.file(diffPath);
+                            if (!(await file.exists())) {
+                                return new Response(JSON.stringify({ success: true, data: { id, diff: '' } }), {
+                                    status: 200,
+                                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                                });
+                            }
+                            const text = await file.text();
+                            return new Response(JSON.stringify({ success: true, data: { id, diff: text } }), {
+                                status: 200,
+                                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                            });
+                        } catch (err) {
+                            return new Response(
+                                JSON.stringify({ success: false, error: 'Failed to read snapshot diff' }),
+                                { status: 500, headers: { 'Content-Type': 'application/json' } }
+                            );
+                        }
+                    }
+
                     // Snapshots - clean
-                    if ((url.pathname === '/api/v1/snapshots/clean') && request.method === 'POST') {
+                    if (url.pathname === '/api/v1/snapshots/clean' && request.method === 'POST') {
                         try {
                             const body = await this.getRequestBody(request);
                             const { overlayStore } = await import('../core/overlay-store.js');
@@ -267,12 +344,18 @@ export class HTTPServer {
                                 headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
                             });
                         } catch {
-                            return new Response(JSON.stringify({ success: false, error: 'Cleanup failed' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+                            return new Response(JSON.stringify({ success: false, error: 'Cleanup failed' }), {
+                                status: 500,
+                                headers: { 'Content-Type': 'application/json' },
+                            });
                         }
                     }
 
                     // Lightweight learning stats (mirrors adapter API)
-                    if ((url.pathname === '/learning-stats' || url.pathname === '/api/v1/learning-stats') && request.method === 'GET') {
+                    if (
+                        (url.pathname === '/learning-stats' || url.pathname === '/api/v1/learning-stats') &&
+                        request.method === 'GET'
+                    ) {
                         try {
                             const stats = await (this.coreAnalyzer as any).getStats?.();
                             return new Response(JSON.stringify({ success: true, data: stats || {} }), {
@@ -280,10 +363,13 @@ export class HTTPServer {
                                 headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
                             });
                         } catch (err) {
-                            return new Response(JSON.stringify({ success: false, error: 'Failed to get learning stats' }), {
-                                status: 500,
-                                headers: { 'Content-Type': 'application/json' },
-                            });
+                            return new Response(
+                                JSON.stringify({ success: false, error: 'Failed to get learning stats' }),
+                                {
+                                    status: 500,
+                                    headers: { 'Content-Type': 'application/json' },
+                                }
+                            );
                         }
                     }
 
@@ -321,17 +407,24 @@ export class HTTPServer {
             },
         });
 
-        console.log(`[HTTP Server] Started at http://${this.config.host}:${this.config.port}`);
-        console.log(`[HTTP Server] OpenAPI spec: http://${this.config.host}:${this.config.port}/openapi.json`);
-        console.log(`[HTTP Server] Web UI: http://${this.config.host}:${this.config.port}/ui`);
-        console.log(`[HTTP Server] Health check: http://${this.config.host}:${this.config.port}/health`);
+        const actual = this.server?.port ?? listenPort;
+        console.log(`[HTTP Server] Started at http://${this.config.host}:${actual}`);
+        console.log(`[HTTP Server] OpenAPI spec: http://${this.config.host}:${actual}/openapi.json`);
+        console.log(`[HTTP Server] Web UI: http://${this.config.host}:${actual}/ui`);
+        console.log(`[HTTP Server] Health check: http://${this.config.host}:${actual}/health`);
 
         // Dev warm-up probe to prime monitoring panels with an initial datapoint
         try {
             const shouldWarm = process.env.DEV_AUTO_WARMUP === '1' || process.env.NODE_ENV === 'development';
             if (shouldWarm) {
                 const proxiedUrl = `http://${this.config.host}:${this.config.port}/api/v1/monitoring`;
-                const httpRequest: HTTPRequest = { method: 'GET', url: proxiedUrl, headers: {}, body: undefined, query: {} };
+                const httpRequest: HTTPRequest = {
+                    method: 'GET',
+                    url: proxiedUrl,
+                    headers: {},
+                    body: undefined,
+                    query: {},
+                };
                 this.httpAdapter.handleRequest(httpRequest).catch(() => {});
             }
         } catch {}
@@ -347,6 +440,13 @@ export class HTTPServer {
         if (this.coreAnalyzer) {
             await this.coreAnalyzer.dispose();
             console.log(`[HTTP Server] Core analyzer disposed`);
+        }
+
+        if (this.reservedPort !== null) {
+            try {
+                await PortRegistry.release(this.reservedPort);
+            } catch {}
+            this.reservedPort = null;
         }
     }
 
@@ -376,7 +476,10 @@ export class HTTPServer {
         try {
             const file = Bun.file(relPath);
             if (!(await file.exists())) return new Response('Not found', { status: 404 });
-            return new Response(file, { status: 200, headers: { 'Content-Type': contentType, 'Cache-Control': 'no-cache' } });
+            return new Response(file, {
+                status: 200,
+                headers: { 'Content-Type': contentType, 'Cache-Control': 'no-cache' },
+            });
         } catch {
             return new Response('Not found', { status: 404 });
         }

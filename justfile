@@ -148,6 +148,13 @@ process-management-info:
     @echo ""
     @echo "🚀 Ready for clean deployment startup!"
 
+# === PORT REGISTRY ===
+
+ports:
+    @echo "📡 Global Port Registry (~/.ontology/ports.json)"
+    @bun run scripts/ports.ts
+
+
 # === PORT MANAGEMENT ===
 
 # Check if required ports are available
