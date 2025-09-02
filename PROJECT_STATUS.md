@@ -186,6 +186,11 @@ ontology-lsp/
 - MCP HTTP:
   - Persist `sessionId` after `initialize` so `tools/list` and `tools/call` work without a prior GET stream.
   - New `pattern_stats` MCP tool (reports L5 totals + metrics).
+  - New workflows: `workflow_locate_confirm_definition` (fast → precise retry) and
+    `workflow_safe_rename` (plan → snapshot diff → optional checks). The safe-rename
+    flow stages a unified diff into a snapshot and can run checks with
+    `runChecks: true|false`. The staged diff is viewable via the new HTTP endpoint
+    `/api/v1/snapshots/{id}/diff` and MCP resources `snapshot://{id}/overlay.diff`.
 - Learning (L5): added `missingExampleContextTimestamp` counter; surfaced via stats and dashboard.
 
 ### ✅ MCP Workflows & Resources (new)
@@ -197,6 +202,28 @@ ontology-lsp/
   - `snapshot://{id}/overlay.diff`: staged diff text for a snapshot.
   - `snapshot://{id}/status`: snapshot metadata (exists, diffCount, createdAt).
   - Purpose: these enable LLMs/clients to navigate results efficiently (no large payload embeds) and can be surfaced in the UI.
+
+### 🌐 Global Port Registry (new)
+- Introduced a global port registry (~/.ontology/ports.json) to avoid cross‑project
+  EADDRINUSE conflicts.
+  - HTTP and MCP servers now reserve a free port near preferred defaults (7000/7001),
+    record ownership, and release on shutdown.
+  - `just ports` prints the current global registry using the external port‑registry CLI.
+  - Environment overrides remain supported: `HTTP_PORT`, `MCP_HTTP_PORT`.
+
+### 📡 Monitoring Snapshots (SQLite)
+- Persist periodic monitoring snapshots in SQLite (`monitoring_snapshots`), enabling
+  dashboards to avoid zeroed panels after restart. Retention managed by lightweight
+  cleanup (last ~200 rows).
+
+### 🔗 HTTP Endpoints (additions)
+- `/api/v1/snapshots` (list), `/api/v1/snapshots/clean` (clean retention), and
+  `/api/v1/snapshots/{id}/diff` (read staged diff text).
+
+### ⚠️ Known Limitations (tracked)
+- Graph Expand: `/api/v1/graph-expand` may 500 under certain symbols/files due to
+  underlying graph extraction assumptions. A hardening pass is planned to return
+  empty neighbors instead of 500 and to add AST‑only fallback for imports/exports.
 
 ### Quick Commands
 - Build: `just build` (or `bun run build:all`)

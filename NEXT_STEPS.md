@@ -40,6 +40,12 @@ Goal: Ensure E2E cross‑protocol validator has reliable HTTP/MCP/LSP/CLI surfac
 - OpenAPI: ensure `/api/v1/learning-stats` appears in spec for discoverability; add to docs.
 - Dashboard dogfooding: keep the “HTTP Pinger” + “Pattern Stats (MCP)” cards; add a small auto‑ping toggle (dev‑only) for local validation.
 
+### 0.35 Graph Expand Hardening (Immediate)
+- Goal: make `/api/v1/graph-expand` resilient and non‑fatal.
+  - Return `{neighbors:{imports:[],exports:[],callers:[],callees:[]}}` on errors instead of 500.
+  - Add AST‑only fallback for imports/exports when graphlib/code‑graph fails.
+  - Tests: add HTTP graph‑expand smoke tests (file + symbol).
+
 ### 0. Architectural roadmap (New)
 
 Goal: make storage pluggable and strengthen observability + reliability
@@ -87,14 +93,19 @@ Goal: make the Layer Performance pane reliable on cold start and after restart.
 - Add small warm‑up probe in server startup (dev only) to populate first datapoint.
 - Add `/monitoring?raw=1` to optionally surface LayerManager’s full `getPerformanceReport()` for diagnostics.
 
+### 0.55 Ports & DevX (Immediate)
+- Global Port Registry:
+  - Status: servers reserve/release ports via `~/.ontology/ports.json`; `just ports` shows usage.
+  - TODO: document env overrides (`HTTP_PORT`, `MCP_HTTP_PORT`) and the external CLI in README.
+
 ### 0.6 MCP Workflows GA (Near‑term)
 
 Goal: ship a small library of safe, composable workflows and make them discoverable.
 
 - Workflows (server):
-  - Add `workflow_safe_rename` (plan_rename → snapshot → propose_patch → run_checks; apply only on ok).
-  - Add `workflow_locate_confirm_definition` (fast → precise retry logic; compact JSON).
-  - Ensure stable JSON outputs: `{ ok, summary, artifacts, next_actions }` across all workflows.
+  - `workflow_safe_rename` delivered (plan_rename → snapshot → propose_patch → run_checks; optional checks via `runChecks`).
+  - `workflow_locate_confirm_definition` delivered (fast → precise retry with compact JSON).
+  - Ensure stable JSON outputs: `{ ok, summary, artifacts, next_actions }` across all workflows; add docs/examples.
 - Prompts (server):
   - Register `workflow-explore-symbol` and `workflow-safe-rename` prompts with Use/Avoid/Returns guidance.
   - Add completable() suggestions for common symbols and edges.
@@ -198,6 +209,16 @@ Proceed with staged rollout while storage adapters and type-safety improvements 
 - **Secrets**: Move all credentials to `env` + GitHub Actions secrets; document rotation
 - **Rate Limiting**: Per-IP and per-route quotas; 429 responses with Retry-After
 - **Input Validation**: Harden schema validation on all adapters; reject unknown fields
+
+## Recent Deliverables Summary (this iteration)
+
+- MCP workflows delivered: locate+confirm definition; safe rename with snapshot
+  diff and optional checks.
+- Monitoring: `/api/v1/monitoring?raw=1`; adapter cache metrics; SQLite monitoring
+  snapshots for rolling windows.
+- HTTP snapshots: `/api/v1/snapshots/{id}/diff` to read staged diff quickly.
+- Global Port Registry integrated; `just ports` delegates to external CLI under
+  `~/programming/port-registry`.
 - **Threat Model**: Document attack surface; add SSRF and path traversal guards
 
 ### 7. Cache & Data Layer (New)
