@@ -13,6 +13,9 @@
 import { ToolRegistry } from '../core/tools/registry.js';
 import { overlayStore } from '../core/overlay-store.js';
 import { AsyncEnhancedGrep } from '../layers/enhanced-search-tools-async.js';
+import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import { DefinitionKind } from '../core/types.js';
 import { createValidationError, type ErrorContext, withMcpErrorHandling } from '../core/utils/error-handler.js';
 import { adapterLogger, mcpLogger } from '../core/utils/file-logger.js';
@@ -129,6 +132,8 @@ export class MCPAdapter {
                         return this.handleWorkflowExploreSymbol(arguments_);
                     case 'workflow_quick_patch_checks':
                         return this.handleWorkflowQuickPatchChecks(arguments_);
+                    case 'workflow_safe_rename':
+                        return this.handleWorkflowSafeRename(arguments_);
                     case 'workflow_locate_confirm_definition':
                         return this.handleWorkflowLocateConfirmDefinition(arguments_);
                     case 'pattern_stats':
@@ -270,6 +275,110 @@ export class MCPAdapter {
         return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: false };
     }
 
+    private async handleWorkflowSafeRename(args: Record<string, any>) {
+        const oldName = String(args?.oldName || '').trim();
+        const newName = String(args?.newName || '').trim();
+        if (!oldName || !newName) {
+            return { content: [{ type: 'text', text: 'oldName and newName required' }], isError: true };
+        }
+        const file = typeof args?.file === 'string' ? args.file : undefined;
+        const commands = Array.isArray(args?.commands) ? (args.commands as string[]) : ['bun run build:tsc'];
+        const timeoutSec = typeof args?.timeoutSec === 'number' ? args.timeoutSec : 240;
+
+        // Step 1: plan rename (WorkspaceEdit preview)
+        const planRes = await this.handlePlanRename({ oldName, newName, file }, { component: 'MCPAdapter', operation: 'workflow_safe_rename', timestamp: Date.now() });
+        const plan = this.safeParseContent(planRes);
+        const changes = plan?.changes || {};
+        const files = Object.keys(changes);
+        if (!files.length) {
+            const out = { ok: false, reason: 'no_changes', message: 'Rename produced no changes' };
+            return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: false };
+        }
+
+        // Step 2: snapshot and generate unified diff from WorkspaceEdit against snapshot
+        const snap = overlayStore.createSnapshot(true);
+        let snapshotDir: string | null = null;
+        try {
+            snapshotDir = await (overlayStore as any).ensureMaterialized?.(snap.id);
+        } catch {}
+        if (!snapshotDir) {
+            const out = { ok: false, reason: 'snapshot_failed', message: 'Failed to materialize snapshot' };
+            return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: true };
+        }
+
+        // Build unified diff
+        const diffParts: string[] = [];
+        const root = (this.coreAnalyzer as any)?.config?.workspaceRoot || process.cwd();
+        const tmpRoot = path.join(snapshotDir, '.mcp-work');
+        await fs.mkdir(tmpRoot, { recursive: true }).catch(() => {});
+
+        for (const uri of files) {
+            const fileEdits = changes[uri] as any[];
+            if (!Array.isArray(fileEdits) || !fileEdits.length) continue;
+            const absPath = (() => { try { return new URL(uri).pathname; } catch { return uri.replace(/^file:\/\//, ''); } })();
+            const rel = path.relative(root, absPath);
+            const snapPath = path.join(snapshotDir, rel);
+            let orig = '';
+            try { orig = await fs.readFile(snapPath, 'utf8'); } catch { continue; }
+            const mod = this.applyTextEdits(orig, fileEdits);
+            const tmpPath = path.join(tmpRoot, rel);
+            await fs.mkdir(path.dirname(tmpPath), { recursive: true }).catch(() => {});
+            await fs.writeFile(tmpPath, mod, 'utf8');
+
+            const relQuoted = rel.replace(/"/g, '\\"');
+            const tmpRel = path.relative(snapshotDir, tmpPath).replace(/"/g, '\\"');
+            const cmd = `git -C "${snapshotDir}" diff --no-index --src-prefix=a/ --dst-prefix=b/ -- "${relQuoted}" "${tmpRel}"`;
+            const proc = spawnSync('bash', ['-lc', cmd], { stdio: 'pipe' });
+            const out = String(proc.stdout || '');
+            if (out && out.trim().length > 0) {
+                diffParts.push(out);
+            }
+        }
+        const unifiedDiff = diffParts.join('\n');
+        const stage = overlayStore.stagePatch(snap.id, unifiedDiff);
+        if (!stage.accepted) {
+            const out = { ok: false, reason: 'stage_failed', message: stage.message || 'Failed to stage diff' };
+            return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: true };
+        }
+
+        // Step 3: run checks inside snapshot
+        const checks = await overlayStore.runChecks(snap.id, commands, timeoutSec);
+        const ok = !!checks.ok;
+        const result = {
+            ok,
+            snapshot: snap.id,
+            filesAffected: files.length,
+            totalEdits: files.reduce((acc, f) => acc + (Array.isArray(changes[f]) ? changes[f].length : 0), 0),
+            elapsedMs: checks.elapsedMs,
+            outputTail: (checks.output || '').slice(-4000),
+            next_actions: ok
+                ? ['Optionally apply this patch to working tree', 'Open snapshot diff: snapshot://' + snap.id + '/overlay.diff']
+                : ['Review failing checks in outputTail', 'Adjust plan and retry'],
+        };
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], isError: !ok };
+    }
+
+    private applyTextEdits(text: string, edits: Array<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; newText: string }>): string {
+        if (!Array.isArray(edits) || edits.length === 0) return text;
+        // Convert positions to offsets
+        const lineStarts: number[] = [0];
+        for (let i = 0; i < text.length; i++) {
+            if (text[i] === '\n') lineStarts.push(i + 1);
+        }
+        const toOffset = (pos: { line: number; character: number }) => {
+            const l = Math.max(0, Math.min(pos.line, lineStarts.length - 1));
+            const lineStart = lineStarts[l] ?? 0;
+            return lineStart + Math.max(0, pos.character);
+        };
+        const items = edits.map((e) => ({ start: toOffset(e.range.start), end: toOffset(e.range.end), newText: e.newText ?? '' }));
+        // Apply from end to start to avoid shifting
+        items.sort((a, b) => b.start - a.start);
+        let out = text;
+        for (const e of items) {
+            out = out.slice(0, e.start) + e.newText + out.slice(e.end);
+        }
+        return out;
+    }
     private async handleWorkflowLocateConfirmDefinition(args: Record<string, any>) {
         const symbol = String(args?.symbol || '').trim();
         if (!symbol) return { content: [{ type: 'text', text: 'symbol required' }], isError: true };

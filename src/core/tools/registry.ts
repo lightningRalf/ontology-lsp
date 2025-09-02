@@ -25,6 +25,22 @@ export class ToolRegistry {
       inputSchema: { type: 'object', properties: { preferExisting: { type: 'boolean' } } },
     },
     {
+      name: 'workflow_safe_rename',
+      title: 'Workflow: Safe Rename (Snapshot + Checks)',
+      description: 'Plan a rename, stage a unified diff into a snapshot, run checks, and return status with next actions.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          oldName: { type: 'string', description: 'Original symbol name' },
+          newName: { type: 'string', description: 'New symbol name' },
+          file: { type: 'string', description: 'Optional context file URI' },
+          commands: { type: 'array', items: { type: 'string' }, default: ['bun run build:tsc'] },
+          timeoutSec: { type: 'number', default: 240 },
+        },
+        required: ['oldName', 'newName'],
+      },
+    },
+    {
       name: 'workflow_explore_symbol',
       title: 'Workflow: Explore Symbol Impact',
       description: 'Find definitions, build a symbol map, and expand neighbors (imports/exports/callers/callees). Returns a compact JSON summary. Use to assess change impact before edits.',
