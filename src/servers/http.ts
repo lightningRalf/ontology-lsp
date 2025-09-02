@@ -252,15 +252,16 @@ export class HTTPServer {
                         }
                     }
 
-                    // Graph Expand endpoint
+                    // Graph Expand endpoint (graceful fallback)
                     if (url.pathname === '/api/v1/graph-expand' && request.method === 'POST') {
+                        const body = await this.getRequestBody(request);
+                        const edges: string[] = Array.isArray(body.edges) && body.edges.length ? body.edges : ['imports', 'exports'];
                         try {
-                            const body = await this.getRequestBody(request);
                             const { expandNeighbors } = await import('../core/code-graph.js');
                             const out = await expandNeighbors({
                                 file: body.file,
                                 symbol: body.symbol,
-                                edges: body.edges || ['imports', 'exports'],
+                                edges,
                                 depth: body.depth,
                                 limit: body.limit,
                             });
@@ -269,9 +270,38 @@ export class HTTPServer {
                                 headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
                             });
                         } catch (err) {
-                            return new Response(JSON.stringify({ success: false, error: 'Graph expand failed' }), {
-                                status: 500,
-                                headers: { 'Content-Type': 'application/json' },
+                            // Fallback: never 500 — provide empty neighbors with a note
+                            const neighbors: Record<string, any[]> = { imports: [], exports: [], callers: [], callees: [] };
+                            const note = 'fallback: graph expand unavailable; returning empty neighbors';
+                            try {
+                                if (typeof body.file === 'string') {
+                                    const f = Bun.file(body.file);
+                                    if (await f.exists()) {
+                                        const text = await f.text();
+                                        const lines = text.split(/\r?\n/);
+                                        if (edges.includes('imports')) {
+                                            const impRe = /^(\s*)(import\s+[^;]+;?)/;
+                                            for (let i = 0; i < lines.length; i++) {
+                                                const m = impRe.exec(lines[i]);
+                                                if (m) neighbors.imports.push({ capture: 'fallback.import', text: m[2], start: { line: i, column: 0 }, end: { line: i, column: lines[i].length } });
+                                            }
+                                        }
+                                        if (edges.includes('exports')) {
+                                            const expRe = /^(\s*)(export\s+[^;{]+|export\s+\{[^}]*\})/;
+                                            for (let i = 0; i < lines.length; i++) {
+                                                const m = expRe.exec(lines[i]);
+                                                if (m) neighbors.exports.push({ capture: 'fallback.export', text: m[2], start: { line: i, column: 0 }, end: { line: i, column: lines[i].length } });
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch {}
+                            const data = body.file
+                                ? { file: body.file, neighbors, note }
+                                : { symbol: String(body.symbol || ''), neighbors, note };
+                            return new Response(JSON.stringify({ success: true, data }), {
+                                status: 200,
+                                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
                             });
                         }
                     }
