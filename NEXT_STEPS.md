@@ -87,6 +87,23 @@ Goal: make the Layer Performance pane reliable on cold start and after restart.
 - Add small warm‑up probe in server startup (dev only) to populate first datapoint.
 - Add `/monitoring?raw=1` to optionally surface LayerManager’s full `getPerformanceReport()` for diagnostics.
 
+### 0.6 MCP Workflows GA (Near‑term)
+
+Goal: ship a small library of safe, composable workflows and make them discoverable.
+
+- Workflows (server):
+  - Add `workflow_safe_rename` (plan_rename → snapshot → propose_patch → run_checks; apply only on ok).
+  - Add `workflow_locate_confirm_definition` (fast → precise retry logic; compact JSON).
+  - Ensure stable JSON outputs: `{ ok, summary, artifacts, next_actions }` across all workflows.
+- Prompts (server):
+  - Register `workflow-explore-symbol` and `workflow-safe-rename` prompts with Use/Avoid/Returns guidance.
+  - Add completable() suggestions for common symbols and edges.
+- UI integration (optional):
+  - Expose snapshot overlay.diff/status via HTTP passthrough or MCP client bridge for preview.
+  - “Apply Preview” button gated behind checks ok (dev-only).
+- Docs:
+  - “Workflows & Recipes” section with examples and expected JSON outputs.
+
 ### 1. Execute Production Deployment
 
 **Requirements**: Docker/Kubernetes permissions to complete deployment

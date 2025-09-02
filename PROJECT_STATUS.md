@@ -188,6 +188,16 @@ ontology-lsp/
   - New `pattern_stats` MCP tool (reports L5 totals + metrics).
 - Learning (L5): added `missingExampleContextTimestamp` counter; surfaced via stats and dashboard.
 
+### ✅ MCP Workflows & Resources (new)
+- Workflow tools (single-call orchestration):
+  - `workflow_explore_symbol`: find definitions (precise), build symbol map (AST-only), expand neighbors; returns a compact JSON for impact analysis.
+  - `workflow_quick_patch_checks`: create/ensure snapshot → stage unified diff → run checks; returns ok, snapshot, and logs.
+- Resource helpers:
+  - `monitoring://summary`: returns analyzer detailed stats as JSON (health, layers, performance).
+  - `snapshot://{id}/overlay.diff`: staged diff text for a snapshot.
+  - `snapshot://{id}/status`: snapshot metadata (exists, diffCount, createdAt).
+  - Purpose: these enable LLMs/clients to navigate results efficiently (no large payload embeds) and can be surfaced in the UI.
+
 ### Quick Commands
 - Build: `just build` (or `bun run build:all`)
 - Start: `just start` → HTTP:7000, MCP:7001
