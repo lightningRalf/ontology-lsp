@@ -56,6 +56,21 @@ export class ToolRegistry {
       },
     },
     {
+      name: 'workflow_locate_confirm_definition',
+      title: 'Workflow: Locate & Confirm Definition',
+      description: 'Locate definitions fast, retry with precise AST validation if ambiguous; returns attempts and chosen results.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          symbol: { type: 'string', description: 'Symbol name to locate' },
+          file: { type: 'string', description: 'Optional context file URI' },
+          precise: { type: 'boolean', default: true },
+          maxResults: { type: 'number', default: 50 },
+        },
+        required: ['symbol'],
+      },
+    },
+    {
       name: 'ast_query',
       description: 'Run a Tree-sitter s-expression query over selected files',
       inputSchema: {

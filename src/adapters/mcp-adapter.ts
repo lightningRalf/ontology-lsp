@@ -129,6 +129,8 @@ export class MCPAdapter {
                         return this.handleWorkflowExploreSymbol(arguments_);
                     case 'workflow_quick_patch_checks':
                         return this.handleWorkflowQuickPatchChecks(arguments_);
+                    case 'workflow_locate_confirm_definition':
+                        return this.handleWorkflowLocateConfirmDefinition(arguments_);
                     case 'pattern_stats':
                         return this.handlePatternStats();
                     case 'get_snapshot':
@@ -264,6 +266,40 @@ export class MCPAdapter {
             stage: staged,
             checks: checksOut,
             next_actions: ok ? ['Apply patch in working tree'] : ['Review failing checks; adjust and re-run']
+        };
+        return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: false };
+    }
+
+    private async handleWorkflowLocateConfirmDefinition(args: Record<string, any>) {
+        const symbol = String(args?.symbol || '').trim();
+        if (!symbol) return { content: [{ type: 'text', text: 'symbol required' }], isError: true };
+        const file = typeof args?.file === 'string' ? args.file : undefined;
+        const attempts: any[] = [];
+        // First attempt: fast path (precise=false)
+        const fast = await this.handleFindDefinition({ symbol, file, precise: false, maxResults: Math.min(50, Number(args?.maxResults || 50)) }, { component: 'MCPAdapter', operation: 'workflow_locate_confirm_definition', timestamp: Date.now() });
+        const fastOut = this.safeParseContent(fast);
+        attempts.push({ mode: 'fast', count: Array.isArray(fastOut?.definitions) ? fastOut.definitions.length : 0 });
+
+        let chosen = fastOut;
+        // If ambiguous or empty and precise not disabled, try precise pass
+        const ambiguous = !fastOut?.definitions || fastOut.definitions.length !== 1;
+        const doPrecise = args?.precise !== false && ambiguous;
+        if (doPrecise) {
+            const precise = await this.handleFindDefinition({ symbol, file, precise: true, maxResults: Math.min(50, Number(args?.maxResults || 50)) }, { component: 'MCPAdapter', operation: 'workflow_locate_confirm_definition', timestamp: Date.now() });
+            const preciseOut = this.safeParseContent(precise);
+            attempts.push({ mode: 'precise', count: Array.isArray(preciseOut?.definitions) ? preciseOut.definitions.length : 0 });
+            // Prefer precise when it yields any results
+            if (preciseOut?.definitions && preciseOut.definitions.length > 0) {
+                chosen = preciseOut;
+            }
+        }
+
+        const out = {
+            ok: Array.isArray(chosen?.definitions) && chosen.definitions.length > 0,
+            symbol,
+            attempts,
+            definitions: chosen?.definitions || [],
+            decision: ambiguous && doPrecise ? 'precise_retry' : 'fast',
         };
         return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: false };
     }

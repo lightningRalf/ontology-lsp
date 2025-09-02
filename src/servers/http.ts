@@ -118,7 +118,16 @@ export class HTTPServer {
                         const l4 = (this.coreAnalyzer as any).getLayer4StorageMetrics?.();
 
                         if (fmt !== 'prometheus') {
-                            return new Response(JSON.stringify({ l1: l1m, l2: l2m, l4: l4 || null }), {
+                            // JSON variant for dashboards: include L4 storage extras for richer panels
+                            const storageExtras = l4 && (l4 as any).extras ? (l4 as any).extras : {};
+                            const storageTotals = l4 && (l4 as any).totals ? (l4 as any).totals : { count: 0, errors: 0 };
+                            return new Response(JSON.stringify({
+                                l1: l1m,
+                                l2: l2m,
+                                l4: l4 || null,
+                                storageExtras,
+                                storageTotals,
+                            }), {
                                 status: l4 || l1m || l2m ? 200 : 503,
                                 headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
                             });
@@ -316,6 +325,16 @@ export class HTTPServer {
         console.log(`[HTTP Server] OpenAPI spec: http://${this.config.host}:${this.config.port}/openapi.json`);
         console.log(`[HTTP Server] Web UI: http://${this.config.host}:${this.config.port}/ui`);
         console.log(`[HTTP Server] Health check: http://${this.config.host}:${this.config.port}/health`);
+
+        // Dev warm-up probe to prime monitoring panels with an initial datapoint
+        try {
+            const shouldWarm = process.env.DEV_AUTO_WARMUP === '1' || process.env.NODE_ENV === 'development';
+            if (shouldWarm) {
+                const proxiedUrl = `http://${this.config.host}:${this.config.port}/api/v1/monitoring`;
+                const httpRequest: HTTPRequest = { method: 'GET', url: proxiedUrl, headers: {}, body: undefined, query: {} };
+                this.httpAdapter.handleRequest(httpRequest).catch(() => {});
+            }
+        } catch {}
     }
 
     async stop(): Promise<void> {
