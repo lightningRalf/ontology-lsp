@@ -7,7 +7,7 @@
 See PROJECT_STATUS.md for achievements and historical context. -->
 
 
-## 🚀 Next Development Priorities (Updated 2025-09-01)
+## 🚀 Next Development Priorities (Updated 2025-09-02)
 
 ### 0.1 Fix‑Bugs‑First: Perf stabilization (Immediate)
 
@@ -15,23 +15,19 @@ Monitoring perf and metrics; continue to gate perf/benchmarks behind env and ite
 
 ### 0.2 L4/L5 Robustness (Immediate)
 
-Goal: Normalize optional inputs at layer boundaries to keep the core protocol‑agnostic, performant, and resilient to sparse data used by perf harnesses.
+Goal: Normalize optional inputs and surface robust metrics across layer boundaries.
 
 - Layer 5 (Pattern Learning):
-  - Normalize examples at the boundary: ensure `example.context` exists and `context.timestamp` defaults to epoch when absent.
-  - Confidence Calculator: make `exampleQualityScore` robust to missing `context.file`/`timestamp` (neutral scoring, no crash).
+  - Status: examples normalized (context defaults + epoch timestamp); metric `missingExampleContextTimestamp` added.
+  - TODO: add tiny fixture factories for examples; include metric assertions in unit tests.
 
 - Layer 4 (Ontology / Storage):
-  - Engine: default `concept.evolution` to `[]` in `addConcept()` when absent.
-  - Storage: iterate `Array.isArray(concept.evolution) ? concept.evolution : []` when persisting.
+  - Status: engine defaults `concept.evolution` to `[]`; storage persists with `Array.isArray(...) ? ... : []`; `evolutionMissing` surfaced via storage extras.
+  - TODO: expand `/metrics` JSON variant to include storage extras for dashboards.
 
 - Observability:
-  - L5: count `missingExampleContextTimestamp` in PatternLearner metrics surface.
-  - L4: add `evolutionMissing` to storage metrics extras (`getMetrics().extras`).
-
-- Tests/Perf:
-  - Add tiny fixture factories to produce model‑shaped examples/concepts.
-  - Keep perf minimal, but include defaults where sensible; perf assertions remain unchanged.
+  - Status: LayerManager → Monitoring wiring complete; HTTP `/monitoring` has fallback to LayerManager report; layer key normalization (l1→layer1) done.
+  - TODO: persist small rolling windows to avoid zeroed panels right after restarts.
 
 ### 0.3 E2E Cross‑Protocol Wiring (Immediate)
 
@@ -42,6 +38,7 @@ Goal: Ensure E2E cross‑protocol validator has reliable HTTP/MCP/LSP/CLI surfac
 - LSP/CLI: implement minimal handlers required by validator (findDefinition, findReferences, rename, suggestRefactoring) or route through unified core helpers; keep budgeted and cancellable.
 - Learning determinism: seed a tiny rename/feedback sequence in local fixture to guarantee ≥1 learned pattern so E2E “learning effectiveness” meets ≥1 pattern condition.
 - OpenAPI: ensure `/api/v1/learning-stats` appears in spec for discoverability; add to docs.
+- Dashboard dogfooding: keep the “HTTP Pinger” + “Pattern Stats (MCP)” cards; add a small auto‑ping toggle (dev‑only) for local validation.
 
 ### 0. Architectural roadmap (New)
 
@@ -80,6 +77,15 @@ before scale-out. Treat these as gating milestones for adoption.
   - run SQLite-only suites (Layer 4, adapters, unified-core, integration slice).
 - LSP spec audit: ensure no non-spec fields in any LSP responses beyond Completion (done for completion items); document any custom executeCommand payloads.
 - Env gating: document Postgres/Triple tests (run only when `PG_URL`/`TRIPLESTORE_URL` set). Keep default SQLite.
+
+### 0.5 Dashboard Metrics Parity (Immediate)
+
+Goal: make the Layer Performance pane reliable on cold start and after restart.
+
+- Normalize layer keys (l1→layer1…): DONE; verify in CI.
+- Use LayerManager fallback when MonitoringService window is empty: DONE.
+- Add small warm‑up probe in server startup (dev only) to populate first datapoint.
+- Add `/monitoring?raw=1` to optionally surface LayerManager’s full `getPerformanceReport()` for diagnostics.
 
 ### 1. Execute Production Deployment
 

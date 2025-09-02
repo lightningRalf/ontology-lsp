@@ -173,12 +173,20 @@ ontology-lsp/
 
 ## 📅 Latest Updates (2025-09-02)
 
-### 🚀 Developer Experience & UI
-- One‑click UI: HTTP serves web UI at `/ui`; OpenAPI at `/openapi.json`.
-- Live MCP monitoring: MCP HTTP server exposes `/mcp-events` (SSE); UI stream card added.
-- Snapshots: list and clean via HTTP + UI; overlay now materializes diffs and runs checks in snapshot cwd.
-- Default SQLite: builds mark `pg` external; Postgres is opt‑in; no PG required for default runs.
-- Codex MCP config: added `ontology-lsp` MCP (stdio) to `~/.codex/config.toml` for easy use from Codex CLI.
+### 🚀 Developer Experience, MCP & Monitoring
+- Web UI:
+  - MCP Live Events: payloads include `iso` timestamps; newest entries render first.
+  - Added “HTTP Pinger” to warm metrics by calling `/definition`, `/ast-query`, `/symbol-map`.
+  - Added “Pattern Stats (MCP)” to fetch Layer 5 stats via the new `pattern_stats` tool.
+- Monitoring wiring:
+  - LayerManager now emits per‑operation performance events; SharedServices forwards to MonitoringService.
+  - HTTP `/api/v1/monitoring` derives totals and layer breakdown from MonitoringService with fallback to `LayerManager.getPerformanceReport()`.
+  - Layer key normalization (l1→layer1, …) so the UI always shows Layer cards.
+- AST Query endpoint hardened: returns empty results if grammars are unavailable (no 500s).
+- MCP HTTP:
+  - Persist `sessionId` after `initialize` so `tools/list` and `tools/call` work without a prior GET stream.
+  - New `pattern_stats` MCP tool (reports L5 totals + metrics).
+- Learning (L5): added `missingExampleContextTimestamp` counter; surfaced via stats and dashboard.
 
 ### Quick Commands
 - Build: `just build` (or `bun run build:all`)
