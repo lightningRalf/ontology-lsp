@@ -11,6 +11,8 @@
  */
 
 import { ToolRegistry } from '../core/tools/registry.js';
+import { overlayStore } from '../core/overlay-store.js';
+import { AsyncEnhancedGrep } from '../layers/enhanced-search-tools-async.js';
 import { DefinitionKind } from '../core/types.js';
 import { createValidationError, type ErrorContext, withMcpErrorHandling } from '../core/utils/error-handler.js';
 import { adapterLogger, mcpLogger } from '../core/utils/file-logger.js';
@@ -123,6 +125,12 @@ export class MCPAdapter {
                 let result: any;
 
                 switch (name) {
+                    case 'workflow_explore_symbol':
+                        return this.handleWorkflowExploreSymbol(arguments_);
+                    case 'workflow_quick_patch_checks':
+                        return this.handleWorkflowQuickPatchChecks(arguments_);
+                    case 'pattern_stats':
+                        return this.handlePatternStats();
                     case 'get_snapshot':
                         return this.handleGetSnapshot(arguments_);
                     case 'propose_patch':
@@ -197,6 +205,78 @@ export class MCPAdapter {
     }
 
     // --- New handlers: snapshots/patches/checks ---
+    private async handlePatternStats() {
+        try {
+            const lm: any = (this.coreAnalyzer as any).layerManager;
+            const l5 = lm?.getLayer?.('layer5');
+            const stats = l5 && typeof l5.getPatternStatistics === 'function' ? await l5.getPatternStatistics() : {};
+            return { content: [{ type: 'text', text: JSON.stringify(stats, null, 2) }], isError: false };
+        } catch (e) {
+            return { content: [{ type: 'text', text: String(e) }], isError: true };
+        }
+    }
+
+    private async handleWorkflowExploreSymbol(args: Record<string, any>) {
+        const symbol = String(args?.symbol || '').trim();
+        if (!symbol) return { content: [{ type: 'text', text: 'symbol required' }], isError: true };
+        const file = typeof args?.file === 'string' ? args.file : undefined;
+        const precise = (args?.precise ?? true) as boolean;
+        const depth = typeof args?.depth === 'number' ? args.depth : 1;
+        const limit = typeof args?.limit === 'number' ? args.limit : 50;
+
+        const defs = await this.handleFindDefinition({ symbol, file, precise, maxResults: limit }, { component: 'MCPAdapter', operation: 'workflow_explore_symbol', timestamp: Date.now() });
+        const map = await this.handleBuildSymbolMap({ symbol, file, maxFiles: Math.min(20, limit), astOnly: true }, { component: 'MCPAdapter', operation: 'workflow_explore_symbol', timestamp: Date.now() });
+        const neighbors = await this.handleGraphExpand({ symbol, edges: ['imports','exports','callers','callees'], depth, limit });
+
+        const out = {
+            ok: true,
+            definitions: this.safeParseContent(defs),
+            symbolMap: this.safeParseContent(map),
+            neighbors: this.safeParseContent(neighbors),
+            tips: [
+                'Prefer files whose basename includes the symbol for quick AST validation.',
+                'Escalate to precise mode when candidates ≥ 3 or confidence is low.'
+            ],
+            next_actions: ['Open top definition', 'Inspect low-confidence callers']
+        };
+        return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: false };
+    }
+
+    private async handleWorkflowQuickPatchChecks(args: Record<string, any>) {
+        const patch = String(args?.patch || '');
+        if (!patch) return { content: [{ type: 'text', text: 'patch required' }], isError: true };
+        const commands = Array.isArray(args?.commands) ? (args.commands as string[]) : ['bun run build:tsc'];
+        const timeoutSec = typeof args?.timeoutSec === 'number' ? args.timeoutSec : 240;
+
+        const snapRes = await this.handleGetSnapshot({ preferExisting: true });
+        const snapText = this.safeParseContent(snapRes);
+        const snapId = (snapText?.snapshot || snapText?.id || snapText?.snapshot_id) as string | undefined;
+        if (!snapId) return { content: [{ type: 'text', text: 'failed to create snapshot' }], isError: true };
+
+        const stage = await this.handleProposePatch({ snapshot: snapId, patch });
+        const staged = this.safeParseContent(stage);
+        const checks = await this.handleRunChecks({ snapshot: snapId, commands, timeoutSec });
+        const checksOut = this.safeParseContent(checks);
+        const ok = !!checksOut?.ok;
+        const out = {
+            ok,
+            snapshot: snapId,
+            stage: staged,
+            checks: checksOut,
+            next_actions: ok ? ['Apply patch in working tree'] : ['Review failing checks; adjust and re-run']
+        };
+        return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: false };
+    }
+
+    private safeParseContent(result: any): any {
+        try {
+            const txt = result?.content?.[0]?.text;
+            if (!txt) return result;
+            return JSON.parse(txt);
+        } catch {
+            return result;
+        }
+    }
     private async handleGetSnapshot(args: Record<string, any>) {
         const snap = overlayStore.createSnapshot(!!args?.preferExisting);
         return { content: [{ type: 'text', text: JSON.stringify({ snapshot: snap.id }, null, 2) }], isError: false };
@@ -940,8 +1020,6 @@ export class MCPAdapter {
     }
 
     /**
-import { overlayStore } from '../core/overlay-store.js';
-import { AsyncEnhancedGrep } from '../layers/enhanced-search-tools-async.js';
      * Execute MCP tool call (alias for handleToolCall for consistency)
      */
     async executeTool(request: { name: string; arguments: Record<string, any> }): Promise<any> {

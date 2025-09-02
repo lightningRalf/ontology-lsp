@@ -364,8 +364,8 @@ describe('Smart Escalation Logic (Unit Tests)', () => {
                 shouldEscalateToLayer2(definitions);
                 const duration = Date.now() - startTime;
 
-                // Should complete in under 1ms
-                expect(duration).toBeLessThan(1);
+                // Should complete within ~1ms (allow equal due to timer granularity)
+                expect(duration).toBeLessThanOrEqual(1);
             }
         });
 

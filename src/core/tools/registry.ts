@@ -8,6 +8,7 @@
 export interface ToolSpec {
   name: string;
   description: string;
+  title?: string;
   inputSchema: any;
   outputSchema?: any;
   availability?: {
@@ -22,6 +23,37 @@ export class ToolRegistry {
       name: 'get_snapshot',
       description: 'Create or return a snapshot id for consistent reads/edits',
       inputSchema: { type: 'object', properties: { preferExisting: { type: 'boolean' } } },
+    },
+    {
+      name: 'workflow_explore_symbol',
+      title: 'Workflow: Explore Symbol Impact',
+      description: 'Find definitions, build a symbol map, and expand neighbors (imports/exports/callers/callees). Returns a compact JSON summary. Use to assess change impact before edits.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          symbol: { type: 'string', description: 'Symbol name to explore' },
+          file: { type: 'string', description: 'Optional context file URI' },
+          precise: { type: 'boolean', default: true },
+          depth: { type: 'number', default: 1 },
+          limit: { type: 'number', default: 50 },
+        },
+        required: ['symbol'],
+      },
+    },
+    {
+      name: 'workflow_quick_patch_checks',
+      title: 'Workflow: Quick Patch + Checks (Snapshot‑Safe)',
+      description: 'Stages a unified diff into a snapshot and runs checks (typecheck/build/tests). Returns ok, snapshot id, and tail of logs. Safe: never writes to working tree.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          patch: { type: 'string', description: 'Unified diff (git format) to stage' },
+          snapshot: { type: 'string', description: 'Optional snapshot id; if absent a snapshot is created' },
+          commands: { type: 'array', items: { type: 'string' }, default: ['bun run build:tsc'] },
+          timeoutSec: { type: 'number', default: 240 },
+        },
+        required: ['patch'],
+      },
     },
     {
       name: 'ast_query',

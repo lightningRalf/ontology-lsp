@@ -139,7 +139,7 @@ class RipgrepProcessPool {
  */
 class SmartSearchCache {
     private cache = new Map<string, CachedResult>();
-    private watchers = new Map<string, fs.FSWatcher>();
+    private watchers = new Map<string, fsSync.FSWatcher>();
     private maxSize: number;
     private ttl: number;
 
