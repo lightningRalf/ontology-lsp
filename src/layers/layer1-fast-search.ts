@@ -3,6 +3,14 @@
 
 import * as path from 'path';
 import {
+    type EnhancedMatches,
+    type Layer,
+    type Match,
+    type MatchCategory,
+    SearchContext,
+    type SearchQuery,
+} from '../types/core';
+import {
     type ClaudeGlobParams,
     type ClaudeGlobResult,
     type ClaudeGrepParams,
@@ -15,14 +23,6 @@ import {
     HybridSearchResult,
     type SearchVariant,
 } from '../types/fast-search';
-import {
-    type EnhancedMatches,
-    type Layer,
-    type Match,
-    type MatchCategory,
-    SearchContext,
-    type SearchQuery,
-} from '../types/core';
 import {
     type EnhancedGlobParams,
     type EnhancedGrepParams,
@@ -80,7 +80,9 @@ const Grep = async (params: ClaudeGrepParams): Promise<ClaudeGrepResult[] | stri
                     ? params.timeout
                     : ((): number => {
                           const env = Number.parseInt(
-                              process.env.FAST_SEARCH_GREP_TIMEOUT_MS || process.env.ENHANCED_GREP_DEFAULT_TIMEOUT_MS || '0',
+                              process.env.FAST_SEARCH_GREP_TIMEOUT_MS ||
+                                  process.env.ENHANCED_GREP_DEFAULT_TIMEOUT_MS ||
+                                  '0',
                               10
                           );
                           return Number.isFinite(env) && env > 0 ? env : 1500; // default 1.5s
@@ -109,7 +111,9 @@ const Grep = async (params: ClaudeGrepParams): Promise<ClaudeGrepResult[] | stri
     } catch (error: any) {
         // Async-only: record timeouts and return empty on error (no sync fallback)
         try {
-            (globalThis as any).__FAST_SEARCH_METRICS__ = (globalThis as any).__FAST_SEARCH_METRICS__ || { timeouts: 0 };
+            (globalThis as any).__FAST_SEARCH_METRICS__ = (globalThis as any).__FAST_SEARCH_METRICS__ || {
+                timeouts: 0,
+            };
             const msg = String(error?.message || error || '');
             if (msg.toLowerCase().includes('timeout')) {
                 (globalThis as any).__FAST_SEARCH_METRICS__.timeouts++;
@@ -1094,7 +1098,10 @@ export class FastSearchLayer implements Layer<SearchQuery, EnhancedMatches> {
         try {
             // Ensure the internal grep respects the intended timeout budget as well
             const timeoutMs = strategy.timeout || this.config.grep.defaultTimeout;
-            const results = await this.executeWithTimeout(() => Grep({ ...strategy.params, timeout: timeoutMs }), timeoutMs);
+            const results = await this.executeWithTimeout(
+                () => Grep({ ...strategy.params, timeout: timeoutMs }),
+                timeoutMs
+            );
 
             return {
                 strategy,

@@ -265,6 +265,33 @@ module.exports = { TestClass, TestFunction };
 };
 
 /**
+ * Tiny fixtures: Example and RenameContext factories for L5 tests
+ */
+export function makeRenameContext(overrides: Partial<import('../src/types/core').RenameContext> = {}) {
+    const base: import('../src/types/core').RenameContext = {
+        file: '/tmp/example.ts',
+        surroundingSymbols: [],
+        timestamp: new Date(),
+    };
+    return { ...base, ...overrides };
+}
+
+export function makeExample(
+    oldName: string,
+    newName: string,
+    overrides: Partial<import('../src/types/core').Example> = {}
+): import('../src/types/core').Example {
+    const baseCtx = makeRenameContext();
+    const ex: import('../src/types/core').Example = {
+        oldName,
+        newName,
+        confidence: 0.8,
+        context: baseCtx,
+    };
+    return { ...ex, ...overrides };
+}
+
+/**
  * Environment detection
  */
 export function isTestEnvironment(): boolean {

@@ -258,6 +258,19 @@ CREATE INDEX IF NOT EXISTS idx_pipeline_executions_start_time ON learning_pipeli
 CREATE INDEX IF NOT EXISTS idx_feedback_corrections_original_id ON feedback_corrections (original_feedback_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_corrections_type ON feedback_corrections (correction_type);
 CREATE INDEX IF NOT EXISTS idx_feedback_corrections_applied_at ON feedback_corrections (applied_at);
+
+-- Monitoring snapshots (rolling window for dashboards)
+CREATE TABLE IF NOT EXISTS monitoring_snapshots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts INTEGER NOT NULL,
+  request_count INTEGER,
+  average_latency REAL,
+  p95_latency REAL,
+  p99_latency REAL,
+  error_rate REAL,
+  cache_hit_rate REAL
+);
+CREATE INDEX IF NOT EXISTS idx_monitoring_snapshots_ts ON monitoring_snapshots (ts);
 `;
 
 /**

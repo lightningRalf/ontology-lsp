@@ -116,15 +116,13 @@ describe('Bloom Filter Fix', () => {
             expect(quick.exact.length).toBe(0);
             return;
         }
-        const queries = ['XyZ9999NonExistent1QwErTy', 'AbC8888NonExistent2ZxCvBn'].map(
-            (id) => ({
-                identifier: id,
-                searchPath: './src',
-                fileTypes: ['ts'] as string[],
-                caseSensitive: false,
-                includeTests: false,
-            })
-        );
+        const queries = ['XyZ9999NonExistent1QwErTy', 'AbC8888NonExistent2ZxCvBn'].map((id) => ({
+            identifier: id,
+            searchPath: './src',
+            fileTypes: ['ts'] as string[],
+            caseSensitive: false,
+            includeTests: false,
+        }));
 
         // First round - populate bloom filter
         const firstRoundTimes: number[] = [];

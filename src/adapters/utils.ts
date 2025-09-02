@@ -3,10 +3,10 @@
  * These utilities eliminate duplicate code between LSP, MCP, HTTP, and CLI adapters
  */
 
+import * as nodePath from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
 import type { Position, Range } from 'vscode-languageserver';
 import { CompletionItemKind } from 'vscode-languageserver';
-import * as nodePath from 'path';
-import { pathToFileURL, fileURLToPath } from 'url';
 import type {
     Completion,
     CompletionRequest,

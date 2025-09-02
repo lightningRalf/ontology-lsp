@@ -186,33 +186,21 @@ export class PatternStorage {
 
             for (const example of pattern.examples) {
                 // Guard optional context/timestamp per NEXT_STEPS A1
-                const ctx = (example as Partial<Example>).context as
-                    | Partial<Example['context']>
-                    | undefined;
-                const timestampISO = (ctx?.timestamp instanceof Date
-                    ? ctx.timestamp
-                    : undefined)?.toISOString() || new Date(0).toISOString();
+                const ctx = (example as Partial<Example>).context as Partial<Example['context']> | undefined;
+                const timestampISO =
+                    (ctx?.timestamp instanceof Date ? ctx.timestamp : undefined)?.toISOString() ||
+                    new Date(0).toISOString();
 
                 const contextPayload = pruneUndefined({
                     file: typeof ctx?.file === 'string' ? ctx.file : undefined,
                     concept: ctx?.concept?.id,
-                    surroundingSymbols: Array.isArray(ctx?.surroundingSymbols)
-                        ? ctx!.surroundingSymbols
-                        : undefined,
+                    surroundingSymbols: Array.isArray(ctx?.surroundingSymbols) ? ctx!.surroundingSymbols : undefined,
                     timestamp: timestampISO,
                 });
 
-                const contextJSON = Object.keys(contextPayload).length
-                    ? JSON.stringify(contextPayload)
-                    : null;
+                const contextJSON = Object.keys(contextPayload).length ? JSON.stringify(contextPayload) : null;
 
-                exampleStmt.run(
-                    pattern.id,
-                    example.oldName,
-                    example.newName,
-                    example.confidence,
-                    contextJSON
-                );
+                exampleStmt.run(pattern.id, example.oldName, example.newName, example.confidence, contextJSON);
             }
 
             // Initialize or update metrics

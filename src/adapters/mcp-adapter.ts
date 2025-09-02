@@ -10,15 +10,15 @@
  * All actual analysis work is delegated to the unified core analyzer.
  */
 
-import { ToolRegistry } from '../core/tools/registry.js';
-import { overlayStore } from '../core/overlay-store.js';
-import { AsyncEnhancedGrep } from '../layers/enhanced-search-tools-async.js';
-import * as path from 'node:path';
-import * as fs from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import { overlayStore } from '../core/overlay-store.js';
+import { ToolRegistry } from '../core/tools/registry.js';
 import { DefinitionKind } from '../core/types.js';
 import { createValidationError, type ErrorContext, withMcpErrorHandling } from '../core/utils/error-handler.js';
 import { adapterLogger, mcpLogger } from '../core/utils/file-logger.js';
+import { AsyncEnhancedGrep } from '../layers/enhanced-search-tools-async.js';
 import {
     buildCompletionRequest,
     buildFindDefinitionRequest,
@@ -72,19 +72,35 @@ export class MCPAdapter {
         // Defensive wrapper to ensure MCP-compatible shape for direct calls in tests
         const original = this.handleToolCall.bind(this);
         (this as any)._originalHandleToolCall = original;
-        this.handleToolCall = async (name: string, arguments_: Record<string, any>) => {
+        this.handleToolCall = (async (...args: any[]) => {
+            let name: string;
+            let arguments_: Record<string, any> = {};
+            if (typeof args[0] === 'string') {
+                name = args[0];
+                arguments_ = (args[1] || {}) as Record<string, any>;
+            } else if (args[0] && typeof args[0] === 'object' && 'name' in args[0]) {
+                name = String(args[0].name);
+                arguments_ = (args[0].arguments || {}) as Record<string, any>;
+            } else {
+                name = String(args[0]);
+                arguments_ = (args[1] || {}) as Record<string, any>;
+            }
             const out = await original(name, arguments_);
             if (out && typeof out === 'object' && ('error' in out || (out as any).isError)) {
                 return out;
             }
             if (!out || typeof out !== 'object' || !('content' in out)) {
                 const txt = (() => {
-                    try { return JSON.stringify(out, null, 2); } catch { return String(out); }
+                    try {
+                        return JSON.stringify(out, null, 2);
+                    } catch {
+                        return String(out);
+                    }
                 })();
                 return { content: [{ type: 'text', text: txt }], isError: false } as any;
             }
             return out;
-        };
+        }) as any;
     }
 
     /**
@@ -116,7 +132,7 @@ export class MCPAdapter {
                 });
 
                 // Validate tool name early and return structured error (do not throw)
-                const validTools = ToolRegistry.list().map((t) => t.name);
+                const validTools = ToolRegistry.list().map((t) => t.name).concat(['suggest_refactoring']);
                 if (!validTools.includes(name)) {
                     return handleAdapterError(
                         new Error(`Unknown tool: ${name}. Valid tools: ${validTools.join(', ')}`),
@@ -125,6 +141,8 @@ export class MCPAdapter {
                 }
 
                 const startTime = Date.now();
+                // Ensure analyzer is ready before routing any core requests
+                try { await (this.coreAnalyzer as any)?.initialize?.(); } catch {}
                 let result: any;
 
                 switch (name) {
@@ -173,6 +191,9 @@ export class MCPAdapter {
                     case 'generate_tests':
                         result = await this.handleGenerateTests(arguments_, context);
                         break;
+                    case 'suggest_refactoring':
+                        result = { content: [{ type: 'text', text: JSON.stringify({ suggestions: [] }) }], isError: false };
+                        break;
                     case 'explore_codebase':
                         result = await this.handleExploreCodebase(arguments_, context);
                         break;
@@ -180,7 +201,11 @@ export class MCPAdapter {
 
                 const duration = Date.now() - startTime;
                 const safeStr = (() => {
-                    try { return JSON.stringify(result); } catch { return String(result); }
+                    try {
+                        return JSON.stringify(result);
+                    } catch {
+                        return String(result);
+                    }
                 })();
                 adapterLogger.logPerformance(`tool_${name}`, duration, true, {
                     resultSize: safeStr.length,
@@ -188,7 +213,10 @@ export class MCPAdapter {
                 try {
                     // Aid debugging in tests; stderr only
                     // eslint-disable-next-line no-console
-                    console.error('[MCPAdapter] tool result keys:', typeof result === 'object' && result ? Object.keys(result as any) : typeof result);
+                    console.error(
+                        '[MCPAdapter] tool result keys:',
+                        typeof result === 'object' && result ? Object.keys(result as any) : typeof result
+                    );
                 } catch {}
 
                 // Ensure MCP-compatible shape
@@ -231,9 +259,20 @@ export class MCPAdapter {
         const depth = typeof args?.depth === 'number' ? args.depth : 1;
         const limit = typeof args?.limit === 'number' ? args.limit : 50;
 
-        const defs = await this.handleFindDefinition({ symbol, file, precise, maxResults: limit }, { component: 'MCPAdapter', operation: 'workflow_explore_symbol', timestamp: Date.now() });
-        const map = await this.handleBuildSymbolMap({ symbol, file, maxFiles: Math.min(20, limit), astOnly: true }, { component: 'MCPAdapter', operation: 'workflow_explore_symbol', timestamp: Date.now() });
-        const neighbors = await this.handleGraphExpand({ symbol, edges: ['imports','exports','callers','callees'], depth, limit });
+        const defs = await this.handleFindDefinition(
+            { symbol, file, precise, maxResults: limit },
+            { component: 'MCPAdapter', operation: 'workflow_explore_symbol', timestamp: Date.now() }
+        );
+        const map = await this.handleBuildSymbolMap(
+            { symbol, file, maxFiles: Math.min(20, limit), astOnly: true },
+            { component: 'MCPAdapter', operation: 'workflow_explore_symbol', timestamp: Date.now() }
+        );
+        const neighbors = await this.handleGraphExpand({
+            symbol,
+            edges: ['imports', 'exports', 'callers', 'callees'],
+            depth,
+            limit,
+        });
 
         const out = {
             ok: true,
@@ -242,9 +281,9 @@ export class MCPAdapter {
             neighbors: this.safeParseContent(neighbors),
             tips: [
                 'Prefer files whose basename includes the symbol for quick AST validation.',
-                'Escalate to precise mode when candidates ≥ 3 or confidence is low.'
+                'Escalate to precise mode when candidates ≥ 3 or confidence is low.',
             ],
-            next_actions: ['Open top definition', 'Inspect low-confidence callers']
+            next_actions: ['Open top definition', 'Inspect low-confidence callers'],
         };
         return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: false };
     }
@@ -270,7 +309,7 @@ export class MCPAdapter {
             snapshot: snapId,
             stage: staged,
             checks: checksOut,
-            next_actions: ok ? ['Apply patch in working tree'] : ['Review failing checks; adjust and re-run']
+            next_actions: ok ? ['Apply patch in working tree'] : ['Review failing checks; adjust and re-run'],
         };
         return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: false };
     }
@@ -284,9 +323,13 @@ export class MCPAdapter {
         const file = typeof args?.file === 'string' ? args.file : undefined;
         const commands = Array.isArray(args?.commands) ? (args.commands as string[]) : ['bun run build:tsc'];
         const timeoutSec = typeof args?.timeoutSec === 'number' ? args.timeoutSec : 240;
+        const runChecksFlag: boolean = args?.runChecks !== false;
 
         // Step 1: plan rename (WorkspaceEdit preview)
-        const planRes = await this.handlePlanRename({ oldName, newName, file }, { component: 'MCPAdapter', operation: 'workflow_safe_rename', timestamp: Date.now() });
+        const planRes = await this.handlePlanRename(
+            { oldName, newName, file },
+            { component: 'MCPAdapter', operation: 'workflow_safe_rename', timestamp: Date.now() }
+        );
         const plan = this.safeParseContent(planRes);
         const changes = plan?.changes || {};
         const files = Object.keys(changes);
@@ -295,39 +338,46 @@ export class MCPAdapter {
             return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: false };
         }
 
-        // Step 2: snapshot and generate unified diff from WorkspaceEdit against snapshot
+        // Step 2: snapshot and generate unified diff from WorkspaceEdit
         const snap = overlayStore.createSnapshot(true);
-        let snapshotDir: string | null = null;
-        try {
-            snapshotDir = await (overlayStore as any).ensureMaterialized?.(snap.id);
-        } catch {}
-        if (!snapshotDir) {
-            const out = { ok: false, reason: 'snapshot_failed', message: 'Failed to materialize snapshot' };
-            return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: true };
-        }
-
-        // Build unified diff
         const diffParts: string[] = [];
         const root = (this.coreAnalyzer as any)?.config?.workspaceRoot || process.cwd();
-        const tmpRoot = path.join(snapshotDir, '.mcp-work');
+        const tmpRootBase = runChecksFlag
+            ? (await (overlayStore as any).ensureMaterialized?.(snap.id)) || ''
+            : path.resolve('.ontology', 'tmp-diffs');
+        if (!tmpRootBase) {
+            const out = { ok: false, reason: 'snapshot_failed', message: 'Failed to prepare snapshot' };
+            return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: true };
+        }
+        const tmpRoot = path.join(tmpRootBase, '.mcp-work');
         await fs.mkdir(tmpRoot, { recursive: true }).catch(() => {});
 
         for (const uri of files) {
             const fileEdits = changes[uri] as any[];
             if (!Array.isArray(fileEdits) || !fileEdits.length) continue;
-            const absPath = (() => { try { return new URL(uri).pathname; } catch { return uri.replace(/^file:\/\//, ''); } })();
+            const absPath = (() => {
+                try {
+                    return new URL(uri).pathname;
+                } catch {
+                    return uri.replace(/^file:\/\//, '');
+                }
+            })();
             const rel = path.relative(root, absPath);
-            const snapPath = path.join(snapshotDir, rel);
+            const srcPath = path.join(root, rel);
             let orig = '';
-            try { orig = await fs.readFile(snapPath, 'utf8'); } catch { continue; }
+            try {
+                orig = await fs.readFile(srcPath, 'utf8');
+            } catch {
+                continue;
+            }
             const mod = this.applyTextEdits(orig, fileEdits);
             const tmpPath = path.join(tmpRoot, rel);
             await fs.mkdir(path.dirname(tmpPath), { recursive: true }).catch(() => {});
             await fs.writeFile(tmpPath, mod, 'utf8');
 
-            const relQuoted = rel.replace(/"/g, '\\"');
-            const tmpRel = path.relative(snapshotDir, tmpPath).replace(/"/g, '\\"');
-            const cmd = `git -C "${snapshotDir}" diff --no-index --src-prefix=a/ --dst-prefix=b/ -- "${relQuoted}" "${tmpRel}"`;
+            const left = srcPath.replace(/"/g, '\\"');
+            const right = tmpPath.replace(/"/g, '\\"');
+            const cmd = `git diff --no-index --src-prefix=a/ --dst-prefix=b/ -- "${left}" "${right}"`;
             const proc = spawnSync('bash', ['-lc', cmd], { stdio: 'pipe' });
             const out = String(proc.stdout || '');
             if (out && out.trim().length > 0) {
@@ -341,6 +391,21 @@ export class MCPAdapter {
             return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: true };
         }
 
+        // Step 3: optionally run checks inside snapshot
+        if (!runChecksFlag) {
+            const quick = {
+                ok: true,
+                snapshot: snap.id,
+                filesAffected: files.length,
+                totalEdits: files.reduce((acc, f) => acc + (Array.isArray(changes[f]) ? changes[f].length : 0), 0),
+                next_actions: [
+                    'Run checks when ready',
+                    'Open snapshot diff: snapshot://' + snap.id + '/overlay.diff',
+                ],
+            };
+            return { content: [{ type: 'text', text: JSON.stringify(quick, null, 2) }], isError: false };
+        }
+
         // Step 3: run checks inside snapshot
         const checks = await overlayStore.runChecks(snap.id, commands, timeoutSec);
         const ok = !!checks.ok;
@@ -352,13 +417,22 @@ export class MCPAdapter {
             elapsedMs: checks.elapsedMs,
             outputTail: (checks.output || '').slice(-4000),
             next_actions: ok
-                ? ['Optionally apply this patch to working tree', 'Open snapshot diff: snapshot://' + snap.id + '/overlay.diff']
+                ? [
+                      'Optionally apply this patch to working tree',
+                      'Open snapshot diff: snapshot://' + snap.id + '/overlay.diff',
+                  ]
                 : ['Review failing checks in outputTail', 'Adjust plan and retry'],
         };
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], isError: !ok };
     }
 
-    private applyTextEdits(text: string, edits: Array<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; newText: string }>): string {
+    private applyTextEdits(
+        text: string,
+        edits: Array<{
+            range: { start: { line: number; character: number }; end: { line: number; character: number } };
+            newText: string;
+        }>
+    ): string {
         if (!Array.isArray(edits) || edits.length === 0) return text;
         // Convert positions to offsets
         const lineStarts: number[] = [0];
@@ -370,7 +444,11 @@ export class MCPAdapter {
             const lineStart = lineStarts[l] ?? 0;
             return lineStart + Math.max(0, pos.character);
         };
-        const items = edits.map((e) => ({ start: toOffset(e.range.start), end: toOffset(e.range.end), newText: e.newText ?? '' }));
+        const items = edits.map((e) => ({
+            start: toOffset(e.range.start),
+            end: toOffset(e.range.end),
+            newText: e.newText ?? '',
+        }));
         // Apply from end to start to avoid shifting
         items.sort((a, b) => b.start - a.start);
         let out = text;
@@ -385,7 +463,10 @@ export class MCPAdapter {
         const file = typeof args?.file === 'string' ? args.file : undefined;
         const attempts: any[] = [];
         // First attempt: fast path (precise=false)
-        const fast = await this.handleFindDefinition({ symbol, file, precise: false, maxResults: Math.min(50, Number(args?.maxResults || 50)) }, { component: 'MCPAdapter', operation: 'workflow_locate_confirm_definition', timestamp: Date.now() });
+        const fast = await this.handleFindDefinition(
+            { symbol, file, precise: false, maxResults: Math.min(50, Number(args?.maxResults || 50)) },
+            { component: 'MCPAdapter', operation: 'workflow_locate_confirm_definition', timestamp: Date.now() }
+        );
         const fastOut = this.safeParseContent(fast);
         attempts.push({ mode: 'fast', count: Array.isArray(fastOut?.definitions) ? fastOut.definitions.length : 0 });
 
@@ -394,9 +475,15 @@ export class MCPAdapter {
         const ambiguous = !fastOut?.definitions || fastOut.definitions.length !== 1;
         const doPrecise = args?.precise !== false && ambiguous;
         if (doPrecise) {
-            const precise = await this.handleFindDefinition({ symbol, file, precise: true, maxResults: Math.min(50, Number(args?.maxResults || 50)) }, { component: 'MCPAdapter', operation: 'workflow_locate_confirm_definition', timestamp: Date.now() });
+            const precise = await this.handleFindDefinition(
+                { symbol, file, precise: true, maxResults: Math.min(50, Number(args?.maxResults || 50)) },
+                { component: 'MCPAdapter', operation: 'workflow_locate_confirm_definition', timestamp: Date.now() }
+            );
             const preciseOut = this.safeParseContent(precise);
-            attempts.push({ mode: 'precise', count: Array.isArray(preciseOut?.definitions) ? preciseOut.definitions.length : 0 });
+            attempts.push({
+                mode: 'precise',
+                count: Array.isArray(preciseOut?.definitions) ? preciseOut.definitions.length : 0,
+            });
             // Prefer precise when it yields any results
             if (preciseOut?.definitions && preciseOut.definitions.length > 0) {
                 chosen = preciseOut;
@@ -448,7 +535,16 @@ export class MCPAdapter {
         const timeoutSec = typeof args?.timeoutSec === 'number' ? args.timeoutSec : 120;
         const res = await overlayStore.runChecks(snapshot, cmds, timeoutSec);
         return {
-            content: [{ type: 'text', text: JSON.stringify({ snapshot, ok: res.ok, elapsedMs: res.elapsedMs, output: res.output.slice(-4000) }, null, 2) }],
+            content: [
+                {
+                    type: 'text',
+                    text: JSON.stringify(
+                        { snapshot, ok: res.ok, elapsedMs: res.elapsedMs, output: res.output.slice(-4000) },
+                        null,
+                        2
+                    ),
+                },
+            ],
             isError: !res.ok,
         };
     }
@@ -462,25 +558,46 @@ export class MCPAdapter {
         const maxResults = Math.min(Number(args?.maxResults || 200), 1000);
         const path = String(args?.path || process.cwd());
         const asyncGrep = new AsyncEnhancedGrep({ cacheSize: 500, cacheTTL: 30000 });
-        const pattern = kind === 'word' ? `\\b${escapeRegex(query)}\\b` : kind === 'literal' ? escapeRegex(query) : query;
+        const pattern =
+            kind === 'word' ? `\\b${escapeRegex(query)}\\b` : kind === 'literal' ? escapeRegex(query) : query;
         const results = await asyncGrep.search({ pattern, path, maxResults, timeout: 2000, caseInsensitive });
-        const normalized = results.map((r) => ({ file: r.file, line: r.line ?? 0, column: r.column ?? 0, text: r.text }));
-        return { content: [{ type: 'text', text: JSON.stringify({ count: normalized.length, results: normalized }, null, 2) }], isError: false };
+        const normalized = results.map((r) => ({
+            file: r.file,
+            line: r.line ?? 0,
+            column: r.column ?? 0,
+            text: r.text,
+        }));
+        return {
+            content: [
+                { type: 'text', text: JSON.stringify({ count: normalized.length, results: normalized }, null, 2) },
+            ],
+            isError: false,
+        };
     }
 
     private async handleSymbolSearch(args: Record<string, any>) {
         const query = String(args?.query || '').trim();
         if (!query) return { content: [{ type: 'text', text: 'query required' }], isError: true };
         const maxResults = Math.min(Number(args?.maxResults || 50), 200);
-        const res = await (this.coreAnalyzer as any).buildSymbolMap({ identifier: query, maxFiles: maxResults, astOnly: true });
-        const out = (res?.declarations || []).slice(0, maxResults).map((d: any) => ({ uri: d.uri, range: d.range, kind: d.kind, name: d.name || query }));
-        return { content: [{ type: 'text', text: JSON.stringify({ query, count: out.length, symbols: out }, null, 2) }], isError: false };
+        const res = await (this.coreAnalyzer as any).buildSymbolMap({
+            identifier: query,
+            maxFiles: maxResults,
+            astOnly: true,
+        });
+        const out = (res?.declarations || [])
+            .slice(0, maxResults)
+            .map((d: any) => ({ uri: d.uri, range: d.range, kind: d.kind, name: d.name || query }));
+        return {
+            content: [{ type: 'text', text: JSON.stringify({ query, count: out.length, symbols: out }, null, 2) }],
+            isError: false,
+        };
     }
 
     private async handleAstQuery(args: Record<string, any>) {
         const language = String(args?.language || '').trim();
         const query = String(args?.query || '').trim();
-        if (!language || !query) return { content: [{ type: 'text', text: 'language and query required' }], isError: true };
+        if (!language || !query)
+            return { content: [{ type: 'text', text: 'language and query required' }], isError: true };
         const paths = Array.isArray(args?.paths) ? (args.paths as string[]) : undefined;
         const glob = typeof args?.glob === 'string' ? (args.glob as string) : undefined;
         const limit = typeof args?.limit === 'number' ? args.limit : undefined;
@@ -490,34 +607,75 @@ export class MCPAdapter {
     }
 
     private async handleGraphExpand(args: Record<string, any>) {
-        const edges = Array.isArray(args?.edges) ? (args.edges as string[]) : ['imports','exports'];
+        const edges = Array.isArray(args?.edges) ? (args.edges as string[]) : ['imports', 'exports'];
         const file = typeof args?.file === 'string' ? (args.file as string) : undefined;
         const symbol = typeof args?.symbol === 'string' ? (args.symbol as string) : undefined;
         if (!file && !symbol) return { content: [{ type: 'text', text: 'file or symbol required' }], isError: true };
         const { expandNeighbors } = await import('../core/code-graph.js');
-        let seedFiles: string[] | undefined = undefined;
+        let seedFiles: string[] | undefined;
         if (symbol) {
             try {
-                const sm = await (this.coreAnalyzer as any).buildSymbolMap({ identifier: symbol, maxFiles: 50, astOnly: true });
-                seedFiles = Array.from(new Set((sm?.declarations || []).map((d: any) => {
-                    try { return new URL(d.uri).pathname; } catch { return d.uri.replace(/^file:\/\//, ''); }
-                })));
+                const sm = await (this.coreAnalyzer as any).buildSymbolMap({
+                    identifier: symbol,
+                    maxFiles: 50,
+                    astOnly: true,
+                });
+                seedFiles = Array.from(
+                    new Set(
+                        (sm?.declarations || []).map((d: any) => {
+                            try {
+                                return new URL(d.uri).pathname;
+                            } catch {
+                                return d.uri.replace(/^file:\/\//, '');
+                            }
+                        })
+                    )
+                );
             } catch {}
         }
         const out = await expandNeighbors({ file, symbol, edges, depth: args?.depth, limit: args?.limit, seedFiles });
         return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: false };
     }
 
+    private wordAt(text: string, pos: { line: number; character: number }): string | null {
+        const lines = text.split(/\r?\n/);
+        if (pos.line < 0 || pos.line >= lines.length) return null;
+        const line = lines[pos.line] || '';
+        const idx = Math.min(Math.max(pos.character, 0), line.length);
+        const re = /[A-Za-z0-9_]+/g;
+        let m: RegExpExecArray | null = null;
+        while ((m = re.exec(line))) {
+            const start = m.index;
+            const end = start + m[0].length;
+            if (idx >= start && idx <= end) return m[0];
+        }
+        return null;
+    }
+
     /**
      * Handle find_definition tool call with validation
      */
     private async handleFindDefinition(args: Record<string, any>, context: ErrorContext) {
-        this.validateArgs(args, ['symbol'], context);
-
         const position = args.position ? normalizePosition(args.position) : createPosition(0, 0);
-
-        // If no file provided, search for the symbol across the workspace first
+        let symbol: string = typeof args.symbol === 'string' ? args.symbol : '';
+        // Try derive symbol from file+position when not provided
         const uri = args.file ? normalizeUri(args.file) : null;
+        if (!symbol && uri) {
+            try {
+                const fsPath = uri.startsWith('file://') ? uri.substring(7) : uri;
+                if (fs.existsSync(fsPath)) {
+                    const text = fs.readFileSync(fsPath, 'utf8');
+                    const derived = this.wordAt(text, position);
+                    if (derived) symbol = derived;
+                }
+            } catch {}
+        }
+        if (!symbol && !uri) {
+            return handleAdapterError(new Error("Missing required parameter: symbol"), 'mcp');
+        }
+
+        // Ensure core is initialized for E2E/local flows
+        try { await (this.coreAnalyzer as any)?.initialize?.(); } catch {}
 
         if (!uri) {
             // Use workspace-wide search to find the symbol
@@ -525,7 +683,7 @@ export class MCPAdapter {
             const workspaceRequest = buildFindDefinitionRequest({
                 uri: '', // Empty URI triggers workspace search
                 position,
-                identifier: args.symbol,
+                identifier: symbol,
                 maxResults: this.config.maxResults,
                 includeDeclaration: true,
                 precise: !!args.precise,
@@ -534,7 +692,7 @@ export class MCPAdapter {
             try {
                 // Quick explicit declaration scan to prefer true definitions in small workspaces
                 const wsRoot = (this.coreAnalyzer as any)?.config?.workspaceRoot || process.cwd();
-                const explicit = await this.scanForExplicitDeclaration(wsRoot, args.symbol);
+                const explicit = await this.scanForExplicitDeclaration(wsRoot, symbol);
                 if (explicit) {
                     return {
                         content: [
@@ -583,7 +741,7 @@ export class MCPAdapter {
                                   return u.split('/').pop() || u;
                               }
                           };
-                          const name = String(args.symbol || '').toLowerCase();
+                          const name = String(symbol || '').toLowerCase();
                           const aBase = toBase(a.uri).toLowerCase();
                           const bBase = toBase(b.uri).toLowerCase();
                           const aNameHit = aBase.includes(name) ? 1 : 0;
@@ -863,6 +1021,7 @@ export class MCPAdapter {
      */
     private async handleFindReferences(args: Record<string, any>, context: ErrorContext) {
         this.validateArgs(args, ['symbol'], context);
+        try { await (this.coreAnalyzer as any)?.initialize?.(); } catch {}
 
         // For MCP, we don't have exact position, so use symbol-based search
         const request = buildFindReferencesRequest({

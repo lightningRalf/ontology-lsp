@@ -155,13 +155,13 @@ export class ConfidenceCalculator {
         let qualityScore = 0;
 
         // Average confidence of examples
-        const avgConfidence = examples.reduce((sum, ex) => sum + (Number.isFinite(ex.confidence) ? ex.confidence : 0), 0) / examples.length;
+        const avgConfidence =
+            examples.reduce((sum, ex) => sum + (Number.isFinite(ex.confidence) ? ex.confidence : 0), 0) /
+            examples.length;
         qualityScore += avgConfidence * 0.1;
 
         // Bonus for having examples from different contexts
-        const uniqueFiles = new Set(
-            examples.map((ex, i) => (ex as any)?.context?.file ?? `unknown-${i}`)
-        );
+        const uniqueFiles = new Set(examples.map((ex, i) => (ex as any)?.context?.file ?? `unknown-${i}`));
         const contextDiversity = uniqueFiles.size / examples.length;
         qualityScore += contextDiversity * 0.05;
 

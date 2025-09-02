@@ -9,12 +9,12 @@
  * 5. Enabling parallel searches
  */
 
-import { type ChildProcess, spawn, execSync } from 'node:child_process';
-import * as os from 'node:os';
+import { type ChildProcess, execSync, spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import * as fsSync from 'node:fs';
 import { createReadStream } from 'node:fs';
 import type * as fs from 'node:fs/promises';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { createInterface } from 'node:readline';
 
@@ -870,7 +870,7 @@ export class AsyncEnhancedGrep {
         const excludes = options.excludePaths || defaultExcludes;
         for (const exclude of excludes) {
             // If the exclude contains glob chars or a dot, treat as raw pattern; otherwise as directory
-            const isGlob = /[*?\[\]{}]|\./.test(exclude);
+            const isGlob = /[*?[\]{}]|\./.test(exclude);
             if (isGlob) {
                 args.push('--glob', `!${exclude}`);
             } else {

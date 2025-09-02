@@ -360,6 +360,35 @@ export class SharedServices {
             } catch {}
         });
 
+        // Persist monitoring snapshots to SQLite for rolling windows
+        this.eventBus.on('monitoring-service:metrics-report', async (payload: any) => {
+            try {
+                const s = payload?.summary || {};
+                // Insert snapshot
+                await this.database.execute(
+                    `INSERT INTO monitoring_snapshots (ts, request_count, average_latency, p95_latency, p99_latency, error_rate, cache_hit_rate)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        Date.now(),
+                        s.requestCount || 0,
+                        s.averageLatency || 0,
+                        s.p95Latency || 0,
+                        s.p99Latency || 0,
+                        s.errorRate || 0,
+                        s.cacheHitRate || 0,
+                    ]
+                );
+                // Retention: keep last 200 rows
+                await this.database.execute(
+                    `DELETE FROM monitoring_snapshots WHERE id NOT IN (SELECT id FROM monitoring_snapshots ORDER BY ts DESC LIMIT 200)`
+                );
+            } catch (err) {
+                // Non-fatal
+                // eslint-disable-next-line no-console
+                console.warn('Failed to persist monitoring snapshot:', err);
+            }
+        });
+
         // Health monitoring
         if (this.config?.monitoring?.enabled) {
             setInterval(

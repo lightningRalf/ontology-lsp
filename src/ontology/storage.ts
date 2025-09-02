@@ -3,8 +3,8 @@ import { Database } from 'bun:sqlite';
 import * as fs from 'fs';
 import * as path from 'path';
 import { type Concept, Relation } from '../types/core';
-import type { StoragePort } from './storage-port';
 import { isValidLocation } from './location-utils';
+import type { StoragePort } from './storage-port';
 
 // Database row type interfaces
 interface ConceptRow {

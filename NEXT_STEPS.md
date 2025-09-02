@@ -13,21 +13,12 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 
 Monitoring perf and metrics; continue to gate perf/benchmarks behind env and iterate if regressions are observed.
 
-### 0.2 L4/L5 Robustness (Immediate)
+### 0.2 L4/L5 Robustness (Complete)
 
-Goal: Normalize optional inputs and surface robust metrics across layer boundaries.
-
-- Layer 5 (Pattern Learning):
-  - Status: examples normalized (context defaults + epoch timestamp); metric `missingExampleContextTimestamp` added.
-  - TODO: add tiny fixture factories for examples; include metric assertions in unit tests.
-
-- Layer 4 (Ontology / Storage):
-  - Status: engine defaults `concept.evolution` to `[]`; storage persists with `Array.isArray(...) ? ... : []`; `evolutionMissing` surfaced via storage extras.
-  - TODO: expand `/metrics` JSON variant to include storage extras for dashboards.
-
-- Observability:
-  - Status: LayerManager → Monitoring wiring complete; HTTP `/monitoring` has fallback to LayerManager report; layer key normalization (l1→layer1) done.
-  - TODO: persist small rolling windows to avoid zeroed panels right after restarts.
+Delivered:
+- L5: examples normalized; `missingExampleContextTimestamp` metric exposed; tiny fixtures + metric assertions added.
+- L4: `/metrics?format=json` includes storage `extras` and `totals` for dashboards.
+- Observability: auto‑init + small rolling windows present; stats fall back to PatternLearner to avoid zeroed panels.
 
 ### 0.3 E2E Cross‑Protocol Wiring (Immediate)
 
@@ -35,16 +26,24 @@ Goal: Ensure E2E cross‑protocol validator has reliable HTTP/MCP/LSP/CLI surfac
 
 - Start/stop test HTTP server within E2E harness or via justfile (added):
   - Use `just start-test-http` before E2E and `just stop-test-http` after.
-- LSP/CLI: implement minimal handlers required by validator (findDefinition, findReferences, rename, suggestRefactoring) or route through unified core helpers; keep budgeted and cancellable.
+- LSP/CLI: minimal handlers added (defs/refs/rename/suggestRefactoring) and file‑based word‑at‑cursor extraction for reliability. Budgeting remains as is.
 - Learning determinism: seed a tiny rename/feedback sequence in local fixture to guarantee ≥1 learned pattern so E2E “learning effectiveness” meets ≥1 pattern condition.
-- OpenAPI: ensure `/api/v1/learning-stats` appears in spec for discoverability; add to docs.
-- Dashboard dogfooding: keep the “HTTP Pinger” + “Pattern Stats (MCP)” cards; add a small auto‑ping toggle (dev‑only) for local validation.
+- OpenAPI: `/api/v1/learning-stats` present; dev warm‑up primes both monitoring and learning‑stats.
+- Dashboard dogfooding: “HTTP Pinger” + “Pattern Stats (MCP)” remain; auto‑ping dev warm‑up in place.
+
+Follow‑ups (Immediate):
+- Edge‑case parity: normalize error shapes across LSP/CLI/HTTP/MCP for the validator’s edge cases (empty symbol, invalid file/position) to achieve ≥80% edge‑case consistency.
+- Learning determinism: ensure ≥1 pattern learned in E2E by seeding via a small dev pipeline (or allow a single learn on dry‑run rename under `E2E=1`).
+- Threshold calibration: relax or make environment‑aware the E2E consistency thresholds for the local fixture (alternatively provide a richer local fixture).
+- MCP robustness: keep the `initialize()` guard at tool entry; consider a tiny debounce to avoid repeated init in quick retries.
 
 ### 0.35 Graph Expand Hardening (Immediate)
 - Goal: make `/api/v1/graph-expand` resilient and non‑fatal.
   - Return `{neighbors:{imports:[],exports:[],callers:[],callees:[]}}` on errors instead of 500.
   - Add AST‑only fallback for imports/exports when graphlib/code‑graph fails.
   - Tests: add HTTP graph‑expand smoke tests (file + symbol).
+
+Status: HTTP fallback implemented (non‑fatal, returns empty neighbors). Tests pending.
 
 ### 0. Architectural roadmap (New)
 
@@ -203,6 +202,8 @@ Proceed with staged rollout while storage adapters and type-safety improvements 
 - **LSP**: Expose `explore` as an `executeCommand` with JSON payload
 - **HTTP**: Add `/api/v1/explore` query parameters for print limits and additional filters
 - **MCP**: Ensure `explore_codebase` supports limit parameters and returns compact JSON by default
+
+Done: HTTP `/api/v1/refactor` endpoint and MCP `suggest_refactoring` tool added for parity.
 
 ### 6. Security Hardening (New)
 - **AuthN/Z**: Add token-based auth for HTTP endpoints; scope tokens per adapter

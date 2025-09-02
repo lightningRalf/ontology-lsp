@@ -9,6 +9,7 @@
  * All analysis work is delegated to the LSP adapter and core analyzer.
  */
 
+import type { Location } from 'vscode-languageserver/node';
 import {
     createConnection,
     DidChangeConfigurationNotification,
@@ -19,19 +20,17 @@ import {
     TextDocumentSyncKind,
     TextDocuments,
 } from 'vscode-languageserver/node';
-
 import { TextDocument } from 'vscode-languageserver-textdocument';
-  import { LSPAdapter } from '../adapters/lsp-adapter.js';
-  import { createDefaultCoreConfig } from '../adapters/utils.js';
-  import { createCodeAnalyzer } from '../core/index.js';
-  import type { CodeAnalyzer } from '../core/unified-analyzer.js';
-  import type { Location } from 'vscode-languageserver/node';
-  import {
-      buildFindDefinitionRequest,
-      buildFindReferencesRequest,
-      definitionToLspLocation,
-      referenceToLspLocation,
-  } from '../adapters/utils.js';
+import { LSPAdapter } from '../adapters/lsp-adapter.js';
+import {
+    buildFindDefinitionRequest,
+    buildFindReferencesRequest,
+    createDefaultCoreConfig,
+    definitionToLspLocation,
+    referenceToLspLocation,
+} from '../adapters/utils.js';
+import { createCodeAnalyzer } from '../core/index.js';
+import type { CodeAnalyzer } from '../core/unified-analyzer.js';
 
 export class LSPServer {
     private connection = createConnection(ProposedFeatures.all);
@@ -149,7 +148,13 @@ export class LSPServer {
 
         // Custom precise references request
         const PreciseReferencesRequest = new RequestType<
-            { uri: string; position?: { line: number; character: number }; symbol?: string; maxResults?: number; includeDeclaration?: boolean },
+            {
+                uri: string;
+                position?: { line: number; character: number };
+                symbol?: string;
+                maxResults?: number;
+                includeDeclaration?: boolean;
+            },
             { locations: Location[]; count: number },
             void
         >('ontology/preciseReferences');
@@ -168,7 +173,10 @@ export class LSPServer {
                 precise: true,
             } as any);
             const result = await (this.coreAnalyzer as any).findReferencesAsync(req);
-            return { locations: result.data.map((r: any) => referenceToLspLocation(r)), count: result.data.length } as any;
+            return {
+                locations: result.data.map((r: any) => referenceToLspLocation(r)),
+                count: result.data.length,
+            } as any;
         });
 
         // Custom precise definition request
@@ -192,7 +200,10 @@ export class LSPServer {
                 precise: true,
             } as any);
             const result = await (this.coreAnalyzer as any).findDefinitionAsync(req);
-            return { locations: result.data.map((d: any) => definitionToLspLocation(d)), count: result.data.length } as any;
+            return {
+                locations: result.data.map((d: any) => definitionToLspLocation(d)),
+                count: result.data.length,
+            } as any;
         });
 
         this.connection.onCompletion(async (params) => {
@@ -226,7 +237,14 @@ export class LSPServer {
         // New: Build Symbol Map (Layer 3 targeted map)
         const BuildSymbolMapRequest = new RequestType<
             { symbol: string; uri?: string; maxFiles?: number; astOnly?: boolean },
-            { identifier: string; files: number; declarations: any[]; references: any[]; imports: any[]; exports: any[] },
+            {
+                identifier: string;
+                files: number;
+                declarations: any[];
+                references: any[];
+                imports: any[];
+                exports: any[];
+            },
             void
         >('symbol/buildSymbolMap');
         this.connection.onRequest(BuildSymbolMapRequest, async (params) => {

@@ -3,9 +3,9 @@
  * Export all main components and utilities
  */
 
+import { createLearningSystem } from '../learning/index';
 // Import for internal use
 import { AnalyzerFactory } from './analyzer-factory';
-import { createLearningSystem } from '../learning/index';
 
 // Learning system types
 export type * from '../learning/types';

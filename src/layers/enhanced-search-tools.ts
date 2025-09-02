@@ -373,7 +373,9 @@ export class EnhancedGrep {
                 let timedOut = false;
                 const to = setTimeout(() => {
                     timedOut = true;
-                    try { proc.kill('SIGTERM'); } catch {}
+                    try {
+                        proc.kill('SIGTERM');
+                    } catch {}
                 }, params.timeout || 5000);
 
                 proc.stdout.on('data', (d) => chunks.push(d.toString('utf8')));
@@ -414,7 +416,7 @@ export class EnhancedGrep {
         args.push('--glob', '!dist/**');
         args.push('--glob', '!.git/**');
         args.push('--glob', '!coverage/**');
-        args.push('--glob', '!*\.min\.js');
+        args.push('--glob', '!*.min.js');
         args.push('--glob', '!package-lock.json');
         args.push('--max-depth', '5');
 
@@ -428,7 +430,14 @@ export class EnhancedGrep {
         else if (params.outputMode === 'count') args.push('-c');
 
         if (params.type) {
-            const map: Record<string, string> = { javascript: 'js', typescript: 'ts', python: 'py', rust: 'rust', go: 'go', java: 'java' };
+            const map: Record<string, string> = {
+                javascript: 'js',
+                typescript: 'ts',
+                python: 'py',
+                rust: 'rust',
+                go: 'go',
+                java: 'java',
+            };
             args.push('--type', map[(params.type || '').toLowerCase()] || params.type);
         }
 

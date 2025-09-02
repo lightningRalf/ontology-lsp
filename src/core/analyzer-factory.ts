@@ -5,17 +5,17 @@
 
 // Import existing layer implementations
 import { ClaudeToolsLayer } from '../layers/claude-tools';
+import { PlannerLayer } from '../layers/planner-layer';
 import { TreeSitterLayer, type TreeSitterResult } from '../layers/tree-sitter';
 import { OntologyEngine } from '../ontology/ontology-engine';
-import { PlannerLayer } from '../layers/planner-layer';
+import { createStorageAdapter } from '../ontology/storage-factory';
 import { PatternLearner } from '../patterns/pattern-learner';
 import { KnowledgeSpreader } from '../propagation/knowledge-spreader';
+import type { EnhancedMatches, SearchQuery } from '../types/core';
 import { DefaultEventBus, LayerManager } from './layer-manager';
 import { SharedServices } from './services/index';
 import { CacheConfig, type CoreConfig, type Layer, LayerConfigs, MonitoringConfig, PerformanceConfig } from './types';
-import type { EnhancedMatches, SearchQuery } from '../types/core';
 import { CodeAnalyzer } from './unified-analyzer';
-import { createStorageAdapter } from '../ontology/storage-factory';
 
 /**
  * Layer adapter interface to wrap existing implementations

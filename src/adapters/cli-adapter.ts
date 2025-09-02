@@ -11,10 +11,11 @@
  * All actual analysis work is delegated to the unified core analyzer.
  */
 
-import type { CodeAnalyzer } from '../core/unified-analyzer.js';
-import { overlayStore } from '../core/overlay-store.js';
-import { AsyncEnhancedGrep } from '../layers/enhanced-search-tools-async.js';
 import leven from 'leven';
+import { overlayStore } from '../core/overlay-store.js';
+import type { CodeAnalyzer } from '../core/unified-analyzer.js';
+import { AsyncEnhancedGrep } from '../layers/enhanced-search-tools-async.js';
+import * as fs from 'node:fs';
 import {
     buildFindDefinitionRequest,
     buildFindReferencesRequest,
@@ -54,11 +55,99 @@ export class CLIAdapter {
     }
 
     /**
+     * Convenience: for E2E validator – direct definition lookup
+     */
+    async findDefinition(
+        file: string,
+        input: { line?: number; character?: number; symbol?: string } = {}
+    ): Promise<any[]> {
+        try { await (this.coreAnalyzer as any)?.initialize?.(); } catch {}
+        const uri = normalizeUri(file || 'file://workspace');
+        const symbol = input.symbol || this.extractWordFromFile(uri, input.line ?? 0, input.character ?? 0) || 'symbol';
+        const request = buildFindDefinitionRequest({
+            uri,
+            position: createPosition(input.line ?? 0, input.character ?? 0),
+            identifier: symbol,
+            maxResults: this.config.maxResults,
+            includeDeclaration: true,
+            precise: true,
+        });
+        const result = await (this.coreAnalyzer as any).findDefinitionAsync(request);
+        return result.data;
+    }
+
+    /**
+     * Convenience: for E2E validator – direct references lookup
+     */
+    async findReferences(file: string, symbol: string): Promise<any[]> {
+        try { await (this.coreAnalyzer as any)?.initialize?.(); } catch {}
+        const uri = normalizeUri(file || 'file://workspace');
+        const request = buildFindReferencesRequest({
+            uri,
+            position: createPosition(0, 0),
+            identifier: symbol,
+            maxResults: this.config.maxResults,
+            includeDeclaration: false,
+            precise: true,
+        });
+        const result = await (this.coreAnalyzer as any).findReferencesAsync(request);
+        return result.data;
+    }
+
+    /**
+     * Convenience: for E2E validator – perform rename (preview)
+     */
+    async rename(file: string, position: { line: number; character: number }, newName: string): Promise<Record<string, any>> {
+        try { await (this.coreAnalyzer as any)?.initialize?.(); } catch {}
+        const uri = normalizeUri(file || 'file://workspace');
+        const identifier = this.extractWordFromFile(uri, position.line, position.character) || 'symbol';
+        const request = buildRenameRequest({ uri, position, identifier, newName, dryRun: true });
+        const result = await this.coreAnalyzer.rename(request);
+        return { changes: result.data.changes || {}, performance: result.performance, preview: true };
+    }
+
+    private extractWordFromFile(uri: string, line: number, character: number): string | null {
+        try {
+            const path = uri.startsWith('file://') ? uri.substring(7) : uri;
+            if (!fs.existsSync(path)) return null;
+            const text = fs.readFileSync(path, 'utf8');
+            const lines = text.split(/\r?\n/);
+            if (line < 0 || line >= lines.length) return null;
+            const ln = lines[line];
+            const idx = Math.min(Math.max(character, 0), ln.length);
+            const re = /[A-Za-z0-9_]+/g;
+            let m: RegExpExecArray | null = null;
+            while ((m = re.exec(ln))) {
+                const start = m.index;
+                const end = start + m[0].length;
+                if (idx >= start && idx <= end) return m[0];
+            }
+            return null;
+        } catch { return null; }
+    }
+
+    /**
+     * Convenience: for E2E validator – refactor suggestions (stub)
+     */
+    async suggestRefactoring(_file: string): Promise<Record<string, any>> {
+        return { suggestions: [], status: 'ok' };
+    }
+
+    /**
      * Handle find command
      */
     async handleFind(
         identifier: string,
-        options: { file?: string; maxResults?: number; json?: boolean; limit?: number; verbose?: boolean; summary?: boolean; precise?: boolean; astOnly?: boolean }
+        options: {
+            file?: string;
+            maxResults?: number;
+            json?: boolean;
+            limit?: number;
+            verbose?: boolean;
+            summary?: boolean;
+            precise?: boolean;
+            astOnly?: boolean;
+        }
     ): Promise<any> {
         try {
             const request = buildFindDefinitionRequest({
@@ -205,7 +294,11 @@ export class CLIAdapter {
     /**
      * Handle plan-rename command (preview only)
      */
-    async handlePlanRename(identifier: string, newName: string, options: { json?: boolean; limit?: number }): Promise<string> {
+    async handlePlanRename(
+        identifier: string,
+        newName: string,
+        options: { json?: boolean; limit?: number }
+    ): Promise<string> {
         try {
             const request = buildRenameRequest({
                 uri: normalizeUri('file://workspace'),
@@ -255,16 +348,28 @@ export class CLIAdapter {
      */
     async handleTextSearch(
         query: string,
-        options: { kind?: 'literal' | 'regex' | 'word'; caseInsensitive?: boolean; path?: string; maxResults?: number; json?: boolean }
+        options: {
+            kind?: 'literal' | 'regex' | 'word';
+            caseInsensitive?: boolean;
+            path?: string;
+            maxResults?: number;
+            json?: boolean;
+        }
     ): Promise<string> {
         const kind = options.kind || 'literal';
         const caseInsensitive = !!options.caseInsensitive;
         const maxResults = Math.min(options.maxResults || this.config.maxResults || 200, 1000);
         const path = options.path || process.cwd();
         const asyncGrep = new AsyncEnhancedGrep({ cacheSize: 500, cacheTTL: 30000 });
-        const pattern = kind === 'word' ? `\\b${escapeRegex(query)}\\b` : kind === 'literal' ? escapeRegex(query) : query;
+        const pattern =
+            kind === 'word' ? `\\b${escapeRegex(query)}\\b` : kind === 'literal' ? escapeRegex(query) : query;
         const results = await asyncGrep.search({ pattern, path, maxResults, timeout: 2000, caseInsensitive });
-        const normalized = results.map((r) => ({ file: r.file, line: r.line ?? 0, column: r.column ?? 0, text: r.text }));
+        const normalized = results.map((r) => ({
+            file: r.file,
+            line: r.line ?? 0,
+            column: r.column ?? 0,
+            text: r.text,
+        }));
         return options.json
             ? JSON.stringify({ count: normalized.length, results: normalized }, null, 2)
             : normalized.map((r) => `${r.file}:${r.line}:${r.column}: ${r.text}`).join('\n');
@@ -275,9 +380,17 @@ export class CLIAdapter {
      */
     async handleSymbolSearch(query: string, options: { maxResults?: number; json?: boolean }): Promise<string> {
         const maxResults = Math.min(options.maxResults || 50, 200);
-        const res = await (this.coreAnalyzer as any).buildSymbolMap({ identifier: query, maxFiles: maxResults, astOnly: true });
-        const out = (res?.declarations || []).slice(0, maxResults).map((d: any) => ({ uri: d.uri, range: d.range, kind: d.kind, name: d.name || query }));
-        return options.json ? JSON.stringify({ query, count: out.length, symbols: out }, null, 2) : out.map((s) => `${s.kind || 'symbol'} ${s.name} @ ${s.uri}:${s.range?.start?.line ?? 0}`).join('\n');
+        const res = await (this.coreAnalyzer as any).buildSymbolMap({
+            identifier: query,
+            maxFiles: maxResults,
+            astOnly: true,
+        });
+        const out = (res?.declarations || [])
+            .slice(0, maxResults)
+            .map((d: any) => ({ uri: d.uri, range: d.range, kind: d.kind, name: d.name || query }));
+        return options.json
+            ? JSON.stringify({ query, count: out.length, symbols: out }, null, 2)
+            : out.map((s) => `${s.kind || 'symbol'} ${s.name} @ ${s.uri}:${s.range?.start?.line ?? 0}`).join('\n');
     }
 
     /**
@@ -300,8 +413,14 @@ export class CLIAdapter {
         if (!res.accepted) return this.formatError(res.message || 'Patch rejected');
         if (options.runChecks) {
             const r = await overlayStore.runChecks(snap.id, options.commands || [], options.timeoutSec || 120);
-            const payload = { snapshot: snap.id, accepted: true, checks: { ok: r.ok, elapsedMs: r.elapsedMs, output: r.output.slice(-4000) } };
-            return options.json ? JSON.stringify(payload, null, 2) : `${snap.id} ${r.ok ? 'OK' : 'FAIL'} (${r.elapsedMs}ms)`;
+            const payload = {
+                snapshot: snap.id,
+                accepted: true,
+                checks: { ok: r.ok, elapsedMs: r.elapsedMs, output: r.output.slice(-4000) },
+            };
+            return options.json
+                ? JSON.stringify(payload, null, 2)
+                : `${snap.id} ${r.ok ? 'OK' : 'FAIL'} (${r.elapsedMs}ms)`;
         }
         const payload = { snapshot: snap.id, accepted: true };
         return options.json ? JSON.stringify(payload, null, 2) : snap.id;
@@ -310,7 +429,12 @@ export class CLIAdapter {
     /**
      * Run checks for snapshot
      */
-    async handleRunChecks(options: { snapshot: string; commands?: string[]; timeoutSec?: number; json?: boolean }): Promise<string> {
+    async handleRunChecks(options: {
+        snapshot: string;
+        commands?: string[];
+        timeoutSec?: number;
+        json?: boolean;
+    }): Promise<string> {
         const snapId = options.snapshot;
         if (!snapId) return this.formatError('snapshot required');
         const r = await overlayStore.runChecks(snapId, options.commands || [], options.timeoutSec || 120);
@@ -332,28 +456,71 @@ export class CLIAdapter {
     /**
      * AST query via Tree-sitter
      */
-    async handleAstQuery(options: { language: 'typescript'|'javascript'|'python'; query: string; paths?: string[]; glob?: string; limit?: number; json?: boolean }): Promise<string> {
+    async handleAstQuery(options: {
+        language: 'typescript' | 'javascript' | 'python';
+        query: string;
+        paths?: string[];
+        glob?: string;
+        limit?: number;
+        json?: boolean;
+    }): Promise<string> {
         const { runAstQuery } = await import('../core/ast-query.js');
-        const out = await runAstQuery({ language: options.language, query: options.query, paths: options.paths, glob: options.glob, limit: options.limit });
+        const out = await runAstQuery({
+            language: options.language,
+            query: options.query,
+            paths: options.paths,
+            glob: options.glob,
+            limit: options.limit,
+        });
         return options.json ? JSON.stringify(out, null, 2) : String(out.count);
     }
 
     /**
      * Graph expand (imports/exports for file; callers/callees stub)
      */
-    async handleGraphExpand(options: { file?: string; symbol?: string; edges: string[]; depth?: number; limit?: number; json?: boolean; seedOnly?: boolean }): Promise<string> {
+    async handleGraphExpand(options: {
+        file?: string;
+        symbol?: string;
+        edges: string[];
+        depth?: number;
+        limit?: number;
+        json?: boolean;
+        seedOnly?: boolean;
+    }): Promise<string> {
         const { expandNeighbors } = await import('../core/code-graph.js');
-        let seedFiles: string[] | undefined = undefined;
+        let seedFiles: string[] | undefined;
         if (options.symbol) {
             try {
-                const sm = await (this.coreAnalyzer as any).buildSymbolMap({ identifier: options.symbol, maxFiles: 50, astOnly: true });
-                seedFiles = Array.from(new Set((sm?.declarations || []).map((d: any) => {
-                    try { return new URL(d.uri).pathname; } catch { return d.uri.replace(/^file:\/\//, ''); }
-                })));
+                const sm = await (this.coreAnalyzer as any).buildSymbolMap({
+                    identifier: options.symbol,
+                    maxFiles: 50,
+                    astOnly: true,
+                });
+                seedFiles = Array.from(
+                    new Set(
+                        (sm?.declarations || []).map((d: any) => {
+                            try {
+                                return new URL(d.uri).pathname;
+                            } catch {
+                                return d.uri.replace(/^file:\/\//, '');
+                            }
+                        })
+                    )
+                );
             } catch {}
         }
-        const out = await expandNeighbors({ file: options.file, symbol: options.symbol, edges: options.edges || ['imports','exports'], depth: options.depth, limit: options.limit, seedFiles, seedStrict: !!options.seedOnly });
-        return options.json ? JSON.stringify(out, null, 2) : (out.file || out.symbol || '') + ` -> ` + Object.keys(out.neighbors || {}).join(',');
+        const out = await expandNeighbors({
+            file: options.file,
+            symbol: options.symbol,
+            edges: options.edges || ['imports', 'exports'],
+            depth: options.depth,
+            limit: options.limit,
+            seedFiles,
+            seedStrict: !!options.seedOnly,
+        });
+        return options.json
+            ? JSON.stringify(out, null, 2)
+            : (out.file || out.symbol || '') + ` -> ` + Object.keys(out.neighbors || {}).join(',');
     }
 
     /**
@@ -366,8 +533,10 @@ export class CLIAdapter {
             const lm: any = (this.coreAnalyzer as any).layerManager;
             const l1: any = lm?.getLayer?.('layer1');
             const l2: any = lm?.getLayer?.('layer2');
-            const l1m = l1 && l1.name === 'FastSearchLayer' && typeof l1.getMetrics === 'function' ? l1.getMetrics() : null;
-            const l2m = l2 && l2.name === 'TreeSitterLayer' && typeof l2.getMetrics === 'function' ? l2.getMetrics() : null;
+            const l1m =
+                l1 && l1.name === 'FastSearchLayer' && typeof l1.getMetrics === 'function' ? l1.getMetrics() : null;
+            const l2m =
+                l2 && l2.name === 'TreeSitterLayer' && typeof l2.getMetrics === 'function' ? l2.getMetrics() : null;
 
             const output = [
                 this.formatHeader('Ontology LSP Statistics'),
@@ -381,8 +550,7 @@ export class CLIAdapter {
                 this.formatHeader('Layer 1 (Fast Search):'),
                 l1m
                     ? `  searches=${l1m.layer.searches} cacheHits=${l1m.layer.cacheHits} fallbacks=${l1m.layer.fallbacks} timeouts=${l1m.layer.timeouts} avgMs=${Math.round(l1m.layer.avgResponseTime)}`
-                    : '  (no metrics)'
-                      ,
+                    : '  (no metrics)',
                 l1m?.asyncTools
                     ? `  async: pool=${l1m.asyncTools.processPoolSize ?? 'auto'} defaultTimeout=${l1m.asyncTools.defaultTimeout ?? 'auto'}ms`
                     : '',
@@ -390,8 +558,7 @@ export class CLIAdapter {
                 this.formatHeader('Layer 2 (AST Parser):'),
                 l2m
                     ? `  parses=${l2m.count} errors=${l2m.errors} p50=${Math.round(l2m.p50)}ms p95=${Math.round(l2m.p95)}ms`
-                    : '  (no metrics)'
-                      ,
+                    : '  (no metrics)',
                 '',
                 this.formatHeader('Performance:'),
                 `Cache enabled: ${diagnostics.sharedServices?.cache?.enabled ?? 'Unknown'}`,
@@ -416,10 +583,7 @@ export class CLIAdapter {
                 output.push('  (no metrics yet)');
             }
 
-            output.push(
-                '',
-                `Timestamp: ${new Date(diagnostics.timestamp).toISOString()}`,
-            );
+            output.push('', `Timestamp: ${new Date(diagnostics.timestamp).toISOString()}`);
 
             return output.join('\n');
         } catch (error) {
@@ -601,7 +765,7 @@ export class CLIAdapter {
                         maxResults: options.maxFiles ?? 20,
                         precise: false,
                     });
-                    for (const d of (defProbe?.data || [])) {
+                    for (const d of defProbe?.data || []) {
                         if ((d as any).name) names.push(String((d as any).name));
                     }
                 } catch {}

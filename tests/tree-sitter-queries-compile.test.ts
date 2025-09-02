@@ -8,18 +8,18 @@ const JavaScript = require('tree-sitter-javascript');
 const TypeScript = require('tree-sitter-typescript').typescript;
 
 describe('Tree-sitter query compile sanity', () => {
-  test('JavaScript classes query compiles (no TS-only nodes)', () => {
-    const jsClasses = `
+    test('JavaScript classes query compiles (no TS-only nodes)', () => {
+        const jsClasses = `
       (class_declaration
         name: (identifier) @class.name
         body: (class_body) @class.body)
     `;
-    const q = new Query(JavaScript, jsClasses);
-    expect(q).toBeDefined();
-  });
+        const q = new Query(JavaScript, jsClasses);
+        expect(q).toBeDefined();
+    });
 
-  test('TypeScript classes query compiles (TS nodes allowed)', () => {
-    const tsClasses = `
+    test('TypeScript classes query compiles (TS nodes allowed)', () => {
+        const tsClasses = `
       (class_declaration
         name: (type_identifier) @class.name
         (class_heritage
@@ -30,8 +30,7 @@ describe('Tree-sitter query compile sanity', () => {
             (type_identifier) @class.implements)*)?
         body: (class_body) @class.body)
     `;
-    const q = new Query(TypeScript, tsClasses);
-    expect(q).toBeDefined();
-  });
+        const q = new Query(TypeScript, tsClasses);
+        expect(q).toBeDefined();
+    });
 });
-

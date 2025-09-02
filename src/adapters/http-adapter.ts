@@ -155,6 +155,8 @@ export class HTTPAdapter {
                     return method === 'POST' ? this.handleFindDefinition(request) : this.methodNotAllowed();
                 case '/references':
                     return method === 'POST' ? this.handleFindReferences(request) : this.methodNotAllowed();
+                case '/refactor':
+                    return method === 'POST' ? this.handleRefactor(request) : this.methodNotAllowed();
                 case '/explore':
                     return method === 'POST' ? this.handleExplore(request) : this.methodNotAllowed();
                 case '/rename':
@@ -305,6 +307,17 @@ export class HTTPAdapter {
         } catch (error) {
             return this.createErrorResponse(400, 'Bad Request', error);
         }
+    }
+
+    /**
+     * Handle POST /api/v1/refactor (stub suggestions)
+     */
+    private async handleRefactor(_request: HTTPRequest): Promise<HTTPResponse> {
+        return {
+            status: 200,
+            headers: {},
+            body: JSON.stringify({ success: true, data: { suggestions: [] } }),
+        };
     }
 
     /**
@@ -658,9 +671,11 @@ export class HTTPAdapter {
                                 Number(monitoring.totalRequests || 0),
                                 Number(layerFallback?.totalRequests || 0)
                             );
-                            const avg = total > 0
-                                ? (Number(monitoring.averageLatency || 0) || Number(layerFallback?.averageResponseTime || 0))
-                                : (Number(monitoring.averageLatency || 0));
+                            const avg =
+                                total > 0
+                                    ? Number(monitoring.averageLatency || 0) ||
+                                      Number(layerFallback?.averageResponseTime || 0)
+                                    : Number(monitoring.averageLatency || 0);
                             return {
                                 totalRequests: total,
                                 averageLatency: avg || 0,
@@ -740,7 +755,10 @@ export class HTTPAdapter {
                 requestCount: Number(metrics?.requestCount || 0),
                 averageLatency: Number(metrics?.averageLatency || 0),
                 errorCount: Number(metrics?.errorCount || 0),
-                errorRate: Number(metrics?.requestCount || 0) > 0 ? Number(metrics?.errorCount || 0) / Number(metrics?.requestCount || 0) : 0,
+                errorRate:
+                    Number(metrics?.requestCount || 0) > 0
+                        ? Number(metrics?.errorCount || 0) / Number(metrics?.requestCount || 0)
+                        : 0,
                 healthy:
                     Number(metrics?.averageLatency || 0) < this.getLayerLatencyThreshold(layerId) &&
                     Number(metrics?.errorCount || 0) / Math.max(Number(metrics?.requestCount || 1), 1) < 0.05,
@@ -874,7 +892,7 @@ export class HTTPAdapter {
                             neighbors: { $ref: '#/components/schemas/GraphNeighbors' },
                             note: { type: 'string' },
                         },
-                        anyOf: [ { required: ['file'] }, { required: ['symbol'] } ],
+                        anyOf: [{ required: ['file'] }, { required: ['symbol'] }],
                     },
                     Position: {
                         type: 'object',
@@ -883,7 +901,10 @@ export class HTTPAdapter {
                     },
                     Range: {
                         type: 'object',
-                        properties: { start: { $ref: '#/components/schemas/Position' }, end: { $ref: '#/components/schemas/Position' } },
+                        properties: {
+                            start: { $ref: '#/components/schemas/Position' },
+                            end: { $ref: '#/components/schemas/Position' },
+                        },
                         required: ['start', 'end'],
                     },
                     Definition: {
@@ -999,7 +1020,10 @@ export class HTTPAdapter {
                                             position: { $ref: '#/components/schemas/Position' },
                                             maxResults: { type: 'integer' },
                                             includeDeclaration: { type: 'boolean' },
-                                            precise: { type: 'boolean', description: 'Run a quick AST validation pass' },
+                                            precise: {
+                                                type: 'boolean',
+                                                description: 'Run a quick AST validation pass',
+                                            },
                                         },
                                     },
                                 },
@@ -1027,7 +1051,12 @@ export class HTTPAdapter {
                                     },
                                 },
                             },
-                            '400': { description: 'Bad Request', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+                            '400': {
+                                description: 'Bad Request',
+                                content: {
+                                    'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } },
+                                },
+                            },
                         },
                     },
                 },
@@ -1042,7 +1071,7 @@ export class HTTPAdapter {
                                         type: 'object',
                                         required: ['language', 'query'],
                                         properties: {
-                                            language: { type: 'string', enum: ['typescript','javascript','python'] },
+                                            language: { type: 'string', enum: ['typescript', 'javascript', 'python'] },
                                             query: { type: 'string' },
                                             paths: { type: 'array', items: { type: 'string' } },
                                             glob: { type: 'string' },
@@ -1060,7 +1089,12 @@ export class HTTPAdapter {
                                         schema: {
                                             allOf: [
                                                 { $ref: '#/components/schemas/ApiResponse' },
-                                                { type: 'object', properties: { data: { $ref: '#/components/schemas/AstQueryResult' } } },
+                                                {
+                                                    type: 'object',
+                                                    properties: {
+                                                        data: { $ref: '#/components/schemas/AstQueryResult' },
+                                                    },
+                                                },
                                             ],
                                         },
                                     },
@@ -1078,11 +1112,17 @@ export class HTTPAdapter {
                                 'application/json': {
                                     schema: {
                                         type: 'object',
-                                        anyOf: [ { required: ['file'] }, { required: ['symbol'] } ],
+                                        anyOf: [{ required: ['file'] }, { required: ['symbol'] }],
                                         properties: {
                                             file: { type: 'string' },
                                             symbol: { type: 'string' },
-                                            edges: { type: 'array', items: { type: 'string', enum: ['imports','exports','callers','callees'] } },
+                                            edges: {
+                                                type: 'array',
+                                                items: {
+                                                    type: 'string',
+                                                    enum: ['imports', 'exports', 'callers', 'callees'],
+                                                },
+                                            },
                                             depth: { type: 'integer' },
                                             limit: { type: 'integer' },
                                         },
@@ -1098,7 +1138,12 @@ export class HTTPAdapter {
                                         schema: {
                                             allOf: [
                                                 { $ref: '#/components/schemas/ApiResponse' },
-                                                { type: 'object', properties: { data: { $ref: '#/components/schemas/GraphExpandResult' } } },
+                                                {
+                                                    type: 'object',
+                                                    properties: {
+                                                        data: { $ref: '#/components/schemas/GraphExpandResult' },
+                                                    },
+                                                },
                                             ],
                                         },
                                     },
@@ -1157,7 +1202,14 @@ export class HTTPAdapter {
                                 },
                             },
                         },
-                        responses: { '200': { description: 'OK', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiResponse' } } } } },
+                        responses: {
+                            '200': {
+                                description: 'OK',
+                                content: {
+                                    'application/json': { schema: { $ref: '#/components/schemas/ApiResponse' } },
+                                },
+                            },
+                        },
                     },
                 },
                 [api('/references')]: {
@@ -1177,7 +1229,10 @@ export class HTTPAdapter {
                                             position: { $ref: '#/components/schemas/Position' },
                                             maxResults: { type: 'integer' },
                                             includeDeclaration: { type: 'boolean' },
-                                            precise: { type: 'boolean', description: 'Run a quick AST validation pass' },
+                                            precise: {
+                                                type: 'boolean',
+                                                description: 'Run a quick AST validation pass',
+                                            },
                                         },
                                     },
                                 },
@@ -1205,7 +1260,12 @@ export class HTTPAdapter {
                                     },
                                 },
                             },
-                            '400': { description: 'Bad Request', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+                            '400': {
+                                description: 'Bad Request',
+                                content: {
+                                    'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } },
+                                },
+                            },
                         },
                     },
                 },
@@ -1272,7 +1332,10 @@ export class HTTPAdapter {
                                                 {
                                                     type: 'object',
                                                     properties: {
-                                                        data: { type: 'array', items: { $ref: '#/components/schemas/Completion' } },
+                                                        data: {
+                                                            type: 'array',
+                                                            items: { $ref: '#/components/schemas/Completion' },
+                                                        },
                                                     },
                                                 },
                                             ],
@@ -1298,7 +1361,10 @@ export class HTTPAdapter {
                                             file: { type: 'string' },
                                             uri: { type: 'string' },
                                             includeDeclaration: { type: 'boolean' },
-                                            precise: { type: 'boolean', description: 'Run a quick AST validation pass' },
+                                            precise: {
+                                                type: 'boolean',
+                                                description: 'Run a quick AST validation pass',
+                                            },
                                             maxResults: { type: 'integer' },
                                         },
                                     },
@@ -1308,7 +1374,9 @@ export class HTTPAdapter {
                         responses: {
                             '200': {
                                 description: 'Success',
-                                content: { 'application/json': { schema: { $ref: '#/components/schemas/ExploreResult' } } },
+                                content: {
+                                    'application/json': { schema: { $ref: '#/components/schemas/ExploreResult' } },
+                                },
                             },
                         },
                     },
@@ -1316,7 +1384,14 @@ export class HTTPAdapter {
                 [api('/stats')]: {
                     get: {
                         summary: 'Get system diagnostics and status',
-                        responses: { '200': { description: 'Success', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiResponse' } } } } },
+                        responses: {
+                            '200': {
+                                description: 'Success',
+                                content: {
+                                    'application/json': { schema: { $ref: '#/components/schemas/ApiResponse' } },
+                                },
+                            },
+                        },
                     },
                 },
                 [api('/learning-stats')]: {
@@ -1325,7 +1400,9 @@ export class HTTPAdapter {
                         responses: {
                             '200': {
                                 description: 'Success',
-                                content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiResponse' } } },
+                                content: {
+                                    'application/json': { schema: { $ref: '#/components/schemas/ApiResponse' } },
+                                },
                             },
                         },
                     },
@@ -1333,7 +1410,14 @@ export class HTTPAdapter {
                 [api('/monitoring')]: {
                     get: {
                         summary: 'Get monitoring metrics',
-                        responses: { '200': { description: 'Success', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiResponse' } } } } },
+                        responses: {
+                            '200': {
+                                description: 'Success',
+                                content: {
+                                    'application/json': { schema: { $ref: '#/components/schemas/ApiResponse' } },
+                                },
+                            },
+                        },
                     },
                 },
                 [api('/stream/search')]: {
@@ -1341,10 +1425,26 @@ export class HTTPAdapter {
                         summary: 'Streaming search results (SSE)',
                         requestBody: {
                             required: true,
-                            content: { 'application/json': { schema: { type: 'object', required: ['pattern'], properties: { pattern: { type: 'string' }, file: { type: 'string' }, uri: { type: 'string' }, maxResults: { type: 'integer' } } } } },
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        required: ['pattern'],
+                                        properties: {
+                                            pattern: { type: 'string' },
+                                            file: { type: 'string' },
+                                            uri: { type: 'string' },
+                                            maxResults: { type: 'integer' },
+                                        },
+                                    },
+                                },
+                            },
                         },
                         responses: {
-                            '200': { description: 'Event stream', content: { 'text/event-stream': { schema: { type: 'string' } } } },
+                            '200': {
+                                description: 'Event stream',
+                                content: { 'text/event-stream': { schema: { type: 'string' } } },
+                            },
                         },
                     },
                 },
@@ -1353,10 +1453,27 @@ export class HTTPAdapter {
                         summary: 'Streaming definition results (SSE)',
                         requestBody: {
                             required: true,
-                            content: { 'application/json': { schema: { type: 'object', required: ['identifier'], properties: { identifier: { type: 'string' }, file: { type: 'string' }, uri: { type: 'string' }, position: { $ref: '#/components/schemas/Position' }, maxResults: { type: 'integer' } } } } },
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        required: ['identifier'],
+                                        properties: {
+                                            identifier: { type: 'string' },
+                                            file: { type: 'string' },
+                                            uri: { type: 'string' },
+                                            position: { $ref: '#/components/schemas/Position' },
+                                            maxResults: { type: 'integer' },
+                                        },
+                                    },
+                                },
+                            },
                         },
                         responses: {
-                            '200': { description: 'Event stream', content: { 'text/event-stream': { schema: { type: 'string' } } } },
+                            '200': {
+                                description: 'Event stream',
+                                content: { 'text/event-stream': { schema: { type: 'string' } } },
+                            },
                         },
                     },
                 },

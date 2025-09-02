@@ -15,10 +15,10 @@ import {
     SymbolRepresentation,
 } from '../types/core';
 import { ConceptBuilder } from './concept-builder';
-import { SimilarityCalculator } from './similarity-calculator';
-import type { StoragePort } from './storage-port';
 import { InstrumentedStoragePort, type L4StorageMetrics } from './instrumented-storage';
 import { isValidLocation, normalizeUri as normUri } from './location-utils';
+import { SimilarityCalculator } from './similarity-calculator';
+import type { StoragePort } from './storage-port';
 
 export interface RelatedConcept {
     concept: Concept;

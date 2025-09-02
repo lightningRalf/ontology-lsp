@@ -4,9 +4,11 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+
 // Gate performance-sensitive suite behind PERF=1 to avoid flakiness in default runs
 const perfOnly = process.env.PERF === '1';
 const perfDescribe = perfOnly ? describe : describe.skip;
+
 import { SharedServices } from '../../src/core/services/index.js';
 import { CodeEvolutionTracker } from '../../src/learning/evolution-tracker.js';
 import { FeedbackLoopSystem } from '../../src/learning/feedback-loop.js';

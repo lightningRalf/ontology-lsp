@@ -193,6 +193,19 @@ ontology-lsp/
     `/api/v1/snapshots/{id}/diff` and MCP resources `snapshot://{id}/overlay.diff`.
 - Learning (L5): added `missingExampleContextTimestamp` counter; surfaced via stats and dashboard.
 
+### ✅ L4/L5 Robustness (Complete)
+- L4 metrics JSON: `/metrics?format=json` now includes storage `extras` and `totals` for dashboards; tests assert presence.
+- L5 metrics surface: `PatternLearner.getMetrics()` exposed; tests validate counter increments when context timestamp is missing.
+- Learning stats resilience: `CodeAnalyzer.getStats()` and `LearningOrchestrator.getLearningStats()` auto-initialize when needed and fall back to `PatternLearner.getStatistics()` to ensure patterns are visible immediately (useful in E2E/dev).
+
+### ✅ E2E Cross‑Protocol Wiring (Progress)
+- LSP/CLI: added convenience methods used by the E2E validator; added file‑based word‑at‑cursor extraction for reliability.
+- MCP: tool call wrapper accepts both `(name, args)` and `{ name, arguments }`; added `suggest_refactoring` stub tool; ensured `coreAnalyzer.initialize()` before handling tools; derive symbol from `file+position` when `symbol` missing.
+- HTTP: added `POST /api/v1/refactor` returning `{ suggestions: [] }` for parity with MCP/LSP/CLI. Dev warm‑up now primes both `/api/v1/monitoring` and `/api/v1/learning-stats`.
+- Core: `findDefinitionAsync`/`findReferencesAsync` now auto‑init prior to validation; `getStats()` fallback includes `PatternLearner` totals.
+
+Status: adapters/LSP integration tests are green. E2E local run improved reliability but still fails strict validator thresholds (edge‑case consistency and learning effectiveness on the minimal local fixture). Follow‑ups are tracked in NEXT_STEPS.
+
 ### ✅ MCP Workflows & Resources (new)
 - Workflow tools (single-call orchestration):
   - `workflow_explore_symbol`: find definitions (precise), build symbol map (AST-only), expand neighbors; returns a compact JSON for impact analysis.

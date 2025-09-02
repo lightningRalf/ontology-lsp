@@ -63,6 +63,14 @@ export class PatternLearner extends EventEmitter {
         this.initPromise = this.initialize();
     }
 
+    /**
+     * Lightweight metrics surface for tests/monitoring
+     * Currently exposes counters that help validate robustness of optional inputs.
+     */
+    getMetrics(): { missingExampleContextTimestamp: number } {
+        return { ...this.metrics };
+    }
+
     async ensureInitialized(): Promise<void> {
         if (this.initPromise) {
             await this.initPromise;
@@ -99,8 +107,7 @@ export class PatternLearner extends EventEmitter {
             surroundingSymbols: Array.isArray((context as any)?.surroundingSymbols)
                 ? (context as any).surroundingSymbols
                 : [],
-            timestamp:
-                (context as any)?.timestamp instanceof Date ? (context as any).timestamp : new Date(0),
+            timestamp: (context as any)?.timestamp instanceof Date ? (context as any).timestamp : new Date(0),
         };
         if (!((context as any)?.timestamp instanceof Date)) {
             this.metrics.missingExampleContextTimestamp++;
@@ -166,8 +173,7 @@ export class PatternLearner extends EventEmitter {
                 surroundingSymbols: Array.isArray((context as any)?.surroundingSymbols)
                     ? (context as any).surroundingSymbols
                     : [],
-                timestamp:
-                    (context as any)?.timestamp instanceof Date ? (context as any).timestamp : new Date(0),
+                timestamp: (context as any)?.timestamp instanceof Date ? (context as any).timestamp : new Date(0),
             },
             confidence: 0.9,
         });
@@ -216,9 +222,7 @@ export class PatternLearner extends EventEmitter {
                             ? (context as any).surroundingSymbols
                             : [],
                         timestamp:
-                            (context as any)?.timestamp instanceof Date
-                                ? (context as any).timestamp
-                                : new Date(0),
+                            (context as any)?.timestamp instanceof Date ? (context as any).timestamp : new Date(0),
                     },
                     confidence: 0.7,
                 },

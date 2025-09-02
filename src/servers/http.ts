@@ -443,7 +443,7 @@ export class HTTPServer {
         console.log(`[HTTP Server] Web UI: http://${this.config.host}:${actual}/ui`);
         console.log(`[HTTP Server] Health check: http://${this.config.host}:${actual}/health`);
 
-        // Dev warm-up probe to prime monitoring panels with an initial datapoint
+        // Dev warm-up probe to prime monitoring panels and learning stats with initial datapoints
         try {
             const shouldWarm = process.env.DEV_AUTO_WARMUP === '1' || process.env.NODE_ENV === 'development';
             if (shouldWarm) {
@@ -456,6 +456,16 @@ export class HTTPServer {
                     query: {},
                 };
                 this.httpAdapter.handleRequest(httpRequest).catch(() => {});
+
+                const lsUrl = `http://${this.config.host}:${this.config.port}/api/v1/learning-stats`;
+                const httpRequest2: HTTPRequest = {
+                    method: 'GET',
+                    url: lsUrl,
+                    headers: {},
+                    body: undefined,
+                    query: {},
+                };
+                this.httpAdapter.handleRequest(httpRequest2).catch(() => {});
             }
         } catch {}
     }

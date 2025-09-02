@@ -187,7 +187,7 @@ export class LayerManager implements ILayerManager {
         // 2. Overall performance is within targets
         // 3. Error rate is below threshold
 
-        const healthyLayers = Array.from(this.layers.values()).filter((layer) => (layer.isHealthy?.() ?? true)).length;
+        const healthyLayers = Array.from(this.layers.values()).filter((layer) => layer.isHealthy?.() ?? true).length;
 
         const totalLayers = this.layers.size;
         const healthyRatio = totalLayers > 0 ? healthyLayers / totalLayers : 0;

@@ -351,8 +351,8 @@ describe('FeedbackLoopSystem Integration', () => {
 
             const emptyConfig = {
                 ...mockConfig,
-                layers: { 
-                    ...mockConfig.layers, 
+                layers: {
+                    ...mockConfig.layers,
                     layer3: { ...mockConfig.layers.layer3, dbPath: emptyDbPath },
                     layer4: { enabled: true, dbPath: emptyDbPath },
                 },

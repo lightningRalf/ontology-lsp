@@ -7,9 +7,11 @@
  */
 
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
+
 // Gate micro performance checks behind PERF=1 to reduce flakiness in default runs
 const perfOnly = process.env.PERF === '1';
 const perfDescribe = perfOnly ? describe : describe.skip;
+
 import { EventEmitter } from 'node:events';
 import type { LayerManager } from '../src/core/layer-manager.ts';
 import type { SharedServices } from '../src/core/services/index.ts';

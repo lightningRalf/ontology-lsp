@@ -15,9 +15,9 @@ process.env.STDIO_MODE = 'true';
  * All analysis work is delegated to the CLI adapter and core analyzer.
  */
 
+import { spawnSync } from 'child_process';
 import { Command } from 'commander';
 import * as fs from 'fs';
-import { spawnSync } from 'child_process';
 // Note: defer heavy imports (tree-sitter, analyzer, adapter) to runtime.
 // This keeps `--help` and `init` working even if native deps are unavailable.
 import * as path from 'path';
@@ -72,7 +72,9 @@ class CLI {
                     const items = result as any[];
                     if (options.summary) {
                         const header = this.formatHeader(`Found ${items.length} definitions (showing ${items.length})`);
-                        const top = items[0] ? `Top: ${this.fmtDef ? this.fmtDef(items[0]) : JSON.stringify(items[0])}` : 'Top: (none)';
+                        const top = items[0]
+                            ? `Top: ${this.fmtDef ? this.fmtDef(items[0]) : JSON.stringify(items[0])}`
+                            : 'Top: (none)';
                         console.log([header, top].join('\n'));
                     } else {
                         const lines: string[] = [
@@ -122,7 +124,9 @@ class CLI {
                     const items = result as any[];
                     if (options.summary) {
                         const header = this.formatHeader(`Found ${items.length} references (showing ${items.length})`);
-                        const top = items[0] ? `Top: ${this.fmtRef ? this.fmtRef(items[0]) : JSON.stringify(items[0])}` : 'Top: (none)';
+                        const top = items[0]
+                            ? `Top: ${this.fmtRef ? this.fmtRef(items[0]) : JSON.stringify(items[0])}`
+                            : 'Top: (none)';
                         console.log([header, top].join('\n'));
                     } else {
                         const lines: string[] = [
@@ -261,7 +265,10 @@ class CLI {
             .option('-j, --json', 'JSON output')
             .action(async (options) => {
                 await this.ensureInitialized(options);
-                const out = await this.cliAdapter.handleGetSnapshot({ preferExisting: !!options.preferExisting, json: !!options.json });
+                const out = await this.cliAdapter.handleGetSnapshot({
+                    preferExisting: !!options.preferExisting,
+                    json: !!options.json,
+                });
                 console.log(out);
                 await this.shutdown();
                 process.exit(0);
@@ -288,7 +295,7 @@ class CLI {
                 const out = await this.cliAdapter.handleProposePatch(patch, {
                     snapshot: options.snapshot,
                     runChecks: !!options.runChecks,
-                    commands: Array.isArray(options.cmd) ? options.cmd : (options.cmd ? [options.cmd] : []),
+                    commands: Array.isArray(options.cmd) ? options.cmd : options.cmd ? [options.cmd] : [],
                     timeoutSec: parseInt(options.timeout),
                     json: !!options.json,
                 });
@@ -309,7 +316,7 @@ class CLI {
                 await this.ensureInitialized(options);
                 const out = await this.cliAdapter.handleRunChecks({
                     snapshot: options.snapshot,
-                    commands: Array.isArray(options.cmd) ? options.cmd : (options.cmd ? [options.cmd] : []),
+                    commands: Array.isArray(options.cmd) ? options.cmd : options.cmd ? [options.cmd] : [],
                     timeoutSec: parseInt(options.timeout),
                     json: !!options.json,
                 });
@@ -357,7 +364,7 @@ class CLI {
                 const out = await this.cliAdapter.handleGraphExpand({
                     file: options.file,
                     symbol: options.symbol,
-                    edges: options.edges || ['imports','exports'],
+                    edges: options.edges || ['imports', 'exports'],
                     seedOnly: !!options.seedOnly,
                     depth: parseInt(options.depth),
                     limit: parseInt(options.limit),
@@ -457,7 +464,11 @@ class CLI {
 
         try {
             // Lazy import heavy modules only when needed
-            const [{ createDefaultCoreConfig, formatDefinitionForCli, formatReferenceForCli }, { createCodeAnalyzer }, { CLIAdapter }] = await Promise.all([
+            const [
+                { createDefaultCoreConfig, formatDefinitionForCli, formatReferenceForCli },
+                { createCodeAnalyzer },
+                { CLIAdapter },
+            ] = await Promise.all([
                 import('../adapters/utils.js'),
                 import('../core/index.js'),
                 import('../adapters/cli-adapter.js'),

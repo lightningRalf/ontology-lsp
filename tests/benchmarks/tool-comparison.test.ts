@@ -16,9 +16,9 @@ const perfDescribe = perfOnly ? describe : describe.skip;
 
 import { execSync } from 'node:child_process';
 import * as fs from 'node:fs/promises';
-import { glob } from 'glob';
 import * as path from 'node:path';
 import { performance } from 'node:perf_hooks';
+import { glob } from 'glob';
 import { EnhancedGlob, EnhancedGrep, EnhancedLS } from '../../src/layers/enhanced-search-tools';
 
 // Interface for Claude tools - these would be the actual Claude function calls

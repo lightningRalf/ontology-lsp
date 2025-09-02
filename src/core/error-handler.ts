@@ -439,15 +439,14 @@ export class HealthChecker {
             const layerHealth = {
                 healthy: (layer.isHealthy?.() ?? true) && errorHandler.isLayerHealthy(name),
                 circuitBreakerState: errorHandler.getCircuitBreakerStats()[name]?.state,
-                metrics:
-                    layer.getMetrics?.() || {
-                        name,
-                        requestCount: 0,
-                        averageLatency: 0,
-                        p95Latency: 0,
-                        errorCount: 0,
-                        cacheHitRate: 0,
-                    },
+                metrics: layer.getMetrics?.() || {
+                    name,
+                    requestCount: 0,
+                    averageLatency: 0,
+                    p95Latency: 0,
+                    errorCount: 0,
+                    cacheHitRate: 0,
+                },
             };
 
             healthReport.layers[name] = layerHealth;

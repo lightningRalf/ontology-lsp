@@ -523,7 +523,9 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
         result.parseTime = Date.now() - startTime;
         if (process.env.PERF === '1' && !process.env.SILENT_MODE) {
             try {
-                console.log(`L2(TreeSitter) parse metrics: count=${this.parseStats.count} p95=${this.parseStats.p95}ms p50=${this.parseStats.p50}ms`);
+                console.log(
+                    `L2(TreeSitter) parse metrics: count=${this.parseStats.count} p95=${this.parseStats.p95}ms p50=${this.parseStats.p50}ms`
+                );
             } catch {}
         }
         return result;
