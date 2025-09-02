@@ -45,6 +45,9 @@ export class PatternLearner extends EventEmitter {
     private learningThreshold = 3;
     private confidenceThreshold = 0.7;
     private initPromise: Promise<void> | null = null;
+    private metrics = {
+        missingExampleContextTimestamp: 0,
+    };
 
     constructor(dbPath: string, config?: { learningThreshold?: number; confidenceThreshold?: number }) {
         super();
@@ -99,6 +102,9 @@ export class PatternLearner extends EventEmitter {
             timestamp:
                 (context as any)?.timestamp instanceof Date ? (context as any).timestamp : new Date(0),
         };
+        if (!((context as any)?.timestamp instanceof Date)) {
+            this.metrics.missingExampleContextTimestamp++;
+        }
 
         // Extract pattern from the rename
         const patternKey = this.extractPatternKey(oldName, newName);
@@ -165,6 +171,9 @@ export class PatternLearner extends EventEmitter {
             },
             confidence: 0.9,
         });
+        if (!((context as any)?.timestamp instanceof Date)) {
+            this.metrics.missingExampleContextTimestamp++;
+        }
 
         // Update confidence
         pattern.confidence = this.confidenceCalculator.calculate(pattern);
@@ -739,6 +748,7 @@ export class PatternLearner extends EventEmitter {
             totalCandidates: this.candidates.size,
             averageConfidence,
             topPatterns,
+            metrics: { ...this.metrics },
         };
     }
 

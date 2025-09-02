@@ -15,7 +15,8 @@ import cors from 'cors';
 import { randomUUID } from 'node:crypto';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { isInitializeRequest, CallToolRequestSchema, ListToolsRequestSchema, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { isInitializeRequest, CallToolRequestSchema, ListToolsRequestSchema, ListResourcesRequestSchema, ListResourceTemplatesRequestSchema, ReadResourceRequestSchema, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { overlayStore } from '../core/overlay-store.js';
 
 import { MCPAdapter } from '../adapters/mcp-adapter.js';
 import { createDefaultCoreConfig } from '../adapters/utils.js';
@@ -92,6 +93,55 @@ async function createMcpServer(): Promise<SessionRecord> {
   // Connect server to transport
   await server.connect(transport);
 
+  // Resource handlers (monitoring + snapshot resources)
+  server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+    resources: [
+      { uri: 'monitoring://summary', name: 'monitoring', title: 'Monitoring Summary', description: 'System health and layer stats', mimeType: 'application/json' },
+    ],
+  }));
+  server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
+    resourceTemplates: [
+      { name: 'snapshot-diff', uriTemplate: 'snapshot://{id}/overlay.diff', title: 'Snapshot Patch Diff', description: 'Staged diff for a snapshot', mimeType: 'text/plain' },
+      { name: 'snapshot-status', uriTemplate: 'snapshot://{id}/status', title: 'Snapshot Status', description: 'Snapshot metadata and staged changes', mimeType: 'application/json' },
+    ],
+  }));
+  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    const uriStr = request.params.uri;
+    try {
+      const uri = new URL(uriStr);
+      if (uri.protocol === 'monitoring:') {
+        const stats = await (analyzer as any).getDetailedStats?.();
+        const body = JSON.stringify(stats || {}, null, 2);
+        return { contents: [{ uri: uri.href, mimeType: 'application/json', text: body }] } as any;
+      }
+      if (uri.protocol === 'snapshot:') {
+        const parts = uri.pathname.split('/').filter(Boolean);
+        const id = parts[0];
+        const tail = parts[1];
+        if (!id) throw new Error('Missing snapshot id');
+        if (tail === 'overlay.diff') {
+          const fs = await import('node:fs/promises');
+          const path = await import('node:path');
+          const ensure = (overlayStore as any).ensureMaterialized?.bind(overlayStore);
+          const dir = ensure ? await ensure(id) : undefined;
+          const diffPath = path.join(dir || '', 'overlay.diff');
+          let text = '';
+          try { text = await fs.readFile(diffPath, 'utf8'); } catch { text = '# No overlay.diff found in snapshot'; }
+          return { contents: [{ uri: uri.href, mimeType: 'text/plain', text }] } as any;
+        }
+        if (tail === 'status') {
+          const snaps = (overlayStore as any).list?.() || [];
+          const snap = snaps.find((s: any) => s.id === id) || null;
+          const body = JSON.stringify({ id, exists: !!snap, diffCount: snap?.diffs?.length || 0, createdAt: snap?.createdAt || null }, null, 2);
+          return { contents: [{ uri: uri.href, mimeType: 'application/json', text: body }] } as any;
+        }
+      }
+      throw new McpError(ErrorCode.InvalidParams, `Unsupported resource ${uriStr}`);
+    } catch (e) {
+      throw new McpError(ErrorCode.InternalError, e instanceof Error ? e.message : String(e));
+    }
+  });
+
   return { server, transport, analyzer, adapter };
 }
 
@@ -123,6 +173,14 @@ app.post('/mcp', async (req, res) => {
     }
 
     await record!.transport.handleRequest(req as any, res as any, req.body);
+
+    // After handling initialize, Streamable HTTP transport may have assigned a session ID
+    // Ensure it's stored so subsequent requests can resolve the session without requiring
+    // a prior GET /mcp handshake (fixes chicken-and-egg for list/call via HTTP)
+    const sid = (record!.transport as any).sessionId as string | undefined;
+    if (sid && !sessions[sid]) {
+      sessions[sid] = record!;
+    }
   } catch (error) {
     if (!res.headersSent) {
       res.status(500).json({ jsonrpc: '2.0', error: { code: -32603, message: 'Internal server error' }, id: null });
@@ -148,8 +206,10 @@ app.get('/mcp-events', (req, res) => {
   res.flushHeaders?.();
 
   const send = (event: string, data: any) => {
+    const ts = typeof data?.ts === 'number' ? data.ts : Date.now();
+    const payload = { ...data, ts, iso: new Date(ts).toISOString() };
     res.write(`event: ${event}\n`);
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
+    res.write(`data: ${JSON.stringify(payload)}\n\n`);
   };
 
   const onCall = (payload: any) => send('toolCall', payload);
@@ -159,7 +219,7 @@ app.get('/mcp-events', (req, res) => {
   mcpEvents.on('toolError', onErr);
 
   // heartbeat
-  const hb = setInterval(() => send('heartbeat', { ts: Date.now() }), 15000);
+  const hb = setInterval(() => send('heartbeat', { }), 15000);
 
   req.on('close', () => {
     clearInterval(hb);

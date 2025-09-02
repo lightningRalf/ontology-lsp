@@ -346,6 +346,20 @@ export class SharedServices {
             console.error('SharedServices error:', data);
         });
 
+        // Layer performance -> Monitoring bridge
+        this.eventBus.on('layer-manager:performance-recorded', (data: any) => {
+            try {
+                this.monitoring.recordPerformance(data);
+            } catch {}
+        });
+
+        // CodeAnalyzer fast-path performance bridge (e.g., layer1 async, layer2 AST quick pass)
+        this.eventBus.on('code-analyzer:performance-recorded', (data: any) => {
+            try {
+                this.monitoring.recordPerformance(data);
+            } catch {}
+        });
+
         // Health monitoring
         if (this.config?.monitoring?.enabled) {
             setInterval(

@@ -230,6 +230,7 @@ export class CodeAnalyzer {
                 excludePaths: ['node_modules', 'dist', '.git', 'coverage', '.e2e-test-workspace', 'logs', 'out', 'build', 'tests', '__tests__', 'examples', 'vscode-client', 'test-output-*'],
             };
 
+            const tL1Start = Date.now();
             let streamingResultsAll = await this.asyncSearchTools.search(asyncOptions);
 
             // Fallback: If no hits for imperfect/short seeds, try a subsequence regex (fuzzy-ish)
@@ -290,7 +291,7 @@ export class CodeAnalyzer {
                 });
             }
 
-            let layer1Time = Date.now() - startTime;
+            let layer1Time = Date.now() - tL1Start;
             let layer2Time = 0;
             let finalDefs: Definition[] = definitions;
 
@@ -419,6 +420,32 @@ export class CodeAnalyzer {
                 const best = [...definitions].sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0];
                 finalDefs = [best];
             }
+
+            // Emit performance snapshots for monitoring
+            try {
+                this.eventBus.emit('code-analyzer:performance-recorded', {
+                    startTime,
+                    endTime: startTime + layer1Time,
+                    duration: layer1Time,
+                    layer: 'layer1',
+                    operation: 'findDefinition',
+                    cacheHit: false,
+                    errorCount: 0,
+                    requestId,
+                });
+                if (layer2Time > 0) {
+                    this.eventBus.emit('code-analyzer:performance-recorded', {
+                        startTime: startTime + layer1Time,
+                        endTime: startTime + layer1Time + layer2Time,
+                        duration: layer2Time,
+                        layer: 'layer2',
+                        operation: 'findDefinition',
+                        cacheHit: false,
+                        errorCount: 0,
+                        requestId,
+                    });
+                }
+            } catch {}
 
             const performance: LayerPerformance = {
                 layer1: layer1Time,
@@ -2693,7 +2720,7 @@ export class CodeAnalyzer {
      * Get system diagnostics and health information
      */
     getDiagnostics(): Record<string, any> {
-        const diagnostics = {
+        const diagnostics: any = {
             initialized: this.initialized,
             layerManager: this.layerManager.getDiagnostics(),
             sharedServices: this.sharedServices.getDiagnostics(),
@@ -2701,6 +2728,26 @@ export class CodeAnalyzer {
             config: this.config,
             timestamp: Date.now(),
         };
+
+        // Inline monitoring snapshot used by HTTP adapter's /monitoring endpoint
+        try {
+            const monSummary = this.sharedServices.monitoring.getSummary();
+            const monDiag = this.sharedServices.monitoring.getDiagnostics();
+            diagnostics.monitoring = {
+                healthy: this.sharedServices.monitoring.isHealthy(),
+                uptime: monDiag?.metrics?.uptime ?? 0,
+                totalRequests: monSummary.requestCount ?? 0,
+                averageLatency: monSummary.averageLatency ?? 0,
+                p95Latency: monSummary.p95Latency ?? 0,
+                p99Latency: monSummary.p99Latency ?? 0,
+                errorRate: monSummary.errorRate ?? 0,
+                cacheHitRate: monSummary.cacheHitRate ?? 0,
+                cacheHits: monDiag?.metrics?.cacheHits ?? 0,
+                cacheMisses: monDiag?.metrics?.cacheMisses ?? 0,
+                layerBreakdown: monSummary.layerBreakdown ?? {},
+                recentErrors: (this.sharedServices as any).monitoring?.recentErrors || [],
+            };
+        } catch {}
 
         // Add learning-specific diagnostics
         if (this.learningOrchestrator) {

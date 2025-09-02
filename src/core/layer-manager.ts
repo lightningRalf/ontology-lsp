@@ -70,6 +70,20 @@ export class LayerManager implements ILayerManager {
             // Register mock layers for testing
             this.registerMockLayers();
 
+            // Initialize all registered layers to ensure health checks pass
+            for (const layer of this.layers.values()) {
+                try {
+                    await (layer.initialize?.() || Promise.resolve());
+                } catch (e) {
+                    // Mark as unhealthy by leaving initialize failure; surface via events
+                    this.eventBus.emit('layer-manager:error', {
+                        layerName: layer.name,
+                        error: e instanceof Error ? e.message : String(e),
+                        timestamp: Date.now(),
+                    });
+                }
+            }
+
             // Start health monitoring
             if (this.config.monitoring.enabled) {
                 this.startHealthCheck();
@@ -301,8 +315,8 @@ export class LayerManager implements ILayerManager {
             const duration = Date.now() - startTime;
             this.updateMetrics(layerName, duration, false, false);
 
-            // Record performance data
-            this.recordPerformance({
+            // Record performance data and emit to event bus for monitoring service
+            const perf: PerformanceMetrics = {
                 startTime,
                 endTime: Date.now(),
                 duration,
@@ -311,7 +325,11 @@ export class LayerManager implements ILayerManager {
                 cacheHit: false, // Would be set by cache layer
                 errorCount: 0,
                 requestId: requestMetadata.id,
-            });
+            };
+            this.recordPerformance(perf);
+            try {
+                this.eventBus.emit('layer-manager:performance-recorded', perf);
+            } catch {}
 
             // Check if performance is degrading
             if (duration > layer.targetLatency * 1.5) {
@@ -331,8 +349,8 @@ export class LayerManager implements ILayerManager {
             const duration = Date.now() - startTime;
             this.updateMetrics(layerName, duration, true, false);
 
-            // Record error performance data
-            this.recordPerformance({
+            // Record error performance data and emit to event bus for monitoring service
+            const perfErr: PerformanceMetrics = {
                 startTime,
                 endTime: Date.now(),
                 duration,
@@ -341,7 +359,11 @@ export class LayerManager implements ILayerManager {
                 cacheHit: false,
                 errorCount: 1,
                 requestId: requestMetadata.id,
-            });
+            };
+            this.recordPerformance(perfErr);
+            try {
+                this.eventBus.emit('layer-manager:performance-recorded', perfErr);
+            } catch {}
 
             this.eventBus.emit('layer-manager:error', {
                 layerName,
