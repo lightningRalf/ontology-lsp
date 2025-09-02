@@ -152,7 +152,7 @@ process-management-info:
 
 ports:
     @echo "📡 Global Port Registry (~/.ontology/ports.json)"
-    @bun run scripts/ports.ts
+    @bun run ~/programming/port-registry/src/cli.ts list
 
 
 # === PORT MANAGEMENT ===
