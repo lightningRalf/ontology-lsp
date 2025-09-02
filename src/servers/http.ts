@@ -185,6 +185,20 @@ export class HTTPServer {
                         });
                     }
 
+                    // Monitoring shortcut: /monitoring -> /api/v1/monitoring (supports ?raw=1)
+                    if (url.pathname === '/monitoring' && request.method === 'GET') {
+                        const proxiedUrl = `${url.origin}/api/v1/monitoring${url.search}`;
+                        const httpRequest: HTTPRequest = {
+                            method: 'GET',
+                            url: proxiedUrl,
+                            headers: Object.fromEntries(request.headers.entries()),
+                            body: undefined,
+                            query: this.extractQuery(proxiedUrl),
+                        };
+                        const resp = await this.httpAdapter.handleRequest(httpRequest);
+                        return new Response(resp.body, { status: resp.status, headers: resp.headers });
+                    }
+
                     // AST Query endpoint
                     if ((url.pathname === '/api/v1/ast-query') && request.method === 'POST') {
                         try {

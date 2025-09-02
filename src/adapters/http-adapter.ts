@@ -74,6 +74,28 @@ export class HTTPAdapter {
         };
     }
 
+    private recordHttpCacheHit(key: string): void {
+        try {
+            const monitoring = (this.coreAnalyzer as any)?.sharedServices?.monitoring;
+            if (monitoring && typeof monitoring.recordCacheHit === 'function') {
+                monitoring.recordCacheHit(`http.responseCache:${key}`, 'memory', Date.now());
+            }
+        } catch {
+            // ignore monitoring errors to keep hot path fast
+        }
+    }
+
+    private recordHttpCacheMiss(key: string): void {
+        try {
+            const monitoring = (this.coreAnalyzer as any)?.sharedServices?.monitoring;
+            if (monitoring && typeof monitoring.recordCacheMiss === 'function') {
+                monitoring.recordCacheMiss(`http.responseCache:${key}`, Date.now());
+            }
+        } catch {
+            // ignore monitoring errors
+        }
+    }
+
     /**
      * Handle HTTP request and route to appropriate handler
      */
@@ -152,7 +174,7 @@ export class HTTPAdapter {
                 case '/learning-stats':
                     return method === 'GET' ? this.handleLearningStats() : this.methodNotAllowed();
                 case '/monitoring':
-                    return method === 'GET' ? this.handleMonitoring() : this.methodNotAllowed();
+                    return method === 'GET' ? this.handleMonitoring(request) : this.methodNotAllowed();
                 // New streaming endpoints
                 case '/stream/search':
                     return method === 'POST' ? this.handleStreamSearch(request) : this.methodNotAllowed();
@@ -180,12 +202,15 @@ export class HTTPAdapter {
             // Check for cached response - fast path
             const cached = this.responseCache.get(cacheKey);
             if (cached && Date.now() - cached.timestamp < HTTPAdapter.RESPONSE_CACHE_TTL) {
+                this.recordHttpCacheHit(cacheKey);
                 return {
                     status: 200,
                     headers: { 'X-Cache': 'HIT' },
                     body: cached.response,
                 };
             }
+            // Count cache miss on HTTP adapter layer
+            this.recordHttpCacheMiss(cacheKey);
 
             const position = body.position ? normalizePosition(body.position) : createPosition(0, 0);
 
@@ -237,12 +262,14 @@ export class HTTPAdapter {
             // Check for cached response
             const cached = this.responseCache.get(cacheKey);
             if (cached && Date.now() - cached.timestamp < HTTPAdapter.RESPONSE_CACHE_TTL) {
+                this.recordHttpCacheHit(cacheKey);
                 return {
                     status: 200,
                     headers: { 'X-Cache': 'HIT' },
                     body: cached.response,
                 };
             }
+            this.recordHttpCacheMiss(cacheKey);
 
             const position = body.position ? normalizePosition(body.position) : createPosition(0, 0);
 
@@ -336,6 +363,16 @@ export class HTTPAdapter {
 
             const result = await this.coreAnalyzer.rename(coreRequest);
             const changes = Object.entries(result.data.changes || {});
+
+            // Optional: Layer 5 pattern stats
+            let l5Ps: any = null;
+            try {
+                const lm2: any = (this.coreAnalyzer as any).layerManager;
+                const l5 = lm2?.getLayer?.('layer5');
+                if (l5 && typeof l5.getPatternStatistics === 'function') {
+                    l5Ps = await l5.getPatternStatistics();
+                }
+            } catch {}
 
             return {
                 status: 200,
@@ -552,16 +589,54 @@ export class HTTPAdapter {
     /**
      * Handle GET /api/v1/monitoring - Enhanced monitoring data for dashboard
      */
-    private async handleMonitoring(): Promise<HTTPResponse> {
+    private async handleMonitoring(request?: HTTPRequest): Promise<HTTPResponse> {
         try {
             const diagnostics = this.coreAnalyzer.getDiagnostics();
             const monitoring = diagnostics.monitoring || {};
+            const rawFlag = (() => {
+                try {
+                    if (!request) return false;
+                    const q = request.query || {};
+                    const v = (q.raw || '').toString().toLowerCase();
+                    return v === '1' || v === 'true' || v === 'yes';
+                } catch {
+                    return false;
+                }
+            })();
 
             // Get detailed monitoring stats if available
             let detailedStats = {} as any;
             const getStats = (this.coreAnalyzer as any).getDetailedStats;
             if (typeof getStats === 'function') {
                 detailedStats = await getStats.call(this.coreAnalyzer);
+            }
+
+            // Fallback: derive layer performance directly from LayerManager if monitoring has no data yet
+            let layerFallback: any = null;
+            try {
+                const lm: any = (this.coreAnalyzer as any).layerManager;
+                if (lm && typeof lm.getPerformanceReport === 'function') {
+                    layerFallback = lm.getPerformanceReport();
+                }
+            } catch {}
+
+            // Optional: Layer 5 (pattern learner) quick stats
+            let l5Ps: any = null;
+            try {
+                const lm2: any = (this.coreAnalyzer as any).layerManager;
+                const l5 = lm2?.getLayer?.('layer5');
+                if (l5 && typeof l5.getPatternStatistics === 'function') {
+                    l5Ps = await l5.getPatternStatistics();
+                }
+            } catch {}
+
+            // If raw flag requested, return raw layer manager performance report for diagnostics
+            if (rawFlag) {
+                return {
+                    status: 200,
+                    headers: {},
+                    body: JSON.stringify({ success: true, data: layerFallback || {} }),
+                };
             }
 
             return {
@@ -578,13 +653,22 @@ export class HTTPAdapter {
                         },
 
                         // Performance metrics
-                        performance: {
-                            totalRequests: monitoring.totalRequests || 0,
-                            averageLatency: monitoring.averageLatency || 0,
-                            p95Latency: monitoring.p95Latency || 0,
-                            p99Latency: monitoring.p99Latency || 0,
-                            errorRate: monitoring.errorRate || 0,
-                        },
+                        performance: (() => {
+                            const total = Math.max(
+                                Number(monitoring.totalRequests || 0),
+                                Number(layerFallback?.totalRequests || 0)
+                            );
+                            const avg = total > 0
+                                ? (Number(monitoring.averageLatency || 0) || Number(layerFallback?.averageResponseTime || 0))
+                                : (Number(monitoring.averageLatency || 0));
+                            return {
+                                totalRequests: total,
+                                averageLatency: avg || 0,
+                                p95Latency: (layerFallback?.p95ResponseTime ?? monitoring.p95Latency) || 0,
+                                p99Latency: (layerFallback?.p99ResponseTime ?? monitoring.p99Latency) || 0,
+                                errorRate: (layerFallback?.errorRate ?? monitoring.errorRate) || 0,
+                            };
+                        })(),
 
                         // Cache metrics
                         cache: {
@@ -595,21 +679,29 @@ export class HTTPAdapter {
                         },
 
                         // Layer performance breakdown
-                        layers: this.formatLayerBreakdown(monitoring.layerBreakdown || {}),
+                        layers: (() => {
+                            const m = monitoring.layerBreakdown || {};
+                            const f = layerFallback?.layerBreakdown || {};
+                            const pick = Object.keys(f).length > Object.keys(m).length ? f : m;
+                            return this.formatLayerBreakdown(pick);
+                        })(),
 
                         // Recent errors
                         recentErrors: monitoring.recentErrors || [],
 
                         // Learning statistics
                         learning: {
-                            patternsLearned: diagnostics.patternsCount || 0,
+                            patternsLearned: (l5Ps?.totalPatterns ?? diagnostics.patternsCount) || 0,
                             conceptsTracked: diagnostics.conceptsCount || 0,
                             learningAccuracy: diagnostics.learningAccuracy || 0,
                             totalAnalyses: diagnostics.totalAnalyses || 0,
+                            patternMetrics: l5Ps?.metrics || {},
                         },
 
-                        // Additional stats from detailed monitoring
-                        ...detailedStats,
+                        // Additional stats from detailed monitoring (kept under 'extra' to avoid overwriting keys)
+                        extra: detailedStats,
+                        // Optional raw layer report when requested
+                        rawReport: undefined,
 
                         timestamp: Date.now(),
                     },
@@ -634,16 +726,24 @@ export class HTTPAdapter {
 
         const formatted: Record<string, any> = {};
 
-        for (const [layerId, metrics] of Object.entries(layerBreakdown)) {
+        const normalizedEntries = Object.entries(layerBreakdown).map(([k, v]) => {
+            if (/^l[1-5]$/.test(k)) {
+                const n = k.slice(1);
+                return [`layer${n}`, v] as const;
+            }
+            return [k, v] as const;
+        });
+
+        for (const [layerId, metrics] of normalizedEntries) {
             formatted[layerId] = {
                 name: layerNames[layerId as keyof typeof layerNames] || layerId,
-                requestCount: metrics.requestCount || 0,
-                averageLatency: metrics.averageLatency || 0,
-                errorCount: metrics.errorCount || 0,
-                errorRate: metrics.requestCount > 0 ? (metrics.errorCount || 0) / metrics.requestCount : 0,
+                requestCount: Number(metrics?.requestCount || 0),
+                averageLatency: Number(metrics?.averageLatency || 0),
+                errorCount: Number(metrics?.errorCount || 0),
+                errorRate: Number(metrics?.requestCount || 0) > 0 ? Number(metrics?.errorCount || 0) / Number(metrics?.requestCount || 0) : 0,
                 healthy:
-                    (metrics.averageLatency || 0) < this.getLayerLatencyThreshold(layerId) &&
-                    (metrics.errorCount || 0) / Math.max(metrics.requestCount || 1, 1) < 0.05,
+                    Number(metrics?.averageLatency || 0) < this.getLayerLatencyThreshold(layerId) &&
+                    Number(metrics?.errorCount || 0) / Math.max(Number(metrics?.requestCount || 1), 1) < 0.05,
             };
         }
 
