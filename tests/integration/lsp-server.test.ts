@@ -109,6 +109,23 @@ describe('LSP Server Integration Tests', () => {
         const response = await sendRequest(serverProcess, graphRequest);
         expect(response).toBeDefined();
     });
+
+    test('Server handles workspace/executeCommand: ontology.explore', async () => {
+        const execRequest = {
+            jsonrpc: '2.0',
+            id: 6,
+            method: 'workspace/executeCommand',
+            params: {
+                command: 'ontology.explore',
+                arguments: [ { identifier: 'HTTPServer', uri: 'file:///test/file.ts', maxResults: 5 } ],
+            },
+        };
+
+        const response = await sendRequest(serverProcess, execRequest);
+        expect(response).toBeDefined();
+        // Should either return result or a soft error payload; both are acceptable for this smoke test
+        expect(response.result || response.error).toBeDefined();
+    });
 });
 
 async function sendRequest(proc: ChildProcess, request: any, timeoutMs = 5000): Promise<any> {

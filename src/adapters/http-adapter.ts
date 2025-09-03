@@ -535,6 +535,7 @@ export class HTTPAdapter {
                 identifier: body.identifier,
                 includeDeclaration: body.includeDeclaration ?? true,
                 maxResults: body.maxResults || this.config.maxResults,
+                conceptual: !!body.conceptual,
             });
 
             return {
@@ -1003,6 +1004,68 @@ export class HTTPAdapter {
                 },
             },
             paths: {
+                [api('/explore')]: {
+                    post: {
+                        summary: 'Explore codebase: aggregate definitions and references',
+                        requestBody: {
+                            required: true,
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        required: ['identifier'],
+                                        properties: {
+                                            identifier: { type: 'string' },
+                                            file: { type: 'string' },
+                                            uri: { type: 'string' },
+                                            includeDeclaration: { type: 'boolean' },
+                                            maxResults: { type: 'integer' },
+                                            precise: { type: 'boolean' },
+                                            conceptual: { type: 'boolean', description: 'Include Layer 4 conceptual hints if available' },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        responses: {
+                            '200': {
+                                description: 'OK',
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            allOf: [
+                                                { $ref: '#/components/schemas/ApiResponse' },
+                                                {
+                                                    type: 'object',
+                                                    properties: {
+                                                        data: {
+                                                            type: 'object',
+                                                            properties: {
+                                                                symbol: { type: 'string' },
+                                                                contextUri: { type: 'string' },
+                                                                definitions: { type: 'array', items: { $ref: '#/components/schemas/Definition' } },
+                                                                references: { type: 'array', items: { $ref: '#/components/schemas/Reference' } },
+                                                                performance: { type: 'object' },
+                                                                diagnostics: { type: 'object' },
+                                                                timestamp: { type: 'number' },
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                    },
+                                },
+                            },
+                            '400': {
+                                description: 'Bad Request',
+                                content: {
+                                    'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } },
+                                },
+                            },
+                        },
+                    },
+                },
                 [api('/definition')]: {
                     post: {
                         summary: 'Find symbol definitions',

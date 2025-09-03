@@ -119,3 +119,99 @@ Run: eza -T -L 3 --git-ignore .
 
 For additional context, read VISION.md (system concept and roadmap),
 PROJECT_STATUS.md (current state), and NEXT_STEPS.md (near‑term work).
+
+
+
+## Dogfooding (MCP‑first)
+
+Prefer dogfooding through the MCP HTTP server (Streamable HTTP) so flows match how real clients integrate. The CLI is available for convenience but MCP should be primary.
+
+### Start servers
+
+```
+just start
+# HTTP: 7000, MCP HTTP: 7001, LSP: 7002
+```
+
+### Open MCP session (JSON‑RPC over HTTP)
+
+Initialize and capture the session id:
+
+```
+curl -i -sS -X POST   -H 'content-type: application/json'   http://localhost:7001/mcp   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | tee /tmp/mcp.init
+
+export MCP_SESSION_ID=$(grep -i ^Mcp-Session-Id: /tmp/mcp.init | awk '{print $2}' | tr -d '')
+echo "MCP_SESSION_ID=$MCP_SESSION_ID"
+```
+
+List available tools:
+
+```
+curl -sS -X POST -H "content-type: application/json" -H "Mcp-Session-Id: $MCP_SESSION_ID"   http://localhost:7001/mcp   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | jq .
+```
+
+### Explore code via MCP (with conceptual hints)
+
+```
+curl -sS -X POST -H "content-type: application/json" -H "Mcp-Session-Id: $MCP_SESSION_ID"   http://localhost:7001/mcp   -d '{
+        "jsonrpc":"2.0",
+        "id":3,
+        "method":"tools/call",
+        "params":{
+          "name":"explore_codebase",
+          "arguments":{ "symbol":"TestClass", "file":"tests/fixtures", "maxResults":50, "conceptual":true }
+        }
+      }' | jq .
+```
+
+Notes:
+- Set `L4_AUGMENT_EXPLORE=1` or pass `conceptual: true` to include Layer 4 conceptual hints.
+- Conceptual is optional and off by default in core.
+
+### Safe rename (plan → snapshot → checks) via MCP
+
+```
+# Plan and stage a safe rename with checks
+curl -sS -X POST -H "content-type: application/json" -H "Mcp-Session-Id: $MCP_SESSION_ID"   http://localhost:7001/mcp   -d '{
+        "jsonrpc":"2.0",
+        "id":4,
+        "method":"tools/call",
+        "params":{
+          "name":"workflow_safe_rename",
+          "arguments":{
+            "oldName":"HTTPServer",
+            "newName":"HTTPServerX",
+            "file":"src/servers/http.ts",
+            "runChecks":true,
+            "commands":["bun run build:all","bun test -q"],
+            "timeoutSec":180
+          }
+        }
+      }' | jq .
+```
+
+Inspect the staged diff for the snapshot (via MCP resource read):
+
+```
+# Replace <SNAP_ID> from previous output
+export SNAP_ID=<SNAP_ID>
+# diff
+curl -sS -X POST -H "content-type: application/json" -H "Mcp-Session-Id: $MCP_SESSION_ID"   http://localhost:7001/mcp   -d '{
+        "jsonrpc":"2.0",
+        "id":5,
+        "method":"resources/read",
+        "params":{ "uri":"snapshot://'$'SNAP_ID/overlay.diff" }
+      }' | jq -r '.contents[0].text'
+# status
+curl -sS -X POST -H "content-type: application/json" -H "Mcp-Session-Id: $MCP_SESSION_ID"   http://localhost:7001/mcp   -d '{
+        "jsonrpc":"2.0",
+        "id":6,
+        "method":"resources/read",
+        "params":{ "uri":"snapshot://'$'SNAP_ID/status" }
+      }' | jq .
+```
+
+### Optional CLI helpers (local dogfooding)
+- `bin/dogfood-explore.sh <symbol> [-f <path>] [--no-conceptual] [--precise] [--json]`
+- `bin/self-apply.sh -f my.diff -- bun run build:all "bun test -q"`
+- `bun run tmp/dogfood-safe-rename.ts`

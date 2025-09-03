@@ -168,6 +168,10 @@ export class LSPAdapter {
                 triggerCharacters: ['.', ':', '(', '<'],
                 allCommitCharacters: [' ', '\t', '\n', ';', ',', ')'],
             },
+            // Expose explore via workspace/executeCommand
+            executeCommandProvider: {
+                commands: ['ontology.explore'],
+            },
             hoverProvider: false, // Not implemented in core yet
             documentSymbolProvider: false, // Not implemented in core yet
             workspaceSymbolProvider: false, // Not implemented in core yet

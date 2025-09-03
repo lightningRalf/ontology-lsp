@@ -20,7 +20,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-SNAP=$(ontology-lsp get-snapshot)
+# Reuse existing snapshot when available for iterative runs
+SNAP=$(ontology-lsp get-snapshot --prefer-existing)
 
 if [[ -z "$PATCH_FILE" ]]; then
   TMP=$(mktemp)

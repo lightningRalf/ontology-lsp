@@ -11,6 +11,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { completable } from '@modelcontextprotocol/sdk/server/completable.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {
     CallToolRequestSchema,
@@ -22,6 +23,7 @@ import {
     McpError,
     ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
 import cors from 'cors';
 import { EventEmitter } from 'events';
 import express from 'express';
@@ -116,6 +118,107 @@ async function createMcpServer(): Promise<SessionRecord> {
 
     // Connect server to transport
     await server.connect(transport);
+
+    // Prompts via SDK registerPrompt
+    const suggestSymbols = (value: string) =>
+        ['HTTPServer', 'TestClass', 'CodeAnalyzer', 'TestFunction'].filter((s) => s.toLowerCase().startsWith((value || '').toLowerCase()));
+    const suggestFiles = (value: string) =>
+        ['src/servers/http.ts', 'tests/fixtures/example.ts', 'src/core/unified-analyzer.ts'].filter((p) =>
+            p.toLowerCase().includes((value || '').toLowerCase())
+        );
+    const suggestCommands = (value: string) =>
+        ['bun run build:all', 'bun test -q', 'bun run build:tsc'].filter((c) => c.toLowerCase().startsWith((value || '').toLowerCase()));
+
+    server.registerPrompt(
+        'plan-safe-rename',
+        {
+            title: 'Plan Safe Rename',
+            description: 'Plan a safe rename and optionally run checks in a snapshot',
+            argsSchema: z.object({
+                oldName: completable(z.string(), (v) => suggestSymbols(v || '')),
+                newName: completable(z.string(), (v) => suggestSymbols(v || '')),
+                file: completable(z.string().optional(), (v) => suggestFiles(v || '')),
+                runChecks: z.boolean().optional(),
+                command: completable(z.string().optional(), (v) => suggestCommands(v || '')),
+            }),
+        },
+        ({ oldName, newName, file = 'file://workspace', runChecks = true, command = 'bun run build:all' }) => ({
+            messages: [
+                {
+                    role: 'system',
+                    content: { type: 'text', text: 'Use plan_rename first; for application use workflow_safe_rename into a snapshot. Prefer AST‑validated hits.' },
+                },
+                {
+                    role: 'user',
+                    content: {
+                        type: 'text',
+                        text: `Intent: rename ${oldName} -> ${newName} at ${file}\nSteps:\n1) tools/call plan_rename { oldName: "${oldName}", newName: "${newName}", file: "${file}" }\n2) tools/call workflow_safe_rename { oldName: "${oldName}", newName: "${newName}", file: "${file}", runChecks: ${runChecks}, commands: ["${command}"], timeoutSec: 180 }`,
+                    },
+                },
+            ],
+        })
+    );
+
+    server.registerPrompt(
+        'investigate-symbol',
+        {
+            title: 'Investigate Symbol',
+            description: 'Explore, build symbol map (AST-only), and expand graph neighbors',
+            argsSchema: z.object({
+                symbol: completable(z.string(), (v) => suggestSymbols(v || '')),
+                file: completable(z.string().optional(), (v) => suggestFiles(v || '')),
+                conceptual: z.boolean().optional(),
+            }),
+        },
+        ({ symbol, file = 'file://workspace', conceptual = false }) => ({
+            messages: [
+                {
+                    role: 'system',
+                    content: {
+                        type: 'text',
+                        text: 'Start broad with explore_codebase (optionally conceptual), then build_symbol_map (astOnly), then graph_expand imports/exports.',
+                    },
+                },
+                {
+                    role: 'user',
+                    content: {
+                        type: 'text',
+                        text: `Target: ${symbol} at ${file}\nSuggested tools:\n- tools/call explore_codebase { symbol: "${symbol}", file: "${file}", conceptual: ${conceptual} }\n- tools/call build_symbol_map { symbol: "${symbol}", file: "${file}", maxFiles: 10, astOnly: true }\n- tools/call graph_expand { symbol: "${symbol}", edges: ["imports","exports"], depth: 1, limit: 50 }`,
+                    },
+                },
+            ],
+        })
+    );
+
+    server.registerPrompt(
+        'quick-patch-checks',
+        {
+            title: 'Quick Patch Checks',
+            description: 'Stage a unified diff to snapshot and run checks',
+            argsSchema: z.object({
+                command: completable(z.string().optional(), (v) => suggestCommands(v || '')),
+                timeoutSec: z.number().optional(),
+            }),
+        },
+        ({ command = 'bun run build:all', timeoutSec = 180 }) => ({
+            messages: [
+                {
+                    role: 'system',
+                    content: {
+                        type: 'text',
+                        text: 'Use get_snapshot + propose_patch + run_checks, keeping edits isolated in snapshot.',
+                    },
+                },
+                {
+                    role: 'user',
+                    content: {
+                        type: 'text',
+                        text: `Suggested calls:\n- tools/call get_snapshot { preferExisting: true }\n- tools/call propose_patch { snapshot: <id>, patch: <unified_diff> }\n- tools/call run_checks { snapshot: <id>, commands: ["${command}"], timeoutSec: ${timeoutSec} }`,
+                    },
+                },
+            ],
+        })
+    );
 
     // Resource handlers (monitoring + snapshot resources)
     server.setRequestHandler(ListResourcesRequestSchema, async () => ({

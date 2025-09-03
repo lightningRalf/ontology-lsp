@@ -213,6 +213,35 @@ export class LSPServer {
             return await this.lspAdapter.handleCompletion(params);
         });
 
+        // Expose workspace/executeCommand for 'ontology.explore'
+        this.connection.onExecuteCommand?.(async (params: { command: string; arguments?: any[] }) => {
+            if (!this.initialized) {
+                throw new Error('Server not initialized');
+            }
+            try {
+                if (params.command !== 'ontology.explore') {
+                    // Unknown command: return empty result to avoid -32601 noise
+                    return null as any;
+                }
+                const arg = (params.arguments && params.arguments[0]) || {};
+                if (!arg || typeof arg !== 'object' || typeof arg.identifier !== 'string' || !arg.identifier.trim()) {
+                    throw new Error('Invalid arguments: expected { identifier: string, uri?, includeDeclaration?, maxResults? }');
+                }
+                const result = await (this.coreAnalyzer as any).exploreCodebase({
+                    uri: arg.uri || arg.file || (this.coreAnalyzer as any)?.config?.workspaceRoot || 'file://workspace',
+                    identifier: arg.identifier,
+                    includeDeclaration: arg.includeDeclaration ?? true,
+                    maxResults: arg.maxResults ?? 100,
+                    precise: !!arg.precise,
+                    conceptual: !!arg.conceptual,
+                });
+                return result as any;
+            } catch (err) {
+                // Return a lightweight error to client; do not throw protocol errors
+                return { error: (err as Error)?.message || String(err) } as any;
+            }
+        });
+
         // Custom requests (lightweight stubs for integration tests)
         const OntologyStatsRequest = new RequestType<{}, { ontology: any; patterns: any }, void>(
             'ontology/getStatistics'

@@ -171,7 +171,31 @@ ontology-lsp/
 ### Plans Archive
 - Moved `IMPLEMENTATION_PLAN_LAYER3_SYMBOL_MAP.md` to `docs/archive/` (completed).
 
-## 📅 Latest Updates (2025-09-02)
+## 📅 Latest Updates (2025-09-03)
+
+### 🚀 Dogfooding Readiness (MCP‑first)
+- L1–L3 pipeline stabilized for dogfooding:
+  - Layer 3 symbol map uses AST‑guided import/export extraction over candidate files (no coarse scans).
+  - Rename planning prefers AST‑validated references for safer WorkspaceEdit previews.
+- L4 conceptual augmentation is available (opt‑in):
+  - Core `exploreCodebase` merges conceptual representations when enabled via `L4_AUGMENT_EXPLORE=1`, `layers.layer4.augmentExplore`, or request `{ conceptual: true }`.
+- MCP prompts (SDK) added to guide workflows:
+  - `plan-safe-rename`, `investigate-symbol`, `quick-patch-checks` with completable arguments (symbols, files, commands).
+  - Prompts live on MCP HTTP (7001) and return messages describing recommended tool sequences.
+- Dogfooding helpers:
+  - `bin/dogfood-explore.sh` – CLI wrapper for explore with `--conceptual` and `--precise`.
+  - `bin/self-apply.sh` – reuses snapshots by default (`get-snapshot --prefer-existing`), stages patches, runs checks.
+  - `tmp/dogfood-safe-rename.ts` – exercises `workflow_safe_rename` with checks; prints concise summary.
+- New tests (seed‑free):
+  - `tests/layer3-symbol-map.test.ts` – exports surfaced for fixture symbol.
+  - `tests/layer3-rename-plan.test.ts` – rename preview returns a WorkspaceEdit shape.
+  - `tests/http-explore-conceptual.test.ts` – `/api/v1/explore` accepts `{ conceptual: true }` and returns valid shape.
+
+### Known Gaps to Watch During Dogfooding
+- Pipelines persistence: learning pipelines still log “Would save pipeline …”. Needs DB‑backed save/list/status (see NEXT_STEPS.md).
+- Graph expand callers/callees: relies on best‑effort heuristics; imports/exports are robust. Monitor for empty vs. 500 behavior (HTTP fallback exists).
+- Conceptual hints depend on L4 storage freshness; ensure adapter metrics and staleness are visible in `/metrics` JSON.
+- Performance tests remain environment‑sensitive; use non‑perf suites for dogfooding.
 
 ### 🚀 Developer Experience, MCP & Monitoring
 - Web UI:

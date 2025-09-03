@@ -619,3 +619,8 @@ In addition to standard LSP methods, the LSP server handles:
   - Result: `{ identifier, files, declarations, references, imports, exports }`
 - `refactor/planRename` – Params: `{ oldName: string, newName: string, uri?: string }`
   - Result: `{ changes: Record<uri, TextEdit[]>, summary: { filesAffected, totalEdits } }`
+- `workspace/executeCommand` – Command: `ontology.explore`
+  - Args[0]: `{ identifier: string, uri?: string, includeDeclaration?: boolean, maxResults?: number, precise?: boolean }`
+  - Result: `{ symbol, contextUri, definitions, references, performance, diagnostics, timestamp }`
+
+See also: `docs/adapter-error-shapes.md` for adapter error envelopes and edge‑case parity guidelines.

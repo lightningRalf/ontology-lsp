@@ -565,7 +565,7 @@ export class CodeAnalyzer {
             Promise.resolve(this.getDiagnostics()),
         ]);
 
-        const result: ExploreResult = {
+        let result: ExploreResult = {
             symbol: request.identifier,
             contextUri: ctxUri,
             definitions: defs.status === 'fulfilled' ? defs.value.data : [],
@@ -578,6 +578,49 @@ export class CodeAnalyzer {
             diagnostics: diags.status === 'fulfilled' ? diags.value : undefined,
             timestamp: Date.now(),
         };
+
+        // Optional Layer 4 augmentation: conceptual representations
+        try {
+            const augment =
+                process.env.L4_AUGMENT_EXPLORE === '1' ||
+                (this.config as any)?.layers?.layer4?.augmentExplore ||
+                !!(request as any).conceptual ||
+                !!(request as any).augmentConcepts;
+            if (augment && (this.config as any)?.layers?.layer4?.enabled) {
+                const layer4: any = (this as any).layerManager?.getLayer('layer4');
+                const engine = layer4 && typeof layer4.getOntologyEngine === 'function' ? layer4.getOntologyEngine() : null;
+                if (engine && typeof engine.ensureInitialized === 'function') {
+                    await engine.ensureInitialized();
+                    const concept = await engine.findConceptStrict(request.identifier);
+                    if (concept) {
+                        const conceptualDefs: any[] = [];
+                        for (const [name, rep] of concept.representations) {
+                            const uri = rep.location?.uri || 'file://unknown';
+                            const line = rep.location?.line ?? 0;
+                            const col = rep.location?.column ?? 0;
+                            conceptualDefs.push({
+                                uri,
+                                range: { start: { line, character: col }, end: { line, character: col } },
+                                kind: 'variable',
+                                name,
+                                source: 'conceptual',
+                                confidence: concept.confidence ?? 0.6,
+                                layer: 'layer4',
+                            });
+                        }
+                        // Merge with definitions, keeping dedup simple by (uri,line,col)
+                        const seen = new Set(result.definitions.map((d: any) => `${d.uri}:${d.range.start.line}:${d.range.start.character}`));
+                        for (const d of conceptualDefs) {
+                            const key = `${d.uri}:${d.range.start.line}:${d.range.start.character}`;
+                            if (!seen.has(key)) {
+                                result.definitions.push(d as any);
+                                seen.add(key);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch {}
 
         return result;
     }
@@ -1566,49 +1609,7 @@ export class CodeAnalyzer {
         }
     }
 
-    private async executeLayer3Concepts(request: FindDefinitionRequest): Promise<Definition[]> {
-        try {
-            const definitions: Definition[] = [];
-
-            // Query concepts database for semantic matches
-            const concepts = await this.queryConceptsDatabase(request.identifier);
-
-            // For each concept, find its symbol representations
-            for (const concept of concepts) {
-                const representations = await this.querySymbolRepresentations(concept.id);
-
-                for (const rep of representations) {
-                    // Convert database representation to Definition
-                    const definition: Definition = {
-                        identifier: rep.name,
-                        uri: rep.uri,
-                        range: {
-                            start: { line: rep.start_line, character: rep.start_character },
-                            end: { line: rep.end_line, character: rep.end_character },
-                        },
-                        kind: this.inferDefinitionKind(concept.category, rep.context),
-                        confidence: this.calculateSemanticConfidence(concept, rep, request.identifier),
-                        source: 'conceptual' as const,
-                        context: rep.context,
-                        metadata: {
-                            conceptId: concept.id,
-                            canonicalName: concept.canonical_name,
-                            occurrences: rep.occurrences,
-                            lastSeen: rep.last_seen,
-                        },
-                    };
-
-                    definitions.push(definition);
-                }
-            }
-
-            // Sort by confidence (highest first)
-            return definitions.sort((a, b) => b.confidence - a.confidence).slice(0, request.maxResults || 50); // Limit results
-        } catch (error) {
-            console.warn('Layer 3 semantic analysis failed:', error);
-            return [];
-        }
-    }
+    // Removed legacy L3 conceptual query: L3 is planner-only (symbol map + rename)
 
     private async executeLayer4Patterns(request: FindDefinitionRequest, existing: Definition[]): Promise<Definition[]> {
         // Implementation would use PatternLearner
@@ -1623,172 +1624,7 @@ export class CodeAnalyzer {
         return [];
     }
 
-    /**
-     * Query concepts database for semantic matches
-     */
-    private async queryConceptsDatabase(identifier: string): Promise<any[]> {
-        // Query concepts table with fuzzy matching on canonical_name
-        const exactMatches = await this.sharedServices.database.query(
-            `SELECT id, canonical_name, confidence, category, signature_fingerprint, metadata
-       FROM concepts 
-       WHERE canonical_name = ? 
-       ORDER BY confidence DESC
-       LIMIT 20`,
-            [identifier]
-        );
-
-        if (exactMatches.length > 0) {
-            return exactMatches;
-        }
-
-        // Fuzzy search using LIKE with wildcards
-        const fuzzyMatches = await this.sharedServices.database.query(
-            `SELECT id, canonical_name, confidence, category, signature_fingerprint, metadata
-       FROM concepts 
-       WHERE canonical_name LIKE ? OR canonical_name LIKE ? OR canonical_name LIKE ?
-       ORDER BY confidence DESC, 
-                CASE 
-                  WHEN canonical_name = ? THEN 1
-                  WHEN canonical_name LIKE ? THEN 2
-                  WHEN canonical_name LIKE ? THEN 3
-                  ELSE 4
-                END
-       LIMIT 20`,
-            [
-                identifier + '%', // starts with
-                '%' + identifier, // ends with
-                '%' + identifier + '%', // contains
-                identifier, // exact (for sorting)
-                identifier + '%', // starts with (for sorting)
-                '%' + identifier, // ends with (for sorting)
-            ]
-        );
-
-        return fuzzyMatches;
-    }
-
-    /**
-     * Query symbol representations for a concept
-     */
-    private async querySymbolRepresentations(conceptId: string): Promise<any[]> {
-        return await this.sharedServices.database.query(
-            `SELECT name, uri, start_line, start_character, end_line, end_character, 
-              occurrences, context, first_seen, last_seen
-       FROM symbol_representations 
-       WHERE concept_id = ?
-       ORDER BY occurrences DESC, last_seen DESC
-       LIMIT 10`,
-            [conceptId]
-        );
-    }
-
-    /**
-     * Infer DefinitionKind from concept category and context
-     */
-    private inferDefinitionKind(category: string | null, context: string | null): DefinitionKind {
-        if (!category && !context) {
-            return DefinitionKind.Variable; // Default fallback
-        }
-
-        const categoryLower = (category || '').toLowerCase();
-        const contextLower = (context || '').toLowerCase();
-
-        // Check category first
-        if (categoryLower.includes('function') || categoryLower.includes('method')) {
-            return DefinitionKind.Function;
-        }
-        if (categoryLower.includes('class')) {
-            return DefinitionKind.Class;
-        }
-        if (categoryLower.includes('interface')) {
-            return DefinitionKind.Interface;
-        }
-        if (categoryLower.includes('type')) {
-            return DefinitionKind.Type;
-        }
-        if (categoryLower.includes('module')) {
-            return DefinitionKind.Module;
-        }
-
-        // Check context for additional clues
-        if (contextLower.includes('function') || contextLower.includes('=>')) {
-            return contextLower.includes('method') ? DefinitionKind.Method : DefinitionKind.Function;
-        }
-        if (contextLower.includes('class ') || contextLower.includes('class{')) {
-            return DefinitionKind.Class;
-        }
-        if (contextLower.includes('interface ')) {
-            return DefinitionKind.Interface;
-        }
-        if (contextLower.includes('const ') || contextLower.includes('let ') || contextLower.includes('var ')) {
-            return DefinitionKind.Variable;
-        }
-        if (contextLower.includes('import ') || contextLower.includes('from ')) {
-            return DefinitionKind.Import;
-        }
-        if (contextLower.includes('export ')) {
-            return DefinitionKind.Export;
-        }
-
-        return DefinitionKind.Variable; // Default fallback
-    }
-
-    /**
-     * Calculate semantic confidence score based on concept and symbol match quality
-     */
-    private calculateSemanticConfidence(concept: any, representation: any, searchIdentifier: string): number {
-        let confidence = 0.0;
-
-        // Base confidence from concept (0.0 to 1.0)
-        confidence += Math.max(0.0, Math.min(1.0, concept.confidence || 0.5));
-
-        // Exact name match bonus
-        if (representation.name === searchIdentifier) {
-            confidence += 0.3;
-        } else if (representation.name.toLowerCase() === searchIdentifier.toLowerCase()) {
-            confidence += 0.2;
-        } else if (representation.name.includes(searchIdentifier) || searchIdentifier.includes(representation.name)) {
-            confidence += 0.1;
-        }
-
-        // Canonical name match bonus
-        if (concept.canonical_name === searchIdentifier) {
-            confidence += 0.2;
-        } else if (concept.canonical_name.toLowerCase() === searchIdentifier.toLowerCase()) {
-            confidence += 0.15;
-        } else if (concept.canonical_name.includes(searchIdentifier)) {
-            confidence += 0.05;
-        }
-
-        // Occurrence frequency bonus (more occurrences = higher confidence)
-        const occurrences = representation.occurrences || 1;
-        confidence += Math.min(0.2, occurrences * 0.01); // Cap at 0.2 bonus
-
-        // Recent usage bonus (within last 30 days)
-        const lastSeen = representation.last_seen || 0;
-        const now = Math.floor(Date.now() / 1000);
-        const daysSinceLastSeen = (now - lastSeen) / (24 * 60 * 60);
-
-        if (daysSinceLastSeen <= 30) {
-            confidence += 0.1 * (1 - daysSinceLastSeen / 30); // Decay over 30 days
-        }
-
-        // Context quality bonus
-        if (representation.context && representation.context.trim().length > 10) {
-            confidence += 0.05;
-        }
-
-        // URI validity check
-        if (representation.uri && representation.uri !== 'file://unknown' && !representation.uri.includes('unknown')) {
-            confidence += 0.1;
-        } else {
-            // Penalize invalid URIs heavily
-            confidence -= 0.3;
-        }
-
-        // Clamp to valid range [0.0, 1.0]
-        return Math.max(0.0, Math.min(1.0, confidence));
-    }
+    // Removed legacy concept queries and confidence calculators from L3 scope
 
     // Reference search implementations
     private async executeLayer1ReferenceSearch(request: FindReferencesRequest): Promise<Reference[]> {
@@ -2014,8 +1850,13 @@ export class CodeAnalyzer {
             precise: true,
         } as any);
 
+        // Prefer AST-validated references when available
+        const refsData = refsRes.data || [];
+        const astValidated = refsData.filter((r: any) => r && (r.astValidated || r.layer === 'layer2'));
+        const chosen = astValidated.length > 0 ? astValidated : refsData;
+
         const editsByFile: Record<string, any[]> = {};
-        for (const r of refsRes.data) {
+        for (const r of chosen) {
             if (!r || !r.range) continue;
             const edit = {
                 range: r.range,
@@ -2057,7 +1898,7 @@ export class CodeAnalyzer {
         const edit: WorkspaceEdit = { changes: editsByFile } as any;
         this.lastRenamePlan = { key: `${oldName}->${newName}`, edit, ts: Date.now() };
         // Encode into return for propagation phase (not used yet)
-        return refsRes.data;
+        return chosen;
     }
 
     private async learnFromRename(request: RenameRequest): Promise<void> {
@@ -2124,22 +1965,70 @@ export class CodeAnalyzer {
         const id = (params.identifier || '').trim();
         if (!id) return { identifier: id, files: 0, declarations: [], references: [], imports: [], exports: [] };
 
-        // Seed candidates from async fast path
-        const defs = await this.findDefinitionAsync({
-            uri: params.uri || '',
-            position: { line: 0, character: 0 },
-            identifier: id,
-            includeDeclaration: true,
-            precise: true,
-        } as any);
-        const files = Array.from(new Set(defs.data.map((d) => this.fileUriToPath(d.uri))));
-        const limit = Math.max(1, Math.min(params.maxFiles || 10, 50));
-        const candidateFiles = new Set(files.slice(0, limit));
+        // Seed candidate files from fast path with robust fallbacks
+        const maxFiles = Math.max(1, Math.min(params.maxFiles || 10, 50));
+        const workspaceRoot = (this.config as any)?.workspaceRoot || process.cwd();
+
+        let defsData: Definition[] = [];
+        try {
+            const defs = await this.findDefinitionAsync({
+                uri: params.uri || 'file://workspace',
+                position: { line: 0, character: 0 },
+                identifier: id,
+                includeDeclaration: true,
+                precise: true,
+            } as any);
+            defsData = defs.data || [];
+        } catch {}
+
+        let files = Array.from(new Set(defsData.map((d) => this.fileUriToPath(d.uri))));
+
+        // If too few files, incorporate references
+        if (files.length < 1 && !params.astOnly) {
+            try {
+                const refsTry = await this.findReferencesAsync({
+                    uri: params.uri || 'file://workspace',
+                    position: { line: 0, character: 0 },
+                    identifier: id,
+                    includeDeclaration: true,
+                    precise: true,
+                } as any);
+                const refFiles = Array.from(new Set(refsTry.data.map((r) => this.fileUriToPath(r.uri))));
+                files = Array.from(new Set([...files, ...refFiles]));
+            } catch {}
+        }
+
+        // Final fallback: small glob + text scan if Layer 1 unavailable
+        if (files.length < 1) {
+            try {
+                const { glob } = await import('glob');
+                const candidates = glob.sync('**/*.{ts,tsx,js,jsx}', {
+                    cwd: workspaceRoot,
+                    ignore: ['**/node_modules/**', '**/dist/**', '**/.git/**', '**/coverage/**'],
+                    nodir: true,
+                } as any);
+                const limited = candidates.slice(0, 200);
+                const fs = await import('node:fs/promises');
+                const word = new RegExp(`\\b${this.escapeRegex(id)}\\b`);
+                for (const rel of limited) {
+                    try {
+                        const abs = path.resolve(workspaceRoot, rel);
+                        const text = await fs.readFile(abs, 'utf8');
+                        if (word.test(text)) {
+                            files.push(abs);
+                            if (files.length >= maxFiles) break;
+                        }
+                    } catch {}
+                }
+            } catch {}
+        }
+
+        const candidateFiles = new Set(files.slice(0, maxFiles));
 
         // Run a small AST pass scoped to candidates
         const layer2Defs = await this.executeLayer2Analysis(
             { identifier: id, uri: params.uri || '', position: { line: 0, character: 0 } } as any,
-            defs.data,
+            defsData,
             candidateFiles
         );
 
@@ -2149,17 +2038,31 @@ export class CodeAnalyzer {
             decls.set(key, { uri: d.uri, range: d.range, kind: d.kind, name: (d as any).name || id });
         }
 
-        const refs = await this.findReferencesAsync({
-            uri: params.uri || '',
-            position: { line: 0, character: 0 },
-            identifier: id,
-            includeDeclaration: false,
-            precise: true,
-        } as any);
+        let refs: FindReferencesResult | null = null;
+        try {
+            refs = await this.findReferencesAsync({
+                uri: params.uri || 'file://workspace',
+                position: { line: 0, character: 0 },
+                identifier: id,
+                includeDeclaration: false,
+                precise: true,
+            } as any);
+        } catch {}
         const refList = new Map<string, any>();
-        for (const r of refs.data) {
+        for (const r of refs?.data || []) {
             const key = `${r.uri}:${r.range.start.line}:${r.range.start.character}`;
             refList.set(key, { uri: r.uri, range: r.range, kind: r.kind, name: (r as any).name || id });
+        }
+
+        // AST-guided import/export discovery (uses Layer 2 to locate lines, minimal file reads)
+        let imports: any[] = [];
+        let exports: any[] = [];
+        if (!params.astOnly) {
+            try {
+                const impExp = await this.scanImportsExports(candidateFiles, id);
+                imports = impExp.imports;
+                exports = impExp.exports;
+            } catch {}
         }
 
         return {
@@ -2167,9 +2070,86 @@ export class CodeAnalyzer {
             files: candidateFiles.size,
             declarations: Array.from(decls.values()),
             references: Array.from(refList.values()),
-            imports: [],
-            exports: [],
+            imports,
+            exports,
         };
+    }
+
+    private async scanImportsExports(
+        candidateFiles: Set<string>,
+        identifier: string
+    ): Promise<{ imports: any[]; exports: any[] }> {
+        const layer = this.layerManager.getLayer('layer2') as any;
+        if (!layer || typeof layer.process !== 'function') return { imports: [], exports: [] };
+
+        // Build minimal EnhancedMatches to scope parsing to candidate files
+        const enhancedMatches: any = {
+            exact: [],
+            fuzzy: [
+                {
+                    file: '',
+                    line: 0,
+                    column: 0,
+                    text: identifier,
+                    length: identifier.length,
+                    confidence: 1,
+                    source: 'exact',
+                },
+            ],
+            conceptual: [],
+            files: candidateFiles,
+            searchTime: 0,
+        };
+
+        const result = await layer.process(enhancedMatches);
+        const imports: any[] = [];
+        const exports: any[] = [];
+
+        // Exports: rely on nodes carrying metadata.exports and filter by identifier
+        const nodes = (result?.nodes || []) as any[];
+        const fileLineCache = new Map<string, string[]>();
+        for (const n of nodes) {
+            const exp = (n.metadata && (n.metadata as any).exports) || null;
+            if (!exp || !Array.isArray(exp) || exp.length === 0) continue;
+            const name = (exp[0] && (exp[0] as any).name) || '';
+            if (!name || name.toLowerCase() !== identifier.toLowerCase()) continue;
+            const filePath = this.extractFilePathFromNodeId(n.id);
+            let lineText = '';
+            try {
+                if (!fileLineCache.has(filePath)) {
+                    const text = await fs.readFile(filePath, 'utf8');
+                    fileLineCache.set(filePath, text.split(/\r?\n/));
+                }
+                const lines = fileLineCache.get(filePath)!;
+                lineText = lines[n.range.start.line] || '';
+            } catch {}
+            exports.push({ uri: this.pathToFileUri(filePath), range: n.range, kind: 'export', name, text: lineText.trim() });
+        }
+
+        // Imports: use relationships with location to read the single line and verify
+        const rels = (result?.relationships || []) as any[];
+        const fs = await import('node:fs/promises');
+        for (const r of rels) {
+            if (r.type !== 'imports' || !r.location) continue;
+            const [filePath, lineStr] = String(r.location).split(':');
+            const lineIdx = Math.max(1, parseInt(lineStr || '1', 10)) - 1;
+            try {
+                const text = await fs.readFile(filePath, 'utf8');
+                const lines = text.split(/\r?\n/);
+                const line = lines[lineIdx] || '';
+                const col = line.toLowerCase().indexOf(identifier.toLowerCase());
+                if (col >= 0) {
+                    imports.push({
+                        uri: this.pathToFileUri(filePath),
+                        range: { start: { line: lineIdx, character: col }, end: { line: lineIdx, character: col + identifier.length } },
+                        kind: 'import',
+                        text: line.trim(),
+                    });
+                }
+            } catch {}
+        }
+
+        return { imports, exports };
     }
 
     private async getPatternCompletions(request: CompletionRequest): Promise<Completion[]> {

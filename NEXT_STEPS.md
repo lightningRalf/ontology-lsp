@@ -9,6 +9,14 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 
 ## 🚀 Next Development Priorities (Updated 2025-09-02)
 
+### 0.0 Dogfooding Pass (MCP‑first, Immediate)
+- Use MCP HTTP (7001) as the primary interface; verify prompts and workflows end‑to‑end.
+- Scenarios to run:
+  - Investigate symbol (prompt: investigate-symbol) → `explore_codebase` (conceptual on/off) → `build_symbol_map` (astOnly) → `graph_expand` imports/exports.
+  - Safe rename (prompt: plan-safe-rename) → `plan_rename` preview → `workflow_safe_rename` (snapshot + checks).
+  - Quick patch checks (prompt: quick-patch-checks) → `get_snapshot` → `propose_patch` → `run_checks`.
+- Confirm: no stdio noise, structured errors, and tool latencies within budgets. Capture regressions.
+
 ### 0.1 Fix‑Bugs‑First: Perf stabilization (Immediate)
 
 Monitoring perf and metrics; continue to gate perf/benchmarks behind env and iterate if regressions are observed.
@@ -44,6 +52,23 @@ Follow‑ups (Immediate):
   - Tests: add HTTP graph‑expand smoke tests (file + symbol).
 
 Status: HTTP fallback implemented (non‑fatal, returns empty neighbors). Tests pending.
+
+### 0.36 Learning Pipelines Persistence (Soon, after L1–L3 stabilization)
+- Replace stub logs with real persistence for learning pipelines:
+  - Save pipelines to DB: `comprehensive_learning`, `pattern_feedback_cycle`, `daily_insights`.
+  - Persist and honor schedules (e.g., `daily_insights` at `0 9 * * *`).
+  - Expose list/status APIs (CLI + HTTP) for pipelines; include lastRun/nextRun.
+  - Tests: seed pipelines, assert DB rows exist, schedule parsed, and status endpoints return expected fields.
+- Remove temporary console messages:
+  - “Would save pipeline comprehensive_learning to database”
+  - “Would save pipeline pattern_feedback_cycle to database”
+  - “Would save pipeline daily_insights to database”
+- Guardrails: feature‑gate in dev; noop in constrained test envs unless `PIPELINES_ENABLE=1`.
+
+### 0.37 MCP Prompts (Follow‑up polish)
+- Add docs for prompts with example arguments and intended tool sequences.
+- Expand completable suggestions using cached symbol/file candidates (budgeted and cancellable).
+- Add a prompt for “confirm definition” using `workflow_locate_confirm_definition`.
 
 ### 0. Architectural roadmap (New)
 

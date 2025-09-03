@@ -605,6 +605,7 @@ export class CLIAdapter {
             verbose?: boolean;
             summary?: boolean;
             precise?: boolean;
+            conceptual?: boolean;
         }
     ): Promise<string> {
         try {
@@ -615,6 +616,7 @@ export class CLIAdapter {
                 includeDeclaration: options.includeDeclaration ?? true,
                 maxResults: options.maxResults || this.config.maxResults,
                 precise: options.precise,
+                conceptual: !!options.conceptual,
             });
 
             const defLimit = options.limit ?? this.config.printLimit ?? 10;

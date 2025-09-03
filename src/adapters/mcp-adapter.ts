@@ -1284,6 +1284,7 @@ export class MCPAdapter {
             includeDeclaration,
             maxResults,
             precise: !!args.precise,
+            conceptual: !!args.conceptual,
         });
 
         // Map definitions/references for MCP output while preserving performance/diagnostics

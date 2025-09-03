@@ -31,6 +31,12 @@
 - **CLI Tool**: Terminal interface with comprehensive command set
 - **Web UI Dashboard**: Real-time monitoring and pattern visualization (port 8080)
 
+## Choosing a Tool
+
+- Ontology‑LSP: IDE navigation (definitions/references), cross‑file rename planning with preview, ontology/knowledge graph, metrics, and multi‑protocol (LSP/MCP/HTTP/CLI).
+- ast‑grep: Fast, rule‑driven structural search and codemods via CLI/editor rules; great for migrations and policy checks without project‑wide semantics.
+- Detailed comparison and interoperability tips: [docs/comparison-ast_grep.md](docs/comparison-ast_grep.md)
+
 ### ⚡ **Production Performance**
 - **Response Time**: <100ms for 95% of requests (validated)
 - **Memory Usage**: ~500MB typical usage with intelligent caching

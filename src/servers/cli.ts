@@ -50,6 +50,7 @@ class CLI {
             .option('-l, --limit <count>', 'Maximum results to print', '20')
             .option('-s, --summary', 'Show summary output only')
             .option('--precise', 'Run a quick AST validation pass')
+            .option('--conceptual', 'Include conceptual (Layer 4) hints if available')
             .option('--ast-only', 'Only return AST-validated results')
             .option('-j, --json', 'Output JSON')
             .option('--no-color', 'Disable colored output')
@@ -431,6 +432,7 @@ class CLI {
                     limit: parseInt(options.limit),
                     summary: !!options.summary,
                     precise: !!options.precise,
+                    conceptual: !!options.conceptual,
                     json: !!options.json,
                     verbose: !!options.verbose,
                 });
