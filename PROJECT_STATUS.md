@@ -196,7 +196,28 @@ ontology-lsp/
 - Graph expand callers/callees: relies on best‑effort heuristics; imports/exports are robust. Monitor for empty vs. 500 behavior (HTTP fallback exists).
 - Conceptual hints depend on L4 storage freshness; ensure adapter metrics and staleness are visible in `/metrics` JSON.
 - Performance tests remain environment‑sensitive; use non‑perf suites for dogfooding.
- - Typecheck surface in core still flags some strictness issues unrelated to dogfooding changes; keep scope narrow and track under technical debt.
+- Typecheck surface in core still flags some strictness issues unrelated to dogfooding changes; keep scope narrow and track under technical debt.
+
+## 📅 Latest Updates (2025-09-04)
+
+### Port Management Simplified (No Registry)
+- Removed the in-repo PortRegistry. Servers bind fixed defaults with .env overrides.
+  - HTTP API: default `7000` (override with `HTTP_API_PORT`)
+  - MCP HTTP: default `7001` (override with `MCP_HTTP_PORT`)
+  - Host can be overridden via config envs (e.g., `MCP_HTTP_HOST`) when applicable.
+- No dynamic reservation or `~/.ontology/ports.json`. Startup is deterministic and easier to operate.
+
+### MCP Adapter Mapping Cleanup
+- Unified on existing API mapping helpers: MCP now uses `definitionToApiResponse`/`referenceToApiResponse`.
+- Removed legacy MCP-specific mapping calls. Fixes startup error: missing export `referenceToMcpResponse`.
+
+### Process Management Polish
+- Silenced noisy messages in `just stop`/`stop-quiet` when PID files are absent.
+- Stop/start flows are cleaner; port cleanup remains intact.
+
+### Impact
+- MCP Streamable HTTP (7001) starts reliably with no missing-export errors.
+- Operators configure ports via `.env` only; no hidden registry state.
 
 ### 🚀 Developer Experience, MCP & Monitoring
 - Web UI:

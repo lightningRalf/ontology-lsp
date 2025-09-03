@@ -14,7 +14,6 @@ import { HTTPAdapter, type HTTPRequest } from '../adapters/http-adapter.js';
 import { createDefaultCoreConfig } from '../adapters/utils.js';
 import { getEnvironmentConfig, type ServerConfig } from '../core/config/server-config.js';
 import { createCodeAnalyzer } from '../core/index';
-import { PortRegistry } from '../utils/port-registry.js';
 import type { CodeAnalyzer } from '../core/unified-analyzer';
 import type { FastSearchLayer } from '../layers/layer1-fast-search.js';
 import type { SearchQuery } from '../types/core.js';
@@ -33,7 +32,7 @@ export class HTTPServer {
     private config: HTTPServerConfig;
     private serverConfig: ServerConfig;
     private server: any = null;
-    private reservedPort: number | null = null;
+    // No external port registry; honor env or defaults
 
     constructor(config: HTTPServerConfig = {}) {
         this.serverConfig = getEnvironmentConfig();
@@ -78,16 +77,8 @@ export class HTTPServer {
             await this.initialize();
         }
 
-        // Determine port: respect env HTTP_PORT, otherwise reserve near configured port
-        let listenPort = Number(process.env.HTTP_PORT || this.config.port || 7000);
-        try {
-            if (!process.env.HTTP_PORT) {
-                listenPort = await PortRegistry.reserve('http-api', listenPort, this.config.host);
-                this.reservedPort = listenPort;
-            }
-        } catch {
-            listenPort = 0; // OS choose
-        }
+        // Determine port: use HTTP_API_PORT env, else configured default (7000)
+        const listenPort = Number(process.env.HTTP_API_PORT || this.config.port || 7000);
 
         this.server = serve({
             hostname: this.config.host,
@@ -483,12 +474,7 @@ export class HTTPServer {
             console.log(`[HTTP Server] Core analyzer disposed`);
         }
 
-        if (this.reservedPort !== null) {
-            try {
-                await PortRegistry.release(this.reservedPort);
-            } catch {}
-            this.reservedPort = null;
-        }
+        // Nothing else to clean up
     }
 
     /**

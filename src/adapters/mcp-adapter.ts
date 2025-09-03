@@ -25,11 +25,11 @@ import {
     buildFindReferencesRequest,
     buildRenameRequest,
     createPosition,
-    definitionToMcpResponse,
+    definitionToApiResponse,
     handleAdapterError,
     normalizePosition,
     normalizeUri,
-    referenceToMcpResponse,
+    referenceToApiResponse,
     validateRequired,
 } from './utils.js';
 
@@ -759,7 +759,7 @@ export class MCPAdapter {
                                 type: 'text',
                                 text: JSON.stringify(
                                     {
-                                        definitions: [definitionToMcpResponse(explicit as any)],
+                                        definitions: [definitionToApiResponse(explicit as any)],
                                         performance: {
                                             layer1: 0,
                                             layer2: 0,
@@ -864,7 +864,7 @@ export class MCPAdapter {
                             type: 'text',
                             text: JSON.stringify(
                                 {
-                                    definitions: prioritized.map((def: any) => definitionToMcpResponse(def)),
+                                    definitions: prioritized.map((def: any) => definitionToApiResponse(def)),
                                     performance: result.performance,
                                     requestId: result.requestId,
                                     count: Array.isArray(prioritized) ? prioritized.length : 0,
@@ -886,7 +886,7 @@ export class MCPAdapter {
                             type: 'text',
                             text: JSON.stringify(
                                 {
-                                    definitions: fallbackDefs.map((def: any) => definitionToMcpResponse(def)),
+                                    definitions: fallbackDefs.map((def: any) => definitionToApiResponse(def)),
                                     performance: { layer1: 0, layer2: 0, layer3: 0, layer4: 0, layer5: 0, total: 0 },
                                     requestId: undefined,
                                     count: fallbackDefs.length,
@@ -942,7 +942,7 @@ export class MCPAdapter {
                     type: 'text',
                     text: JSON.stringify(
                         {
-                            definitions: prioritized.map((def: any) => definitionToMcpResponse(def)),
+                            definitions: prioritized.map((def: any) => definitionToApiResponse(def)),
                             performance: result.performance,
                             requestId: result.requestId,
                             count: Array.isArray(prioritized) ? prioritized.length : 0,
@@ -1100,7 +1100,7 @@ export class MCPAdapter {
                     type: 'text',
                     text: JSON.stringify(
                         {
-                            references: result.data.map((ref: any) => referenceToMcpResponse(ref)),
+                            references: result.data.map((ref: any) => referenceToApiResponse(ref)),
                             performance: result.performance,
                             requestId: result.requestId,
                             count: result.data.length,
@@ -1350,8 +1350,8 @@ export class MCPAdapter {
         const mapped = {
             symbol: coreResult.symbol,
             contextUri: coreResult.contextUri,
-            definitions: coreResult.definitions.map((def: any) => definitionToMcpResponse(def)),
-            references: coreResult.references.map((ref: any) => referenceToMcpResponse(ref)),
+            definitions: coreResult.definitions.map((def: any) => definitionToApiResponse(def)),
+            references: coreResult.references.map((ref: any) => referenceToApiResponse(ref)),
             performance: coreResult.performance,
             diagnostics: coreResult.diagnostics,
             timestamp: coreResult.timestamp,

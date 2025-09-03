@@ -30,7 +30,6 @@ import express from 'express';
 import { MCPAdapter } from '../adapters/mcp-adapter.js';
 import { createDefaultCoreConfig } from '../adapters/utils.js';
 import { getEnvironmentConfig } from '../core/config/server-config.js';
-import { PortRegistry } from '../utils/port-registry.js';
 import { createCodeAnalyzer } from '../core/index';
 import { overlayStore } from '../core/overlay-store.js';
 import type { CodeAnalyzer } from '../core/unified-analyzer';
@@ -44,17 +43,7 @@ type SessionRecord = {
 
 const cfg = getEnvironmentConfig();
 const HOST = process.env.MCP_HTTP_HOST || cfg.host || 'localhost';
-async function resolvePort(): Promise<number> {
-    const envPort = process.env.MCP_HTTP_PORT ? Number(process.env.MCP_HTTP_PORT) : undefined;
-    if (envPort && Number.isFinite(envPort)) return envPort;
-    // Reserve a global port near 7001 to avoid cross-project conflicts
-    try {
-        return await PortRegistry.reserve('mcp-http', Number(cfg.ports.mcpHTTP || 7001), HOST);
-    } catch {
-        // Fallback: let the OS choose
-        return 0;
-    }
-}
+const PORT = Number(process.env.MCP_HTTP_PORT || cfg.ports.mcpHTTP || 7001);
 
 const app = express();
 app.use(express.json());
@@ -413,21 +402,8 @@ app.get('/health', (_req, res) => {
 // Start server
 let server: any = null;
 (async () => {
-    const PORT = await resolvePort();
     server = app.listen(PORT, HOST, () => {
         console.log(`MCP Streamable HTTP server listening at http://${HOST}:${(server.address() as any).port}`);
-    });
-    const actualPort = (server.address() as any).port as number;
-    process.on('exit', () => {
-        void PortRegistry.release(actualPort);
-    });
-    process.on('SIGINT', () => {
-        void PortRegistry.release(actualPort);
-        process.exit(0);
-    });
-    process.on('SIGTERM', () => {
-        void PortRegistry.release(actualPort);
-        process.exit(0);
     });
 })().catch((e) => {
     console.error('Failed to start MCP HTTP server:', e);

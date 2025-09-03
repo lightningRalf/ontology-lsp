@@ -158,6 +158,10 @@ export function referenceToApiResponse(ref: Reference) {
   return { uri: normalizeUri(ref.uri), range, kind: (ref as any).kind, name: (ref as any).name };
 }
 
+// Legacy MCP helpers kept for adapter compatibility
+// Map core types to MCP-friendly response objects (same shape as API helpers)
+// NOTE: MCP adapters use the same normalized shape as HTTP.
+
 export function validateRequired(params: Record<string, any>, required: string[]): void {
   for (const field of required) if (params[field] === undefined || params[field] === null) throw new Error(`Missing required parameter: ${field}`);
 }

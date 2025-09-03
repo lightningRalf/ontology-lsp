@@ -7,7 +7,7 @@
 See PROJECT_STATUS.md for achievements and historical context. -->
 
 
-## 🚀 Next Development Priorities (Updated 2025-09-02)
+## 🚀 Next Development Priorities (Updated 2025-09-04)
 
 ### 0.0 Dogfooding Pass (MCP‑first, Immediate)
 - Use MCP HTTP (7001) as the primary interface; verify prompts and workflows end‑to‑end.
@@ -22,6 +22,16 @@ Delivered (update):
 - Snapshot helpers: `snap_diff`, `snap_status`, `snap_progress`, and guarded `snap_apply`
 - MCP `apply_snapshot` tool + `overlayStore.applyToWorkingTree()`
 - Default monitoring off for stdio; HTTP server enables metrics explicitly; dogfood sets `SILENT_MODE=1`
+
+### 0.05 Port Management Simplification (Immediate)
+- Confirm removal of in-repo PortRegistry across code and docs.
+  - Verify no remaining imports/usages; ensure Justfile help doesn’t imply a global registry.
+  - Keep ports fixed by default; document env overrides in CONFIG.md.
+- Document env overrides in one place:
+  - `HTTP_API_PORT` (default 7000)
+  - `MCP_HTTP_PORT` (default 7001)
+  - Optional: `MCP_HTTP_HOST` (defaults to config host)
+- Optional cleanup: update or remove `just ports` if external registry tooling is not present.
 
 ### 0.1 Fix‑Bugs‑First: Perf stabilization (Immediate)
 
@@ -58,6 +68,11 @@ Follow‑ups (Immediate):
   - Tests: add HTTP graph‑expand smoke tests (file + symbol).
 
 Status: Fallback implemented in MCP adapter (non‑fatal; empty neighbors with note). HTTP fallback already present. Add HTTP smoke tests next.
+
+### 0.355 MCP Adapter Mapping Consistency (Short)
+- Ensure all adapters share a single mapping surface:
+  - Use `definitionToApiResponse`/`referenceToApiResponse` across HTTP/MCP/CLI/LSP where applicable.
+- Add a unit test to prevent reintroduction of MCP‑specific mapping exports.
 
 ### 0.36 Learning Pipelines Persistence (Soon, after L1–L3 stabilization)
 - Replace stub logs with real persistence for learning pipelines:

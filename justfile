@@ -70,9 +70,9 @@ start: stop-quiet
 stop:
     @echo "🛑 Stopping Ontology LSP servers..."
     @echo "  Stopping PID-tracked processes..."
-    @-bash -c "if [ -f .ontology/pids/lsp.pid ]; then pid=\$$(cat .ontology/pids/lsp.pid | sed 's/!//g'); kill \$$pid 2>/dev/null && echo '    ✅ LSP server stopped' || true; rm .ontology/pids/lsp.pid; fi"
-    @-bash -c "if [ -f .ontology/pids/http-api.pid ]; then pid=\$$(cat .ontology/pids/http-api.pid | sed 's/!//g'); kill \$$pid 2>/dev/null && echo '    ✅ HTTP API stopped' || true; rm .ontology/pids/http-api.pid; fi"
-    @-bash -c "if [ -f .ontology/pids/mcp-http.pid ]; then pid=\$$(cat .ontology/pids/mcp-http.pid | sed 's/!//g'); kill \$$pid 2>/dev/null && echo '    ✅ MCP HTTP stopped' || true; rm .ontology/pids/mcp-http.pid; fi"
+    @-bash -c "if [ -f .ontology/pids/lsp.pid ]; then sed 's/!//g' .ontology/pids/lsp.pid | xargs -r kill 2>/dev/null || true; rm -f .ontology/pids/lsp.pid; fi"
+    @-bash -c "if [ -f .ontology/pids/http-api.pid ]; then sed 's/!//g' .ontology/pids/http-api.pid | xargs -r kill 2>/dev/null || true; rm -f .ontology/pids/http-api.pid; fi"
+    @-bash -c "if [ -f .ontology/pids/mcp-http.pid ]; then sed 's/!//g' .ontology/pids/mcp-http.pid | xargs -r kill 2>/dev/null || true; rm -f .ontology/pids/mcp-http.pid; fi"
     @echo "  Cleaning up any remaining processes on target ports..."
     @just clean-ports-quiet
     @echo "  Terminating any orphaned processes..."
@@ -84,9 +84,9 @@ stop:
 
 # Stop quietly (internal use)
 stop-quiet:
-    @-bash -c "if [ -f .ontology/pids/lsp.pid ]; then pid=\$$(cat .ontology/pids/lsp.pid | sed 's/!//g'); kill \$$pid 2>/dev/null; rm .ontology/pids/lsp.pid; fi" 2>/dev/null || true
-    @-bash -c "if [ -f .ontology/pids/http-api.pid ]; then pid=\$$(cat .ontology/pids/http-api.pid | sed 's/!//g'); kill \$$pid 2>/dev/null; rm .ontology/pids/http-api.pid; fi" 2>/dev/null || true
-    @-bash -c "if [ -f .ontology/pids/mcp-http.pid ]; then pid=\$$(cat .ontology/pids/mcp-http.pid | sed 's/!//g'); kill \$$pid 2>/dev/null; rm .ontology/pids/mcp-http.pid; fi" 2>/dev/null || true
+    @-bash -c "if [ -f .ontology/pids/lsp.pid ]; then sed 's/!//g' .ontology/pids/lsp.pid | xargs -r kill 2>/dev/null || true; rm -f .ontology/pids/lsp.pid; fi" 2>/dev/null || true
+    @-bash -c "if [ -f .ontology/pids/http-api.pid ]; then sed 's/!//g' .ontology/pids/http-api.pid | xargs -r kill 2>/dev/null || true; rm -f .ontology/pids/http-api.pid; fi" 2>/dev/null || true
+    @-bash -c "if [ -f .ontology/pids/mcp-http.pid ]; then sed 's/!//g' .ontology/pids/mcp-http.pid | xargs -r kill 2>/dev/null || true; rm -f .ontology/pids/mcp-http.pid; fi" 2>/dev/null || true
     @just clean-ports-quiet
     @-pkill -f "src/servers" 2>/dev/null || true
     @-pkill -f "ontology-lsp" 2>/dev/null || true
