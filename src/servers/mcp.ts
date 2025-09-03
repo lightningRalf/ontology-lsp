@@ -81,6 +81,7 @@ export class MCPServer {
     async initialize(): Promise<void> {
         // Initialize core analyzer
         const config = createDefaultCoreConfig();
+        config.monitoring.enabled = false; // disable periodic metrics for stdio MCP
         const workspaceRoot = process.env.WORKSPACE_ROOT || process.cwd();
 
         this.coreAnalyzer = await createCodeAnalyzer({

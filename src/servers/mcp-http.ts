@@ -73,6 +73,7 @@ const mcpEvents = new EventEmitter();
 async function createMcpServer(): Promise<SessionRecord> {
     // Initialize core analyzer
     const coreConfig = createDefaultCoreConfig();
+    coreConfig.monitoring.enabled = false; // disable periodic metrics for MCP HTTP dogfooding
     const workspaceRoot = process.env.WORKSPACE_ROOT || process.cwd();
     const analyzer = await createCodeAnalyzer({ ...coreConfig, workspaceRoot });
     await analyzer.initialize();

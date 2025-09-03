@@ -153,6 +153,18 @@ export class ToolRegistry {
             },
         },
         {
+            name: 'apply_snapshot',
+            description: 'Apply a staged snapshot overlay.diff to the working tree (guarded by env)',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    snapshot: { type: 'string' },
+                    check: { type: 'boolean', default: false },
+                },
+                required: ['snapshot'],
+            },
+        },
+        {
             name: 'find_definition',
             description: 'Find symbol definition with fuzzy/AST validation',
             inputSchema: {

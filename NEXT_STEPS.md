@@ -17,6 +17,12 @@ See PROJECT_STATUS.md for achievements and historical context. -->
   - Quick patch checks (prompt: quick-patch-checks) → `get_snapshot` → `propose_patch` → `run_checks`.
 - Confirm: no stdio noise, structured errors, and tool latencies within budgets. Capture regressions.
 
+Delivered (update):
+- Fast stdio MCP dogfood scripts + Just tasks: `dogfood`, `dogfood_full`, `dogfood_progress` (bounded workspace; ms timings)
+- Snapshot helpers: `snap_diff`, `snap_status`, `snap_progress`, and guarded `snap_apply`
+- MCP `apply_snapshot` tool + `overlayStore.applyToWorkingTree()`
+- Default monitoring off for stdio; HTTP server enables metrics explicitly; dogfood sets `SILENT_MODE=1`
+
 ### 0.1 Fix‑Bugs‑First: Perf stabilization (Immediate)
 
 Monitoring perf and metrics; continue to gate perf/benchmarks behind env and iterate if regressions are observed.
@@ -51,7 +57,7 @@ Follow‑ups (Immediate):
   - Add AST‑only fallback for imports/exports when graphlib/code‑graph fails.
   - Tests: add HTTP graph‑expand smoke tests (file + symbol).
 
-Status: HTTP fallback implemented (non‑fatal, returns empty neighbors). Tests pending.
+Status: Fallback implemented in MCP adapter (non‑fatal; empty neighbors with note). HTTP fallback already present. Add HTTP smoke tests next.
 
 ### 0.36 Learning Pipelines Persistence (Soon, after L1–L3 stabilization)
 - Replace stub logs with real persistence for learning pipelines:
@@ -265,6 +271,7 @@ Done: HTTP `/api/v1/refactor` endpoint and MCP `suggest_refactoring` tool added 
 - **Cross‑Protocol Consistency**: Monitor in CI; ensure MCP/LSP/HTTP/CLI parity remains stable under deterministic budgets. Repro: `bun test tests/consistency.test.ts --timeout 180000`.
  - **Enhanced Search Caps**: Enforce result cap in async aggregator or adjust test threshold to configured cap. Repro: `bun test tests/enhanced-search-async.test.ts` (fails large result set efficiency).
   - **Layer 1 Timeouts**: Increase LS directory analysis timeout and Layer 1 budget in perf suite or gate by env. Repro: `bun test tests/performance.test.ts --timeout 300000`.
+ - Dogfood smoke: keep fast path green; avoid pulling unrelated strictness errors into the loop. Typecheck for core remains a separate, tracked task.
 
 ### 9.3 Ontology & Storage
 - Keep SQLite default; continue running Layer 4 suites in CI by default.
@@ -300,6 +307,7 @@ Done: HTTP `/api/v1/refactor` endpoint and MCP `suggest_refactoring` tool added 
 - **VS Code Palette Labels**: Use “Symbol: Build Symbol Map” and “Refactor: Plan Rename (Preview)” (avoid “Ontology:” prefix).
  - **Layer Numbering**: Normalize all docs to use the new L1–L5 mapping (Planner = L3, Ontology = L4, Pattern Learning & Propagation = L5).
  - **StoragePort**: Link to `docs/STORAGE_PORT.md`; show adapter config examples.
+ - **Dogfooding How‑To**: Add a short section in README describing: `just dogfood`, `dogfood_full`, `dogfood_progress`, `snap_*` commands; mention `ALLOW_SNAPSHOT_APPLY=1` guard, bounded workspace, and progress logs.
 
 ### 12. Cleanup (New)
 - **Legacy Shims Removal**: After a stability period, remove compatibility shims for `claude-tools` imports and types; consolidate references to `layer1-fast-search`.

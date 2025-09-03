@@ -196,6 +196,7 @@ ontology-lsp/
 - Graph expand callers/callees: relies on best‑effort heuristics; imports/exports are robust. Monitor for empty vs. 500 behavior (HTTP fallback exists).
 - Conceptual hints depend on L4 storage freshness; ensure adapter metrics and staleness are visible in `/metrics` JSON.
 - Performance tests remain environment‑sensitive; use non‑perf suites for dogfooding.
+ - Typecheck surface in core still flags some strictness issues unrelated to dogfooding changes; keep scope narrow and track under technical debt.
 
 ### 🚀 Developer Experience, MCP & Monitoring
 - Web UI:
@@ -752,4 +753,32 @@ For detailed implementation history, see git commit history.
   - Layer 4: Ontology/Semantic Graph (was Layer 3)
   - Layer 5: Pattern Learning & Propagation (was Layers 4–5)
 
+### 🆕 Latest (Dogfooding + Silent Monitoring) — 2025‑09‑03
+- Dogfooding flow hardened and made practical for real editing
+  - Added fast stdio MCP dogfood scripts and Just tasks:
+    - `just dogfood`, `just dogfood_full`, `just dogfood_progress`
+    - Bounded workspace (defaults to `tests/fixtures`) for predictable latency
+    - Clear ms timings; optional progress logs under `.ontology/snapshots/<id>/progress.log`
+  - Snapshot helpers: `snap_diff`, `snap_status`, `snap_progress`, and guarded `snap_apply` (sets `ALLOW_SNAPSHOT_APPLY=1`) to apply staged overlay diffs to the working tree
+  - Introduced `apply_snapshot` MCP tool and `overlayStore.applyToWorkingTree()`
+- Monitoring defaults simplified to avoid stdio noise/timers
+  - Default `monitoring.enabled = false` for stdio/CLI paths
+  - HTTP server explicitly re‑enables metrics; MCP HTTP keeps metrics off for dogfooding
+  - Dogfood scripts set `SILENT_MODE=1` to suppress periodic logs
+- Graph Expand hardening (MCP adapter)
+  - `graph_expand` now returns empty neighbors with a note on errors instead of 500
+  - File/symbol flows validated via fast dogfood test
+- Workspace URI handling hardened
+  - `file://workspace[/…]` resolves to the active workspace root (env `ONTOLOGY_WORKSPACE`/`WORKSPACE_ROOT`), ensuring adapters normalize URIs correctly
+- MCP adapter fs API correctness
+  - Replaced `fs.existsSync`/`readFileSync` usage in `handleFindDefinition` with async `fs.stat`/`fs.readFile` to satisfy Bun/TS and avoid sync IO
+- Utilities restored
+  - Reintroduced minimal `src/adapters/utils.ts` for adapter helpers and a factory‑backed `createDefaultCoreConfig()` to reduce divergence
+- Justfile fixes
+  - Removed colon‑based recipe names; added `dogfood_*` and `snap_*` tasks
+
+Impact
+- Practical, repeatable dogfooding loop to stage→check→apply with clear guardrails
+- No more long silent waits or periodic metrics contamination in stdio
+- Safer MCP adapter behavior and robust graph expand results
 Metrics and docs now reflect the new numbering.

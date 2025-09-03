@@ -408,7 +408,12 @@ export class CLIAdapter {
         patch: string,
         options: { snapshot?: string; runChecks?: boolean; commands?: string[]; timeoutSec?: number; json?: boolean }
     ): Promise<string> {
-        const snap = overlayStore.ensureSnapshot(options.snapshot);
+        let snap;
+        try {
+            snap = overlayStore.ensureSnapshot(options.snapshot);
+        } catch (e) {
+            return this.formatError(`invalid snapshot: ${e instanceof Error ? e.message : String(e)}`);
+        }
         const res = overlayStore.stagePatch(snap.id, patch);
         if (!res.accepted) return this.formatError(res.message || 'Patch rejected');
         if (options.runChecks) {

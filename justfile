@@ -218,9 +218,38 @@ stop-test-http:
 
 # Run E2E suite locally using local workspace, with the test HTTP server
 e2e-local: start-test-http
-    @echo "🧪 Running E2E (local workspace)"
-    @E2E=1 USE_LOCAL_REPOS=true BUN_JOBS=1 bun test tests/e2e/ --timeout 600000 || true
-    @just stop-test-http
+
+# === DOGFOOD (stdio MCP) ===
+
+dogfood:
+    @echo "🥣 Dogfooding (stdio MCP) — fast path" 
+    @echo "   Steps: explore(off/on) → plan_rename → get_snapshot+propose_patch"
+    @echo "   Flags: -w|--workspace <dir> (default: tests/fixtures), -f|--file, -s|--symbol, --full"
+    @CI=1 ~/.bun/bin/bun run scripts/dogfood-mcp.ts
+
+dogfood_full:
+    @echo "🥣 Dogfooding (stdio MCP) — with quick checks (build:tsc)"
+    @echo "   Flags: -w|--workspace <dir> (default: tests/fixtures)"
+    @CI=1 ~/.bun/bin/bun run scripts/dogfood-mcp.ts --full
+
+snap_diff id:
+    @~/.bun/bin/bun run scripts/snapshot-tools.ts diff {{id}}
+
+snap_status id:
+    @~/.bun/bin/bun run scripts/snapshot-tools.ts status {{id}}
+
+
+snap_progress id:
+    @~/.bun/bin/bun run scripts/snapshot-tools.ts progress {{id}}
+
+
+snap_apply id:
+    @ALLOW_SNAPSHOT_APPLY=1 ~/.bun/bin/bun run scripts/snapshot-tools.ts apply {{id}}
+
+dogfood_progress:
+    @echo "🥣 Dogfooding with progress logs (bounded workspace)" 
+    @echo "   Progress: .ontology/snapshots/<id>/progress.log (snap:progress)"
+    @CI=1 DOGFOOD_PROGRESS=1 ~/.bun/bin/bun run scripts/dogfood-mcp.ts -w tests/fixtures -f tests/fixtures/example.ts -s TestClass
 
 # === BUILD COMMANDS ===
 

@@ -160,8 +160,10 @@ export class MCPAdapter {
                         return this.handleGetSnapshot(arguments_);
                     case 'propose_patch':
                         return this.handleProposePatch(arguments_);
-                    case 'run_checks':
-                        return this.handleRunChecks(arguments_);
+                case 'run_checks':
+                    return this.handleRunChecks(arguments_);
+                case 'apply_snapshot':
+                    return this.handleApplySnapshot(arguments_);
                     case 'text_search':
                         return this.handleTextSearch(arguments_);
                     case 'symbol_search':
@@ -520,10 +522,15 @@ export class MCPAdapter {
         if (!patch) {
             return { content: [{ type: 'text', text: 'Missing patch' }], isError: true };
         }
-        const snap = overlayStore.ensureSnapshot(snapshot);
-        const res = overlayStore.stagePatch(snap.id, patch);
-        const payload = { accepted: res.accepted, snapshot: snap.id, message: res.message };
-        return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }], isError: !res.accepted };
+        try {
+            const snap = overlayStore.ensureSnapshot(snapshot);
+            const res = overlayStore.stagePatch(snap.id, patch);
+            const payload = { accepted: res.accepted, snapshot: snap.id, message: res.message };
+            return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }], isError: !res.accepted };
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: 'text', text: `Invalid snapshot: ${msg}` }], isError: true };
+        }
     }
 
     private async handleRunChecks(args: Record<string, any>) {
@@ -533,7 +540,13 @@ export class MCPAdapter {
         }
         const cmds = Array.isArray(args?.commands) ? (args?.commands as string[]) : [];
         const timeoutSec = typeof args?.timeoutSec === 'number' ? args.timeoutSec : 120;
-        const res = await overlayStore.runChecks(snapshot, cmds, timeoutSec);
+        let res: any;
+        try {
+            res = await overlayStore.runChecks(snapshot, cmds, timeoutSec);
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: 'text', text: `Invalid snapshot: ${msg}` }], isError: true };
+        }
         return {
             content: [
                 {
@@ -547,6 +560,44 @@ export class MCPAdapter {
             ],
             isError: !res.ok,
         };
+    }
+
+    private async handleApplySnapshot(args: Record<string, any>) {
+        const snapshot = String(args?.snapshot || '').trim();
+        const check = !!args?.check;
+        if (!snapshot) {
+            return { content: [{ type: 'text', text: 'Missing snapshot' }], isError: true };
+        }
+        if (process.env.ALLOW_SNAPSHOT_APPLY !== '1') {
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: 'apply_snapshot is disabled. Set ALLOW_SNAPSHOT_APPLY=1 to enable.',
+                    },
+                ],
+                isError: true,
+            };
+        }
+        try {
+            const res = await overlayStore.applyToWorkingTree(snapshot, { check });
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify(
+                            { snapshot, ok: res.ok, elapsedMs: res.elapsedMs, output: res.output.slice(-4000) },
+                            null,
+                            2
+                        ),
+                    },
+                ],
+                isError: !res.ok,
+            };
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: 'text', text: `apply_snapshot failed: ${msg}` }], isError: true };
+        }
     }
 
     // --- New handlers: search ---
@@ -611,30 +662,37 @@ export class MCPAdapter {
         const file = typeof args?.file === 'string' ? (args.file as string) : undefined;
         const symbol = typeof args?.symbol === 'string' ? (args.symbol as string) : undefined;
         if (!file && !symbol) return { content: [{ type: 'text', text: 'file or symbol required' }], isError: true };
-        const { expandNeighbors } = await import('../core/code-graph.js');
-        let seedFiles: string[] | undefined;
-        if (symbol) {
-            try {
-                const sm = await (this.coreAnalyzer as any).buildSymbolMap({
-                    identifier: symbol,
-                    maxFiles: 50,
-                    astOnly: true,
-                });
-                seedFiles = Array.from(
-                    new Set(
-                        (sm?.declarations || []).map((d: any) => {
-                            try {
-                                return new URL(d.uri).pathname;
-                            } catch {
-                                return d.uri.replace(/^file:\/\//, '');
-                            }
-                        })
-                    )
-                );
-            } catch {}
+        try {
+            const { expandNeighbors } = await import('../core/code-graph.js');
+            let seedFiles: string[] | undefined;
+            if (symbol) {
+                try {
+                    const sm = await (this.coreAnalyzer as any).buildSymbolMap({
+                        identifier: symbol,
+                        maxFiles: 50,
+                        astOnly: true,
+                    });
+                    seedFiles = Array.from(
+                        new Set(
+                            (sm?.declarations || []).map((d: any) => {
+                                try {
+                                    return new URL(d.uri).pathname;
+                                } catch {
+                                    return d.uri.replace(/^file:\/\//, '');
+                                }
+                            })
+                        )
+                    );
+                } catch {}
+            }
+            const out = await expandNeighbors({ file, symbol, edges, depth: args?.depth, limit: args?.limit, seedFiles });
+            return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: false };
+        } catch {
+            const neighbors: Record<string, any[]> = { imports: [], exports: [], callers: [], callees: [] };
+            const note = 'fallback: graph expand unavailable; returning empty neighbors';
+            const payload = file ? { file, neighbors, note } : { symbol: symbol || '', neighbors, note };
+            return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }], isError: false };
         }
-        const out = await expandNeighbors({ file, symbol, edges, depth: args?.depth, limit: args?.limit, seedFiles });
-        return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: false };
     }
 
     private wordAt(text: string, pos: { line: number; character: number }): string | null {
@@ -663,8 +721,9 @@ export class MCPAdapter {
         if (!symbol && uri) {
             try {
                 const fsPath = uri.startsWith('file://') ? uri.substring(7) : uri;
-                if (fs.existsSync(fsPath)) {
-                    const text = fs.readFileSync(fsPath, 'utf8');
+                const exists = await fs.stat(fsPath).then(() => true).catch(() => false);
+                if (exists) {
+                    const text = await fs.readFile(fsPath, 'utf8');
                     const derived = this.wordAt(text, position);
                     if (derived) symbol = derived;
                 }

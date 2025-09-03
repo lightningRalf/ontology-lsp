@@ -53,6 +53,7 @@ export class HTTPServer {
 
         // Initialize core analyzer
         const coreConfig = createDefaultCoreConfig();
+        coreConfig.monitoring.enabled = true; // enable metrics only for HTTP server
 
         this.coreAnalyzer = await createCodeAnalyzer({
             ...coreConfig,
