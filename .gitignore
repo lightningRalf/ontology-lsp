@@ -60,8 +60,26 @@ Thumbs.db
 .ontology/
 # VS Code test binaries
 vscode-client/.vscode-test/
+# Be defensive: ignore all nested .vscode-test dirs in subpackages
+**/.vscode-test/
 # VS Code extension build outputs
 vscode-client/out/
+# Do not commit built VSIX packages
+*.vsix
+
+# Monorepo build outputs
+**/dist/
+
+# Local temp dirs
+tmp/
+
+# Test artifacts and logs
+test-output*.txt
+.e2e-test-workspace/
+.test-results/
+.test-results-perf/
+.test-workspace/
+test-results/
 
 # Temporary/experimental directories
 bun-mcp-sse-transport/
