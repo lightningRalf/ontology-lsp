@@ -124,7 +124,7 @@ PROJECT_STATUS.md (current state), and NEXT_STEPS.md (near‑term work).
 
 ## Dogfooding (MCP‑first)
 
-Prefer dogfooding through the MCP HTTP server (Streamable HTTP) so flows match how real clients integrate. The CLI is available for convenience but MCP should be primary.
+Prefer dogfooding through the MCP HTTP server (Streamable HTTP) so flows match how real clients integrate. The CLI is available for convenience but MCP should be primary. When building features or fixes, validate via the registered MCP tools and prompts (workflows), not by calling internals directly.
 
 ### Start servers
 
@@ -210,6 +210,20 @@ curl -sS -X POST -H "content-type: application/json" -H "Mcp-Session-Id: $MCP_SE
         "params":{ "uri":"snapshot://'$'SNAP_ID/status" }
       }' | jq .
 ```
+
+### Dogfood Workflows (expected during changes)
+
+- Use the prompts to exercise end‑to‑end flows during development:
+  - `plan-safe-rename` → calls `plan_rename` then `workflow_safe_rename` (snapshot + checks)
+  - `investigate-symbol` → `explore_codebase` (conceptual on/off) → `build_symbol_map` (astOnly) → `graph_expand`
+  - `quick-patch-checks` → `get_snapshot` → `propose_patch` → `run_checks`
+- Validate results are structured, errors are JSON‑RPC with codes, and latencies are within budgets.
+- Prefer small fixtures under `tests/fixtures` when iterating.
+
+### Quick helpers
+- `just dogfood` (stdio MCP fast path; bounded workspace)
+- `just dogfood_full` (includes quick checks via build:tsc)
+- `just sync-ports` to align `.env` ports (if using MCP HTTP locally)
 
 ### Optional CLI helpers (local dogfooding)
 - `bin/dogfood-explore.sh <symbol> [-f <path>] [--no-conceptual] [--precise] [--json]`
