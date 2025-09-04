@@ -23,6 +23,7 @@ Delivered (update):
 - MCP `apply_snapshot` tool + `overlayStore.applyToWorkingTree()`
 - Default monitoring off for stdio; HTTP server enables metrics explicitly; dogfood sets `SILENT_MODE=1`
 - Fast MCP wrapper guard added: `mcp-wrapper.sh` now checks for `dist/mcp-fast/mcp-fast.js` and prints build instructions to stderr if missing (prevents MCP client start timeouts)
+ - Ports sync helper added: `just sync-ports` writes `HTTP_API_PORT` and `MCP_HTTP_PORT` to `.env` using an external registry if available (or local free‑port scan). Servers still bind fixed defaults and only read `.env`.
 
 ### 0.05 Port Management Simplification (Immediate)
 - Confirm removal of in-repo PortRegistry across code and docs.
@@ -140,9 +141,10 @@ Goal: make the Layer Performance pane reliable on cold start and after restart.
 - Add `/monitoring?raw=1` to optionally surface LayerManager’s full `getPerformanceReport()` for diagnostics.
 
 ### 0.55 Ports & DevX (Immediate)
-- No Port Registry: in‑repo/global registries are removed/not required. Servers bind fixed defaults with env overrides.
+- No server‑side Port Registry: servers bind fixed defaults with env overrides. No registry calls at runtime.
 - Env overrides: `HTTP_API_PORT` (HTTP 7000), `MCP_HTTP_PORT` (MCP HTTP 7001), optional `MCP_HTTP_HOST`.
-- Optional tooling: `just ports` calls an external CLI (if installed) and is not used by servers.
+- New helper: `just sync-ports` updates `.env` by reserving ports via external registry (if installed) or by scanning for free ports. Keeps stability across restarts without coupling servers.
+- Optional tooling: `just ports` lists the external registry when present.
 - Note: the stdio Fast MCP server (`src/servers/mcp-fast.ts`) does not bind a port.
 
 ### 0.6 MCP Workflows GA (Near‑term)

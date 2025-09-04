@@ -205,7 +205,10 @@ ontology-lsp/
   - HTTP API: default `7000` (override with `HTTP_API_PORT`)
   - MCP HTTP: default `7001` (override with `MCP_HTTP_PORT`)
   - Host can be overridden via config envs (e.g., `MCP_HTTP_HOST`) when applicable.
-- No dynamic reservation or `~/.ontology/ports.json`. Startup is deterministic and easier to operate.
+- No server dependency on a registry. Startup remains deterministic.
+- Optional integration: `just sync-ports` can populate/adjust `.env` using an external registry
+  (`~/programming/port-registry`) when present, or a local free-port scan otherwise. Servers still
+  read ports from `.env` and do not call the registry.
 
 ### MCP Adapter Mapping Cleanup
 - Unified on existing API mapping helpers: MCP now uses `definitionToApiResponse`/`referenceToApiResponse`.
@@ -238,6 +241,9 @@ ontology-lsp/
     `runChecks: true|false`. The staged diff is viewable via the new HTTP endpoint
     `/api/v1/snapshots/{id}/diff` and MCP resources `snapshot://{id}/overlay.diff`.
 - Learning (L5): added `missingExampleContextTimestamp` counter; surfaced via stats and dashboard.
+ - Ports DevX: Added `bin/sync-env-ports.sh` and `just sync-ports` to write `HTTP_API_PORT` and
+   `MCP_HTTP_PORT` into `.env` (prefers external registry, falls back to local scan). Keeps ports
+   stable across restarts without coupling servers to a registry.
 
 ### 🧰 MCP Fast (stdio) Startup Reliability
 - Added a guard to `mcp-wrapper.sh` that checks for the compiled binary `dist/mcp-fast/mcp-fast.js`.
@@ -271,6 +277,7 @@ Status: adapters/LSP integration tests are green. E2E local run improved reliabi
 ### 🌐 Port Registry (clarification)
 - No in‑repo or global port registry is used by servers. They bind fixed defaults with env overrides.
 - The `just ports` task is an optional convenience that calls an external CLI (if installed) and does not affect server behavior.
+ - The new `just sync-ports` task can leverage that external CLI to select ports and persist them to `.env`.
 
 ### 📡 Monitoring Snapshots (SQLite)
 - Persist periodic monitoring snapshots in SQLite (`monitoring_snapshots`), enabling
@@ -291,6 +298,7 @@ Status: adapters/LSP integration tests are green. E2E local run improved reliabi
 - Start: `just start` → HTTP:7000, MCP:7001
 - UI: open `http://localhost:7000/ui`
 - Live events: `http://localhost:7001/mcp-events`
+ - Sync ports into `.env`: `just sync-ports`
 
 ---
 
