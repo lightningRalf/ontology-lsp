@@ -23,7 +23,20 @@ Delivered (update):
 - MCP `apply_snapshot` tool + `overlayStore.applyToWorkingTree()`
 - Default monitoring off for stdio; HTTP server enables metrics explicitly; dogfood sets `SILENT_MODE=1`
 - Fast MCP wrapper guard added: `mcp-wrapper.sh` now checks for `dist/mcp-fast/mcp-fast.js` and prints build instructions to stderr if missing (prevents MCP client start timeouts)
- - Ports sync helper added: `just sync-ports` writes `HTTP_API_PORT` and `MCP_HTTP_PORT` to `.env` using an external registry if available (or local free‑port scan). Servers still bind fixed defaults and only read `.env`.
+- Ports sync helper added: `just sync-ports` writes `HTTP_API_PORT` and `MCP_HTTP_PORT` to `.env` using an external registry if available (or local free‑port scan). Servers still bind fixed defaults and only read `.env`.
+
+Follow‑ups from latest dogfooding (Immediate):
+- MCP HTTP initialize: POST `/mcp { method: initialize }` returns 500 (no `Mcp-Session-Id`).
+  - Action: add error logging around `createMcpServer()` in `mcp-http.ts` and fix init flow so initialize returns 200 with session id.
+  - Verify with curl and add a small smoke test under `tests/http-mcp-init.test.ts`.
+- MCP adapter error shape: `invalid_tool` and missing required params currently return non‑error text payloads.
+  - Action: normalize to JSON‑RPC errors (`-32601` for unknown tool, `-32602` for invalid params) with stable `data` field across protocols.
+  - Update `test-claude-mcp-integration.ts` Error Scenarios to assert new shapes.
+- Dogfood script drift: `scripts/dogfood-mcp.ts` assumes old config (`layers.layer1.grep.*`).
+  - Action: remove direct `grep/glob` overrides; use existing `CoreConfig.layers.*.timeout` knobs instead.
+  - Keep timings in output; gate conceptual with `L4_AUGMENT_EXPLORE=1`.
+- DevX: `just status/health` hardcode 7000/7001/7002.
+  - Action: read `.env` overrides when present and print both expected and active ports.
 
 ### 0.05 Port Management Simplification (Immediate)
 - Confirm removal of in-repo PortRegistry across code and docs.
@@ -75,6 +88,7 @@ Status: Fallback implemented in MCP adapter (non‑fatal; empty neighbors with n
 - Ensure all adapters share a single mapping surface:
   - Use `definitionToApiResponse`/`referenceToApiResponse` across HTTP/MCP/CLI/LSP where applicable.
 - Add a unit test to prevent reintroduction of MCP‑specific mapping exports.
+ - Align error semantics across adapters (unknown tool, validation): return JSON‑RPC errors with consistent `data`.
 
 ### 0.36 Learning Pipelines Persistence (Soon, after L1–L3 stabilization)
 - Replace stub logs with real persistence for learning pipelines:
