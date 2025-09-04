@@ -14,6 +14,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { isCoreError } from '../core/errors.js';
 import { toMcpError } from '../adapters/error-mapper.js';
+import { ToolExecutor } from '../core/tools/executor.js';
 // IMPORTANT: Avoid importing heavy core modules at top-level.
 // Use type-only import to prevent runtime side effects.
 import type { CodeAnalyzer } from '../core/unified-analyzer';
@@ -24,6 +25,7 @@ export class FastMCPServer {
     private mcpAdapter?: any;
     private initPromise?: Promise<void>;
     private initialized = false;
+    private executor: ToolExecutor;
 
     constructor() {
         this.server = new Server(
@@ -38,6 +40,7 @@ export class FastMCPServer {
             }
         );
 
+        this.executor = new ToolExecutor();
         this.setupHandlers();
         this.setupStdioCleanup();
     }
@@ -174,7 +177,7 @@ export class FastMCPServer {
 
                 // Execute tool call with timeout
                 const result = await Promise.race([
-                    this.mcpAdapter.handleToolCall(name, args || {}),
+                    this.executor.execute(this.mcpAdapter, name, (args || {}) as Record<string, any>),
                     new Promise((_, reject) => setTimeout(() => reject(new Error('Tool call timeout')), 30000)),
                 ]);
 

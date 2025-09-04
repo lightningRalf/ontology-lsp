@@ -164,6 +164,7 @@
   },
   "active": "b50f4ac68bdf0f49",
   "lastOpenFiles": [
+    "src/core/tools/executor.ts",
     "src/adapters/error-mapper.ts",
     "src/core/errors.ts",
     "tests/mcp-http-init.test.ts",
@@ -174,7 +175,6 @@
     "dist",
     "src/adapters/utils.ts",
     "home/lightningralf/programming/ontology-lsp",
-    "home/lightningralf/programming",
     "docs/adapter-error-shapes.md",
     "docs/videos/02-find.gif",
     "docs/videos/01-init.gif",

@@ -34,6 +34,7 @@ import { createDefaultCoreConfig } from '../adapters/utils.js';
 import { getEnvironmentConfig } from '../core/config/server-config.js';
 import { createCodeAnalyzer } from '../core/index';
 import { overlayStore } from '../core/overlay-store.js';
+import { ToolExecutor } from '../core/tools/executor.js';
 import type { CodeAnalyzer } from '../core/unified-analyzer';
 
 type SessionRecord = {
@@ -71,6 +72,7 @@ async function createMcpServer(): Promise<SessionRecord> {
 
     // Create adapter and low-level server with handlers
     const adapter = new MCPAdapter(analyzer);
+    const executor = new ToolExecutor();
     const server = new Server(
         { name: 'ontology-lsp', version: '1.0.0' },
         { capabilities: { tools: {}, resources: {}, prompts: {} } }
@@ -84,7 +86,7 @@ async function createMcpServer(): Promise<SessionRecord> {
         try {
             const sid = transport.sessionId || 'unknown';
             mcpEvents.emit('toolCall', { sessionId: sid, name, args, ts: Date.now() });
-            return await adapter.handleToolCall(name, args || {});
+            return await executor.execute(adapter, name, (args || {}) as Record<string, any>);
         } catch (error) {
             const sid = transport.sessionId || 'unknown';
             mcpEvents.emit('toolError', {
