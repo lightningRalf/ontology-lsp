@@ -206,6 +206,10 @@ export class CLIAdapter {
         }
     ): Promise<any> {
         try {
+            // For consistency across protocols, require a file context for references
+            if (!options.file) {
+                return [];
+            }
             const request = buildFindReferencesRequest({
                 uri: normalizeUri(options.file || 'file://workspace'),
                 position: createPosition(0, 0),

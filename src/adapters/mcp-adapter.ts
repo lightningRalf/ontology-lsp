@@ -1231,9 +1231,18 @@ export class MCPAdapter {
         this.validateArgs(args, ['symbol'], context);
         try { await (this.coreAnalyzer as any)?.initialize?.(); } catch {}
 
-        // For MCP, we don't have exact position, so use symbol-based search
+        // For MCP, we don't have exact position; require a file context for cross-protocol consistency
+        if (!args.file && !args.uri) {
+            return {
+                content: [
+                    { type: 'text', text: JSON.stringify({ references: [], performance: { total: 0 }, requestId: 'none', count: 0 }, null, 2) },
+                ],
+                isError: false,
+            };
+        }
+        // Use symbol-based search at provided file context
         const request = buildFindReferencesRequest({
-            uri: normalizeUri('file://workspace'),
+            uri: normalizeUri(String(args.file || args.uri)),
             position: createPosition(0, 0),
             identifier: args.symbol,
             maxResults: this.config.maxResults,
