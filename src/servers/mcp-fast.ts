@@ -15,6 +15,7 @@ import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } fr
 import { isCoreError } from '../core/errors.js';
 import { toMcpError } from '../adapters/error-mapper.js';
 import { ToolExecutor } from '../core/tools/executor.js';
+import { registerCommonPrompts, registerCommonResources } from './mcp-shared.js';
 // IMPORTANT: Avoid importing heavy core modules at top-level.
 // Use type-only import to prevent runtime side effects.
 import type { CodeAnalyzer } from '../core/unified-analyzer';
@@ -36,6 +37,9 @@ export class FastMCPServer {
             {
                 capabilities: {
                     tools: {},
+                    // Enable prompts/resources caps when env flags are set (to keep fast stdio minimal by default)
+                    prompts: process.env.FAST_STDIO_PROMPTS === '1' ? {} : undefined,
+                    resources: process.env.FAST_STDIO_RESOURCES === '1' ? {} : undefined,
                 },
             }
         );
@@ -159,6 +163,14 @@ export class FastMCPServer {
                 ],
             };
         });
+
+        // Optionally register prompts/resources for stdio (opt-in via env to preserve fast startup defaults)
+        if (process.env.FAST_STDIO_PROMPTS === '1') {
+            registerCommonPrompts(this.server);
+        }
+        if (process.env.FAST_STDIO_RESOURCES === '1') {
+            registerCommonResources(this.server);
+        }
 
         // Handle tool calls - initialize on demand
         this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
