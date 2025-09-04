@@ -288,6 +288,9 @@ build-mcp:
     @echo "🚀 Building MCP fast server..."
     @mkdir -p dist/mcp-fast
     {{bun}} build src/servers/mcp-fast.ts --target=bun --outdir=dist/mcp-fast --format=esm \
+        --external tree-sitter --external tree-sitter-typescript \
+        --external tree-sitter-javascript --external tree-sitter-python \
+        --external pg --external bun:sqlite --external express --external cors \
         --sourcemap
     @echo "✅ MCP fast server built at dist/mcp-fast/mcp-fast.js"
 

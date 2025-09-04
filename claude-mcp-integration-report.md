@@ -1,26 +1,26 @@
 # Claude-MCP Integration Test Report
 
-**Overall Result: 6/7 tests passed**
-**Total Duration: 5551ms**
+**Overall Result: 7/7 tests passed**
+**Total Duration: 5838ms**
 **Server Startup Time: N/A**
 
 ## Summary
 
-❌ **1 TESTS FAILED** - Server has compatibility issues
+✅ **ALL TESTS PASSED** - Server is fully Claude-compatible!
 
 ## Detailed Results
 
 ### ✅ Claude Initialization Sequence
 - **Duration:** 32ms
 - **Details:** {
-  "serverStartupTime": 1014,
+  "serverStartupTime": 1019,
   "initializationTime": 32,
   "toolsFound": 4,
   "expectedTools": 4
 }
 
 ### ✅ find_definition Tool
-- **Duration:** 3977ms
+- **Duration:** 4283ms
 - **Details:** {
   "basicSearchResults": 1,
   "workspaceSearchResults": 1,
@@ -29,15 +29,15 @@
 }
 
 ### ✅ find_references Tool
-- **Duration:** 20ms
+- **Duration:** 21ms
 - **Details:** {
-  "referencesFound": 6,
+  "referencesFound": 8,
   "includeDeclaration": true,
   "scope": "workspace"
 }
 
 ### ✅ rename_symbol Tool
-- **Duration:** 103ms
+- **Duration:** 104ms
 - **Details:** {
   "changesCount": 0,
   "preview": true,
@@ -54,43 +54,35 @@
   "coverage": "comprehensive"
 }
 
-### ❌ Error Scenarios
+### ✅ Error Scenarios
 - **Duration:** 43ms
 - **Details:** {
   "tests": [
     {
       "name": "Invalid tool",
-      "passed": false,
+      "passed": true,
       "details": {
-        "hasJsonRpcError": false,
+        "hasJsonRpcError": true,
         "hasResultError": false,
-        "hasAnyError": false,
-        "result": {
-          "content": [
-            {
-              "type": "text",
-              "text": "\"Unknown tool: invalid_tool_that_does_not_exist. Valid tools: get_snapshot, workflow_safe_rename, workflow_explore_symbol, workflow_quick_patch_checks, workflow_locate_confirm_definition, ast_query, graph_expand, propose_patch, run_checks, apply_snapshot, find_definition, rename_symbol, find_references, explore_codebase, build_symbol_map, plan_rename, apply_rename, text_search, symbol_search, list_files, get_completions, list_symbols, diagnostics, pattern_stats, generate_tests, knowledge_insights, cache_controls, suggest_refactoring\""
-            }
-          ],
-          "isError": false
+        "hasAnyError": true,
+        "correctErrorType": true,
+        "error": {
+          "code": -32601,
+          "message": "MCP error -32601: Unknown tool: invalid_tool_that_does_not_exist"
         }
       }
     },
     {
       "name": "Missing parameters",
-      "passed": false,
+      "passed": true,
       "details": {
-        "hasJsonRpcError": false,
+        "hasJsonRpcError": true,
         "hasResultError": false,
-        "hasAnyError": false,
-        "result": {
-          "content": [
-            {
-              "type": "text",
-              "text": "Missing required parameter: symbol"
-            }
-          ],
-          "isError": false
+        "hasAnyError": true,
+        "isValidationError": true,
+        "error": {
+          "code": -32602,
+          "message": "MCP error -32602: Missing required parameters: symbol"
         }
       }
     },
@@ -119,21 +111,18 @@
     }
   ],
   "summary": {
-    "passed": 2,
-    "failed": 2,
+    "passed": 4,
+    "failed": 0,
     "total": 4,
-    "failedTests": [
-      "Invalid tool",
-      "Missing parameters"
-    ]
+    "failedTests": []
   }
 }
 
 ### ✅ Performance Benchmarks
-- **Duration:** 1365ms
+- **Duration:** 1344ms
 - **Details:** {
-  "toolListAvg": 10.4,
-  "findDefAvg": 57.666666666666664,
+  "toolListAvg": 10.2,
+  "findDefAvg": 50.666666666666664,
   "findRefAvg": 10,
   "requirements": {
     "toolList": "<100ms",
@@ -149,4 +138,4 @@
 
 ## Recommendations
 
-- Fix Error Scenarios: Unknown error
+🎉 No issues found! The server is ready for Claude integration.

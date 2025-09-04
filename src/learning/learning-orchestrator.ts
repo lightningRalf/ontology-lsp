@@ -1138,7 +1138,9 @@ export class LearningOrchestrator {
 
     private setupScheduledPipeline(pipelineId: string, schedule: string): void {
         // In a real implementation, this would use node-cron or similar
-        console.error(`Would setup cron job for pipeline ${pipelineId} with schedule: ${schedule}`);
+        if (!process.env.SILENT_MODE && !process.env.STDIO_MODE) {
+            console.error(`Would setup cron job for pipeline ${pipelineId} with schedule: ${schedule}`);
+        }
     }
 
     private updatePerformanceMetrics(timeMs: number, success: boolean): void {
@@ -1203,17 +1205,23 @@ export class LearningOrchestrator {
 
     private async savePipelineToDatabase(pipeline: LearningPipeline): Promise<void> {
         // Implementation would save pipeline configuration to database
-        console.error(`Would save pipeline ${pipeline.id} to database`);
+        if (!process.env.SILENT_MODE && !process.env.STDIO_MODE) {
+            console.error(`Would save pipeline ${pipeline.id} to database`);
+        }
     }
 
     private async savePipelineStats(pipeline: LearningPipeline): Promise<void> {
         // Implementation would update pipeline statistics in database
-        console.error(`Would update stats for pipeline ${pipeline.id}`);
+        if (!process.env.SILENT_MODE && !process.env.STDIO_MODE) {
+            console.error(`Would update stats for pipeline ${pipeline.id}`);
+        }
     }
 
     private async loadPipelinesFromDatabase(): Promise<void> {
         // Implementation would load additional pipelines from database
-        console.error('Would load additional pipelines from database');
+        if (!process.env.SILENT_MODE && !process.env.STDIO_MODE) {
+            console.error('Would load additional pipelines from database');
+        }
     }
 
     /**
