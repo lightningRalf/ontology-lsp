@@ -74,6 +74,7 @@ vscode-client/out/
 tmp/
 
 # Test artifacts and logs
+test-results.txt
 test-output*.txt
 .e2e-test-workspace/
 .test-results/
