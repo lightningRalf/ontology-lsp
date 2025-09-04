@@ -101,24 +101,24 @@ test:
 # Run unit tests only
 test-unit:
     @echo "🧪 Running unit tests..."
-    bun test test/unit
+    bun test tests/unit
 
 # Run integration tests
 test-integration:
     @echo "🔗 Running integration tests..."
-    bun test test/integration
+    bun test tests/integration
 
 # Run end-to-end tests
 test-e2e:
     @echo "🎯 Running end-to-end tests..."
     @just start-test-servers
-    bun test test/e2e
+    bun test tests/e2e
     @just stop-test-servers
 
 # Run MCP adapter tests
 test-mcp:
     @echo "🤖 Testing MCP adapter..."
-    bun test test/adapters/mcp
+    bun test tests/adapters/mcp
 
 # Test with coverage
 test-coverage:
@@ -176,9 +176,9 @@ backup:
 test-migration:
     @echo "🧪 Testing migration..."
     @echo "Testing core functionality..."
-    bun test test/migration/core.test.ts
+    bun test tests/migration/core.test.ts
     @echo "Testing adapter connections..."
-    bun test test/migration/adapters.test.ts
+    bun test tests/migration/adapters.test.ts
     @echo "✅ Migration tests passed"
 
 # ═══════════════════════════════════════════════════════════════

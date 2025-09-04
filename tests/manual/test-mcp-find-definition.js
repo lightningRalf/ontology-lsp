@@ -8,6 +8,7 @@
 import { spawn } from 'child_process';
 import { createInterface } from 'readline';
 import path from 'path';
+import path from 'path';
 
 class MCPStdioClient {
   constructor(command, args = []) {
@@ -31,8 +32,8 @@ class MCPStdioClient {
       STDIO_MODE: 'true',
       BUN_DISABLE_ANALYTICS: '1',
       BUN_DISABLE_TRANSPILER_CACHE: '1',
-      ONTOLOGY_DB_PATH: '/home/lightningralf/programming/ontology-lsp/.ontology/ontology.db',
-      ONTOLOGY_WORKSPACE: '/home/lightningralf/programming/ontology-lsp'
+      ONTOLOGY_DB_PATH: path.resolve(process.cwd(), '.ontology/ontology.db'),
+      ONTOLOGY_WORKSPACE: process.cwd()
     };
 
     // Spawn the process

@@ -87,6 +87,7 @@ test-results/
 bun-mcp-sse-transport/
 mcp-language-server/
 .claude-trace/
+legacy/
 
 # Local knowledge base / notes
 .obsidian/

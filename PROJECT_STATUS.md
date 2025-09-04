@@ -536,7 +536,7 @@ Notes:
 - JUnit (optional): `bun test --reporter=junit --reporter-outfile=report.xml`
 
 ### 🔁 Quick reproduction
-- Focused: `bun test test/layer1-*.test.ts test/error-handling.test.ts`
+- Focused: `bun test tests/layer1-*.test.ts tests/error-handling.test.ts`
 - File-URI tests: `bun test tests/file-uri-resolution.test.ts --bail=1`
 - Full suite stop-at-first-failure: `bun test --bail=1`
 

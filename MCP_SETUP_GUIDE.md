@@ -27,7 +27,7 @@ bun run test-mcp-server.ts
 ### 4. Run Unit Tests
 
 ```bash
-bun test test/adapters/mcp.test.ts
+bun test tests/adapters/mcp.test.ts
 ```
 
 ## Testing with Claude Desktop
