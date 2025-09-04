@@ -8,14 +8,14 @@ describe('HTTP /api/v1/graph-expand fallback', () => {
   const base = `http://${host}:${port}`;
 
   beforeAll(async () => {
-    process.env.HTTP_PORT = String(port);
+    process.env.HTTP_API_PORT = String(port);
     server = new HTTPServer({ host, port, workspaceRoot: process.cwd(), enableOpenAPI: false });
     await server.start();
   });
 
   afterAll(async () => {
     await server.stop();
-    delete process.env.HTTP_PORT;
+    delete process.env.HTTP_API_PORT;
   });
 
   test('returns 200 and structure for file even if parser unavailable', async () => {

@@ -63,7 +63,7 @@ app.use(
 const sessions: Record<string, SessionRecord> = {};
 const mcpEvents = new EventEmitter();
 
-async function createMcpServer(): Promise<SessionRecord> {
+async function createMcpServer(desiredSid?: string): Promise<SessionRecord> {
     // Initialize core analyzer
     const coreConfig = createDefaultCoreConfig();
     coreConfig.monitoring.enabled = false; // disable periodic metrics for MCP HTTP dogfooding
@@ -108,7 +108,7 @@ async function createMcpServer(): Promise<SessionRecord> {
 
     // Create transport (session id assigned on first initialize)
     const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
+        sessionIdGenerator: () => desiredSid || randomUUID(),
         onsessioninitialized: (sessionId) => {
             // Attach after connect
         },
@@ -149,7 +149,10 @@ app.post('/mcp', async (req, res) => {
             !sessionId && (isInitializeRequest(req.body) || (req.body && req.body.method === 'initialize'))
         ) {
             try {
-                record = await createMcpServer();
+                const preSid = randomUUID();
+                record = await createMcpServer(preSid);
+                // Expose session id on first initialize response for client convenience
+                try { res.setHeader('Mcp-Session-Id', preSid); } catch {}
             } catch (e) {
                 // Log detailed error to help diagnose 500s on initialize
                 // eslint-disable-next-line no-console
@@ -165,6 +168,7 @@ app.post('/mcp', async (req, res) => {
             // When session is initialized, store it
             transport.onsessioninitialized = (sid: string) => {
                 sessions[sid] = record!;
+                try { res.setHeader('Mcp-Session-Id', sid); } catch {}
             };
             transport.onclose = () => {
                 if (transport.sessionId) delete sessions[transport.sessionId];

@@ -1148,9 +1148,9 @@ export class CodeAnalyzer {
     async findDefinition(request: FindDefinitionRequest): Promise<FindDefinitionResult>;
     async findDefinition(file: string, input?: { line?: number; character?: number; symbol?: string }): Promise<any>;
     async findDefinition(arg1: any, arg2?: any): Promise<any> {
-        // Lazy init for E2E/legacy calls
+        // Require explicit initialization for request path
         if (!this.initialized) {
-            await this.initialize();
+            throw new Error('CodeAnalyzer not initialized');
         }
 
         // Legacy/E2E path: (file, input) → Definition[]

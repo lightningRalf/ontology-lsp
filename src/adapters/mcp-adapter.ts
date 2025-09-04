@@ -168,7 +168,9 @@ export class MCPAdapter {
                 // Validate tool name early and return structured error (do not throw)
                 const validTools = ToolRegistry.list().map((t) => t.name).concat(['suggest_refactoring']);
                 if (!validTools.includes(name)) {
-                    throw new CoreError('UnknownTool', `Unknown tool: ${name}. Valid tools: ${validTools.join(', ')}`);
+                    const msg = `Unknown tool: ${name}. Valid tools: ${validTools.join(', ')}`;
+                    // Return MCP-style error payload expected by tests without throwing
+                    return { error: true, message: msg } as any;
                 }
 
                 const startTime = Date.now();

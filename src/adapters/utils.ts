@@ -187,3 +187,93 @@ export function createDefaultCoreConfig(): CoreConfig {
   (cfg as any).monitoring = { ...(cfg as any).monitoring, enabled: false };
   return cfg as CoreConfig;
 }
+
+// Pretty-format helpers for CLI output (kept simple and robust)
+export function formatDefinitionForCli(def: any): string {
+  try {
+    const uri = def.uri ?? def.location?.uri ?? '';
+    const range = def.range ?? def.location?.range ?? {};
+    const start = range.start ?? { line: 0, character: 0 };
+    const kind = def.kind ?? def.type ?? '';
+    const name = def.name ?? def.identifier ?? '';
+    const pos = `${(start.line ?? 0) + 1}:${(start.character ?? 0) + 1}`;
+    return `${uri}:${pos} [${kind}] ${name}`.trim();
+  } catch {
+    return String(def);
+  }
+}
+
+export function formatReferenceForCli(ref: any): string {
+  try {
+    const uri = ref.uri ?? ref.location?.uri ?? '';
+    const range = ref.range ?? ref.location?.range ?? {};
+    const start = range.start ?? { line: 0, character: 0 };
+    const kind = ref.kind ?? ref.type ?? '';
+    const name = ref.name ?? ref.identifier ?? '';
+    const pos = `${(start.line ?? 0) + 1}:${(start.character ?? 0) + 1}`;
+    return `${uri}:${pos} [${kind}] ${name}`.trim();
+  } catch {
+    return String(ref);
+  }
+}
+
+export function formatCompletionForCli(item: any): string {
+  try {
+    const label = item.label ?? item.text ?? '';
+    const detail = item.detail ? ` — ${item.detail}` : '';
+    const kind = item.kind ? ` [${item.kind}]` : '';
+    return `${label}${kind}${detail}`.trim();
+  } catch {
+    return String(item);
+  }
+}
+
+// LSP mappers (simple, tolerant)
+export function definitionToLspLocation(def: any): { uri: string; range: any } {
+  const uri = normalizeUri(def.uri ?? def.location?.uri ?? 'file://unknown');
+  const range = normalizeRange((def.range ?? def.location?.range) as any);
+  return { uri, range };
+}
+
+export function referenceToLspLocation(ref: any): { uri: string; range: any } {
+  const uri = normalizeUri(ref.uri ?? ref.location?.uri ?? 'file://unknown');
+  const range = normalizeRange((ref.range ?? ref.location?.range) as any);
+  return { uri, range };
+}
+
+export function completionToLspItem(item: any): { label: string; detail?: string; kind?: number } {
+  // Map a few common kinds to LSP numeric kinds; default to Text(1)
+  const kindMap: Record<string, number> = {
+    text: 1,
+    method: 2,
+    function: 3,
+    constructor: 4,
+    field: 5,
+    variable: 6,
+    class: 7,
+    interface: 8,
+    module: 9,
+    property: 10,
+  };
+  const label = String(item.label ?? item.text ?? '');
+  const detail = item.detail ? String(item.detail) : undefined;
+  const kindKey = String(item.kind ?? '').toLowerCase();
+  const kind = kindMap[kindKey] ?? 1;
+  return { label, detail, kind };
+}
+
+export function workspaceEditToLsp(edit: any): any {
+  // If already in { changes: { uri: TextEdit[] } } shape, return as-is
+  if (edit && edit.changes && typeof edit.changes === 'object') return edit;
+  // If in array form, convert
+  if (Array.isArray(edit)) {
+    const changes: Record<string, any[]> = {};
+    for (const e of edit) {
+      const uri = normalizeUri(e.uri ?? e.file ?? 'file://unknown');
+      const edits = (e.edits ?? e.changes ?? []).map((te: any) => ({ range: normalizeRange(te.range as any), newText: te.newText }));
+      changes[uri] = (changes[uri] || []).concat(edits);
+    }
+    return { changes };
+  }
+  return { changes: {} };
+}

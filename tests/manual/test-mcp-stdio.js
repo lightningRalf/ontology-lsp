@@ -7,7 +7,6 @@ const { spawn } = require('node:child_process');
 
 // Start the stdio server
 const server = spawn('bun', ['run', 'src/stdio.ts'], {
-  cwd: './mcp-ontology-server',
   stdio: ['pipe', 'pipe', 'pipe']
 });
 
