@@ -1,7 +1,7 @@
 # Claude-MCP Integration Test Report
 
 **Overall Result: 6/7 tests passed**
-**Total Duration: 6064ms**
+**Total Duration: 5551ms**
 **Server Startup Time: N/A**
 
 ## Summary
@@ -20,7 +20,7 @@
 }
 
 ### ✅ find_definition Tool
-- **Duration:** 4354ms
+- **Duration:** 3977ms
 - **Details:** {
   "basicSearchResults": 1,
   "workspaceSearchResults": 1,
@@ -29,15 +29,15 @@
 }
 
 ### ✅ find_references Tool
-- **Duration:** 21ms
+- **Duration:** 20ms
 - **Details:** {
-  "referencesFound": 8,
+  "referencesFound": 6,
   "includeDeclaration": true,
   "scope": "workspace"
 }
 
 ### ✅ rename_symbol Tool
-- **Duration:** 113ms
+- **Duration:** 103ms
 - **Details:** {
   "changesCount": 0,
   "preview": true,
@@ -46,7 +46,7 @@
 }
 
 ### ✅ generate_tests Tool
-- **Duration:** 12ms
+- **Duration:** 11ms
 - **Details:** {
   "status": "not_implemented",
   "target": "src/servers/mcp-fast.ts",
@@ -130,11 +130,11 @@
 }
 
 ### ✅ Performance Benchmarks
-- **Duration:** 1489ms
+- **Duration:** 1365ms
 - **Details:** {
   "toolListAvg": 10.4,
-  "findDefAvg": 98.66666666666667,
-  "findRefAvg": 10.666666666666666,
+  "findDefAvg": 57.666666666666664,
+  "findRefAvg": 10,
   "requirements": {
     "toolList": "<100ms",
     "findDef": "<5000ms",

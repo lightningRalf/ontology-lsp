@@ -234,7 +234,11 @@ export class MCPAdapter {
                 } as any;
             });
         } catch (error) {
-            // Always return structured MCP error payload instead of throwing
+            // Let servers map CoreError to protocol-specific errors
+            if (error instanceof CoreError) {
+                throw error;
+            }
+            // Fallback: return adapter-shaped message for non-core errors
             return handleAdapterError(error, 'mcp');
         }
     }
