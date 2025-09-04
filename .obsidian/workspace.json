@@ -164,6 +164,7 @@
   },
   "active": "b50f4ac68bdf0f49",
   "lastOpenFiles": [
+    "tests/mcp-http-init.test.ts",
     "bin/sync-env-ports.sh",
     "dist/mcp-fast/mcp-fast.js",
     "dist/mcp-fast/mcp-fast.js.map",
@@ -174,7 +175,6 @@
     "home/lightningralf/programming",
     "home/lightningralf",
     "home",
-    "scripts/dogfood-harden-path.ts",
     "docs/adapter-error-shapes.md",
     "docs/videos/02-find.gif",
     "docs/videos/01-init.gif",

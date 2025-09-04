@@ -14,6 +14,7 @@ import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { overlayStore } from '../core/overlay-store.js';
+import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ToolRegistry } from '../core/tools/registry.js';
 import { DefinitionKind } from '../core/types.js';
 import { createValidationError, type ErrorContext, withMcpErrorHandling } from '../core/utils/error-handler.js';
@@ -134,9 +135,9 @@ export class MCPAdapter {
                 // Validate tool name early and return structured error (do not throw)
                 const validTools = ToolRegistry.list().map((t) => t.name).concat(['suggest_refactoring']);
                 if (!validTools.includes(name)) {
-                    return handleAdapterError(
-                        new Error(`Unknown tool: ${name}. Valid tools: ${validTools.join(', ')}`),
-                        'mcp'
+                    throw new McpError(
+                        ErrorCode.MethodNotFound,
+                        `Unknown tool: ${name}. Valid tools: ${validTools.join(', ')}`
                     );
                 }
 
@@ -730,7 +731,7 @@ export class MCPAdapter {
             } catch {}
         }
         if (!symbol && !uri) {
-            return handleAdapterError(new Error("Missing required parameter: symbol"), 'mcp');
+            throw new McpError(ErrorCode.InvalidParams, 'Missing required parameter: symbol');
         }
 
         // Ensure core is initialized for E2E/local flows

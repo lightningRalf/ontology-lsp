@@ -192,10 +192,11 @@ export class FastMCPServer {
                     console.error(`Tool call failed: ${name}`, error);
                 }
 
-                throw new McpError(
-                    ErrorCode.InternalError,
-                    `Tool ${name} failed: ${error instanceof Error ? error.message : String(error)}`
-                );
+                // Preserve McpError codes so clients see proper JSON-RPC errors
+                if (error instanceof McpError) {
+                    throw error;
+                }
+                throw new McpError(ErrorCode.InternalError, `Tool ${name} failed: ${error instanceof Error ? error.message : String(error)}`);
             }
         });
     }

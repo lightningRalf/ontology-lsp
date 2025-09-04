@@ -37,10 +37,9 @@ async function main() {
   const renameTarget = 'TestFunction';
 
   const cfg = createDefaultCoreConfig();
-  // Keep this fast and deterministic
-  (cfg.layers as any).layer1.grep.defaultTimeout = 1500;
-  (cfg.layers as any).layer1.glob.defaultTimeout = 1000;
-  (cfg.layers as any).layer2.parseTimeout = 40;
+  // Keep this fast and deterministic using current config knobs
+  (cfg.layers as any).layer1.timeout = 1500;
+  (cfg.layers as any).layer2.timeout = 100; // AST budget
   process.env.CI = process.env.CI || '1';
   // Suppress periodic monitoring logs during script run
   process.env.SILENT_MODE = '1';

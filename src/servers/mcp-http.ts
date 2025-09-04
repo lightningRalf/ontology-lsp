@@ -91,10 +91,10 @@ async function createMcpServer(): Promise<SessionRecord> {
                 error: error instanceof Error ? error.message : String(error),
                 ts: Date.now(),
             });
-            throw new McpError(
-                ErrorCode.InternalError,
-                `Tool ${name} failed: ${error instanceof Error ? error.message : String(error)}`
-            );
+            if (error instanceof McpError) {
+                throw error;
+            }
+            throw new McpError(ErrorCode.InternalError, `Tool ${name} failed: ${error instanceof Error ? error.message : String(error)}`);
         }
     });
 
@@ -299,7 +299,19 @@ app.post('/mcp', async (req, res) => {
         } else if (
             !sessionId && (isInitializeRequest(req.body) || (req.body && req.body.method === 'initialize'))
         ) {
-            record = await createMcpServer();
+            try {
+                record = await createMcpServer();
+            } catch (e) {
+                // Log detailed error to help diagnose 500s on initialize
+                // eslint-disable-next-line no-console
+                console.error('[MCP HTTP] createMcpServer failed:', e);
+                res.status(500).json({
+                    jsonrpc: '2.0',
+                    error: { code: -32603, message: 'Initialization failed', data: String(e instanceof Error ? e.message : e) },
+                    id: req.body?.id ?? null,
+                });
+                return;
+            }
             const transport = record.transport;
             // When session is initialized, store it
             transport.onsessioninitialized = (sid: string) => {
@@ -317,7 +329,20 @@ app.post('/mcp', async (req, res) => {
             return;
         }
 
-        await record!.transport.handleRequest(req as any, res as any, req.body);
+        try {
+            await record!.transport.handleRequest(req as any, res as any, req.body);
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('[MCP HTTP] handleRequest error:', e);
+            if (!res.headersSent) {
+                res.status(500).json({
+                    jsonrpc: '2.0',
+                    error: { code: -32603, message: 'Internal server error', data: String(e instanceof Error ? e.message : e) },
+                    id: req.body?.id ?? null,
+                });
+            }
+            return;
+        }
 
         // After handling initialize, Streamable HTTP transport may have assigned a session ID
         // Ensure it's stored so subsequent requests can resolve the session without requiring
@@ -327,11 +352,13 @@ app.post('/mcp', async (req, res) => {
             sessions[sid] = record!;
         }
     } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('[MCP HTTP] Uncaught error:', error);
         if (!res.headersSent) {
             res.status(500).json({
                 jsonrpc: '2.0',
-                error: { code: -32603, message: 'Internal server error' },
-                id: null,
+                error: { code: -32603, message: 'Internal server error', data: String(error instanceof Error ? error.message : error) },
+                id: req.body?.id ?? null,
             });
         }
     }

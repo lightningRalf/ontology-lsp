@@ -1,43 +1,43 @@
 # Claude-MCP Integration Test Report
 
-**Overall Result: 7/7 tests passed**
-**Total Duration: 25257ms**
+**Overall Result: 6/7 tests passed**
+**Total Duration: 6064ms**
 **Server Startup Time: N/A**
 
 ## Summary
 
-✅ **ALL TESTS PASSED** - Server is fully Claude-compatible!
+❌ **1 TESTS FAILED** - Server has compatibility issues
 
 ## Detailed Results
 
 ### ✅ Claude Initialization Sequence
-- **Duration:** 56ms
+- **Duration:** 32ms
 - **Details:** {
-  "serverStartupTime": 1025,
-  "initializationTime": 56,
+  "serverStartupTime": 1014,
+  "initializationTime": 32,
   "toolsFound": 4,
   "expectedTools": 4
 }
 
 ### ✅ find_definition Tool
-- **Duration:** 13868ms
+- **Duration:** 4354ms
 - **Details:** {
-  "basicSearchResults": 0,
-  "workspaceSearchResults": 54,
-  "fuzzySearchResults": 0,
-  "nonExistentResults": 0
+  "basicSearchResults": 1,
+  "workspaceSearchResults": 1,
+  "fuzzySearchResults": 1,
+  "nonExistentResults": 1
 }
 
 ### ✅ find_references Tool
-- **Duration:** 1635ms
+- **Duration:** 21ms
 - **Details:** {
-  "referencesFound": 1,
+  "referencesFound": 8,
   "includeDeclaration": true,
   "scope": "workspace"
 }
 
 ### ✅ rename_symbol Tool
-- **Duration:** 21ms
+- **Duration:** 113ms
 - **Details:** {
   "changesCount": 0,
   "preview": true,
@@ -46,7 +46,7 @@
 }
 
 ### ✅ generate_tests Tool
-- **Duration:** 11ms
+- **Duration:** 12ms
 - **Details:** {
   "status": "not_implemented",
   "target": "src/servers/mcp-fast.ts",
@@ -54,35 +54,43 @@
   "coverage": "comprehensive"
 }
 
-### ✅ Error Scenarios
-- **Duration:** 8264ms
+### ❌ Error Scenarios
+- **Duration:** 43ms
 - **Details:** {
   "tests": [
     {
       "name": "Invalid tool",
-      "passed": true,
+      "passed": false,
       "details": {
-        "hasJsonRpcError": true,
+        "hasJsonRpcError": false,
         "hasResultError": false,
-        "hasAnyError": true,
-        "correctErrorType": true,
-        "error": {
-          "code": -32603,
-          "message": "MCP error -32603: Tool invalid_tool_that_does_not_exist failed: MCP error -32603: Operation failed after 4 attempts: MCP error -32602: Unknown tool: invalid_tool_that_does_not_exist. Valid tools: find_definition, find_references, rename_symbol, generate_tests"
+        "hasAnyError": false,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "\"Unknown tool: invalid_tool_that_does_not_exist. Valid tools: get_snapshot, workflow_safe_rename, workflow_explore_symbol, workflow_quick_patch_checks, workflow_locate_confirm_definition, ast_query, graph_expand, propose_patch, run_checks, apply_snapshot, find_definition, rename_symbol, find_references, explore_codebase, build_symbol_map, plan_rename, apply_rename, text_search, symbol_search, list_files, get_completions, list_symbols, diagnostics, pattern_stats, generate_tests, knowledge_insights, cache_controls, suggest_refactoring\""
+            }
+          ],
+          "isError": false
         }
       }
     },
     {
       "name": "Missing parameters",
-      "passed": true,
+      "passed": false,
       "details": {
-        "hasJsonRpcError": true,
+        "hasJsonRpcError": false,
         "hasResultError": false,
-        "hasAnyError": true,
-        "isValidationError": true,
-        "error": {
-          "code": -32603,
-          "message": "MCP error -32603: Tool find_definition failed: MCP error -32602: Operation failed after 4 attempts: MCP error -32602: Missing required parameter: symbol"
+        "hasAnyError": false,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "Missing required parameter: symbol"
+            }
+          ],
+          "isError": false
         }
       }
     },
@@ -111,19 +119,22 @@
     }
   ],
   "summary": {
-    "passed": 4,
-    "failed": 0,
+    "passed": 2,
+    "failed": 2,
     "total": 4,
-    "failedTests": []
+    "failedTests": [
+      "Invalid tool",
+      "Missing parameters"
+    ]
   }
 }
 
 ### ✅ Performance Benchmarks
-- **Duration:** 1402ms
+- **Duration:** 1489ms
 - **Details:** {
-  "toolListAvg": 10.2,
-  "findDefAvg": 63,
-  "findRefAvg": 14,
+  "toolListAvg": 10.4,
+  "findDefAvg": 98.66666666666667,
+  "findRefAvg": 10.666666666666666,
   "requirements": {
     "toolList": "<100ms",
     "findDef": "<5000ms",
@@ -138,4 +149,4 @@
 
 ## Recommendations
 
-🎉 No issues found! The server is ready for Claude integration.
+- Fix Error Scenarios: Unknown error
