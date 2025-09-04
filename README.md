@@ -68,6 +68,10 @@
 └─────────────────┘
 ```
 
+### Architecture Decisions
+
+- ADR-0001: Prime Ontology Engine and Triple Graph Storage — docs/adr/0001-prime-ontology-triple-graph.md
+
 ## Installation
 
 ### Prerequisites

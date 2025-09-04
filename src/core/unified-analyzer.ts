@@ -581,11 +581,24 @@ export class CodeAnalyzer {
 
         // Optional Layer 4 augmentation: conceptual representations
         try {
-            const augment =
-                process.env.L4_AUGMENT_EXPLORE === '1' ||
-                (this.config as any)?.layers?.layer4?.augmentExplore ||
-                !!(request as any).conceptual ||
-                !!(request as any).augmentConcepts;
+            // Tri-state resolution order: env override -> request override -> config default
+            const envFlag = (process.env.L4_AUGMENT_EXPLORE || '').toLowerCase();
+            const envOverride = envFlag
+                ? ['1', 'true', 'on', 'yes'].includes(envFlag)
+                    ? true
+                    : ['0', 'false', 'off', 'no'].includes(envFlag)
+                        ? false
+                        : undefined
+                : undefined;
+            const reqObj: any = request as any;
+            const reqOverride =
+                typeof reqObj?.conceptual === 'boolean'
+                    ? (reqObj.conceptual as boolean)
+                    : typeof reqObj?.augmentConcepts === 'boolean'
+                        ? (reqObj.augmentConcepts as boolean)
+                        : undefined;
+            const cfgDefault = (this.config as any)?.layers?.layer4?.augmentExplore ?? false;
+            const augment = (envOverride ?? reqOverride ?? cfgDefault) === true;
             if (augment && (this.config as any)?.layers?.layer4?.enabled) {
                 const layer4: any = (this as any).layerManager?.getLayer('layer4');
                 const engine = layer4 && typeof layer4.getOntologyEngine === 'function' ? layer4.getOntologyEngine() : null;

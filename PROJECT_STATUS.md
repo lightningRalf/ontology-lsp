@@ -90,6 +90,12 @@ Hybrid plan summary (2025‑09‑01):
   - Decision (Fix‑Bugs‑First): Defer Postgres and Triple Store feature work; keep adapters stubbed/in‑memory for parity only. Focus on L1–L4 with SQLite stability.
 - Observability and SLOs per layer (p95/p99, error rates, budgets):
   - Emit layer-specific metrics; dashboards for L3/L4/L5 decisions; live MCP events stream integrated in web UI.
+  - Adopt OpenTelemetry for prime/storage ops; export to SQL JSONB via collector (see ADR-0001 / NEXT_STEPS 2.2).
+
+- ADR-0001: Prime Ontology + Triple Graph
+  - Decision recorded in docs/adr/0001-prime-ontology-triple-graph.md.
+  - Plan: add `prime_ontology` tool across MCP stdio/HTTP, HTTP, CLI; implement PrimeEngine (bounded L1/L2/L3→L4 seeding), triple-compatible storage under StoragePort, and plugin APIs for L4/L5 strategies and model providers.
+  - Status: ADR written; NEXT_STEPS updated; scaffolding next.
 - CI reliability and type safety:
   - Resolve outstanding tsc errors in adapters; enable strict mode
   - Reduce flaky perf tests; fix deterministic budgets in CI
@@ -177,8 +183,9 @@ ontology-lsp/
 - L1–L3 pipeline stabilized for dogfooding:
   - Layer 3 symbol map uses AST‑guided import/export extraction over candidate files (no coarse scans).
   - Rename planning prefers AST‑validated references for safer WorkspaceEdit previews.
-- L4 conceptual augmentation is available (opt‑in):
-  - Core `exploreCodebase` merges conceptual representations when enabled via `L4_AUGMENT_EXPLORE=1`, `layers.layer4.augmentExplore`, or request `{ conceptual: true }`.
+- L4 conceptual augmentation default-on (with opt‑out):
+  - Core `exploreCodebase` augments with conceptual representations by default (`layers.layer4.augmentExplore: true`).
+  - Opt‑out via env `L4_AUGMENT_EXPLORE=0` or per-request `{ conceptual: false }`.
 - MCP prompts (SDK) added to guide workflows:
   - `plan-safe-rename`, `investigate-symbol`, `quick-patch-checks` with completable arguments (symbols, files, commands).
   - Prompts live on MCP HTTP (7001) and return messages describing recommended tool sequences.
@@ -843,3 +850,10 @@ Impact
 - No more long silent waits or periodic metrics contamination in stdio
 - Safer MCP adapter behavior and robust graph expand results
 Metrics and docs now reflect the new numbering.
+### ADR-0001: Prime Ontology + Triple Graph (Recorded)
+- Added ADR: docs/adr/0001-prime-ontology-triple-graph.md
+- Scope: `prime_ontology` tool (MCP stdio/HTTP parity, HTTP, CLI), PrimeEngine (budgeted L1/L2/L3→L4 seeding), triple‑compatible storage via StoragePort, pluginable strategies for L4/L5, model providers via MCP bridge, and OpenTelemetry to SQL JSONB.
+- NEXT_STEPS updated with concrete tasks under section 2.2.
+
+### Ontology‑First Workflow Tweaks
+- MCP workflows (`workflow_explore_symbol`, `workflow_locate_confirm_definition`, `workflow_safe_rename`) consult L4 first to infer a seed file when `file` is omitted; improves precision under the same budgets; graceful fallback when L4 lacks data.

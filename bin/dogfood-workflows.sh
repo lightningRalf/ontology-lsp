@@ -14,6 +14,7 @@ MCP_PORT=$(grep -E '^MCP_HTTP_PORT=' .env | cut -d= -f2- || echo 7001)
 
 init() {
   curl -i -sS -X POST \
+    -H 'accept: application/json, text/event-stream' \
     -H 'content-type: application/json' \
     "http://localhost:${MCP_PORT}/mcp" \
     -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"dogfood","version":"1.0"}}}'
@@ -30,7 +31,10 @@ echo "MCP_SESSION_ID=$SID"
 call() {
   local name="$1"; shift
   local args="$1"; shift || true
-  curl -sS -X POST -H 'content-type: application/json' -H "Mcp-Session-Id: $SID" \
+  curl -sS -X POST \
+    -H 'accept: application/json, text/event-stream' \
+    -H 'content-type: application/json' \
+    -H "Mcp-Session-Id: $SID" \
     "http://localhost:${MCP_PORT}/mcp" \
     -d "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"$name\",\"arguments\":$args}}"
 }
@@ -56,4 +60,3 @@ EOF
 call workflow_quick_patch_checks "{\"patch\":$(jq -Rs . <<< "$PATCH"),\"timeoutSec\": 120}" | jq -r '.result.content[0].text' | head -c 400; echo
 
 exit 0
-

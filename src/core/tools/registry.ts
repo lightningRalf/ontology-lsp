@@ -379,18 +379,12 @@ export class ToolRegistry {
                 required: ['action'],
             },
         },
-    ];
-
-    static list(): ToolSpec[] {
-        return [...ToolRegistry.tools];
-    }
-}
         // WORKFLOWS (renamed, preferred)
         {
             name: 'rename_safely',
             title: 'Rename Safely (Snapshot + Checks)',
             description:
-                'Use for: safe symbol rename across files. Avoid: ad‑hoc search/replace. Returns: { ok, changes, snapshot, next_actions }',
+                'Use for: safe symbol rename across files. Avoid: ad-hoc search/replace. Returns: { ok, changes, snapshot, next_actions }',
             category: 'workflow',
             inputSchema: {
                 type: 'object',
@@ -444,7 +438,7 @@ export class ToolRegistry {
             name: 'locate_confirm_definition',
             title: 'Locate & Confirm Definition',
             description:
-                'Use for: precise go‑to‑def. Avoid: guessing. Returns: { attempts: [fast, precise], definitions }',
+                'Use for: precise go-to-def. Avoid: guessing. Returns: { attempts: [fast, precise], definitions }',
             category: 'workflow',
             inputSchema: {
                 type: 'object',
@@ -488,7 +482,6 @@ export class ToolRegistry {
                 required: ['patch'],
             },
         },
-        // META: Execute Intent (auto-selects a high-value workflow)
         {
             name: 'execute_intent',
             title: 'Execute Intent (Auto-Select Workflow)',
@@ -513,3 +506,9 @@ export class ToolRegistry {
                 },
             },
         },
+    ];
+
+    static list(): ToolSpec[] {
+        return [...ToolRegistry.tools];
+    }
+}

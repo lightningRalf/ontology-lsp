@@ -361,6 +361,11 @@ export interface Layer4Config {
     adapter?: 'sqlite' | 'postgres' | 'triplestore';
     // Preferred ontology DB path (for sqlite adapter)
     dbPath?: string;
+    // When true, explore_codebase always augments definitions with
+    // conceptual representations from the ontology (Layer 4), even if the
+    // request doesn't pass conceptual=true. Can still be gated by env flags
+    // or adapter-specific behaviors.
+    augmentExplore?: boolean;
 }
 
 export interface Layer5Config {

@@ -579,3 +579,37 @@ Goal: Ship LLM‑friendly, snapshot‑aware tool surface with hybrid routing.
 
 - Integrate SCIP callers/callees where available; for non-SCIP repos, add a lightweight project graph seeded from declarations/import graph.
 - Validate against goldens; switch to SCIP by default when fresh; keep grep+AST as fallback.
+### 2.2 Ontology Prime + Triple Graph (New)
+
+Goal: implement ADR-0001 (PrimeEngine and triple-graph-compatible storage), with pluginable strategies for L4/L5 and telemetry via OpenTelemetry.
+
+- Reference: ADR-0001 — docs/adr/0001-prime-ontology-triple-graph.md
+
+- Tooling (Core & Adapters)
+  - [ ] Add `prime_ontology` to ToolRegistry with schema & defaults (visible to MCP stdio/HTTP, HTTP, CLI).
+  - [ ] MCP stdio/HTTP handlers: stream progress and return summary JSON; enforce budgets (timeout, maxItems).
+  - [ ] HTTP: `POST /api/v1/ontology/prime` endpoint with same schema; CLI alias `ontology-lsp ontology prime`.
+
+- PrimeEngine (Layered, budgeted)
+  - [ ] Scaffold `src/ontology/prime/engine.ts` (batching, layer timings, dryRun support).
+  - [ ] Built-in strategies (L4): `symbols_only`, `scan_neighbors`, `project_sample` (categories: seeding/inference/consolidation/validation/import/export).
+  - [ ] Respect ignore rules; chunk by N files; attribute time to L1/L2/L3/L4; skip L5 by default.
+
+- Triple Graph Mapping (StoragePort)
+  - [ ] Extend TripleStoreStorageAdapter with explicit SPO mapping for Concept/Representation/Relation.
+  - [ ] Add import/export strategies (`ontology_export_snapshot`, `ontology_import_jsonl`).
+  - [ ] Keep StoragePort contracts stable; no leakage to higher layers.
+
+- Plugin System (L4/L5 + Model Providers)
+  - [ ] Plugin API: `registerOntologyStrategy`, `registerPatternStrategy`, `registerModelProvider` with minimal, versioned contracts.
+  - [ ] Security: default no-network; network only via ModelProviders using MCP bridges; enforce budgets.
+  - [ ] Ship two example plugins (one L4 inference strategy; one L5 learning strategy) with docs.
+
+- Telemetry (OpenTelemetry → SQL JSONB)
+  - [ ] Add spans: `code.analyzer.prime`, `prime.batch`, `l1.search`, `l2.parse`, `l3.symbol_map`, `l4.persist`, `plugin.run`, `model.invoke`.
+  - [ ] Attributes: layer, strategy_name, strategy_category, item_count, budget_ms, depth, max_items, plugin_name, provider_name, storage_adapter.
+  - [ ] Provide local collector config writing to SQL jsonb; add DDL and views; surface aggregates in `/monitoring`.
+
+- Docs
+  - [ ] Write ADR-0001 (done) and link from README/NEXT_STEPS. See docs/adr/0001-prime-ontology-triple-graph.md
+  - [ ] Authoring guide for strategy/plugin creators (categories, examples, budgets, telemetry).

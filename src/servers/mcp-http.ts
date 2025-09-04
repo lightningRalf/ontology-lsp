@@ -117,9 +117,22 @@ async function createMcpServer(): Promise<SessionRecord> {
     // Connect server to transport
     await server.connect(transport);
 
-    // Prompts and resources (shared module)
-    registerCommonPrompts(server);
-    registerCommonResources(server);
+    // Prompts and resources (shared module) — guard for SDKs without prompt support
+    try {
+        // @ts-expect-error: older SDKs may not have registerPrompt
+        if (typeof (server as any).registerPrompt === 'function') {
+            registerCommonPrompts(server);
+        }
+    } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[MCP HTTP] Prompts registration skipped:', (e as Error)?.message || String(e));
+    }
+    try {
+        registerCommonResources(server);
+    } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[MCP HTTP] Resources registration skipped:', (e as Error)?.message || String(e));
+    }
 
     return { server, transport, analyzer, adapter };
 }

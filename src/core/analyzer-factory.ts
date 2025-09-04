@@ -83,9 +83,10 @@ class Layer2Adapter extends LayerAdapter {
 
     private treeSitter: TreeSitterLayer;
 
-    constructor(config: any) {
+    constructor(config: any, ontology?: OntologyEngine) {
         super();
-        this.treeSitter = new TreeSitterLayer(config);
+        // Optionally inject ontology engine to enrich relevance and concept inference
+        this.treeSitter = new TreeSitterLayer(config, ontology);
     }
 
     getTreeSitter(): TreeSitterLayer {
@@ -134,6 +135,15 @@ class Layer4Adapter extends LayerAdapter {
 
     getPatternLearner(): PatternLearner {
         return this.patternLearner;
+    }
+
+    // Lightweight stats surface used by adapters (MCP/HTTP)
+    async getPatternStatistics(): Promise<any> {
+        try {
+            return await this.patternLearner.getStatistics();
+        } catch (e) {
+            return { error: (e as Error)?.message || String(e) };
+        }
     }
 }
 
@@ -197,6 +207,9 @@ export class AnalyzerFactory {
                     enabled: true,
                     adapter: 'sqlite',
                     dbPath: '.ontology/ontology.db',
+                    // Enable conceptual augmentation by default so explore_codebase
+                    // returns ontology-backed hints without needing a flag.
+                    augmentExplore: true,
                 },
                 layer5: {
                     enabled: true,
@@ -295,13 +308,6 @@ export class AnalyzerFactory {
             },
         });
 
-        const layer2 = new Layer2Adapter({
-            enabled: fullConfig.layers.layer2.enabled,
-            timeout: fullConfig.layers.layer2.timeout,
-            languages: fullConfig.layers.layer2.languages,
-            maxFileSize: fullConfig.layers.layer2.maxFileSize.toString(),
-        });
-
         const ontologyDbPath = fullConfig.layers.layer4?.dbPath || fullConfig.layers.layer3.dbPath;
         const layer3Planner = new PlannerLayer();
         const storage = createStorageAdapter({
@@ -310,6 +316,13 @@ export class AnalyzerFactory {
             dbPath: ontologyDbPath,
         } as any);
         const layer4Ont = new Layer3Adapter(storage);
+
+        const layer2 = new Layer2Adapter({
+            enabled: fullConfig.layers.layer2.enabled,
+            timeout: fullConfig.layers.layer2.timeout,
+            languages: fullConfig.layers.layer2.languages,
+            maxFileSize: fullConfig.layers.layer2.maxFileSize.toString(),
+        }, layer4Ont.getOntologyEngine());
 
         const layer5Pat = new Layer4Adapter(ontologyDbPath, {
             learningThreshold: (fullConfig.layers as any).layer5?.learningThreshold ?? 3,

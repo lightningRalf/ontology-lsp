@@ -120,6 +120,35 @@ export class MCPAdapter {
         }));
     }
 
+    // --- Ontology (L4) helpers to enrich workflows ---
+    private getOntologyEngine(): any | null {
+        try {
+            const lm: any = (this.coreAnalyzer as any).layerManager;
+            const l4 = lm?.getLayer?.('layer4');
+            if (l4 && typeof l4.getOntologyEngine === 'function') return l4.getOntologyEngine();
+        } catch {}
+        return null;
+    }
+
+    private async pickOntologySeedFile(symbol: string): Promise<string | undefined> {
+        const engine = this.getOntologyEngine();
+        if (!engine) return undefined;
+        try { await engine.ensureInitialized?.(); } catch {}
+        try {
+            // Prefer non-strict to allow inference/creation when missing
+            const concept = await (engine.findConcept?.(symbol) ?? engine.findConceptStrict?.(symbol));
+            if (!concept) return undefined;
+            let bestUri: string | undefined;
+            let bestCount = -1;
+            for (const [_, rep] of concept.representations) {
+                const uri = (rep as any)?.location?.uri as string | undefined;
+                const occ = (rep as any)?.occurrences ?? 0;
+                if (uri && occ >= bestCount) { bestCount = occ; bestUri = uri; }
+            }
+            return bestUri;
+        } catch { return undefined; }
+    }
+
     /**
      * Handle MCP tool call with enhanced error handling
      */
@@ -365,7 +394,11 @@ export class MCPAdapter {
     private async handleWorkflowExploreSymbol(args: Record<string, any>) {
         const symbol = String(args?.symbol || '').trim();
         if (!symbol) return { content: [{ type: 'text', text: 'symbol required' }], isError: true };
-        const file = typeof args?.file === 'string' ? args.file : undefined;
+        let file = typeof args?.file === 'string' ? args.file : undefined;
+        if (!file) {
+            // Ontology-first: use a known representation location to scope downstream steps
+            file = (await this.pickOntologySeedFile(symbol)) || undefined;
+        }
         const precise = (args?.precise ?? true) as boolean;
         const depth = typeof args?.depth === 'number' ? args.depth : 1;
         const limit = typeof args?.limit === 'number' ? args.limit : 50;
@@ -378,12 +411,11 @@ export class MCPAdapter {
             { symbol, file, maxFiles: Math.min(20, limit), astOnly: true },
             { component: 'MCPAdapter', operation: 'workflow_explore_symbol', timestamp: Date.now() }
         );
-        const neighbors = await this.handleGraphExpand({
-            symbol,
-            edges: ['imports', 'exports', 'callers', 'callees'],
-            depth,
-            limit,
-        });
+        const neighbors = await this.handleGraphExpand(
+            file
+                ? { file, edges: ['imports', 'exports', 'callers', 'callees'], depth, limit }
+                : { symbol, edges: ['imports', 'exports', 'callers', 'callees'], depth, limit }
+        );
 
         const out = {
             ok: true,
@@ -431,7 +463,10 @@ export class MCPAdapter {
         if (!oldName || !newName) {
             return { content: [{ type: 'text', text: 'oldName and newName required' }], isError: true };
         }
-        const file = typeof args?.file === 'string' ? args.file : undefined;
+        let file = typeof args?.file === 'string' ? args.file : undefined;
+        if (!file) {
+            file = (await this.pickOntologySeedFile(oldName)) || undefined;
+        }
         const commands = Array.isArray(args?.commands) ? (args.commands as string[]) : ['bun run build:tsc'];
         const timeoutSec = typeof args?.timeoutSec === 'number' ? args.timeoutSec : 240;
         const runChecksFlag: boolean = args?.runChecks !== false;
@@ -571,7 +606,10 @@ export class MCPAdapter {
     private async handleWorkflowLocateConfirmDefinition(args: Record<string, any>) {
         const symbol = String(args?.symbol || '').trim();
         if (!symbol) return { content: [{ type: 'text', text: 'symbol required' }], isError: true };
-        const file = typeof args?.file === 'string' ? args.file : undefined;
+        let file = typeof args?.file === 'string' ? args.file : undefined;
+        if (!file) {
+            file = (await this.pickOntologySeedFile(symbol)) || undefined;
+        }
         const attempts: any[] = [];
         // First attempt: fast path (precise=false)
         const fast = await this.handleFindDefinition(
