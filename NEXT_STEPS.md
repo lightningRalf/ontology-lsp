@@ -22,6 +22,7 @@ Delivered (update):
 - Snapshot helpers: `snap_diff`, `snap_status`, `snap_progress`, and guarded `snap_apply`
 - MCP `apply_snapshot` tool + `overlayStore.applyToWorkingTree()`
 - Default monitoring off for stdio; HTTP server enables metrics explicitly; dogfood sets `SILENT_MODE=1`
+- Fast MCP wrapper guard added: `mcp-wrapper.sh` now checks for `dist/mcp-fast/mcp-fast.js` and prints build instructions to stderr if missing (prevents MCP client start timeouts)
 
 ### 0.05 Port Management Simplification (Immediate)
 - Confirm removal of in-repo PortRegistry across code and docs.
@@ -139,9 +140,10 @@ Goal: make the Layer Performance pane reliable on cold start and after restart.
 - Add `/monitoring?raw=1` to optionally surface LayerManager’s full `getPerformanceReport()` for diagnostics.
 
 ### 0.55 Ports & DevX (Immediate)
-- Global Port Registry:
-  - Status: servers reserve/release ports via `~/.ontology/ports.json`; `just ports` shows usage.
-  - TODO: document env overrides (`HTTP_PORT`, `MCP_HTTP_PORT`) and the external CLI in README.
+- No Port Registry: in‑repo/global registries are removed/not required. Servers bind fixed defaults with env overrides.
+- Env overrides: `HTTP_API_PORT` (HTTP 7000), `MCP_HTTP_PORT` (MCP HTTP 7001), optional `MCP_HTTP_HOST`.
+- Optional tooling: `just ports` calls an external CLI (if installed) and is not used by servers.
+- Note: the stdio Fast MCP server (`src/servers/mcp-fast.ts`) does not bind a port.
 
 ### 0.6 MCP Workflows GA (Near‑term)
 
@@ -264,8 +266,8 @@ Done: HTTP `/api/v1/refactor` endpoint and MCP `suggest_refactoring` tool added 
 - Monitoring: `/api/v1/monitoring?raw=1`; adapter cache metrics; SQLite monitoring
   snapshots for rolling windows.
 - HTTP snapshots: `/api/v1/snapshots/{id}/diff` to read staged diff quickly.
-- Global Port Registry integrated; `just ports` delegates to external CLI under
-  `~/programming/port-registry`.
+- Port Management clarified: no in‑repo/global registry; fixed defaults with env overrides. `just ports` is an optional external helper (`~/programming/port-registry`) and not required.
+- MCP Fast startup: wrapper guard prevents missing‑binary timeouts; handshake remains instant (lazy core init on first tool call).
 - **Threat Model**: Document attack surface; add SSRF and path traversal guards
 
 ### 7. Cache & Data Layer (New)

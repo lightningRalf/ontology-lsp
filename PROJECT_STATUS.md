@@ -239,6 +239,12 @@ ontology-lsp/
     `/api/v1/snapshots/{id}/diff` and MCP resources `snapshot://{id}/overlay.diff`.
 - Learning (L5): added `missingExampleContextTimestamp` counter; surfaced via stats and dashboard.
 
+### 🧰 MCP Fast (stdio) Startup Reliability
+- Added a guard to `mcp-wrapper.sh` that checks for the compiled binary `dist/mcp-fast/mcp-fast.js`.
+  If missing, the wrapper prints clear build instructions to stderr and exits non‑zero.
+- Outcome: prevents “MCP client failed to start: request timed out” caused by launching before building.
+- Handshake remains instant: server lists tools without initializing the core; lazy init happens on first tool call with per‑call timeouts.
+
 ### ✅ L4/L5 Robustness (Complete)
 - L4 metrics JSON: `/metrics?format=json` now includes storage `extras` and `totals` for dashboards; tests assert presence.
 - L5 metrics surface: `PatternLearner.getMetrics()` exposed; tests validate counter increments when context timestamp is missing.
@@ -262,13 +268,9 @@ Status: adapters/LSP integration tests are green. E2E local run improved reliabi
   - `snapshot://{id}/status`: snapshot metadata (exists, diffCount, createdAt).
   - Purpose: these enable LLMs/clients to navigate results efficiently (no large payload embeds) and can be surfaced in the UI.
 
-### 🌐 Global Port Registry (new)
-- Introduced a global port registry (~/.ontology/ports.json) to avoid cross‑project
-  EADDRINUSE conflicts.
-  - HTTP and MCP servers now reserve a free port near preferred defaults (7000/7001),
-    record ownership, and release on shutdown.
-  - `just ports` prints the current global registry using the external port‑registry CLI.
-  - Environment overrides remain supported: `HTTP_PORT`, `MCP_HTTP_PORT`.
+### 🌐 Port Registry (clarification)
+- No in‑repo or global port registry is used by servers. They bind fixed defaults with env overrides.
+- The `just ports` task is an optional convenience that calls an external CLI (if installed) and does not affect server behavior.
 
 ### 📡 Monitoring Snapshots (SQLite)
 - Persist periodic monitoring snapshots in SQLite (`monitoring_snapshots`), enabling
