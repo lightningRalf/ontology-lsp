@@ -207,6 +207,35 @@ ontology-lsp/
 
 ## 📅 Latest Updates (2025-09-04)
 
+### Repo hygiene & test reorg
+- Consolidated test suites under `tests/` (replaces `test/`).
+  - Moved root `test*.{js,ts}` developer scripts to `tests/manual/`.
+  - Updated docs, scripts, and just tasks to reference `tests/...`.
+- Standardized test outputs to `.test-results/` (ignored by Git).
+- Ignored large/local artifacts: `**/.vscode-test/`, `*.vsix`, `**/dist/`,
+  `.test-ontology/`, `.test-results*`, `.e2e-test-workspace/`, `legacy/`.
+- Removed tracked test logs and cleaned local snapshot/results folders.
+- Made `mcp-wrapper.sh` repo‑relative and environment‑configurable.
+
+### Cross‑protocol consistency (references)
+- Aligned CLI/MCP reference lookups with Core/LSP/HTTP:
+  - Require file/URI context for references to avoid workspace‑wide drift.
+  - Return empty references when missing context, matching other adapters.
+- Added tolerant adapter mappers in `src/adapters/utils.ts` used by LSP/CLI:
+  `definitionToLspLocation`, `referenceToLspLocation`, `completionToLspItem`,
+  `workspaceEditToLsp`, plus simple CLI formatters for pretty output.
+
+### MCP HTTP initialize (work in progress)
+- Initialization path now persists session tracking and attempts to emit
+  `Mcp-Session-Id` immediately on first POST `/mcp`.
+- Added safer error logging around `createMcpServer()`; further validation
+  remains to ensure header presence across environments.
+
+### Core analyzer init semantics
+- `CodeAnalyzer.findDefinition(request)` now requires explicit init; calling
+  before `initialize()` throws an error. This matches tests that validate
+  initialization behavior and prevents unintended lazy init in request mode.
+
 ### MCP stdio Workflows & Meta Pipeline (Dev UX)
 - Stdio server now exposes a lean, high‑value tool list (workflows only) with clear titles and “Use for/Avoid/Returns” descriptions:
   - rename_safely, locate_confirm_definition, explore_symbol_impact, patch_checks_in_snapshot
