@@ -118,7 +118,7 @@ Find all references to a symbol.
   "references": [
     {"file": "src/layers/orchestrator.ts", "line": 47, "type": "declaration"},
     {"file": "src/index.ts", "line": 82, "type": "call"},
-    {"file": "test/orchestrator.test.ts", "line": 15, "type": "call"}
+    {"file": "tests/orchestrator.test.ts", "line": 15, "type": "call"}
   ],
   "count": 3
 }

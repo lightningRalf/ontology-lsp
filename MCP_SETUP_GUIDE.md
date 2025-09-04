@@ -170,7 +170,7 @@ NODE_ENV=development LOG_LEVEL=debug bun run adapters/mcp/index.ts
 1. Add tool definition in `adapters/mcp/tools.ts`
 2. Add handler in `adapters/mcp/index.ts`
 3. Add translation methods in `adapters/mcp/translator.ts`
-4. Add tests in `test/adapters/mcp.test.ts`
+4. Add tests in `tests/adapters/mcp.test.ts`
 
 ### Architecture Overview
 

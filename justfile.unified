@@ -16,7 +16,7 @@ init:
     @mkdir -p core/{analyzer,layers,services,types}
     @mkdir -p adapters/{mcp,lsp,http,shared}
     @mkdir -p config
-    @mkdir -p test/{unit,integration,e2e}
+    @mkdir -p tests/{unit,integration,e2e}
     @mkdir -p scripts
     @mkdir -p .ontology/{cache,db,logs}
     @echo "📦 Installing dependencies..."

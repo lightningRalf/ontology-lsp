@@ -793,7 +793,7 @@ test-mcp-enhanced:
 # Test error handling and recovery systems
 test-error-handling:
     @echo "🧪 Testing Error Handling and Recovery Systems..."
-    {{bun}} test test/error-handling.test.ts --verbose
+    {{bun}} test tests/error-handling.test.ts --verbose
 
 # Test all endpoints
 test-endpoints:

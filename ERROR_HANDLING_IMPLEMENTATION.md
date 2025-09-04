@@ -147,7 +147,7 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 ## Testing
 
-### Test Suite (`test/error-handling.test.ts`)
+### Test Suite (`tests/error-handling.test.ts`)
 - **Error Handler**: Retry logic, circuit breaker, validation
 - **File Logger**: Log formatting, rotation, security
 - **Connection Manager**: State transitions, metrics, events
