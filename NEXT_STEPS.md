@@ -24,6 +24,11 @@ Delivered (update):
 - Default monitoring off for stdio; HTTP server enables metrics explicitly; dogfood sets `SILENT_MODE=1`
 - Fast MCP wrapper guard added: `mcp-wrapper.sh` now checks for `dist/mcp-fast/mcp-fast.js` and prints build instructions to stderr if missing (prevents MCP client start timeouts)
 - Ports sync helper added: `just sync-ports` writes `HTTP_API_PORT` and `MCP_HTTP_PORT` to `.env` using an external registry if available (or local free‑port scan). Servers still bind fixed defaults and only read `.env`.
+- Unified prompts/resources module used by both MCP HTTP and stdio; stdio now lists workflows only by default but exposes prompts/resources (flags on in dev wrapper).
+- High‑value workflows with clear titles/descriptions: rename_safely, locate_confirm_definition, explore_symbol_impact, patch_checks_in_snapshot.
+- New meta & utility workflows: execute_intent (auto‑select), extract_snapshot_artifacts (links), apply_after_checks (dev‑gated apply).
+- Partial snapshot materialization (`SNAPSHOT_PARTIAL=1`): copy only touched files + essential configs for faster loops.
+- New resource: `snapshot://{id}/progress` for progress logs.
 
 Follow‑ups from latest dogfooding (Immediate):
 - MCP HTTP initialize: POST `/mcp { method: initialize }` returns 500 (no `Mcp-Session-Id`).
@@ -37,6 +42,13 @@ Follow‑ups from latest dogfooding (Immediate):
   - Keep timings in output; gate conceptual with `L4_AUGMENT_EXPLORE=1`.
 - DevX: `just status/health` hardcode 7000/7001/7002.
   - Action: read `.env` overrides when present and print both expected and active ports.
+
+New follow‑ups (Immediate):
+- Targeted checks (only touched files): extend `run_checks` and `patch_checks_in_snapshot` with `onlyTouched: true` to run `tsc` against changed files or project refs. Default this in stdio when commands aren’t provided.
+- HTTP parity endpoint: add `POST /api/v1/tools/call` using ToolExecutor so workflows are available to non‑MCP clients.
+- CLI parity: add `ontology-lsp workflow <name> --args <json>` to call ToolExecutor; pre‑define `rename-safely`, `patch-checks-in-snapshot` aliases.
+- Diff adapter: accept `apply_patch` format in `propose_patch` by converting to unified diff with strict validation.
+- Dev ergonomics: add `FAST_STDIO_CHECKS=touched` default for stdio to avoid hangs when commands are omitted.
 
 ### 0.05 Port Management Simplification (Immediate)
 - Confirm removal of in-repo PortRegistry across code and docs.
@@ -88,7 +100,7 @@ Status: Fallback implemented in MCP adapter (non‑fatal; empty neighbors with n
 - Ensure all adapters share a single mapping surface:
   - Use `definitionToApiResponse`/`referenceToApiResponse` across HTTP/MCP/CLI/LSP where applicable.
 - Add a unit test to prevent reintroduction of MCP‑specific mapping exports.
- - Align error semantics across adapters (unknown tool, validation): return JSON‑RPC errors with consistent `data`.
+- Align error semantics across adapters (unknown tool, validation): return JSON‑RPC errors with consistent `data`.
 
 ### 0.36 Learning Pipelines Persistence (Soon, after L1–L3 stabilization)
 - Replace stub logs with real persistence for learning pipelines:

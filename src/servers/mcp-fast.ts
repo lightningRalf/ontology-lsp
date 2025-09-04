@@ -50,118 +50,18 @@ export class FastMCPServer {
     }
 
     private setupHandlers(): void {
-        // List available tools - return immediately without initialization
+        // List available tools - return immediately without initialization; allow filtering for stdio
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-            // Return tools without initializing the core
-            return {
-                tools: [
-                    {
-                        name: 'find_definition',
-                        description: 'Find symbol definition with fuzzy matching and semantic understanding',
-                        inputSchema: {
-                            type: 'object',
-                            properties: {
-                                symbol: {
-                                    type: 'string',
-                                    description: 'Symbol name to find (supports fuzzy matching)',
-                                },
-                                file: {
-                                    type: 'string',
-                                    description: 'Current file context',
-                                },
-                                position: {
-                                    type: 'object',
-                                    properties: {
-                                        line: { type: 'number' },
-                                        character: { type: 'number' },
-                                    },
-                                },
-                            },
-                            required: ['symbol'],
-                        },
-                    },
-                    {
-                        name: 'find_references',
-                        description: 'Find all references to a symbol across the codebase',
-                        inputSchema: {
-                            type: 'object',
-                            properties: {
-                                symbol: {
-                                    type: 'string',
-                                    description: 'Symbol to find references for',
-                                },
-                                includeDeclaration: {
-                                    type: 'boolean',
-                                    default: false,
-                                    description: 'Include the declaration in results',
-                                },
-                                scope: {
-                                    type: 'string',
-                                    enum: ['workspace', 'file', 'function'],
-                                    default: 'workspace',
-                                    description: 'Search scope',
-                                },
-                            },
-                            required: ['symbol'],
-                        },
-                    },
-                    {
-                        name: 'rename_symbol',
-                        description: 'Rename symbol with intelligent propagation across related concepts',
-                        inputSchema: {
-                            type: 'object',
-                            properties: {
-                                oldName: {
-                                    type: 'string',
-                                    description: 'Current symbol name',
-                                },
-                                newName: {
-                                    type: 'string',
-                                    description: 'New symbol name',
-                                },
-                                preview: {
-                                    type: 'boolean',
-                                    default: true,
-                                    description: 'Preview changes without applying',
-                                },
-                                scope: {
-                                    type: 'string',
-                                    enum: ['exact', 'related', 'similar'],
-                                    default: 'exact',
-                                    description: 'Propagation scope',
-                                },
-                            },
-                            required: ['oldName', 'newName'],
-                        },
-                    },
-                    {
-                        name: 'generate_tests',
-                        description: 'Generate tests based on code understanding and patterns',
-                        inputSchema: {
-                            type: 'object',
-                            properties: {
-                                target: {
-                                    type: 'string',
-                                    description: 'File or function to generate tests for',
-                                },
-                                framework: {
-                                    type: 'string',
-                                    enum: ['bun', 'jest', 'vitest', 'mocha', 'auto'],
-                                    default: 'auto',
-                                    description: 'Test framework to use',
-                                },
-                                coverage: {
-                                    type: 'string',
-                                    enum: ['basic', 'comprehensive', 'edge-cases'],
-                                    default: 'comprehensive',
-                                    description: 'Test coverage level',
-                                },
-                            },
-                            required: ['target'],
-                        },
-                    },
-                ],
-            };
+            const { ToolRegistry } = await import('../core/tools/registry.js');
+            const all = ToolRegistry.list();
+            const mode = process.env.FAST_STDIO_LIST_MODE || 'workflows';
+            const preferRenamed = process.env.FAST_STDIO_PREFER_RENAMED === '1';
+            let tools = all;
+            if (mode === 'workflows') {
+                tools = all.filter((t: any) => t.category === 'workflow');
+                if (preferRenamed) tools = tools.filter((t: any) => !String(t.name).startsWith('workflow_'));
+            }
+            return { tools } as any;
         });
 
         // Optionally register prompts/resources for stdio (opt-in via env to preserve fast startup defaults)

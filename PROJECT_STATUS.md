@@ -200,6 +200,32 @@ ontology-lsp/
 
 ## 📅 Latest Updates (2025-09-04)
 
+### MCP stdio Workflows & Meta Pipeline (Dev UX)
+- Stdio server now exposes a lean, high‑value tool list (workflows only) with clear titles and “Use for/Avoid/Returns” descriptions:
+  - rename_safely, locate_confirm_definition, explore_symbol_impact, patch_checks_in_snapshot
+  - execute_intent (meta): auto‑selects rename/patch/locate/explore/apply based on args/intent
+  - extract_snapshot_artifacts (links overlay.diff/status/progress), apply_after_checks (dev‑gated)
+- Prompts/resources are visible and usable in stdio (opt‑in flags were enabled in dev wrapper). Prompts guide best‑practice sequences; tools remain the contracts.
+- Tool list curation for stdio: only workflows are listed; legacy names (workflow_*) remain callable but are no longer advertised by default.
+
+### Unified Prompts/Resources (No Drift)
+- Introduced shared registration module `src/servers/mcp-shared.ts` used by both MCP HTTP and stdio servers.
+- Prompts: plan‑safe‑rename, investigate‑symbol, quick‑patch‑checks, and new locate‑confirm.
+- Resources: monitoring://summary, snapshot://{id}/overlay.diff|status|progress (progress is new).
+
+### Partial Snapshot Materialization (Faster Loops)
+- Snapshot staging records touched files from the patch (supports both apply_patch and git unified diff formats).
+- With `SNAPSHOT_PARTIAL=1`, snapshot creation copies only touched files and essential configs (tsconfig*, package.json) instead of the entire workspace.
+- Falls back to full copy when needed; progress logs note partial copy.
+
+### Error Mapping & Validation
+- Centralized protocol‑agnostic errors (CoreError) and protocol mapping in servers to keep adapters thin.
+- Added ToolExecutor to validate tool args via ToolRegistry and dispatch consistently across servers.
+
+### Dev Wrapper Defaults (stdio)
+- Enabled prompts/resources in stdio, list workflows only, prefer renamed tool names, allow dev apply, and partial snapshots:
+  - `FAST_STDIO_LIST_MODE=workflows`, `FAST_STDIO_PREFER_RENAMED=1`, `FAST_STDIO_PROMPTS=1`, `FAST_STDIO_RESOURCES=1`, `ALLOW_SNAPSHOT_APPLY=1`, `SNAPSHOT_PARTIAL=1`.
+
 ### Port Management Simplified (No Registry)
 - Removed the in-repo PortRegistry. Servers bind fixed defaults with .env overrides.
   - HTTP API: default `7000` (override with `HTTP_API_PORT`)
@@ -241,6 +267,10 @@ ontology-lsp/
     `runChecks: true|false`. The staged diff is viewable via the new HTTP endpoint
     `/api/v1/snapshots/{id}/diff` and MCP resources `snapshot://{id}/overlay.diff`.
 - Learning (L5): added `missingExampleContextTimestamp` counter; surfaced via stats and dashboard.
+
+### 🧪 Dogfooding & Workflows (Ready)
+- New script `bin/dogfood-workflows.sh` exercises investigate, safe‑rename, patch checks via MCP HTTP.
+- Stdio workflows and prompts enabled via wrapper for Codex flows.
  - Ports DevX: Added `bin/sync-env-ports.sh` and `just sync-ports` to write `HTTP_API_PORT` and
    `MCP_HTTP_PORT` into `.env` (prefers external registry, falls back to local scan). Keeps ports
    stable across restarts without coupling servers to a registry.

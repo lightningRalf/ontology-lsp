@@ -9,6 +9,15 @@ export BUN_DISABLE_ANALYTICS=1
 export BUN_DISABLE_TRANSPILER_CACHE=1
 export ONTOLOGY_DB_PATH="/home/lightningralf/programming/ontology-lsp/.ontology/ontology.db"
 export ONTOLOGY_WORKSPACE="/home/lightningralf/programming/ontology-lsp"
+# Codex stdio defaults: publish workflows, include prompts/resources, allow apply in dev.
+export FAST_STDIO_LIST_MODE=workflows
+export FAST_STDIO_PREFER_RENAMED=1
+export FAST_STDIO_PROMPTS=1
+export FAST_STDIO_RESOURCES=1
+# Enable applying snapshot to working tree in dev (guarded path)
+export ALLOW_SNAPSHOT_APPLY=1
+# Prefer partial snapshot materialization for faster dev loops
+export SNAPSHOT_PARTIAL=1
 
 # Use the optimized fast MCP server (no caching to ensure hot reload works)
 # Guard: ensure the built server exists, otherwise print a clear hint and exit

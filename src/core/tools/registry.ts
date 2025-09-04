@@ -15,6 +15,7 @@ export interface ToolSpec {
         adapters?: Array<'mcp' | 'http' | 'cli' | 'lsp'>;
         languages?: string[];
     };
+    category?: 'workflow' | 'operation' | 'system';
 }
 
 export class ToolRegistry {
@@ -24,11 +25,13 @@ export class ToolRegistry {
             description: 'Create or return a snapshot id for consistent reads/edits',
             inputSchema: { type: 'object', properties: { preferExisting: { type: 'boolean' } } },
         },
+        // WORKFLOWS (legacy names kept for compatibility)
         {
             name: 'workflow_safe_rename',
             title: 'Workflow: Safe Rename (Snapshot + Checks)',
             description:
                 'Plan a rename, stage a unified diff into a snapshot, run checks, and return status with next actions.',
+      category: 'workflow',
       inputSchema: {
         type: 'object',
         properties: {
@@ -47,6 +50,7 @@ export class ToolRegistry {
             title: 'Workflow: Explore Symbol Impact',
             description:
                 'Find definitions, build a symbol map, and expand neighbors (imports/exports/callers/callees). Returns a compact JSON summary. Use to assess change impact before edits.',
+            category: 'workflow',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -64,6 +68,7 @@ export class ToolRegistry {
             title: 'Workflow: Quick Patch + Checks (Snapshot‑Safe)',
             description:
                 'Stages a unified diff into a snapshot and runs checks (typecheck/build/tests). Returns ok, snapshot id, and tail of logs. Safe: never writes to working tree.',
+            category: 'workflow',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -80,6 +85,7 @@ export class ToolRegistry {
             title: 'Workflow: Locate & Confirm Definition',
             description:
                 'Locate definitions fast, retry with precise AST validation if ambiguous; returns attempts and chosen results.',
+            category: 'workflow',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -379,3 +385,131 @@ export class ToolRegistry {
         return [...ToolRegistry.tools];
     }
 }
+        // WORKFLOWS (renamed, preferred)
+        {
+            name: 'rename_safely',
+            title: 'Rename Safely (Snapshot + Checks)',
+            description:
+                'Use for: safe symbol rename across files. Avoid: ad‑hoc search/replace. Returns: { ok, changes, snapshot, next_actions }',
+            category: 'workflow',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    oldName: { type: 'string' },
+                    newName: { type: 'string' },
+                    file: { type: 'string' },
+                    commands: { type: 'array', items: { type: 'string' }, default: ['bun run build:tsc'] },
+                    timeoutSec: { type: 'number', default: 240 },
+                    runChecks: { type: 'boolean', default: true },
+                },
+                required: ['oldName', 'newName'],
+            },
+        },
+        {
+            name: 'explore_symbol_impact',
+            title: 'Explore Symbol Impact',
+            description:
+                'Use for: quick impact analysis (defs/map/neighbors). Avoid: large raw dumps. Returns: { definitions, symbolMap, neighbors }',
+            category: 'workflow',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    symbol: { type: 'string' },
+                    file: { type: 'string' },
+                    precise: { type: 'boolean', default: true },
+                    depth: { type: 'number', default: 1 },
+                    limit: { type: 'number', default: 50 },
+                },
+                required: ['symbol'],
+            },
+        },
+        {
+            name: 'patch_checks_in_snapshot',
+            title: 'Patch Checks in Snapshot',
+            description:
+                'Use for: validate a unified diff safely. Avoid: editing working tree. Returns: { ok, elapsedMs, output_tail }',
+            category: 'workflow',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    patch: { type: 'string' },
+                    snapshot: { type: 'string' },
+                    commands: { type: 'array', items: { type: 'string' }, default: ['bun run build:tsc'] },
+                    timeoutSec: { type: 'number', default: 240 },
+                },
+                required: ['patch'],
+            },
+        },
+        {
+            name: 'locate_confirm_definition',
+            title: 'Locate & Confirm Definition',
+            description:
+                'Use for: precise go‑to‑def. Avoid: guessing. Returns: { attempts: [fast, precise], definitions }',
+            category: 'workflow',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    symbol: { type: 'string' },
+                    file: { type: 'string' },
+                    precise: { type: 'boolean', default: true },
+                    maxResults: { type: 'number', default: 50 },
+                },
+                required: ['symbol'],
+            },
+        },
+        {
+            name: 'extract_snapshot_artifacts',
+            title: 'Extract Snapshot Artifacts',
+            description:
+                'Use for: quickly getting overlay.diff/status/progress links for a snapshot. Returns: { snapshot, links }',
+            category: 'workflow',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    snapshot: { type: 'string' },
+                },
+                required: ['snapshot'],
+            },
+        },
+        {
+            name: 'apply_after_checks',
+            title: 'Apply After Checks',
+            description:
+                'Use for: patch → checks → apply (dev only). Guarded by ALLOW_SNAPSHOT_APPLY=1. Returns: { ok, snapshot, applied, output_tail }',
+            category: 'workflow',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    patch: { type: 'string' },
+                    snapshot: { type: 'string' },
+                    commands: { type: 'array', items: { type: 'string' }, default: ['bun run build:tsc'] },
+                    timeoutSec: { type: 'number', default: 240 },
+                },
+                required: ['patch'],
+            },
+        },
+        // META: Execute Intent (auto-selects a high-value workflow)
+        {
+            name: 'execute_intent',
+            title: 'Execute Intent (Auto-Select Workflow)',
+            description:
+                'Use for: auto-orchestrating rename/patch/explore/locate. Provide minimal args; returns selected workflow result + next_actions.',
+            category: 'workflow',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    intent: { type: 'string', enum: ['rename', 'patch', 'explore', 'locate', 'apply'], description: 'Preferred action; optional if args imply intent' },
+                    // Rename
+                    oldName: { type: 'string' },
+                    newName: { type: 'string' },
+                    file: { type: 'string' },
+                    // Patch
+                    patch: { type: 'string' },
+                    applyIfOk: { type: 'boolean', default: false, description: 'If checks pass and apply is allowed, apply snapshot' },
+                    commands: { type: 'array', items: { type: 'string' }, description: 'Optional commands for checks' },
+                    timeoutSec: { type: 'number', default: 240 },
+                    // Explore/Locate
+                    symbol: { type: 'string' },
+                },
+            },
+        },

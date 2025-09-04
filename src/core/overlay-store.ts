@@ -8,6 +8,7 @@ type Snapshot = {
     id: string;
     createdAt: number;
     diffs: string[];
+    touchedFiles?: Set<string>;
 };
 
 export class OverlayStore {
@@ -93,6 +94,34 @@ export class OverlayStore {
         }
     }
 
+    private parseTouchedFilesFromPatch(diff: string): string[] {
+        const files = new Set<string>();
+        const lines = diff.split(/\r?\n/);
+        for (const line of lines) {
+            // apply_patch format
+            let m = line.match(/^\*\*\*\s+(?:Update|Add|Delete) File:\s+(.+)$/);
+            if (m) {
+                files.add(m[1].trim());
+                continue;
+            }
+            // git unified diff header
+            m = line.match(/^\+\+\+\s+[ab]\/(.+)$/) || line.match(/^---\s+[ab]\/(.+)$/);
+            if (m) {
+                files.add(m[1].trim());
+                continue;
+            }
+            // diff --git a/path b/path
+            m = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
+            if (m) {
+                files.add(m[1].trim());
+                files.add(m[2].trim());
+                continue;
+            }
+        }
+        // Filter obvious non-files
+        return Array.from(files).filter((p) => p && !p.endsWith('/'));
+    }
+
     stagePatch(snapshotId: string, diff: string, maxSizeBytes = 512 * 1024): { accepted: boolean; message?: string } {
         if (!diff || typeof diff !== 'string') return { accepted: false, message: 'Empty diff' };
         if (Buffer.byteLength(diff, 'utf8') > maxSizeBytes) {
@@ -100,6 +129,13 @@ export class OverlayStore {
         }
         const snap = this.ensureSnapshot(snapshotId);
         snap.diffs.push(diff);
+        try {
+            const touched = this.parseTouchedFilesFromPatch(diff);
+            if (touched.length) {
+                if (!snap.touchedFiles) snap.touchedFiles = new Set<string>();
+                for (const f of touched) snap.touchedFiles.add(f);
+            }
+        } catch {}
         return { accepted: true };
     }
 
@@ -117,43 +153,58 @@ export class OverlayStore {
         const dir = path.join(snapsRoot, snapshotId);
         await fsp.mkdir(snapsRoot, { recursive: true }).catch(() => {});
         const exists = fs.existsSync(dir);
+        const preferPartial = process.env.SNAPSHOT_PARTIAL === '1';
+        const snap = this.snapshots.get(snapshotId);
+        const touched = snap?.touchedFiles ? Array.from(snap.touchedFiles) : [];
         if (!exists) {
             await this.logProgress(snapshotId, 'materialize:start');
             await fsp.mkdir(dir, { recursive: true });
-            // Prefer rsync for speed; fallback to tar pipe with excludes to avoid self-copy recursion
-            if (this.which('rsync')) {
-                await this.logProgress(snapshotId, `materialize:rsync ${base} -> ${dir}`);
-                spawnSync(
-                    'bash',
-                    [
-                        '-lc',
-                        // Copy only the workspace root if provided; otherwise copy current directory
-                        `rsync -a --delete --exclude .git --exclude node_modules --exclude .ontology --exclude dist ${JSON.stringify(base)}/ ${dir}/`,
-                    ],
-                    { stdio: 'pipe' }
-                );
-            } else if (this.which('tar')) {
-                await this.logProgress(snapshotId, `materialize:tar ${base} -> ${dir}`);
-                const cmd = `tar -C ${JSON.stringify(base)} --exclude .git --exclude node_modules --exclude .ontology --exclude dist -cf - . | tar -C ${JSON.stringify(dir)} -xf -`;
-                spawnSync('bash', ['-lc', cmd], { stdio: 'pipe' });
-            } else {
-                // Fallback: copy entries individually, skipping excluded dirs
-                const entries = await fsp.readdir(base, { withFileTypes: true });
-                for (const ent of entries) {
-                    if (['.git', '.ontology', 'node_modules', 'dist'].includes(ent.name)) continue;
-                    const src = path.join(base, ent.name);
-                    const dest = path.join(dir, ent.name);
+            if (preferPartial && touched.length > 0) {
+                // Partial materialize: copy only touched files and essential configs
+                await this.logProgress(snapshotId, `materialize:partial ${touched.length} files`);
+                const essential = ['tsconfig.json', 'tsconfig.build.json', 'package.json'];
+                const toCopy = [...new Set([...touched, ...essential])];
+                for (const rel of toCopy) {
                     try {
-                        spawnSync('bash', ['-lc', `cp -a ${JSON.stringify(src)} ${JSON.stringify(dest)}`], {
-                            stdio: 'pipe',
-                        });
+                        const src = path.join(base, rel);
+                        const dst = path.join(dir, rel);
+                        await fsp.mkdir(path.dirname(dst), { recursive: true }).catch(() => {});
+                        if (fs.existsSync(src) && fs.statSync(src).isFile()) {
+                            spawnSync('bash', ['-lc', `cp -a ${JSON.stringify(src)} ${JSON.stringify(dst)}`], { stdio: 'pipe' });
+                        }
                     } catch {}
+                }
+            } else {
+                // Full copy: prefer rsync; fallback to tar or cp
+                if (this.which('rsync')) {
+                    await this.logProgress(snapshotId, `materialize:rsync ${base} -> ${dir}`);
+                    spawnSync(
+                        'bash',
+                        [
+                            '-lc',
+                            `rsync -a --delete --exclude .git --exclude node_modules --exclude .ontology --exclude dist ${JSON.stringify(base)}/ ${dir}/`,
+                        ],
+                        { stdio: 'pipe' }
+                    );
+                } else if (this.which('tar')) {
+                    await this.logProgress(snapshotId, `materialize:tar ${base} -> ${dir}`);
+                    const cmd = `tar -C ${JSON.stringify(base)} --exclude .git --exclude node_modules --exclude .ontology --exclude dist -cf - . | tar -C ${JSON.stringify(dir)} -xf -`;
+                    spawnSync('bash', ['-lc', cmd], { stdio: 'pipe' });
+                } else {
+                    const entries = await fsp.readdir(base, { withFileTypes: true });
+                    for (const ent of entries) {
+                        if (['.git', '.ontology', 'node_modules', 'dist'].includes(ent.name)) continue;
+                        const src = path.join(base, ent.name);
+                        const dest = path.join(dir, ent.name);
+                        try {
+                            spawnSync('bash', ['-lc', `cp -a ${JSON.stringify(src)} ${JSON.stringify(dest)}`], { stdio: 'pipe' });
+                        } catch {}
+                    }
                 }
             }
             await this.logProgress(snapshotId, 'materialize:done');
         }
         // Apply staged diffs if any
-        const snap = this.snapshots.get(snapshotId);
         if (!snap) return dir;
         if (snap.diffs.length > 0) {
             await this.logProgress(snapshotId, `apply:diffs ${snap.diffs.length}`);

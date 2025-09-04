@@ -51,7 +51,7 @@ export function registerCommonPrompts(server: Server): void {
           role: 'user',
           content: {
             type: 'text',
-            text: `Intent: rename ${oldName} -> ${newName} at ${file}\nSteps:\n1) tools/call plan_rename { oldName: "${oldName}", newName: "${newName}", file: "${file}" }\n2) tools/call workflow_safe_rename { oldName: "${oldName}", newName: "${newName}", file: "${file}", runChecks: ${runChecks}, commands: ["${command}"], timeoutSec: 180 }`,
+            text: `Intent: rename ${oldName} -> ${newName} at ${file}\nSteps:\n1) tools/call plan_rename { oldName: "${oldName}", newName: "${newName}", file: "${file}" }\n2) tools/call rename_safely { oldName: "${oldName}", newName: "${newName}", file: "${file}", runChecks: ${runChecks}, commands: ["${command}"], timeoutSec: 180 }`,
           },
         },
       ],
@@ -83,7 +83,7 @@ export function registerCommonPrompts(server: Server): void {
           role: 'user',
           content: {
             type: 'text',
-            text: `Target: ${symbol} at ${file}\nSuggested tools:\n- tools/call explore_codebase { symbol: "${symbol}", file: "${file}", conceptual: ${conceptual} }\n- tools/call build_symbol_map { symbol: "${symbol}", file: "${file}", maxFiles: 10, astOnly: true }\n- tools/call graph_expand { symbol: "${symbol}", edges: ["imports","exports"], depth: 1, limit: 50 }`,
+            text: `Target: ${symbol} at ${file}\nSuggested tools:\n- tools/call explore_codebase { symbol: "${symbol}", file: "${file}", conceptual: ${conceptual} }\n- tools/call build_symbol_map { symbol: "${symbol}", file: "${file}", maxFiles: 10, astOnly: true }\n- tools/call graph_expand { symbol: "${symbol}", edges: ["imports","exports"], depth: 1, limit: 50 }\n- Optional: tools/call explore_symbol_impact { symbol: "${symbol}", file: "${file}", limit: 50 }`,
           },
         },
       ],
@@ -114,7 +114,35 @@ export function registerCommonPrompts(server: Server): void {
           role: 'user',
           content: {
             type: 'text',
-            text: `Suggested calls:\n- tools/call get_snapshot { preferExisting: true }\n- tools/call propose_patch { snapshot: <id>, patch: <unified_diff> }\n- tools/call run_checks { snapshot: <id>, commands: ["${command}"], timeoutSec: ${timeoutSec} }`,
+            text: `Suggested calls:\n- tools/call get_snapshot { preferExisting: true }\n- tools/call propose_patch { snapshot: <id>, patch: <unified_diff> }\n- tools/call run_checks { snapshot: <id>, commands: ["${command}"], timeoutSec: ${timeoutSec} }\n- Or single call: tools/call patch_checks_in_snapshot { patch: <unified_diff>, timeoutSec: ${timeoutSec} }`,
+          },
+        },
+      ],
+    })
+  );
+
+  // Locate & Confirm Definition
+  server.registerPrompt(
+    'locate-confirm',
+    {
+      title: 'Locate & Confirm Definition',
+      description: 'Fast locate, precise retry if ambiguous; returns chosen definitions with attempts.',
+      argsSchema: z.object({
+        symbol: completable(z.string(), (v) => ['HTTPServer', 'TestClass', 'CodeAnalyzer'].filter((s) => s.toLowerCase().startsWith((v || '').toLowerCase()))),
+        file: completable(z.string().optional(), (v) => ['src/servers/http.ts', 'tests/fixtures/example.ts'].filter((p) => p.toLowerCase().includes((v || '').toLowerCase()))),
+      }),
+    },
+    ({ symbol, file = 'file://workspace' }) => ({
+      messages: [
+        {
+          role: 'system',
+          content: { type: 'text', text: 'Prefer precise confirmation only when fast pass is ambiguous.' },
+        },
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: `Target: ${symbol} at ${file}\nSuggested tool:\n- tools/call locate_confirm_definition { symbol: "${symbol}", file: "${file}" }`,
           },
         },
       ],
@@ -151,6 +179,13 @@ export function registerCommonResources(server: Server): void {
         title: 'Snapshot Status',
         description: 'Snapshot metadata and staged changes',
         mimeType: 'application/json',
+      },
+      {
+        name: 'snapshot-progress',
+        uriTemplate: 'snapshot://{id}/progress',
+        title: 'Snapshot Progress',
+        description: 'Progress log for snapshot operations',
+        mimeType: 'text/plain',
       },
     ],
   }));
@@ -198,6 +233,19 @@ export function registerCommonResources(server: Server): void {
           );
           return { contents: [{ uri: uri.href, mimeType: 'application/json', text: body }] } as any;
         }
+        if (tail === 'progress') {
+          const fs = await import('node:fs/promises');
+          const path = await import('node:path');
+          const snapsRoot = path.resolve('.ontology', 'snapshots');
+          const logPath = path.join(snapsRoot, id, 'progress.log');
+          let text = '';
+          try {
+            text = await fs.readFile(logPath, 'utf8');
+          } catch {
+            text = '# No progress.log found for snapshot';
+          }
+          return { contents: [{ uri: uri.href, mimeType: 'text/plain', text }] } as any;
+        }
       }
       throw new McpError(ErrorCode.InvalidParams, `Unsupported resource ${uriStr}`);
     } catch (e) {
@@ -205,4 +253,3 @@ export function registerCommonResources(server: Server): void {
     }
   });
 }
-

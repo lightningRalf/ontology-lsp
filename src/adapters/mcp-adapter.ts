@@ -108,11 +108,15 @@ export class MCPAdapter {
      * Get available MCP tools
      */
     getTools() {
-        // Map registry tools directly; MCP SDK will consume the schema
-        return ToolRegistry.list().map((t) => ({
+        // Map registry tools with title and lightweight annotations for better UX
+        return ToolRegistry.list().map((t: any) => ({
             name: t.name,
+            title: t.title || undefined,
             description: t.description,
             inputSchema: t.inputSchema,
+            annotations: t.category
+                ? { category: t.category, recommended: t.category === 'workflow' }
+                : { recommended: false },
         }));
     }
 
@@ -144,13 +148,27 @@ export class MCPAdapter {
                 let result: any;
 
                 switch (name) {
+                    case 'execute_intent':
+                        return this.handleExecuteIntent(arguments_);
+                    case 'extract_snapshot_artifacts':
+                        return this.handleExtractSnapshotArtifacts(arguments_);
+                    case 'apply_after_checks':
+                        return this.handleApplyAfterChecks(arguments_);
                     case 'workflow_explore_symbol':
+                        return this.handleWorkflowExploreSymbol(arguments_);
+                    case 'explore_symbol_impact':
                         return this.handleWorkflowExploreSymbol(arguments_);
                     case 'workflow_quick_patch_checks':
                         return this.handleWorkflowQuickPatchChecks(arguments_);
+                    case 'patch_checks_in_snapshot':
+                        return this.handleWorkflowQuickPatchChecks(arguments_);
                     case 'workflow_safe_rename':
                         return this.handleWorkflowSafeRename(arguments_);
+                    case 'rename_safely':
+                        return this.handleWorkflowSafeRename(arguments_);
                     case 'workflow_locate_confirm_definition':
+                        return this.handleWorkflowLocateConfirmDefinition(arguments_);
+                    case 'locate_confirm_definition':
                         return this.handleWorkflowLocateConfirmDefinition(arguments_);
                     case 'pattern_stats':
                         return this.handlePatternStats();
@@ -241,6 +259,95 @@ export class MCPAdapter {
             // Fallback: return adapter-shaped message for non-core errors
             return handleAdapterError(error, 'mcp');
         }
+    }
+
+    private async handleExecuteIntent(args: Record<string, any>) {
+        const intentRaw = String(args?.intent || '').trim().toLowerCase();
+        const hasPatch = typeof args?.patch === 'string' && args.patch.trim().length > 0;
+        const hasRename = typeof args?.oldName === 'string' && typeof args?.newName === 'string' && args.oldName && args.newName;
+        const hasSymbol = typeof args?.symbol === 'string' && args.symbol.trim().length > 0;
+
+        const prefer = intentRaw as 'rename' | 'patch' | 'explore' | 'locate' | 'apply' | '';
+        let invoked = '';
+        let result: any = null;
+
+        // Choose intent
+        if (prefer === 'rename' || hasRename) {
+            invoked = 'rename_safely';
+            result = await this.handleWorkflowSafeRename(args);
+        } else if (prefer === 'patch' || hasPatch) {
+            invoked = 'patch_checks_in_snapshot';
+            const checks = await this.handleWorkflowQuickPatchChecks(args);
+            const out = this.safeParseContent(checks) || {};
+            // Optionally apply if ok and allowed
+            const doApply = !!args?.applyIfOk && out?.ok && process.env.ALLOW_SNAPSHOT_APPLY === '1';
+            if (doApply && out?.snapshot) {
+                const applied = await this.handleApplySnapshot({ snapshot: out.snapshot, check: false });
+                const appTxt = this.safeParseContent(applied) || {};
+                const payload = { invoked, ...out, applied: !!appTxt?.ok };
+                return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }], isError: !out?.ok };
+            }
+            return checks;
+        } else if (prefer === 'locate' || (hasSymbol && args?.precise !== false)) {
+            invoked = 'locate_confirm_definition';
+            result = await this.handleWorkflowLocateConfirmDefinition(args);
+        } else if (prefer === 'explore' || hasSymbol) {
+            invoked = 'explore_symbol_impact';
+            result = await this.handleWorkflowExploreSymbol(args);
+        } else if (prefer === 'apply') {
+            invoked = 'apply_snapshot';
+            result = await this.handleApplySnapshot(args);
+        } else {
+            const payload = { invoked: 'none', ok: false, message: 'Insufficient arguments; provide patch, oldName+newName, or symbol' };
+            return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }], isError: true };
+        }
+
+        // Attach invoked to response content (when possible)
+        try {
+            const txt = this.safeParseContent(result) || {};
+            const payload = { invoked, ...txt };
+            return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }], isError: false };
+        } catch {
+            return result;
+        }
+    }
+
+    private async handleExtractSnapshotArtifacts(args: Record<string, any>) {
+        const snapshot = String(args?.snapshot || '').trim();
+        if (!snapshot) return { content: [{ type: 'text', text: 'snapshot required' }], isError: true };
+        const links = [
+            { uri: `snapshot://${snapshot}/overlay.diff`, name: 'overlay.diff', mimeType: 'text/plain' },
+            { uri: `snapshot://${snapshot}/status`, name: 'status', mimeType: 'application/json' },
+            { uri: `snapshot://${snapshot}/progress`, name: 'progress', mimeType: 'text/plain' },
+        ];
+        const payload = { snapshot, links };
+        return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }], isError: false };
+    }
+
+    private async handleApplyAfterChecks(args: Record<string, any>) {
+        const patch = String(args?.patch || '').trim();
+        if (!patch) return { content: [{ type: 'text', text: 'patch required' }], isError: true };
+        const commands = Array.isArray(args?.commands) ? (args.commands as string[]) : ['bun run build:tsc'];
+        const timeoutSec = typeof args?.timeoutSec === 'number' ? args.timeoutSec : 240;
+        // Ensure/derive snapshot
+        const snapRes = await this.handleGetSnapshot({ preferExisting: true });
+        const snapTxt = this.safeParseContent(snapRes);
+        const snapshot = (snapTxt?.snapshot || snapTxt?.id) as string | undefined;
+        if (!snapshot) return { content: [{ type: 'text', text: 'failed to create snapshot' }], isError: true };
+        // Stage
+        const stage = await this.handleProposePatch({ snapshot, patch });
+        const stageOut = this.safeParseContent(stage) || {};
+        // Checks
+        const checks = await this.handleRunChecks({ snapshot, commands, timeoutSec });
+        const chk = this.safeParseContent(checks) || {};
+        if (chk?.ok && process.env.ALLOW_SNAPSHOT_APPLY === '1') {
+            const app = await this.handleApplySnapshot({ snapshot, check: false });
+            const appOut = this.safeParseContent(app) || {};
+            const payload = { ok: !!chk?.ok, snapshot, applied: !!appOut?.ok, output_tail: chk?.output?.slice?.(-4000) || '' };
+            return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }], isError: !chk?.ok };
+        }
+        const payload = { ok: !!chk?.ok, snapshot, applied: false, output_tail: chk?.output?.slice?.(-4000) || '' };
+        return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }], isError: !chk?.ok };
     }
 
     // --- New handlers: snapshots/patches/checks ---
