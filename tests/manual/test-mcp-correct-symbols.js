@@ -6,6 +6,8 @@
 
 import { spawn } from 'child_process';
 import { createInterface } from 'readline';
+import path from 'path';
+import path from 'path';
 
 class MCPClient {
   constructor(command, args = []) {
@@ -26,8 +28,8 @@ class MCPClient {
       STDIO_MODE: 'true',
       BUN_DISABLE_ANALYTICS: '1',
       BUN_DISABLE_TRANSPILER_CACHE: '1',
-      ONTOLOGY_DB_PATH: '/home/lightningralf/programming/ontology-lsp/.ontology/ontology.db',
-      ONTOLOGY_WORKSPACE: '/home/lightningralf/programming/ontology-lsp'
+      ONTOLOGY_DB_PATH: path.resolve(process.cwd(), '.ontology/ontology.db'),
+      ONTOLOGY_WORKSPACE: process.cwd()
     };
 
     this.process = spawn(this.command, this.args, {
@@ -126,7 +128,7 @@ class MCPClient {
 async function testCorrectSymbols() {
   console.log('=== MCP find_definition Test with Correct Symbol Names ===\n');
   
-  const client = new MCPClient('/home/lightningralf/programming/ontology-lsp/mcp-wrapper.sh');
+  const client = new MCPClient(path.resolve(process.cwd(), 'mcp-wrapper.sh'));
   
   // These are the actual class names from the source code
   const symbols = [
@@ -168,8 +170,9 @@ async function testCorrectSymbols() {
         const toShow = result.definitions.slice(0, 5);
         for (const def of toShow) {
           const fullPath = def.uri.replace('file://', '');
+          const repoRoot = path.resolve(process.cwd()) + path.sep;
           const relativePath = fullPath
-            .replace('/home/lightningralf/programming/ontology-lsp/', '')
+            .replace(repoRoot, '')
             .replace('/mnt/wslg/distro', '');
           
           const isSource = relativePath.startsWith('src/');

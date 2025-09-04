@@ -1,9 +1,0 @@
-\n=== POST-RUN ANALYTICS (PERF) ===
-Total files: 4, Passed: 4, Failed: 0
-Total duration: 100101ms, Avg per file: 25025ms
-\nTop slowest files:
- 21769 ms  tests/performance/benchmark.test.ts
-   248 ms  tests/performance/learning-concurrency.test.ts
-    53 ms  tests/performance/large-tree.test.ts
-     0 ms  file
-\nFailures:

@@ -81,6 +81,7 @@ test-output*.txt
 .test-results-perf/
 .test-workspace/
 test-results/
+.test-ontology/
 
 # Temporary/experimental directories
 bun-mcp-sse-transport/

@@ -6,7 +6,8 @@ import { spawn } from 'child_process';
 console.log('Testing full MCP stdio protocol...\n');
 
 // Start MCP server
-const server = spawn('bun', ['run', '/home/lightningralf/programming/ontology-lsp/dist/mcp/mcp.js'], {
+import path from 'path';
+const server = spawn('bun', ['run', path.resolve(process.cwd(), 'dist/mcp/mcp.js')], {
   stdio: ['pipe', 'pipe', 'pipe']
 });
 

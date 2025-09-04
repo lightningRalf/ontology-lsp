@@ -5,11 +5,13 @@
 
 const { spawn } = require('child_process');
 const readline = require('readline');
+const path = require('path');
 
-// Spawn the MCP server
-const mcpServer = spawn('/home/lightningralf/.bun/bin/bun', [
+// Spawn the MCP server (use PATH bun and repo-relative path)
+const serverPath = path.resolve(process.cwd(), 'src/servers/mcp.ts');
+const mcpServer = spawn('bun', [
   'run',
-  '/home/lightningralf/programming/ontology-lsp/src/servers/mcp.ts'
+  serverPath
 ], {
   stdio: ['pipe', 'pipe', 'pipe']
 });

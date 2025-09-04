@@ -5,11 +5,13 @@
  * Tests that Layer 2 only parses files found by Layer 1, not all files
  */
 
-import { CodeAnalyzer } from "./src/core/unified-analyzer.js";
-import { LayerManager } from "./src/core/layer-manager.js";
-import { SharedServices } from "./src/core/services/index.js";
-import { createTestConfig, registerRealLayers } from "./tests/test-helpers.js";
-import { FindDefinitionRequest } from "./src/core/types.js";
+import { CodeAnalyzer } from "../../src/core/unified-analyzer.js";
+import { LayerManager } from "../../src/core/layer-manager.js";
+import { SharedServices } from "../../src/core/services/index.js";
+import { createTestConfig, registerRealLayers } from "../test-helpers.js";
+import { FindDefinitionRequest } from "../../src/core/types.js";
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 async function testLayer2Optimization() {
   console.log("🧪 Testing Layer 2 Optimization (Phase 3)");
@@ -53,7 +55,7 @@ async function testLayer2Optimization() {
     
     const request: FindDefinitionRequest = {
       identifier: "AsyncEnhancedGrep",
-      uri: "file:///home/lightningralf/programming/ontology-lsp/src/layers/enhanced-search-tools-async.ts",
+      uri: pathToFileURL(resolve(process.cwd(), 'src/layers/enhanced-search-tools-async.ts')).toString(),
       position: { line: 10, character: 20 },
       includeDeclaration: true,
       maxResults: 10
@@ -84,7 +86,7 @@ async function testLayer2Optimization() {
     
     const commonRequest: FindDefinitionRequest = {
       identifier: "function",
-      uri: "file:///home/lightningralf/programming/ontology-lsp/src",
+      uri: pathToFileURL(resolve(process.cwd(), 'src')).toString(),
       position: { line: 1, character: 0 },
       includeDeclaration: true,
       maxResults: 5

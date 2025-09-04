@@ -6,6 +6,7 @@
 
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
+import path from 'node:path';
 
 class MCPClient {
   constructor(command, args = []) {
@@ -26,8 +27,8 @@ class MCPClient {
       STDIO_MODE: 'true',
       BUN_DISABLE_ANALYTICS: '1',
       BUN_DISABLE_TRANSPILER_CACHE: '1',
-      ONTOLOGY_DB_PATH: '/home/lightningralf/programming/ontology-lsp/.ontology/ontology.db',
-      ONTOLOGY_WORKSPACE: '/home/lightningralf/programming/ontology-lsp'
+      ONTOLOGY_DB_PATH: path.resolve(process.cwd(), '.ontology/ontology.db'),
+      ONTOLOGY_WORKSPACE: process.cwd()
     };
 
     this.process = spawn(this.command, this.args, {
@@ -126,7 +127,7 @@ class MCPClient {
 async function testSourceSymbols() {
   console.log('=== MCP find_definition Test for Source Code ===\n');
   
-  const client = new MCPClient('/home/lightningralf/programming/ontology-lsp/mcp-wrapper.sh');
+  const client = new MCPClient(path.resolve(process.cwd(), 'mcp-wrapper.sh'));
   
   const symbols = [
     'UnifiedAnalyzer',      // Main class in src/core/unified-analyzer.ts
@@ -158,7 +159,7 @@ async function testSourceSymbols() {
         // Show first 3 definitions
         const toShow = result.definitions.slice(0, 3);
         for (const def of toShow) {
-          const file = def.uri.replace('file://', '').replace('/home/lightningralf/programming/ontology-lsp/', '');
+          const file = def.uri.replace('file://', '').replace(path.resolve(process.cwd()) + path.sep, '');
           console.log(`   📄 ${file}:${def.line}`);
           console.log(`      Kind: ${def.kind}, Confidence: ${def.confidence}`);
         }

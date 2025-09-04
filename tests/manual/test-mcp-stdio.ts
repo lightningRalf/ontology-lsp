@@ -5,11 +5,13 @@
 
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
+import { resolve } from 'node:path';
 
-// Spawn the MCP server
-const mcpServer = spawn('/home/lightningralf/.bun/bin/bun', [
+// Spawn the MCP server (use bun from PATH and repo-relative server path)
+const serverPath = resolve(process.cwd(), 'src/servers/mcp.ts');
+const mcpServer = spawn('bun', [
   'run',
-  '/home/lightningralf/programming/ontology-lsp/src/servers/mcp.ts'
+  serverPath
 ], {
   stdio: ['pipe', 'pipe', 'pipe']
 });

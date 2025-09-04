@@ -1,4 +1,0 @@
-{"file":"tests/benchmarks/tool-comparison.test.ts","duration_ms":78031,"exit_code":0}
-{"file":"tests/performance/benchmark.test.ts","duration_ms":21769,"exit_code":0}
-{"file":"tests/performance/large-tree.test.ts","duration_ms":53,"exit_code":0}
-{"file":"tests/performance/learning-concurrency.test.ts","duration_ms":248,"exit_code":0}

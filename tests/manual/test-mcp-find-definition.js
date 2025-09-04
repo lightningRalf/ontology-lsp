@@ -7,6 +7,7 @@
 
 import { spawn } from 'child_process';
 import { createInterface } from 'readline';
+import path from 'path';
 
 class MCPStdioClient {
   constructor(command, args = []) {
@@ -181,7 +182,7 @@ async function testMCPFindDefinition() {
   console.log('MCP stdio Server Test - find_definition');
   console.log('===========================================');
 
-  const client = new MCPStdioClient('/home/lightningralf/programming/ontology-lsp/mcp-wrapper.sh');
+  const client = new MCPStdioClient(path.resolve(process.cwd(), 'mcp-wrapper.sh'));
 
   try {
     // Start and initialize the server

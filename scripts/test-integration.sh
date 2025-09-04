@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 # Configuration
 TEST_DIR="tests"
 COVERAGE_DIR="coverage"
-RESULTS_DIR="test-results"
+RESULTS_DIR=".test-results"
 TIMEOUT_DEFAULT=120000
 TIMEOUT_PERFORMANCE=300000
 

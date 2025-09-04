@@ -11,7 +11,7 @@ import { TreeSitterLayer } from './src/layers/tree-sitter.ts';
 // Mock search query
 const testQuery = {
   identifier: 'testFunction',
-  searchPath: '/home/lightningralf/programming/ontology-lsp/src',
+  searchPath: 'src',
   fileTypes: ['ts', 'js'],
   caseSensitive: false,
   includeTests: false
