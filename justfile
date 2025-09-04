@@ -21,6 +21,7 @@ default:
     @echo "  just dev            - Development mode with auto-reload"
     @echo "  just status         - Check server status"
     @echo "  just health         - Health check for all servers"
+    @echo "  just sync-ports     - Adjust .env ports via external registry or local scan"
     @echo ""
     @echo "📊 Monitoring:"
     @echo "  just logs           - Tail server logs"
@@ -153,6 +154,10 @@ process-management-info:
 ports:
     @echo "📡 Global Port Registry (~/.ontology/ports.json)"
     @bun run ~/programming/port-registry/src/cli.ts list
+
+sync-ports:
+    @echo "🔌 Syncing ports into .env (prefers registry; falls back to local scan)"
+    @bash bin/sync-env-ports.sh
 
 
 # === PORT MANAGEMENT ===
