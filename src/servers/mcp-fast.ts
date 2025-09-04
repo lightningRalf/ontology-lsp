@@ -12,6 +12,8 @@ process.env.STDIO_MODE = 'true';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { isCoreError } from '../core/errors.js';
+import { toMcpError } from '../adapters/error-mapper.js';
 // IMPORTANT: Avoid importing heavy core modules at top-level.
 // Use type-only import to prevent runtime side effects.
 import type { CodeAnalyzer } from '../core/unified-analyzer';
@@ -191,12 +193,13 @@ export class FastMCPServer {
                 } else {
                     console.error(`Tool call failed: ${name}`, error);
                 }
-
-                // Preserve McpError codes so clients see proper JSON-RPC errors
-                if (error instanceof McpError) {
-                    throw error;
+                if (isCoreError(error) || error instanceof McpError) {
+                    throw toMcpError(error);
                 }
-                throw new McpError(ErrorCode.InternalError, `Tool ${name} failed: ${error instanceof Error ? error.message : String(error)}`);
+                throw new McpError(
+                    ErrorCode.InternalError,
+                    `Tool ${name} failed: ${error instanceof Error ? error.message : String(error)}`
+                );
             }
         });
     }

@@ -28,6 +28,8 @@ import cors from 'cors';
 import { EventEmitter } from 'events';
 import express from 'express';
 import { MCPAdapter } from '../adapters/mcp-adapter.js';
+import { isCoreError } from '../core/errors.js';
+import { toMcpError } from '../adapters/error-mapper.js';
 import { createDefaultCoreConfig } from '../adapters/utils.js';
 import { getEnvironmentConfig } from '../core/config/server-config.js';
 import { createCodeAnalyzer } from '../core/index';
@@ -91,10 +93,13 @@ async function createMcpServer(): Promise<SessionRecord> {
                 error: error instanceof Error ? error.message : String(error),
                 ts: Date.now(),
             });
-            if (error instanceof McpError) {
-                throw error;
+            if (isCoreError(error) || error instanceof McpError) {
+                throw toMcpError(error);
             }
-            throw new McpError(ErrorCode.InternalError, `Tool ${name} failed: ${error instanceof Error ? error.message : String(error)}`);
+            throw new McpError(
+                ErrorCode.InternalError,
+                `Tool ${name} failed: ${error instanceof Error ? error.message : String(error)}`
+            );
         }
     });
 

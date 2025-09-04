@@ -164,6 +164,8 @@
   },
   "active": "b50f4ac68bdf0f49",
   "lastOpenFiles": [
+    "src/adapters/error-mapper.ts",
+    "src/core/errors.ts",
     "tests/mcp-http-init.test.ts",
     "bin/sync-env-ports.sh",
     "dist/mcp-fast/mcp-fast.js",
@@ -173,8 +175,6 @@
     "src/adapters/utils.ts",
     "home/lightningralf/programming/ontology-lsp",
     "home/lightningralf/programming",
-    "home/lightningralf",
-    "home",
     "docs/adapter-error-shapes.md",
     "docs/videos/02-find.gif",
     "docs/videos/01-init.gif",
