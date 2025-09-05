@@ -65,11 +65,28 @@ export class FastMCPServer {
         });
 
         // Optionally register prompts/resources for stdio (opt-in via env to preserve fast startup defaults)
+        // Be defensive: older MCP SDKs may not support prompts/resources. Guard by feature-detection.
         if (process.env.FAST_STDIO_PROMPTS === '1') {
-            registerCommonPrompts(this.server);
+            try {
+                // @ts-expect-error: SDK versions prior to prompts won't have registerPrompt
+                if (typeof (this.server as any).registerPrompt === 'function') {
+                    registerCommonPrompts(this.server);
+                }
+            } catch (e) {
+                // Skip prompts if not supported; never print to stdout in stdio mode
+                if (process.env.DEBUG && !process.env.STDIO_MODE) {
+                    console.warn('[MCP stdio] Prompts registration skipped:', (e as Error)?.message || String(e));
+                }
+            }
         }
         if (process.env.FAST_STDIO_RESOURCES === '1') {
-            registerCommonResources(this.server);
+            try {
+                registerCommonResources(this.server);
+            } catch (e) {
+                if (process.env.DEBUG && !process.env.STDIO_MODE) {
+                    console.warn('[MCP stdio] Resources registration skipped:', (e as Error)?.message || String(e));
+                }
+            }
         }
 
         // Handle tool calls - initialize on demand

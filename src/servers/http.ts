@@ -11,6 +11,8 @@
 
 import { serve } from 'bun';
 import { HTTPAdapter, type HTTPRequest } from '../adapters/http-adapter.js';
+import { MCPAdapter } from '../adapters/mcp-adapter.js';
+import { ToolExecutor } from '../core/tools/executor.js';
 import { createDefaultCoreConfig } from '../adapters/utils.js';
 import { getEnvironmentConfig, type ServerConfig } from '../core/config/server-config.js';
 import { createCodeAnalyzer } from '../core/index';
@@ -223,7 +225,8 @@ export class HTTPServer {
                     // AST Query endpoint
                     if (url.pathname === '/api/v1/ast-query' && request.method === 'POST') {
                         try {
-                            const body = await this.getRequestBody(request);
+                            const raw = await this.getRequestBody(request);
+                            const body: any = raw ? JSON.parse(raw) : {};
                             const { runAstQuery } = await import('../core/ast-query.js');
                             const out = await runAstQuery({
                                 language: body.language,
@@ -244,9 +247,38 @@ export class HTTPServer {
                         }
                     }
 
+                    // Generic Tools endpoint (HTTP parity with MCP tools)
+                    if (url.pathname === '/api/v1/tools/call' && request.method === 'POST') {
+                        try {
+                            const raw = await this.getRequestBody(request);
+                            const body: any = raw ? JSON.parse(raw) : {};
+                            const name = String(body?.name || '').trim();
+                            const args = (body?.arguments && typeof body.arguments === 'object') ? body.arguments : {};
+                            if (!name) {
+                                return new Response(JSON.stringify({ error: 'Missing tool name' }), {
+                                    status: 400,
+                                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                                });
+                            }
+                            const mcpAdapter = new MCPAdapter(this.coreAnalyzer);
+                            const executor = new ToolExecutor();
+                            const result = await executor.execute(mcpAdapter as any, name, args as Record<string, any>);
+                            return new Response(JSON.stringify({ success: true, result }), {
+                                status: 200,
+                                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                            });
+                        } catch (err) {
+                            return new Response(JSON.stringify({ success: false, error: 'tool call failed' }), {
+                                status: 500,
+                                headers: { 'Content-Type': 'application/json' },
+                            });
+                        }
+                    }
+
                     // Graph Expand endpoint (graceful fallback)
                     if (url.pathname === '/api/v1/graph-expand' && request.method === 'POST') {
-                        const body = await this.getRequestBody(request);
+                        const raw = await this.getRequestBody(request);
+                        const body: any = raw ? JSON.parse(raw) : {};
                         const edges: string[] = Array.isArray(body.edges) && body.edges.length ? body.edges : ['imports', 'exports'];
                         try {
                             const { expandNeighbors } = await import('../core/code-graph.js');

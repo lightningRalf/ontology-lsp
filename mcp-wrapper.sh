@@ -24,6 +24,8 @@ export FAST_STDIO_RESOURCES="${FAST_STDIO_RESOURCES:-1}"
 export ALLOW_SNAPSHOT_APPLY="${ALLOW_SNAPSHOT_APPLY:-1}"
 # Prefer partial snapshot materialization for faster dev loops
 export SNAPSHOT_PARTIAL="${SNAPSHOT_PARTIAL:-1}"
+# Prefer quick checks on touched files when commands are omitted
+export FAST_STDIO_CHECKS="${FAST_STDIO_CHECKS:-touched}"
 
 # Prefer the optimized fast MCP server if built; fallback to standard build
 FAST_SERVER_JS="$REPO_ROOT/dist/mcp-fast/mcp-fast.js"

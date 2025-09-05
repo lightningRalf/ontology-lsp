@@ -99,25 +99,38 @@ restart: stop start
 # Check health
 health:
     @echo "🧪 Checking server health..."
-    @curl -s --max-time 1 http://localhost:7000/health >/dev/null 2>&1 && echo "✅ HTTP API (7000): HEALTHY" || echo "❌ HTTP API (7000): NOT RESPONDING"
-    @curl -s --max-time 1 http://localhost:7001/health >/dev/null 2>&1 && echo "✅ MCP HTTP (7001): HEALTHY" || echo "❌ MCP HTTP (7001): NOT RESPONDING"
+    @HTTP_PORT=$$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
+    MCP_PORT=$$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7001); \
+    echo "(env) HTTP_API_PORT=$$HTTP_PORT MCP_HTTP_PORT=$$MCP_PORT"; \
+    (curl -s --max-time 1 http://localhost:$$HTTP_PORT/health >/dev/null 2>&1 && echo "✅ HTTP API ($$HTTP_PORT): HEALTHY" || echo "❌ HTTP API ($$HTTP_PORT): NOT RESPONDING"); \
+    (curl -s --max-time 1 http://localhost:$$MCP_PORT/health >/dev/null 2>&1 && echo "✅ MCP HTTP ($$MCP_PORT): HEALTHY" || echo "❌ MCP HTTP ($$MCP_PORT): NOT RESPONDING")
 
 # Show server status with port information
 status:
     @echo "📊 Server Status"
     @echo "=================="
     @echo ""
-    @echo "🔌 Background Services:"
-    @curl -s --max-time 1 http://localhost:7000/health >/dev/null 2>&1 && echo "  ✅ HTTP API Server: Running on port 7000" || echo "  ❌ HTTP API Server: Not responding on port 7000"  
-    @curl -s --max-time 1 http://localhost:7001/health >/dev/null 2>&1 && echo "  ✅ MCP HTTP Server: Running on port 7001" || echo "  ❌ MCP HTTP Server: Not responding on port 7001"
-    @curl -s --max-time 1 http://localhost:7002 >/dev/null 2>&1 && echo "  ✅ LSP TCP Server: Running on port 7002" || echo "  ❌ LSP TCP Server: Not responding on port 7002"
-    @echo ""
-    @echo "📝 On-Demand Services (stdio):"
+    @HTTP_PORT=$$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
+    MCP_PORT=$$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7001); \
+    LSP_PORT=$$(grep -E '^LSP_SERVER_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7002); \
+    echo "🔧 Ports (env/.env): HTTP=$$HTTP_PORT MCP=$$MCP_PORT LSP=$$LSP_PORT"; \
+    echo ""; \
+    echo "🔌 Background Services:"; \
+    (curl -s --max-time 1 http://localhost:$$HTTP_PORT/health >/dev/null 2>&1 && echo "  ✅ HTTP API Server: Running on port $$HTTP_PORT" || echo "  ❌ HTTP API Server: Not responding on port $$HTTP_PORT"); \
+    (curl -s --max-time 1 http://localhost:$$MCP_PORT/health >/dev/null 2>&1 && echo "  ✅ MCP HTTP Server: Running on port $$MCP_PORT" || echo "  ❌ MCP HTTP Server: Not responding on port $$MCP_PORT"); \
+    (curl -s --max-time 1 http://localhost:$$LSP_PORT >/dev/null 2>&1 && echo "  ✅ LSP TCP Server: Running on port $$LSP_PORT" || echo "  ❌ LSP TCP Server: Not responding on port $$LSP_PORT"); \
+    echo ""; \
+    echo "📝 On-Demand Services (stdio):"
     @test -f dist/mcp/mcp.js && echo "  ✅ MCP STDIO Server (dist): Available" || echo "  ❌ MCP STDIO Server (dist): Not found. Run 'bun run build:mcp-stdio'"
     @test -f src/servers/lsp.ts && echo "  ✅ LSP STDIO Server: Available (launches on-demand)" || echo "  ❌ LSP STDIO Server: Not found"
     @echo ""
-    @echo "🌐 Port Usage Details:"
-    @just check-ports-status
+    @echo "🌐 Port Usage Details:" 
+    @HTTP_PORT=$$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
+    MCP_PORT=$$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7001); \
+    LSP_PORT=$$(grep -E '^LSP_SERVER_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7002); \
+    echo "  Port $$HTTP_PORT:"; (ss -tulnp 2>/dev/null | grep ":$$HTTP_PORT " >/dev/null && echo "   🔴 IN USE" || echo "   🟢 AVAILABLE"); \
+    echo "  Port $$MCP_PORT:"; (ss -tulnp 2>/dev/null | grep ":$$MCP_PORT " >/dev/null && echo "   🔴 IN USE" || echo "   🟢 AVAILABLE"); \
+    echo "  Port $$LSP_PORT:"; (ss -tulnp 2>/dev/null | grep ":$$LSP_PORT " >/dev/null && echo "   🔴 IN USE" || echo "   🟢 AVAILABLE")
 
 # Show logs
 logs:

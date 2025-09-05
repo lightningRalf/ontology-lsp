@@ -7,74 +7,52 @@
 See PROJECT_STATUS.md for achievements and historical context. -->
 
 
-## 🚀 Next Development Priorities (Updated 2025-09-04)
+## 🚀 Next Development Priorities (Tool‑First, aligned with VISION)
 
-### 0.0 Dogfooding Pass (MCP‑first, Immediate)
-- Use MCP HTTP (7001) as the primary interface; verify prompts and workflows end‑to‑end.
-- Scenarios to run:
-  - Investigate symbol (prompt: investigate-symbol) → `explore_codebase` (conceptual on/off) → `build_symbol_map` (astOnly) → `graph_expand` imports/exports.
-  - Safe rename (prompt: plan-safe-rename) → `plan_rename` preview → `workflow_safe_rename` (snapshot + checks).
-  - Quick patch checks (prompt: quick-patch-checks) → `get_snapshot` → `propose_patch` → `run_checks`.
-- Confirm: no stdio noise, structured errors, and tool latencies within budgets. Capture regressions.
+### 0.0 Tool‑First Gate (Immediate)
+- Dogfood three primary flows end‑to‑end using public tools (no internals):
+  1) locate_confirm_definition (fixture symbol) → structured JSON with ≥1 definition
+  2) rename_safely (runChecks=false) → snapshot id + non‑empty diff
+  3) patch_checks_in_snapshot (onlyTouched=true) with a tiny apply_patch diff → ok=false/true but structured JSON and quick runtime
+- Definition of Done:
+  - All three pass under `bun test` using HTTP `/api/v1/tools/call` or CLI `workflow`
+  - Structured errors only; no stdio noise; p95 budgets met on fixture
 
-Delivered (update):
-- Fast stdio MCP dogfood scripts + Just tasks: `dogfood`, `dogfood_full`, `dogfood_progress` (bounded workspace; ms timings)
-- Snapshot helpers: `snap_diff`, `snap_status`, `snap_progress`, and guarded `snap_apply`
-- MCP `apply_snapshot` tool + `overlayStore.applyToWorkingTree()`
-- Default monitoring off for stdio; HTTP server enables metrics explicitly; dogfood sets `SILENT_MODE=1`
-- Fast MCP wrapper guard added: `mcp-wrapper.sh` now checks for `dist/mcp-fast/mcp-fast.js` and prints build instructions to stderr if missing (prevents MCP client start timeouts)
-- Ports sync helper added: `just sync-ports` writes `HTTP_API_PORT` and `MCP_HTTP_PORT` to `.env` using an external registry if available (or local free‑port scan). Servers still bind fixed defaults and only read `.env`.
-- Unified prompts/resources module used by both MCP HTTP and stdio; stdio now lists workflows only by default but exposes prompts/resources (flags on in dev wrapper).
-- High‑value workflows with clear titles/descriptions: rename_safely, locate_confirm_definition, explore_symbol_impact, patch_checks_in_snapshot.
-- New meta & utility workflows: execute_intent (auto‑select), extract_snapshot_artifacts (links), apply_after_checks (dev‑gated apply).
-- Partial snapshot materialization (`SNAPSHOT_PARTIAL=1`): copy only touched files + essential configs for faster loops.
-- New resource: `snapshot://{id}/progress` for progress logs.
-
-Follow‑ups from latest dogfooding (Immediate):
-- MCP HTTP initialize: ensure POST `/mcp { method: initialize }` returns
-  `200` and sets `Mcp-Session-Id` header reliably.
-  - Status: added pre‑seeded session id and response header in handler;
-    improved error logging around `createMcpServer()`. Still validate
-    header presence across environments.
-  - Verify with curl and keep/extend the smoke test under
-    `tests/mcp-http-init.test.ts`.
-- MCP adapter error shape: unknown tool/invalid params should be stable.
-  - Status: adapter now returns `{ error: true, message }` for unknown
-    tools to satisfy tests; longer‑term, consider JSON‑RPC error mapping
-    for parity with servers.
-- Dogfood script drift: `scripts/dogfood-mcp.ts` assumes old config (`layers.layer1.grep.*`).
-  - Action: remove direct `grep/glob` overrides; use existing `CoreConfig.layers.*.timeout` knobs instead.
-  - Keep timings in output; gate conceptual with `L4_AUGMENT_EXPLORE=1`.
-- DevX: `just status/health` hardcode 7000/7001/7002.
-  - Action: read `.env` overrides when present and print both expected and active ports.
-
-New follow‑ups (Immediate):
-- Targeted checks (only touched files): extend `run_checks` and `patch_checks_in_snapshot` with `onlyTouched: true` to run `tsc` against changed files or project refs. Default this in stdio when commands aren’t provided.
-- HTTP parity endpoint: add `POST /api/v1/tools/call` using ToolExecutor so workflows are available to non‑MCP clients.
-- CLI parity: add `ontology-lsp workflow <name> --args <json>` to call ToolExecutor; pre‑define `rename-safely`, `patch-checks-in-snapshot` aliases.
-- Diff adapter: accept `apply_patch` format in `propose_patch` by converting to unified diff with strict validation.
-- Dev ergonomics: add `FAST_STDIO_CHECKS=touched` default for stdio to avoid hangs when commands are omitted.
-
-### 0.05 Port Management Simplification (Immediate)
-- Confirm removal of in-repo PortRegistry across code and docs.
-  - Verify no remaining imports/usages; ensure Justfile help doesn’t imply a global registry.
-  - Keep ports fixed by default; document env overrides in CONFIG.md.
-- Document env overrides in one place:
-  - `HTTP_API_PORT` (default 7000)
-  - `MCP_HTTP_PORT` (default 7001)
-  - Optional: `MCP_HTTP_HOST` (defaults to config host)
-- Optional cleanup: update or remove `just ports` if external registry tooling is not present.
+### 0.05 Port Management Simplification (Keep Simple)
+- No runtime port registry; fixed defaults with `.env` overrides
+- `just health/status` read `.env` and print effective ports (done)
 
 ### 0.1 Fix‑Bugs‑First: Perf stabilization (Immediate)
 
 Monitoring perf and metrics; continue to gate perf/benchmarks behind env and iterate if regressions are observed.
 
-### 0.2 L4/L5 Robustness (Complete)
+### 0.15 Minimal Viable L1→L5 (Working Paths)
+- L1 Fast Search: validate `text_search` tool; cap results; p95≤50ms on fixture
+- L2 AST Analysis: validate `ast_query` and `list_symbols`; p95≤150ms; fail soft if grammars are missing
+- L3 Planner: validate `build_symbol_map` and `plan_rename` preview; include counts in output
+- L4 Ontology: validate `explore_codebase` with `conceptual:true`; toggle via env; metrics visible
+- L5 Learning: validate `pattern_stats`; add a tiny `learn/provide_feedback` round‑trip and assert counters
+- All via `tools/call` or CLI `workflow` with e2e tests; add layer tags to logs
 
-Delivered:
-- L5: examples normalized; `missingExampleContextTimestamp` metric exposed; tiny fixtures + metric assertions added.
-- L4: `/metrics?format=json` includes storage `extras` and `totals` for dashboards.
-- Observability: auto‑init + small rolling windows present; stats fall back to PatternLearner to avoid zeroed panels.
+### 0.18 Pipelines Tool Surface (L5)
+- Expose `run_pipeline` (manual trigger) and `list_pipeline_runs` tools
+  - `run_pipeline { id }` → `{ ok, runId }`
+  - `list_pipeline_runs { id, limit? }` → recent runs with status/metrics
+- Add a quick smoke test that triggers `pattern_feedback_cycle` and returns a run id
+- Keep schedules as no‑ops unless explicitly enabled (dev only)
+
+### 0.2 Dogfood‑Every‑Change (Immediate)
+- Add `just dogfood_ci` to run three primary flows and print concise JSON summaries
+- Prefer HTTP `/api/v1/tools/call` for portability; MCP stdio acceptable for local iteration
+- Gate PRs: include outputs (or CI links) demonstrating success; no merges without tool‑first validation
+
+### 0.25 Observability & SLO Conformance
+- Ensure `/metrics` JSON includes p50/p95/p99 per layer and op counts/errors
+- Adapter logs include per‑layer timing for each workflow invocation
+
+### 0.28 L4/L5 Robustness (Ongoing)
+- L4 (SQLite): keep forward‑only auto‑migrate in dev; guard evolution reads/writes; add indices for hot paths
+- L5: pipelines persisted (minimal). Next: `run_pipeline`, run history listing, and simple retry/backoff
 
 ### 0.3 E2E Cross‑Protocol Wiring (Immediate)
 

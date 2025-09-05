@@ -173,6 +173,28 @@ app.post('/mcp', async (req, res) => {
             transport.onclose = () => {
                 if (transport.sessionId) delete sessions[transport.sessionId];
             };
+
+            // Some clients omit Accept; the SDK transport can respond 406.
+            // Be lenient for initialize: ensure Accept includes JSON and event-stream.
+            const accepts = (req.headers['accept'] as string | undefined) || '';
+            const needJson = !/application\/json/i.test(accepts);
+            const needSse = !/text\/event-stream/i.test(accepts);
+            if (needJson || needSse) {
+                try {
+                    const merged = [
+                        ...(accepts ? accepts.split(',').map((s) => s.trim()).filter(Boolean) : []),
+                        ...(needJson ? ['application/json'] : []),
+                        ...(needSse ? ['text/event-stream'] : []),
+                    ]
+                        .filter((v, i, a) => a.indexOf(v) === i)
+                        .join(', ');
+                    (req.headers as any)['accept'] = merged;
+                } catch {}
+            }
+            // Also ensure Content-Type is application/json for POST initialize
+            if (!/application\/json/i.test(String(req.headers['content-type'] || ''))) {
+                (req.headers as any)['content-type'] = 'application/json';
+            }
         } else {
             res.status(400).json({
                 jsonrpc: '2.0',

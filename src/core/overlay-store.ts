@@ -230,14 +230,35 @@ export class OverlayStore {
     async runChecks(
         snapshotId: string,
         commands: string[],
-        timeoutSec = 120
+        timeoutSec = 120,
+        opts: { onlyTouched?: boolean } = {}
     ): Promise<{ ok: boolean; output: string; elapsedMs: number }> {
         this.assertValidId(snapshotId);
         const start = Date.now();
         // Materialize snapshot into .ontology/snapshots/<id>
         const cwd = (await this.ensureMaterialized(snapshotId)) || process.cwd();
         const output: string[] = [];
-        for (const cmd of commands && commands.length ? commands : ['bun run typecheck', 'bun run build']) {
+        // Build command list
+        let cmdList = commands && commands.length ? [...commands] : ['bun run typecheck', 'bun run build'];
+        const onlyTouched = !!opts.onlyTouched || (process.env.FAST_STDIO_CHECKS || '').toLowerCase() === 'touched';
+        try {
+            const snap = this.ensureSnapshot(snapshotId);
+            const touched = Array.from(snap.touchedFiles || []);
+            const tsFiles = touched.filter((f) => /\.(ts|tsx)$/.test(f));
+            if (onlyTouched && touched.length > 0 && tsFiles.length > 0 && this.which('bunx')) {
+                // Prefer a quick typecheck against touched TS files
+                const limited = tsFiles.slice(0, 50) // cap to avoid overly long cmdlines
+                    .map((f) => JSON.stringify(f)).join(' ');
+                const quick = `bunx tsc --noEmit --pretty false ${limited}`;
+                // Prepend quick check if no explicit commands were provided
+                if (!(commands && commands.length)) {
+                    cmdList = [quick];
+                } else {
+                    cmdList.unshift(quick);
+                }
+            }
+        } catch {}
+        for (const cmd of cmdList) {
             await this.logProgress(snapshotId, `run:${cmd}:start`);
             const [bin, ...args] = cmd.split(' ');
             const ok = await new Promise<boolean>((resolve) => {

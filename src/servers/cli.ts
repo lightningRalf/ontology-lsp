@@ -457,6 +457,129 @@ class CLI {
             .action(async (options) => {
                 await this.handleInit(options);
             });
+
+        // Generic workflow executor (HTTP/MCP parity)
+        this.program
+            .command('workflow <name>')
+            .description('Execute a workflow/tool by name via the unified ToolExecutor')
+            .option('-a, --args <json>', 'JSON arguments for the workflow/tool')
+            .option('-F, --args-file <path>', 'Path to a JSON file with arguments')
+            .option('-j, --json', 'Print raw JSON response where applicable')
+            .action(async (name, options) => {
+                await this.ensureInitialized(options);
+                try {
+                    const [{ MCPAdapter }, { ToolExecutor }] = await Promise.all([
+                        import('../adapters/mcp-adapter.js'),
+                        import('../core/tools/executor.js'),
+                    ]);
+                    let args: Record<string, any> = {};
+                    if (options.argsFile) {
+                        const p = path.resolve(String(options.argsFile));
+                        const body = fs.readFileSync(p, 'utf8');
+                        args = JSON.parse(body);
+                    } else if (options.args) {
+                        args = JSON.parse(String(options.args));
+                    }
+                    const mcp = new MCPAdapter(this.coreAnalyzer);
+                    const exec = new ToolExecutor();
+                    const result = await exec.execute(mcp as any, String(name), args);
+                    const printed = this.printToolResult(result, !!options.json);
+                    console.log(printed);
+                    await this.shutdown();
+                    process.exit(0);
+                } catch (e) {
+                    console.error(`Workflow failed: ${e instanceof Error ? e.message : String(e)}`);
+                    await this.shutdown();
+                    process.exit(1);
+                }
+            });
+
+        // Alias: rename-safely (wraps 'rename_safely')
+        this.program
+            .command('rename-safely <oldName> <newName>')
+            .description('Plan a safe rename, stage diff, optionally run checks inside a snapshot')
+            .option('-f, --file <path>', 'Optional context file')
+            .option('--no-checks', 'Skip running checks')
+            .option('--cmd <command...>', 'Commands to run (e.g., "bun run build:tsc")')
+            .option('-t, --timeout <sec>', 'Timeout seconds for checks', '240')
+            .option('-j, --json', 'Print raw JSON response')
+            .action(async (oldName, newName, options) => {
+                await this.ensureInitialized(options);
+                const [{ MCPAdapter }, { ToolExecutor }] = await Promise.all([
+                    import('../adapters/mcp-adapter.js'),
+                    import('../core/tools/executor.js'),
+                ]);
+                const args: Record<string, any> = {
+                    oldName: String(oldName),
+                    newName: String(newName),
+                    file: options.file ? String(options.file) : undefined,
+                    runChecks: options.checks !== false,
+                    commands: Array.isArray(options.cmd) ? options.cmd : options.cmd ? [options.cmd] : ['bun run build:tsc'],
+                    timeoutSec: parseInt(String(options.timeout) || '240', 10),
+                };
+                const mcp = new MCPAdapter(this.coreAnalyzer);
+                const exec = new ToolExecutor();
+                const result = await exec.execute(mcp as any, 'rename_safely', args);
+                const printed = this.printToolResult(result, !!options.json);
+                console.log(printed);
+                await this.shutdown();
+                process.exit(0);
+            });
+
+        // Alias: patch-checks-in-snapshot (wraps 'patch_checks_in_snapshot')
+        this.program
+            .command('patch-checks-in-snapshot')
+            .description('Stage a unified diff and run checks inside a snapshot (safe)')
+            .option('-s, --snapshot <id>', 'Snapshot id (optional)')
+            .option('-p, --patch-file <path>', 'Path to unified diff file (default: stdin)')
+            .option('--cmd <command...>', 'Commands to run (default: bun run build:tsc)')
+            .option('-t, --timeout <sec>', 'Timeout seconds for checks', '240')
+            .option('--only-touched', 'Prefer quick checks for touched files only')
+            .option('-j, --json', 'Print raw JSON response')
+            .action(async (options) => {
+                await this.ensureInitialized(options);
+                const [{ MCPAdapter }, { ToolExecutor }] = await Promise.all([
+                    import('../adapters/mcp-adapter.js'),
+                    import('../core/tools/executor.js'),
+                ]);
+                let patch = '';
+                if (options.patchFile) {
+                    patch = fs.readFileSync(path.resolve(String(options.patchFile)), 'utf8');
+                } else {
+                    patch = fs.readFileSync(0, 'utf8'); // stdin
+                }
+                const args: Record<string, any> = {
+                    patch,
+                    snapshot: options.snapshot ? String(options.snapshot) : undefined,
+                    commands: Array.isArray(options.cmd) ? options.cmd : options.cmd ? [options.cmd] : ['bun run build:tsc'],
+                    timeoutSec: parseInt(String(options.timeout) || '240', 10),
+                    onlyTouched: !!options.onlyTouched,
+                };
+                const mcp = new MCPAdapter(this.coreAnalyzer);
+                const exec = new ToolExecutor();
+                const result = await exec.execute(mcp as any, 'patch_checks_in_snapshot', args);
+                const printed = this.printToolResult(result, !!options.json);
+                console.log(printed);
+                await this.shutdown();
+                process.exit(0);
+            });
+    }
+
+    private printToolResult(res: any, rawJson: boolean): string {
+        try {
+            if (rawJson) {
+                return JSON.stringify(res, null, 2);
+            }
+            const text = res?.content?.[0]?.text;
+            if (typeof text === 'string') return text;
+            return JSON.stringify(res, null, 2);
+        } catch {
+            try {
+                return String(res);
+            } catch {
+                return '';
+            }
+        }
     }
 
     private async ensureInitialized(options: any): Promise<void> {

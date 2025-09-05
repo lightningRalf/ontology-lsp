@@ -75,6 +75,7 @@ export class ToolRegistry {
                     patch: { type: 'string', description: 'Unified diff (git format) to stage' },
                     snapshot: { type: 'string', description: 'Optional snapshot id; if absent a snapshot is created' },
                     commands: { type: 'array', items: { type: 'string' }, default: ['bun run build:tsc'] },
+                    onlyTouched: { type: 'boolean', description: 'Restrict checks to touched files when possible', default: false },
                     timeoutSec: { type: 'number', default: 240 },
                 },
                 required: ['patch'],
@@ -153,6 +154,7 @@ export class ToolRegistry {
                 properties: {
                     snapshot: { type: 'string' },
                     commands: { type: 'array', items: { type: 'string' } },
+                    onlyTouched: { type: 'boolean', description: 'Restrict checks to touched files when possible', default: false },
                     timeoutSec: { type: 'number', default: 120 },
                 },
                 required: ['snapshot'],
@@ -332,6 +334,20 @@ export class ToolRegistry {
                 type: 'object',
                 properties: { file: { type: 'string' } },
                 required: ['file'],
+            },
+        },
+        {
+            name: 'list_pipelines',
+            description: 'List learning pipelines (id, name, trigger, schedule, enabled)',
+            inputSchema: { type: 'object', properties: {} },
+        },
+        {
+            name: 'pipeline_status',
+            description: 'Get status for a learning pipeline',
+            inputSchema: {
+                type: 'object',
+                properties: { id: { type: 'string' } },
+                required: ['id'],
             },
         },
         {

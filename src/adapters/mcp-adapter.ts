@@ -179,6 +179,12 @@ export class MCPAdapter {
                 let result: any;
 
                 switch (name) {
+                    case 'list_pipelines':
+                        return this.handleListPipelines();
+                    case 'pipeline_status':
+                        return this.handlePipelineStatus(arguments_);
+                    case 'list_symbols':
+                        return this.handleListSymbols(arguments_);
                     case 'execute_intent':
                         return this.handleExecuteIntent(arguments_);
                     case 'extract_snapshot_artifacts':
@@ -251,9 +257,10 @@ export class MCPAdapter {
                 const duration = Date.now() - startTime;
                 const safeStr = (() => {
                     try {
-                        return JSON.stringify(result);
+                        const s = JSON.stringify(result);
+                        return typeof s === 'string' ? s : '';
                     } catch {
-                        return String(result);
+                        try { return String(result ?? ''); } catch { return ''; }
                     }
                 })();
                 adapterLogger.logPerformance(`tool_${name}`, duration, true, {
@@ -289,6 +296,87 @@ export class MCPAdapter {
             }
             // Fallback: return adapter-shaped message for non-core errors
             return handleAdapterError(error, 'mcp');
+        }
+    }
+
+    private async handleListSymbols(args: Record<string, any>) {
+        const file = typeof args?.file === 'string' ? args.file : '';
+        if (!file) return { content: [{ type: 'text', text: 'file required' }], isError: true };
+        try {
+            const fs = await import('node:fs/promises');
+            const path = await import('node:path');
+            const abs = path.isAbsolute(file) ? file : path.resolve(process.cwd(), file);
+            const text = await fs.readFile(abs, 'utf8');
+            const lines = text.split(/\r?\n/);
+            const out: Array<{ name: string; kind: string; line: number; character: number }> = [];
+            const push = (name: string, kind: string, line: number, character: number) => {
+                out.push({ name, kind, line, character });
+            };
+            // Simple, file-scoped regex extraction (fast and bounded)
+            for (let i = 0; i < lines.length; i++) {
+                const l = lines[i];
+                let m = /\bclass\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(l);
+                if (m) push(m[1], 'class', i, Math.max(0, l.indexOf(m[1])));
+                m = /\bfunction\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/.exec(l);
+                if (m) push(m[1], 'function', i, Math.max(0, l.indexOf(m[1])));
+                m = /\binterface\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(l);
+                if (m) push(m[1], 'interface', i, Math.max(0, l.indexOf(m[1])));
+                m = /\bconst\s+([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(l);
+                if (m) push(m[1], 'const', i, Math.max(0, l.indexOf(m[1])));
+                m = /\bexport\s+\{\s*([^}]+)\}/.exec(l);
+                if (m) {
+                    const names = m[1].split(',').map((s) => s.trim()).filter(Boolean);
+                    for (const n of names) push(n.split(/\s+as\s+/i)[0], 'export', i, Math.max(0, l.indexOf(n)));
+                }
+            }
+            const result = { file: abs, symbols: out.slice(0, 500) };
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], isError: false };
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: 'text', text: `list_symbols failed: ${msg}` }], isError: true };
+        }
+    }
+
+    // --- Pipelines (L5) ---
+    private getLearningOrchestrator(): any | null {
+        try {
+            const lo = (this.coreAnalyzer as any)?.learningOrchestrator;
+            return lo || null;
+        } catch { return null; }
+    }
+
+    private async handleListPipelines() {
+        const lo = this.getLearningOrchestrator();
+        if (!lo) return { content: [{ type: 'text', text: 'learning orchestrator unavailable' }], isError: true };
+        try {
+            const items = Array.from((lo as any).pipelines?.values?.() || []).map((p: any) => ({
+                id: p.id, name: p.name, trigger: p.trigger, schedule: p.schedule || null, enabled: !!p.enabled,
+            }));
+            return { content: [{ type: 'text', text: JSON.stringify({ pipelines: items }, null, 2) }], isError: false };
+        } catch (e) {
+            return { content: [{ type: 'text', text: 'failed to list pipelines' }], isError: true };
+        }
+    }
+
+    private async handlePipelineStatus(args: Record<string, any>) {
+        const id = String(args?.id || '').trim();
+        if (!id) return { content: [{ type: 'text', text: 'id required' }], isError: true };
+        const lo = this.getLearningOrchestrator();
+        if (!lo) return { content: [{ type: 'text', text: 'learning orchestrator unavailable' }], isError: true };
+        try {
+            const p = (lo as any).pipelines?.get?.(id);
+            if (!p) return { content: [{ type: 'text', text: JSON.stringify({ ok: false, reason: 'not_found' }) }], isError: false };
+            const status = {
+                id: p.id,
+                name: p.name,
+                trigger: p.trigger,
+                schedule: p.schedule || null,
+                enabled: !!p.enabled,
+                stats: p.stats || { runsCompleted: 0, runsSuccessful: 0, averageRuntimeMs: 0 },
+            };
+            return { content: [{ type: 'text', text: JSON.stringify(status, null, 2) }], isError: false };
+        } catch {
+            return { content: [{ type: 'text', text: 'failed to get pipeline status' }], isError: true };
         }
     }
 
@@ -555,7 +643,9 @@ export class MCPAdapter {
         }
 
         // Step 3: run checks inside snapshot
-        const checks = await overlayStore.runChecks(snap.id, commands, timeoutSec);
+        const onlyTouchedEnv = (process.env.FAST_STDIO_CHECKS || '').toLowerCase() === 'touched';
+        const onlyTouched = typeof (args as any)?.onlyTouched === 'boolean' ? !!(args as any).onlyTouched : onlyTouchedEnv;
+        const checks = await overlayStore.runChecks(snap.id, commands, timeoutSec, { onlyTouched });
         const ok = !!checks.ok;
         const result = {
             ok,
@@ -673,13 +763,71 @@ export class MCPAdapter {
         }
         try {
             const snap = overlayStore.ensureSnapshot(snapshot);
-            const res = overlayStore.stagePatch(snap.id, patch);
+            const isApplyPatch = /\*\*\*\s+Begin Patch/.test(patch);
+            const unified = isApplyPatch ? this.convertApplyPatchToUnified(patch) : patch;
+            const res = overlayStore.stagePatch(snap.id, unified);
             const payload = { accepted: res.accepted, snapshot: snap.id, message: res.message };
             return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }], isError: !res.accepted };
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
             return { content: [{ type: 'text', text: `Invalid snapshot: ${msg}` }], isError: true };
         }
+    }
+
+    // Convert simple apply_patch format to a minimal unified diff understood by git/patch
+    private convertApplyPatchToUnified(patch: string): string {
+        const lines = patch.replace(/\r\n/g, '\n').split('\n');
+        const out: string[] = [];
+        let i = 0;
+        function isFileHeader(s: string) {
+            return /^\*\*\*\s+(Update|Add|Delete) File: /i.test(s);
+        }
+        while (i < lines.length) {
+            const line = lines[i];
+            // Find next file op
+            const m = line.match(/^\*\*\*\s+(Update|Add|Delete) File:\s+(.+)$/i);
+            if (!m) {
+                i++;
+                continue;
+            }
+            const kind = m[1].toLowerCase();
+            const file = m[2].trim();
+            i++;
+            const chunk: string[] = [];
+            while (i < lines.length && !isFileHeader(lines[i]) && !/^\*\*\*\s+End Patch$/i.test(lines[i])) {
+                const l = lines[i];
+                // Accept hunk markers and diff lines; ignore apply_patch footers
+                if (/^@@/.test(l) || /^[ +\-]/.test(l)) {
+                    chunk.push(l);
+                }
+                i++;
+            }
+            if (kind === 'delete') {
+                throw new Error(`apply_patch delete not supported for ${file}`);
+            }
+            // Minimal unified framing
+            out.push(`diff --git a/${file} b/${file}`);
+            if (kind === 'add') {
+                out.push(`--- /dev/null`);
+                out.push(`+++ b/${file}`);
+            } else {
+                out.push(`--- a/${file}`);
+                out.push(`+++ b/${file}`);
+            }
+            // Ensure at least one hunk header exists
+            if (!chunk.some((l) => /^@@/.test(l))) {
+                out.push('@@');
+            }
+            for (const l of chunk) {
+                if (/^\*\*\*\s+End of File/i.test(l)) continue;
+                out.push(l);
+            }
+        }
+        const joined = out.join('\n');
+        if (!joined.trim()) {
+            throw new Error('apply_patch conversion produced empty diff');
+        }
+        return joined + (joined.endsWith('\n') ? '' : '\n');
     }
 
     private async handleRunChecks(args: Record<string, any>) {
@@ -689,9 +837,11 @@ export class MCPAdapter {
         }
         const cmds = Array.isArray(args?.commands) ? (args?.commands as string[]) : [];
         const timeoutSec = typeof args?.timeoutSec === 'number' ? args.timeoutSec : 120;
+        const onlyTouchedEnv = (process.env.FAST_STDIO_CHECKS || '').toLowerCase() === 'touched';
+        const onlyTouched = typeof args?.onlyTouched === 'boolean' ? !!args.onlyTouched : onlyTouchedEnv;
         let res: any;
         try {
-            res = await overlayStore.runChecks(snapshot, cmds, timeoutSec);
+            res = await overlayStore.runChecks(snapshot, cmds, timeoutSec, { onlyTouched });
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
             return { content: [{ type: 'text', text: `Invalid snapshot: ${msg}` }], isError: true };

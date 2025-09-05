@@ -1204,23 +1204,69 @@ export class LearningOrchestrator {
     // Database helper methods
 
     private async savePipelineToDatabase(pipeline: LearningPipeline): Promise<void> {
-        // Implementation would save pipeline configuration to database
-        if (!process.env.SILENT_MODE && !process.env.STDIO_MODE) {
-            console.error(`Would save pipeline ${pipeline.id} to database`);
+        try {
+            const db = (this.sharedServices as any).database;
+            const components = JSON.stringify(pipeline.components || []);
+            await db.execute(
+                `INSERT OR REPLACE INTO pipelines (id, name, description, components, trigger, schedule, enabled, config, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, strftime('%s','now'))`,
+                [
+                    pipeline.id,
+                    pipeline.name,
+                    pipeline.description || '',
+                    components,
+                    pipeline.trigger,
+                    pipeline.schedule || null,
+                    pipeline.enabled ? 1 : 0,
+                    JSON.stringify({}),
+                ]
+            );
+        } catch (e) {
+            if (!process.env.SILENT_MODE && !process.env.STDIO_MODE) {
+                console.error(`Pipeline save failed (${pipeline.id}):`, e instanceof Error ? e.message : String(e));
+            }
         }
     }
 
     private async savePipelineStats(pipeline: LearningPipeline): Promise<void> {
-        // Implementation would update pipeline statistics in database
-        if (!process.env.SILENT_MODE && !process.env.STDIO_MODE) {
-            console.error(`Would update stats for pipeline ${pipeline.id}`);
+        try {
+            const db = (this.sharedServices as any).database;
+            await db.execute(
+                `UPDATE pipelines SET updated_at = strftime('%s','now') WHERE id = ?`,
+                [pipeline.id]
+            );
+        } catch (e) {
+            if (!process.env.SILENT_MODE && !process.env.STDIO_MODE) {
+                console.error(`Pipeline stats update failed (${pipeline.id}):`, e instanceof Error ? e.message : String(e));
+            }
         }
     }
 
     private async loadPipelinesFromDatabase(): Promise<void> {
-        // Implementation would load additional pipelines from database
-        if (!process.env.SILENT_MODE && !process.env.STDIO_MODE) {
-            console.error('Would load additional pipelines from database');
+        try {
+            const db = (this.sharedServices as any).database;
+            const rows = await db.query<any>(`SELECT id, name, description, components, trigger, schedule, enabled FROM pipelines`);
+            for (const row of rows) {
+                if (this.pipelines.has(row.id)) continue;
+                let comps: any[] = [];
+                try { comps = JSON.parse(row.components || '[]'); } catch { comps = []; }
+                const pipeline: LearningPipeline = {
+                    id: row.id,
+                    name: row.name,
+                    description: row.description || '',
+                    components: comps as any,
+                    trigger: row.trigger,
+                    schedule: row.schedule || undefined,
+                    enabled: !!row.enabled,
+                    stats: { runsCompleted: 0, runsSuccessful: 0, averageRuntimeMs: 0 },
+                };
+                // Register without re-saving to avoid recursion
+                this.pipelines.set(pipeline.id, pipeline);
+            }
+        } catch (e) {
+            if (!process.env.SILENT_MODE && !process.env.STDIO_MODE) {
+                console.error('Failed to load pipelines from database:', e instanceof Error ? e.message : String(e));
+            }
         }
     }
 

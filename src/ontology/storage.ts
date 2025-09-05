@@ -72,6 +72,8 @@ export class OntologyStorage implements StoragePort {
     private skippedRepsSave = 0;
     private skippedRepsLoad = 0;
     private missingEvolution = 0;
+    // Guard for schema drift in local dev DBs
+    private supportsEvolutionStates = true;
 
     constructor(private dbPath: string) {
         // Ensure directory exists
@@ -88,6 +90,42 @@ export class OntologyStorage implements StoragePort {
         this.createTables();
         this.createIndices();
         this.cleanupMalformedRepresentations();
+        this.ensureSchemaCompatibility();
+    }
+
+    private ensureSchemaCompatibility(): void {
+        // Attempt forward-only, idempotent migrations in dev by default.
+        const auto = (process.env.L4_AUTO_MIGRATE ?? '1') !== '0';
+        try {
+            // evolution_history columns
+            const evoInfo = this.db.query(`PRAGMA table_info(evolution_history)`).all() as Array<{ name: string }>;
+            const evoCols = new Set(evoInfo.map((r) => (r as any).name));
+            const missingFrom = !evoCols.has('from_state');
+            const missingTo = !evoCols.has('to_state');
+            if (auto && (missingFrom || missingTo)) {
+                try { if (missingFrom) this.db.exec(`ALTER TABLE evolution_history ADD COLUMN from_state TEXT`); } catch {}
+                try { if (missingTo) this.db.exec(`ALTER TABLE evolution_history ADD COLUMN to_state TEXT`); } catch {}
+            }
+        } catch {}
+        try {
+            // concepts.signature_fingerprint
+            const conInfo = this.db.query(`PRAGMA table_info(concepts)`).all() as Array<{ name: string }>;
+            const conCols = new Set(conInfo.map((r) => (r as any).name));
+            if (auto && !conCols.has('signature_fingerprint')) {
+                try { this.db.exec(`ALTER TABLE concepts ADD COLUMN signature_fingerprint TEXT`); } catch {}
+            }
+        } catch {}
+        // Final detection for guards
+        try {
+            const info = this.db.query(`PRAGMA table_info(evolution_history)`).all() as Array<{ name: string }>;
+            const cols = new Set(info.map((r) => (r as any).name));
+            this.supportsEvolutionStates = cols.has('from_state') && cols.has('to_state');
+            if (!this.supportsEvolutionStates) {
+                console.warn('[L4] Skipping evolution_history writes: schema missing from_state/to_state');
+            }
+        } catch {
+            this.supportsEvolutionStates = false;
+        }
     }
 
     private createTables(): void {
@@ -165,6 +203,10 @@ export class OntologyStorage implements StoragePort {
                 ON representations(name);
             CREATE INDEX IF NOT EXISTS idx_representations_concept_id 
                 ON representations(concept_id);
+            CREATE INDEX IF NOT EXISTS idx_repr_concept_name 
+                ON representations(concept_id, name);
+            CREATE INDEX IF NOT EXISTS idx_repr_location_uri 
+                ON representations(location_uri);
             
             CREATE INDEX IF NOT EXISTS idx_relations_from 
                 ON relations(from_concept_id);
@@ -256,32 +298,34 @@ export class OntologyStorage implements StoragePort {
                 );
             }
 
-            // Save evolution history
-            const clearEvolutionStmt = this.db.prepare(`
-                DELETE FROM evolution_history WHERE concept_id = ?
-            `);
-            clearEvolutionStmt.run(concept.id);
+            // Save evolution history (guard schema drift)
+            if (this.supportsEvolutionStates) {
+                const clearEvolutionStmt = this.db.prepare(`
+                    DELETE FROM evolution_history WHERE concept_id = ?
+                `);
+                clearEvolutionStmt.run(concept.id);
 
-            const evolutionStmt = this.db.prepare(`
-                INSERT INTO evolution_history 
-                (concept_id, timestamp, change_type, from_state, to_state, reason, confidence)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            `);
+                const evolutionStmt = this.db.prepare(`
+                    INSERT INTO evolution_history 
+                    (concept_id, timestamp, change_type, from_state, to_state, reason, confidence)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                `);
 
-            const evolutions = Array.isArray((concept as any).evolution) ? (concept as any).evolution : [];
-            if (!Array.isArray((concept as any).evolution)) {
-                this.missingEvolution++;
-            }
-            for (const evolution of evolutions) {
-                evolutionStmt.run(
-                    concept.id,
-                    evolution.timestamp.toISOString(),
-                    evolution.type,
-                    evolution.from,
-                    evolution.to,
-                    evolution.reason,
-                    evolution.confidence
-                );
+                const evolutions = Array.isArray((concept as any).evolution) ? (concept as any).evolution : [];
+                if (!Array.isArray((concept as any).evolution)) {
+                    this.missingEvolution++;
+                }
+                for (const evolution of evolutions) {
+                    evolutionStmt.run(
+                        concept.id,
+                        evolution.timestamp.toISOString(),
+                        evolution.type,
+                        evolution.from,
+                        evolution.to,
+                        evolution.reason,
+                        evolution.confidence
+                    );
+                }
             }
 
             // Save metadata
@@ -462,24 +506,31 @@ export class OntologyStorage implements StoragePort {
                 });
             }
 
-            // Load evolution history
-            const evolutionRows = this.db
-                .prepare(`
-                SELECT * FROM evolution_history WHERE concept_id = ? ORDER BY timestamp DESC
-            `)
-                .all(row.id);
-
-            const evolution = evolutionRows.map((evRow) => {
-                const row = evRow as EvolutionRow;
-                return {
-                    timestamp: new Date(row.timestamp),
-                    type: row.change_type as 'rename' | 'signature' | 'relation' | 'canonical_rename' | 'move',
-                    from: row.from_state,
-                    to: row.to_state,
-                    reason: row.reason || '',
-                    confidence: row.confidence,
-                };
-            });
+            // Load evolution history (guard schema drift)
+            const evolution = (() => {
+                try {
+                    const info = this.db.query(`PRAGMA table_info(evolution_history)`).all() as Array<{ name: string }>;
+                    const cols = new Set(info.map((r) => (r as any).name));
+                    const ok = cols.has('from_state') && cols.has('to_state');
+                    if (!ok) return [] as any[];
+                    const evolutionRows = this.db
+                        .prepare(`SELECT * FROM evolution_history WHERE concept_id = ? ORDER BY timestamp DESC`)
+                        .all(row.id);
+                    return evolutionRows.map((evRow) => {
+                        const er = evRow as EvolutionRow;
+                        return {
+                            timestamp: new Date(er.timestamp),
+                            type: er.change_type as 'rename' | 'signature' | 'relation' | 'canonical_rename' | 'move',
+                            from: er.from_state,
+                            to: er.to_state,
+                            reason: er.reason || '',
+                            confidence: er.confidence,
+                        };
+                    });
+                } catch {
+                    return [] as any[];
+                }
+            })();
 
             // Load metadata
             const metadataRow = this.db

@@ -4,7 +4,7 @@
 
 The unified core architecture is fully implemented and operational with all critical issues resolved.
 
-## 📊 Current Status: Core stable; Hybrid Code Brain rollout in progress
+## 📊 Current Status: Core stable; Tool‑First L1→L5 rollout in progress
 
 Hybrid plan summary (2025‑09‑01):
 - Default router: AST + graph for read/nav; optional SCIP/LSIF for offline precision; LSP limited to typed rename/impl under flags.
@@ -62,10 +62,11 @@ Hybrid plan summary (2025‑09‑01):
   - Tools: text_search, symbol_search, ast_query, graph_expand, get_snapshot, propose_patch, run_checks, build_symbol_map, plan_rename
 - **HTTP Adapter**: Running on port 7000, all endpoints working
   - Endpoints: /api/v1/ast-query, /api/v1/graph-expand, /api/v1/snapshots, /api/v1/snapshots/clean
-- **CLI Adapter**: Commands exposed for Layer 3 features:
-  - `symbol-map <identifier>` (Symbol)
-  - `plan-rename <old> <new>` (Refactor)
-  - New: `text-search`, `symbol-search`, `ast-query`, `graph-expand [--seed-only]`, `snapshots clean`
+  - NEW: `POST /api/v1/tools/call` for MCP‑parity tool execution (uses ToolExecutor)
+- **CLI Adapter**: Thin wrapper exposing tool workflows (stdio)
+  - Core commands: `symbol-map <identifier>`, `plan-rename <old> <new>`, `text-search`, `symbol-search`, `ast-query`, `graph-expand`, `snapshots clean`
+  - NEW workflows: `workflow <name> --args <json>`, `rename-safely <old> <new> [...]`, `patch-checks-in-snapshot [...]`
+  - NEW tools: `workflow list_symbols --args '{"file":"..."}'` (file‑scoped), `workflow list_pipelines`, `workflow pipeline_status --args '{"id":"..."}'`
 - **VS Code Extension**: Command Palette entries aligned with namespaces:
   - “Symbol: Build Symbol Map”
   - “Refactor: Plan Rename (Preview)”
@@ -73,7 +74,7 @@ Hybrid plan summary (2025‑09‑01):
 ### Learning System ✅
 - Pattern Detection: Persisting to database
 - Feedback Loop: **FULLY OPERATIONAL** - Comprehensive integration testing complete
-- Evolution Tracking: Database access restored
+- Evolution Tracking: Database access restored; schema drift guarded in dev (see L4 note)
 - Team Knowledge: Fully initialized
 
 ### Deployment Configuration ✅
@@ -243,6 +244,37 @@ ontology-lsp/
   - extract_snapshot_artifacts (links overlay.diff/status/progress), apply_after_checks (dev‑gated)
 - Prompts/resources are visible and usable in stdio (opt‑in flags were enabled in dev wrapper). Prompts guide best‑practice sequences; tools remain the contracts.
 - Tool list curation for stdio: only workflows are listed; legacy names (workflow_*) remain callable but are no longer advertised by default.
+
+## 📅 Latest Updates (2025-09-05)
+
+- Tool‑First parity
+  - HTTP parity endpoint: `POST /api/v1/tools/call` executes any registered tool/workflow via ToolExecutor
+  - CLI workflows: added `workflow`, `rename-safely`, `patch-checks-in-snapshot` commands
+  - MCP adapter: added `list_symbols` (file‑scoped), `list_pipelines`, `pipeline_status`
+
+- Edits + Snapshots
+  - `propose_patch` now accepts `apply_patch` format; converts to unified diff before staging
+  - Snapshot checks support `onlyTouched` (fast `tsc --noEmit` against touched TS files when enabled)
+  - Dev defaults: `FAST_STDIO_CHECKS=touched`, `SNAPSHOT_PARTIAL=1`
+
+- L4 Ontology storage (SQLite)
+  - Dev‑safe auto‑migrate: forward‑only, idempotent ALTERs for evolution_history(from_state,to_state) and concepts(signature_fingerprint)
+  - Graceful guard: skip evolution writes/reads if columns remain missing (single warning)
+  - Added helpful indices: representations(concept_id,name), representations(location_uri)
+
+- L5 Learning (pipelines)
+  - Minimal persistence added: tables `pipelines` and `pipeline_runs` with basic indexes
+  - LearningOrchestrator now saves/loads pipelines from DB
+  - Tools surfaced: `list_pipelines`, `pipeline_status`
+
+- Docs
+  - CONFIG.md corrected server-config path; documented HTTP tools endpoint and CLI workflows
+  - docs/WORKFLOWS.md added; docs/README.md updated with quick start and parity overview
+
+### Known Gaps (tool‑first gating)
+- `run_pipeline` tool (manual trigger) not yet exposed; add tool + simple status tail
+- `list_symbols` currently regex‑based (fast). Optional AST‑backed listing can be added behind a feature flag
+- Some `tsc` checks fail in this repository due to missing type defs (jest, estree, etc.) — expected in dev; structure and tool flow are correct
 
 ### Unified Prompts/Resources (No Drift)
 - Introduced shared registration module `src/servers/mcp-shared.ts` used by both MCP HTTP and stdio servers.

@@ -6,7 +6,7 @@ The Ontology LSP system uses a centralized configuration approach to prevent por
 
 ## Configuration File
 
-The main configuration is defined in `mcp-ontology-server/src/config/server-config.ts`.
+The main configuration is defined in `src/core/config/server-config.ts`.
 
 ## Port Allocation
 
@@ -39,6 +39,14 @@ Settings are loaded in this priority order:
 - `MCP_HTTP_PORT` - MCP HTTP server port (default: 7001)
 - `LSP_SERVER_PORT` - LSP server port for TCP mode (default: 7002)
 - `LSP_HOST` - Server host (default: localhost)
+
+### Storage (Layer 4) Selection
+- `LAYER4_ADAPTER` or `ONTOLOGY_STORAGE_ADAPTER` or `STORAGE_ADAPTER`
+  - Values: `sqlite` (default) | `postgres` | `triplestore` (scaffold)
+- `ONTOLOGY_DB_PATH` or `LAYER4_DB_PATH`
+  - Path to SQLite DB file (applies to Layers 3/4/5 when set)
+- `ONTOLOGY_PG_URL` / `DATABASE_URL` / `PG_URL`
+  - Postgres connection string (only required if using `postgres` adapter)
 
 ### Performance Settings
 - `LSP_TIMEOUT` - Request timeout in milliseconds (default: 5000)
@@ -195,6 +203,38 @@ Layer 4 persists concepts and relations through a pluggable StoragePort. Select 
     - `export ONTOLOGY_PG_URL=postgres://user:pass@localhost:5432/ontology`
   - Set adapter:
     - `layers.layer4.adapter: postgres`
+
+## MCP/HTTP/CLI Parity (New)
+
+### HTTP: Generic Tools Endpoint
+
+- `POST /api/v1/tools/call`
+  - Body: `{ "name": "<toolName>", "arguments": { ... } }`
+  - Returns: `{ success: true, result: <MCP tool result> }`
+  - Example:
+    ```bash
+    curl -sS -X POST \
+      -H 'content-type: application/json' \
+      http://localhost:${HTTP_API_PORT:-7000}/api/v1/tools/call \
+      -d '{"name":"get_snapshot","arguments":{"preferExisting":true}}' | jq .
+    ```
+
+### CLI Workflows
+
+- Generic: `ontology-lsp workflow <name> --args '<json>' [--args-file file] [--json]`
+  - Example: `ontology-lsp workflow locate_confirm_definition --args '{"symbol":"TestClass","file":"tests/fixtures/example.ts"}'`
+
+- Rename safely (alias of `rename_safely` tool):
+  - `ontology-lsp rename-safely <oldName> <newName> [-f file] [--no-checks] [--cmd <command...>] [-t sec] [--json]`
+
+- Patch checks in snapshot (alias of `patch_checks_in_snapshot`):
+  - `ontology-lsp patch-checks-in-snapshot [-s snapshot] [-p patch.diff] [--cmd <command...>] [-t sec] [--only-touched] [--json]`
+
+### Dev UX Env Defaults
+
+- `FAST_STDIO_CHECKS=touched` (default in `mcp-wrapper.sh`): run quick type checks for touched TS files inside snapshots when commands are omitted.
+- `SNAPSHOT_PARTIAL=1`: partial snapshot materialization (only touched files + essentials).
+- `L4_AUGMENT_EXPLORE=1`: opt-in conceptual hints for explore flows.
 
 - Triple Store options:
   - Adapter is scaffolded but CRUD is not implemented yet.

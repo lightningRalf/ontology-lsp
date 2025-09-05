@@ -185,6 +185,33 @@ export function handleAdapterError(error: unknown, _adapter: 'http' | 'mcp' | 'c
 export function createDefaultCoreConfig(): CoreConfig {
   const cfg = AnalyzerFactory.createDefaultConfig();
   (cfg as any).monitoring = { ...(cfg as any).monitoring, enabled: false };
+
+  // Allow simple env-based overrides for storage without touching callers
+  // Default remains SQLite; only switch if explicitly requested.
+  try {
+    const adapterEnv =
+      process.env.LAYER4_ADAPTER || process.env.ONTOLOGY_STORAGE_ADAPTER || process.env.STORAGE_ADAPTER;
+    if (adapterEnv) {
+      (cfg as any).layers = (cfg as any).layers || {};
+      (cfg as any).layers.layer4 = { ...(cfg as any).layers.layer4, adapter: adapterEnv };
+    }
+    const dbPathEnv = process.env.ONTOLOGY_DB_PATH || process.env.LAYER4_DB_PATH;
+    if (dbPathEnv) {
+      (cfg as any).layers = (cfg as any).layers || {};
+      (cfg as any).layers.layer4 = { ...(cfg as any).layers.layer4, dbPath: dbPathEnv };
+      (cfg as any).layers.layer3 = { ...(cfg as any).layers.layer3, dbPath: dbPathEnv };
+      (cfg as any).layers.layer5 = { ...(cfg as any).layers.layer5, dbPath: dbPathEnv };
+    }
+    const augmentExplore = process.env.L4_AUGMENT_EXPLORE;
+    if (augmentExplore) {
+      (cfg as any).layers.layer4 = {
+        ...(cfg as any).layers.layer4,
+        augmentExplore: augmentExplore === '1' || augmentExplore === 'true',
+      };
+    }
+  } catch {
+    // ignore env parsing errors; keep defaults
+  }
   return cfg as CoreConfig;
 }
 

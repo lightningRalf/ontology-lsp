@@ -271,6 +271,33 @@ CREATE TABLE IF NOT EXISTS monitoring_snapshots (
   cache_hit_rate REAL
 );
 CREATE INDEX IF NOT EXISTS idx_monitoring_snapshots_ts ON monitoring_snapshots (ts);
+
+-- Learning pipelines (L5) - minimal persistence
+CREATE TABLE IF NOT EXISTS pipelines (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  components TEXT NOT NULL, -- JSON array of component keys
+  trigger TEXT NOT NULL,    -- manual|automatic|scheduled|event_driven
+  schedule TEXT,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  config TEXT,              -- JSON for future use
+  created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+  updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+);
+CREATE TABLE IF NOT EXISTS pipeline_runs (
+  id TEXT PRIMARY KEY,
+  pipeline_id TEXT NOT NULL,
+  started_at INTEGER NOT NULL,
+  finished_at INTEGER,
+  status TEXT NOT NULL DEFAULT 'pending',
+  metrics TEXT, -- JSON summary
+  FOREIGN KEY (pipeline_id) REFERENCES pipelines (id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_pipelines_trigger ON pipelines (trigger);
+CREATE INDEX IF NOT EXISTS idx_pipelines_enabled ON pipelines (enabled);
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_pipeline ON pipeline_runs (pipeline_id);
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_status ON pipeline_runs (status);
 `;
 
 /**
