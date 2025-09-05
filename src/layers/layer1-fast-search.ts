@@ -1008,7 +1008,10 @@ export class FastSearchLayer implements Layer<SearchQuery, EnhancedMatches> {
                 // Search co-located files
                 await this.searchFilesForIdentifier(colocated, query, matches);
             } catch (error) {
-                console.warn(`LS analysis failed for directory: ${dir}`, error);
+                // Keep stdio clean in tests/stdio paths; log only when DEBUG is set
+                if (process.env.DEBUG || process.env.VERBOSE_LS === '1') {
+                    console.warn(`LS analysis failed for directory: ${dir}`, error);
+                }
             }
         }
     }

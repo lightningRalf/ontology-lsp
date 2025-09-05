@@ -9,14 +9,7 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 
 ## 🚀 Next Development Priorities (Tool‑First, aligned with VISION)
 
-### 0.0 Tool‑First Gate (Immediate)
-- Dogfood three primary flows end‑to‑end using public tools (no internals):
-  1) locate_confirm_definition (fixture symbol) → structured JSON with ≥1 definition
-  2) rename_safely (runChecks=false) → snapshot id + non‑empty diff
-  3) patch_checks_in_snapshot (onlyTouched=true) with a tiny apply_patch diff → ok=false/true but structured JSON and quick runtime
-- Definition of Done:
-  - All three pass under `bun test` using HTTP `/api/v1/tools/call` or CLI `workflow`
-  - Structured errors only; no stdio noise; p95 budgets met on fixture
+<!-- 0.0 Tool‑First Gate: Completed (2025‑09‑06). See PROJECT_STATUS.md for details. -->
 
 ### 0.05 Port Management Simplification (Keep Simple)
 - No runtime port registry; fixed defaults with `.env` overrides

@@ -268,10 +268,19 @@ export class CodeAnalyzer {
             // Use a short timeout derived from layer1 config to avoid long blocking
             const layer1Timeout = (this.config.layers?.layer1 as any)?.timeout ?? 1000;
             const asyncTimeout = Math.max(1000, Math.min(4000, layer1Timeout));
+            const searchDir = this.extractDirectoryFromUri(request.uri);
+            const isTestsScope = (() => {
+                try {
+                    const p = (searchDir || '').replace(/\\/g, '/');
+                    return /(^|\/)tests(\/|$)/.test(p) || /(^|\/)__tests__(\/|$)/.test(p);
+                } catch {
+                    return false;
+                }
+            })();
             const asyncOptions: AsyncSearchOptions = {
                 // Allow partial, case-insensitive substring matching for responsiveness
                 pattern: `${this.escapeRegex(request.identifier)}`,
-                path: this.extractDirectoryFromUri(request.uri),
+                path: searchDir,
                 maxResults: request.maxResults ?? 50,
                 timeout: asyncTimeout,
                 caseInsensitive: true,
@@ -285,8 +294,8 @@ export class CodeAnalyzer {
                     'logs',
                     'out',
                     'build',
-                    'tests',
-                    '__tests__',
+                    // allow searches when the request is explicitly scoped under tests
+                    ...(isTestsScope ? [] : ['tests', '__tests__']),
                     'examples',
                     'vscode-client',
                     'test-output-*',
@@ -307,7 +316,7 @@ export class CodeAnalyzer {
                     try {
                         streamingResultsAll = await this.asyncSearchTools.search({
                             pattern: fuzzyPattern,
-                            path: this.extractDirectoryFromUri(request.uri),
+                            path: searchDir,
                             maxResults: request.maxResults ?? 50,
                             timeout: Math.min(asyncOptions.timeout + 500, 5000),
                             caseInsensitive: true,
@@ -676,9 +685,18 @@ export class CodeAnalyzer {
                 (this.config as any)?.layers?.layer1?.grep?.defaultTimeout ??
                 1000;
             const asyncTimeout = Math.max(1000, Math.min(4000, l1Base));
+            const searchDir = this.extractDirectoryFromUri(request.uri);
+            const isTestsScope = (() => {
+                try {
+                    const p = (searchDir || '').replace(/\\/g, '/');
+                    return /(^|\/)tests(\/|$)/.test(p) || /(^|\/)__tests__(\/|$)/.test(p);
+                } catch {
+                    return false;
+                }
+            })();
             const asyncOptions: AsyncSearchOptions = {
                 pattern: `${this.escapeRegex(request.identifier)}`,
-                path: this.extractDirectoryFromUri(request.uri),
+                path: searchDir,
                 maxResults: request.maxResults ?? 200,
                 timeout: asyncTimeout,
                 caseInsensitive: true,
@@ -692,8 +710,7 @@ export class CodeAnalyzer {
                     'logs',
                     'out',
                     'build',
-                    'tests',
-                    '__tests__',
+                    ...(isTestsScope ? [] : ['tests', '__tests__']),
                     'examples',
                     'vscode-client',
                     'test-output-*',
@@ -712,7 +729,7 @@ export class CodeAnalyzer {
                     try {
                         streamingResultsAll = await this.asyncSearchTools.search({
                             pattern: fuzzyPattern,
-                            path: this.extractDirectoryFromUri(request.uri),
+                            path: searchDir,
                             maxResults: request.maxResults ?? 200,
                             timeout: Math.min(asyncTimeout + 500, 5000),
                             caseInsensitive: true,

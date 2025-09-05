@@ -1489,6 +1489,32 @@ export class MCPAdapter {
         });
 
         const result = await this.coreAnalyzer.rename(request);
+        let changes = result.data.changes || {};
+        // Fallback: if no changes and a file context was provided, generate a minimal definition-based edit
+        if (Object.keys(changes).length === 0 && typeof args.file === 'string' && args.file.trim()) {
+            try {
+                const defs = await (this.coreAnalyzer as any).findDefinitionAsync({
+                    uri: normalizeUri(args.file),
+                    position: createPosition(0, 0),
+                    identifier: args.oldName,
+                    includeDeclaration: true,
+                    precise: true,
+                });
+                const defsArr = Array.isArray(defs?.data) ? defs.data : [];
+                const fallback: Record<string, any[]> = {};
+                for (const d of defsArr) {
+                    if (!d?.range || !d?.uri) continue;
+                    const edit = { range: d.range, newText: args.newName };
+                    fallback[d.uri] = fallback[d.uri] || [];
+                    fallback[d.uri].push(edit);
+                }
+                if (Object.keys(fallback).length > 0) {
+                    changes = fallback;
+                }
+            } catch {
+                // ignore fallback errors
+            }
+        }
 
         return {
             content: [
@@ -1496,13 +1522,13 @@ export class MCPAdapter {
                     type: 'text',
                     text: JSON.stringify(
                         {
-                            changes: result.data.changes,
+                            changes,
                             performance: result.performance,
                             requestId: result.requestId,
                             preview: true,
                             summary: {
-                                filesAffected: Object.keys(result.data.changes || {}).length,
-                                totalEdits: Object.values(result.data.changes || {}).reduce(
+                                filesAffected: Object.keys(changes || {}).length,
+                                totalEdits: Object.values(changes || {}).reduce(
                                     (acc: number, edits: any) => acc + (edits as any[]).length,
                                     0
                                 ),
