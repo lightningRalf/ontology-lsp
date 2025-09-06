@@ -269,6 +269,12 @@ dogfood_progress:
     @echo "   Progress: .ontology/snapshots/<id>/progress.log (snap:progress)"
     @CI=1 DOGFOOD_PROGRESS=1 ~/.bun/bin/bun run scripts/dogfood-mcp.ts -w tests/fixtures -f tests/fixtures/example.ts -s TestClass
 
+# CI-friendly dogfood using HTTP tools
+dogfood_ci:
+    @echo "🥣 Dogfooding (HTTP tools) — CI summary"
+    @echo "   Runs: explore → rename_safely → patch_checks_in_snapshot"
+    @CI=1 WORKSPACE_ROOT=tests/fixtures ~/.bun/bin/bun run scripts/dogfood-ci.ts
+
 # === BUILD COMMANDS ===
 
 # Build all server components

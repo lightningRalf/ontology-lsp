@@ -33,9 +33,10 @@ Monitoring perf and metrics; continue to gate perf/benchmarks behind env and ite
 - Document typical troubleshooting and budgets for long‑running pipelines
 
 ### 0.2 Dogfood‑Every‑Change (Immediate)
-- Add `just dogfood_ci` to run three primary flows and print concise JSON summaries
+- Integrate `just dogfood_ci` into CI: publish JSON summary as artifact and/or PR comment
 - Prefer HTTP `/api/v1/tools/call` for portability; MCP stdio acceptable for local iteration
-- Gate PRs: include outputs (or CI links) demonstrating success; no merges without tool‑first validation
+- Gate PRs on dogfood_ci success; include link to artifact/summary for tool‑first validation
+- Optional: document JSON summary shape and add a minimal schema check in CI
 
 ### 0.25 Observability & SLO Conformance
 - Ensure `/metrics` JSON includes p50/p95/p99 per layer and op counts/errors

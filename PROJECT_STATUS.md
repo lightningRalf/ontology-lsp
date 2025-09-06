@@ -955,6 +955,15 @@ Impact
 - No more long silent waits or periodic metrics contamination in stdio
 - Safer MCP adapter behavior and robust graph expand results
 Metrics and docs now reflect the new numbering.
+
+## 📅 Latest Updates (2025-09-06)
+
+### 🥣 Dogfooding (HTTP) — CI Runner
+- Added a lightweight HTTP-based dogfood runner and Just task:
+  - Script: `scripts/dogfood-ci.ts` starts a local HTTP server (bounded to `tests/fixtures`) and calls `/api/v1/tools/call` to run three flows: `explore_symbol_impact`, `rename_safely` (checks disabled for speed), and `patch_checks_in_snapshot` (typecheck).
+  - Task: `just dogfood_ci` prints a concise JSON summary with timings and counts for CI/PR visibility.
+- Rationale: fulfills NEXT_STEPS 0.2 “Dogfood‑Every‑Change” by providing a portable, reproducible tool-first validation path without relying on long suites.
+- Validation: targeted HTTP adapter tests pass locally (`http-tools-call`, `http-explore-conceptual`, `http-graph-expand`).
 ### ADR-0001: Prime Ontology + Triple Graph (Recorded)
 - Added ADR: docs/adr/0001-prime-ontology-triple-graph.md
 - Scope: `prime_ontology` tool (MCP stdio/HTTP parity, HTTP, CLI), PrimeEngine (budgeted L1/L2/L3→L4 seeding), triple‑compatible storage via StoragePort, pluginable strategies for L4/L5, model providers via MCP bridge, and OpenTelemetry to SQL JSONB.
