@@ -488,6 +488,30 @@ Status: adapters/LSP integration tests are green. E2E local run improved reliabi
 - Process hygiene:
   - Fixed duplicate `snap_diff` task by adding `snap_diff_cli` alias.
 
+### 📦 Pipelines HTTP + UI (dev ergonomics)
+- Endpoints (HTTP):
+  - `POST /api/v1/pipelines/run` (non‑stream start) → returns `{ ok, runId }`.
+  - `GET /api/v1/pipelines/run?id=&runId=` (poll‑once run detail).
+  - `GET /api/v1/pipelines/status?id=` (pipeline status summary).
+  - `GET /api/v1/pipelines/runs?id=&limit=` (recent runs).
+  - `GET /api/v1/pipelines` (list pipelines).
+  - `POST /api/v1/pipelines` (register pipeline; dev‑only convenience; mirrors LO.registerPipeline).
+- OpenAPI: added schemas and paths for all the above; keeps HTTP parity with MCP tools where applicable.
+- Web UI (/ui): Pipelines panel now supports:
+  - Loading pipelines into a dropdown (HTTP list endpoint),
+  - Stream run (NDJSON), run status, recent runs, run detail,
+  - Inputs for Run ID and Limit; dropdown syncs to the text field for quick actions.
+- Tests (Bun):
+  - `tests/http-pipelines-run-start.test.ts` (start non‑stream),
+  - `tests/http-pipelines-run-detail.test.ts` (detail),
+  - `tests/http-pipelines-status-runs.test.ts` (status + runs),
+  - `tests/http-pipelines-list-endpoint.test.ts` (list),
+  - `tests/http-pipelines-register-endpoint.test.ts` (register),
+  - OpenAPI presence: `tests/http-openapi-pipelines.test.ts`.
+- Notes:
+  - Unknown pipeline IDs are handled non‑fatally (DB may log FK constraint warnings in dev; endpoints still return stable JSON).
+  - Registration is intended for dev/dogfooding to avoid manual DB/model seeding.
+
 ### 🛡️ Policy
 - AGENTS.md updated with a concise, mandatory Tool‑First Editing Policy:
   - Stage edits via Ontology‑LSP tools (snapshots + checks), not direct writes.

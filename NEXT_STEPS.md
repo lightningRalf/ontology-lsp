@@ -32,9 +32,17 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 Status: `list_symbols` now supports an AST‑backed path behind a feature flag (env `LIST_SYMBOLS_AST=1` or `{"ast":true}`), with regex fallback preserved. Targeted HTTP test added.
 
 ### 0.181 Pipeline Run UX (Follow‑up)
-- DONE: Add streamable HTTP tail for pipeline run output (NDJSON) — `POST /api/v1/pipelines/run-stream`.
-- Next: Surface non‑streaming run detail endpoint (optional) and light UI wiring.
-- Document typical troubleshooting and budgets for long‑running pipelines.
+- DONE: Add streamable HTTP tail (NDJSON) — `POST /api/v1/pipelines/run-stream`.
+- DONE: Add non‑streaming run detail endpoint — `GET /api/v1/pipelines/run?id=&runId=`.
+- DONE: Light UI wiring (Pipelines card: status, runs, run detail; run‑stream tail).
+- DONE: Non‑tools parity endpoints:
+  - `POST /api/v1/pipelines/run` (start non‑stream), `GET /api/v1/pipelines/status`, `GET /api/v1/pipelines/runs`.
+  - `GET /api/v1/pipelines` (list) and `POST /api/v1/pipelines` (register; dev‑only) for dogfooding convenience.
+- Next: Minor UX polish and guardrails
+  - UI: add status badges, localStorage for last pipeline/run, and a tiny register form.
+  - Auth: optional token gate for the pipelines write endpoints in HTTP adapter.
+  - DB hygiene: suppress/no‑op dev FK warnings for unknown IDs when registration isn’t used.
+  - Docs: examples for register/list/status/runs and typical troubleshooting (timeouts, budgets).
 
 ### 0.2 Dogfood‑Every‑Change (Immediate)
 - Integrate `just dogfood_ci` into CI: publish JSON summary as artifact and/or PR comment

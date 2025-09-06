@@ -825,8 +825,39 @@ export class HTTPAdapter {
                 description: 'REST API for ontology-enhanced language server functionality',
             },
             servers: [{ url: 'http://localhost:7000' }],
-            components: {
-                schemas: {
+                components: {
+                    schemas: {
+                        PipelineStatus: {
+                            type: 'object',
+                            properties: {
+                                id: { type: 'string' },
+                                name: { type: 'string' },
+                                trigger: { type: 'string' },
+                                schedule: { type: 'string', nullable: true },
+                                enabled: { type: 'boolean' },
+                                stats: {
+                                    type: 'object',
+                                    properties: {
+                                        runsCompleted: { type: 'integer' },
+                                        runsSuccessful: { type: 'integer' },
+                                        averageRuntimeMs: { type: 'number' },
+                                        lastError: { type: 'string' },
+                                    },
+                                },
+                            },
+                        },
+                        PipelineRun: {
+                            type: 'object',
+                            properties: {
+                                id: { type: 'string' },
+                                pipeline_id: { type: 'string' },
+                                started_at: { type: 'integer' },
+                                finished_at: { type: 'integer', nullable: true },
+                                status: { type: 'string' },
+                                metrics: { type: 'object' },
+                            },
+                            required: ['id', 'pipeline_id', 'started_at', 'status'],
+                        },
                     LocateConfirmDefinitionResult: {
                         type: 'object',
                         properties: {
@@ -1413,6 +1444,238 @@ export class HTTPAdapter {
                                     },
                                 },
                             },
+                        },
+                    },
+                },
+                [api('/pipelines/status')]: {
+                    get: {
+                        summary: 'Get pipeline status',
+                        parameters: [
+                            { name: 'id', in: 'query', required: true, schema: { type: 'string' } },
+                        ],
+                        responses: {
+                            '200': {
+                                description: 'OK',
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            allOf: [
+                                                { $ref: '#/components/schemas/ApiResponse' },
+                                                { type: 'object', properties: { data: { $ref: '#/components/schemas/PipelineStatus' } } },
+                                            ],
+                                        },
+                                    },
+                                },
+                            },
+                            '400': { description: 'Bad Request' },
+                        },
+                    },
+                },
+                [api('/pipelines/runs')]: {
+                    get: {
+                        summary: 'List recent pipeline runs',
+                        parameters: [
+                            { name: 'id', in: 'query', required: true, schema: { type: 'string' } },
+                            { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100 } },
+                        ],
+                        responses: {
+                            '200': {
+                                description: 'OK',
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            allOf: [
+                                                { $ref: '#/components/schemas/ApiResponse' },
+                                                {
+                                                    type: 'object',
+                                                    properties: {
+                                                        data: {
+                                                            type: 'object',
+                                                            properties: { runs: { type: 'array', items: { $ref: '#/components/schemas/PipelineRun' } } },
+                                                        },
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                    },
+                                },
+                            },
+                            '400': { description: 'Bad Request' },
+                        },
+                    },
+                },
+                [api('/pipelines/run')]: {
+                    get: {
+                        summary: 'Get a specific pipeline run detail (poll-once)',
+                        parameters: [
+                            { name: 'id', in: 'query', required: true, schema: { type: 'string' } },
+                            { name: 'runId', in: 'query', required: true, schema: { type: 'string' } },
+                        ],
+                        responses: {
+                            '200': {
+                                description: 'OK',
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            allOf: [
+                                                { $ref: '#/components/schemas/ApiResponse' },
+                                                {
+                                                    type: 'object',
+                                                    properties: {
+                                                        data: {
+                                                            type: 'object',
+                                                            properties: {
+                                                                pipelineId: { type: 'string' },
+                                                                runId: { type: 'string' },
+                                                                run: { oneOf: [ { $ref: '#/components/schemas/PipelineRun' }, { type: 'null' } ] },
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                    },
+                                },
+                            },
+                            '400': { description: 'Bad Request' },
+                        },
+                    },
+                    post: {
+                        summary: 'Start a pipeline run (non-streaming)',
+                        requestBody: {
+                            required: true,
+                            content: {
+                                'application/json': {
+                                    schema: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+                                },
+                            },
+                        },
+                        responses: {
+                            '200': {
+                                description: 'OK',
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            allOf: [
+                                                { $ref: '#/components/schemas/ApiResponse' },
+                                                {
+                                                    type: 'object',
+                                                    properties: { data: { type: 'object', properties: { ok: { type: 'boolean' }, runId: { type: 'string' } } } },
+                                                },
+                                            ],
+                                        },
+                                    },
+                                },
+                            },
+                            '400': { description: 'Bad Request' },
+                        },
+                    },
+                },
+                [api('/pipelines')]: {
+                    get: {
+                        summary: 'List pipelines',
+                        responses: {
+                            '200': {
+                                description: 'OK',
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            allOf: [
+                                                { $ref: '#/components/schemas/ApiResponse' },
+                                                {
+                                                    type: 'object',
+                                                    properties: {
+                                                        data: {
+                                                            type: 'object',
+                                                            properties: {
+                                                                pipelines: {
+                                                                    type: 'array',
+                                                                    items: {
+                                                                        type: 'object',
+                                                                        properties: {
+                                                                            id: { type: 'string' },
+                                                                            name: { type: 'string' },
+                                                                            trigger: { type: 'string' },
+                                                                            schedule: { type: 'string', nullable: true },
+                                                                            enabled: { type: 'boolean' },
+                                                                        },
+                                                                        required: ['id','name','trigger','enabled'],
+                                                                    },
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    post: {
+                        summary: 'Register a learning pipeline (dev-only)',
+                        requestBody: {
+                            required: true,
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        required: ['id', 'name', 'components', 'trigger'],
+                                        properties: {
+                                            id: { type: 'string' },
+                                            name: { type: 'string' },
+                                            description: { type: 'string' },
+                                            components: {
+                                                type: 'array',
+                                                items: { type: 'string', enum: ['pattern_learning','feedback_loop','evolution_tracking','team_knowledge'] },
+                                            },
+                                            trigger: { type: 'string', enum: ['manual','automatic','scheduled','event_driven'] },
+                                            schedule: { type: 'string' },
+                                            eventTriggers: { type: 'array', items: { type: 'string' } },
+                                            enabled: { type: 'boolean' },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        responses: {
+                            '200': {
+                                description: 'OK',
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            allOf: [
+                                                { $ref: '#/components/schemas/ApiResponse' },
+                                                { type: 'object', properties: { data: { type: 'object', properties: { id: { type: 'string' } } } } },
+                                            ],
+                                        },
+                                    },
+                                },
+                            },
+                            '400': { description: 'Bad Request' },
+                        },
+                    },
+                },
+                [api('/pipelines/{id}')]: {
+                    get: {
+                        summary: 'Get pipeline by id (status/detail)',
+                        parameters: [ { name: 'id', in: 'path', required: true, schema: { type: 'string' } } ],
+                        responses: {
+                            '200': {
+                                description: 'OK',
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            allOf: [
+                                                { $ref: '#/components/schemas/ApiResponse' },
+                                                { type: 'object', properties: { data: { $ref: '#/components/schemas/PipelineStatus' } } },
+                                            ],
+                                        },
+                                    },
+                                },
+                            },
+                            '400': { description: 'Bad Request' },
                         },
                     },
                 },

@@ -427,6 +427,240 @@ export class HTTPServer {
                         }
                     }
 
+                    // Pipelines: non-streaming run start (immediate)
+                    if (url.pathname === '/api/v1/pipelines/run' && request.method === 'POST') {
+                        try {
+                            const raw = await this.getRequestBody(request);
+                            const body: any = raw ? JSON.parse(raw) : {};
+                            const pipelineId = String(body?.id || '').trim();
+                            if (!pipelineId) {
+                                return new Response(JSON.stringify({ success: false, error: 'id required' }), {
+                                    status: 400,
+                                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                                });
+                            }
+                            const mcpAdapter = new MCPAdapter(this.coreAnalyzer);
+                            const executor = new ToolExecutor();
+                            const runRes = await executor.execute(mcpAdapter as any, 'run_pipeline', { id: pipelineId });
+                            const txt = (() => { try { return (runRes as any)?.content?.[0]?.text ?? ''; } catch { return ''; } })();
+                            const json = (() => { try { return JSON.parse(txt); } catch { return { ok: false, runId: '', reason: 'parse_error' }; } })();
+                            return new Response(JSON.stringify({ success: true, data: json }), {
+                                status: 200,
+                                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                            });
+                        } catch (err) {
+                            return new Response(JSON.stringify({ success: false, error: 'run failed' }), {
+                                status: 500,
+                                headers: { 'Content-Type': 'application/json' },
+                            });
+                        }
+                    }
+
+                    // Pipelines: non-streaming run detail (poll-once)
+                    if (url.pathname === '/api/v1/pipelines/run' && request.method === 'GET') {
+                        try {
+                            const pipelineId = String(url.searchParams.get('id') || '').trim();
+                            const runId = String(url.searchParams.get('runId') || '').trim();
+                            if (!pipelineId || !runId) {
+                                return new Response(JSON.stringify({ success: false, error: 'id and runId required' }), {
+                                    status: 400,
+                                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                                });
+                            }
+
+                            const mcpAdapter = new MCPAdapter(this.coreAnalyzer);
+                            const executor = new ToolExecutor();
+                            const listRes = await executor.execute(mcpAdapter as any, 'list_pipeline_runs', {
+                                id: pipelineId,
+                                limit: 25,
+                            });
+                            const ltxt = (() => { try { return (listRes as any)?.content?.[0]?.text ?? ''; } catch { return ''; } })();
+                            const ljson = (() => { try { return JSON.parse(ltxt); } catch { return { runs: [] as any[] }; } })();
+                            const runs = Array.isArray((ljson as any)?.runs) ? (ljson as any).runs : [];
+                            const row = runs.find((r: any) => String(r?.id) === runId) || null;
+
+                            return new Response(
+                                JSON.stringify({ success: true, data: { pipelineId, runId, run: row } }),
+                                {
+                                    status: 200,
+                                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                                }
+                            );
+                        } catch (err) {
+                            return new Response(JSON.stringify({ success: false, error: 'run detail failed' }), {
+                                status: 500,
+                                headers: { 'Content-Type': 'application/json' },
+                            });
+                        }
+                    }
+
+                    // Pipelines: status (single pipeline)
+                    if (url.pathname === '/api/v1/pipelines/status' && request.method === 'GET') {
+                        try {
+                            const pipelineId = String(url.searchParams.get('id') || '').trim();
+                            if (!pipelineId) {
+                                return new Response(JSON.stringify({ success: false, error: 'id required' }), {
+                                    status: 400,
+                                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                                });
+                            }
+                            const mcpAdapter = new MCPAdapter(this.coreAnalyzer);
+                            const executor = new ToolExecutor();
+                            const res = await executor.execute(mcpAdapter as any, 'pipeline_status', { id: pipelineId });
+                            const txt = (() => { try { return (res as any)?.content?.[0]?.text ?? ''; } catch { return ''; } })();
+                            const json = (() => { try { return JSON.parse(txt); } catch { return { ok: false, reason: 'parse_error' }; } })();
+                            return new Response(
+                                JSON.stringify({ success: true, data: json }),
+                                {
+                                    status: 200,
+                                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                                }
+                            );
+                        } catch (err) {
+                            return new Response(JSON.stringify({ success: false, error: 'status failed' }), {
+                                status: 500,
+                                headers: { 'Content-Type': 'application/json' },
+                            });
+                        }
+                    }
+
+                    // Pipelines: runs (recent)
+                    if (url.pathname === '/api/v1/pipelines/runs' && request.method === 'GET') {
+                        try {
+                            const pipelineId = String(url.searchParams.get('id') || '').trim();
+                            const limit = Math.max(1, Math.min(100, Number(url.searchParams.get('limit') || '10')));
+                            if (!pipelineId) {
+                                return new Response(JSON.stringify({ success: false, error: 'id required' }), {
+                                    status: 400,
+                                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                                });
+                            }
+                            const mcpAdapter = new MCPAdapter(this.coreAnalyzer);
+                            const executor = new ToolExecutor();
+                            const res = await executor.execute(mcpAdapter as any, 'list_pipeline_runs', { id: pipelineId, limit });
+                            const txt = (() => { try { return (res as any)?.content?.[0]?.text ?? ''; } catch { return ''; } })();
+                            const json = (() => { try { return JSON.parse(txt); } catch { return { runs: [] }; } })();
+                            return new Response(
+                                JSON.stringify({ success: true, data: json }),
+                                {
+                                    status: 200,
+                                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                                }
+                            );
+                        } catch (err) {
+                            return new Response(JSON.stringify({ success: false, error: 'runs failed' }), {
+                                status: 500,
+                                headers: { 'Content-Type': 'application/json' },
+                            });
+                        }
+                    }
+
+                    // Pipelines: list
+                    if (url.pathname === '/api/v1/pipelines' && request.method === 'GET') {
+                        try {
+                            const mcpAdapter = new MCPAdapter(this.coreAnalyzer);
+                            const executor = new ToolExecutor();
+                            const res = await executor.execute(mcpAdapter as any, 'list_pipelines', {});
+                            const txt = (() => { try { return (res as any)?.content?.[0]?.text ?? ''; } catch { return ''; } })();
+                            const json = (() => { try { return JSON.parse(txt); } catch { return { pipelines: [] }; } })();
+                            return new Response(JSON.stringify({ success: true, data: json }), {
+                                status: 200,
+                                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                            });
+                        } catch (err) {
+                            return new Response(JSON.stringify({ success: false, error: 'list failed' }), {
+                                status: 500,
+                                headers: { 'Content-Type': 'application/json' },
+                            });
+                        }
+                    }
+
+                    // Pipelines: register (dev-only)
+                    if (url.pathname === '/api/v1/pipelines' && request.method === 'POST') {
+                        try {
+                            const raw = await this.getRequestBody(request);
+                            const body: any = raw ? JSON.parse(raw) : {};
+                            const id = String(body?.id || '').trim();
+                            const name = String(body?.name || '').trim();
+                            const components = Array.isArray(body?.components) ? body.components : [];
+                            const trigger = String(body?.trigger || '').trim();
+                            const schedule = body?.schedule ? String(body.schedule) : undefined;
+                            const description = body?.description ? String(body.description) : '';
+                            const eventTriggers = Array.isArray(body?.eventTriggers) ? body.eventTriggers : undefined;
+                            const enabled = body?.enabled != null ? !!body.enabled : true;
+
+                            if (!id || !name || !components.length || !trigger) {
+                                return new Response(
+                                    JSON.stringify({ success: false, error: 'id, name, components, trigger required' }),
+                                    {
+                                        status: 400,
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'Access-Control-Allow-Origin': '*',
+                                        },
+                                    }
+                                );
+                            }
+
+                            const lo = (this.coreAnalyzer as any)?.learningOrchestrator;
+                            if (!lo || typeof lo.registerPipeline !== 'function') {
+                                return new Response(JSON.stringify({ success: false, error: 'learning orchestrator unavailable' }), {
+                                    status: 500,
+                                    headers: { 'Content-Type': 'application/json' },
+                                });
+                            }
+
+                            const payload = {
+                                id,
+                                name,
+                                description,
+                                components,
+                                trigger,
+                                schedule,
+                                eventTriggers,
+                                enabled,
+                            };
+                            const pid = await lo.registerPipeline(payload);
+                            return new Response(JSON.stringify({ success: true, data: { id: pid } }), {
+                                status: 200,
+                                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                            });
+                        } catch (err) {
+                            return new Response(JSON.stringify({ success: false, error: 'register failed' }), {
+                                status: 500,
+                                headers: { 'Content-Type': 'application/json' },
+                            });
+                        }
+                    }
+
+                    // Pipelines: get by id (status/detail)
+                    if (url.pathname.startsWith('/api/v1/pipelines/') && request.method === 'GET') {
+                        try {
+                            const m = url.pathname.match(/^\/api\/v1\/pipelines\/([^/]+)$/);
+                            const pipelineId = m && m[1] ? decodeURIComponent(m[1]) : '';
+                            if (!pipelineId) {
+                                return new Response(JSON.stringify({ success: false, error: 'id required' }), {
+                                    status: 400,
+                                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                                });
+                            }
+                            const mcpAdapter = new MCPAdapter(this.coreAnalyzer);
+                            const executor = new ToolExecutor();
+                            const res = await executor.execute(mcpAdapter as any, 'pipeline_status', { id: pipelineId });
+                            const txt = (() => { try { return (res as any)?.content?.[0]?.text ?? ''; } catch { return ''; } })();
+                            const json = (() => { try { return JSON.parse(txt); } catch { return { ok: false, reason: 'parse_error' }; } })();
+                            return new Response(JSON.stringify({ success: true, data: json }), {
+                                status: 200,
+                                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                            });
+                        } catch (err) {
+                            return new Response(JSON.stringify({ success: false, error: 'get failed' }), {
+                                status: 500,
+                                headers: { 'Content-Type': 'application/json' },
+                            });
+                        }
+                    }
+
                     // Graph Expand endpoint (graceful fallback)
                     if (url.pathname === '/api/v1/graph-expand' && request.method === 'POST') {
                         const raw = await this.getRequestBody(request);

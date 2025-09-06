@@ -140,15 +140,33 @@
 
       <section class="col">
         <div class="card">
-          <header><h2>Pipelines (Streamable HTTP)</h2></header>
+          <header><h2>Pipelines (Streamable HTTP + Details)</h2></header>
           <div class="body">
             <div class="row">
               <div>
                 <label>Pipeline ID</label>
                 <input id="pl-id" type="text" placeholder="pattern_feedback_cycle" />
               </div>
-              <button id="btnPlList">List</button>
+              <div>
+                <label>Pipelines</label>
+                <select id="pl-id-sel"></select>
+              </div>
+              <div>
+                <label>Run ID</label>
+                <input id="pl-runId" type="text" placeholder="<uuid>" />
+              </div>
+              <div>
+                <label>Limit</label>
+                <input id="pl-limit" type="number" value="10" min="1" max="100" />
+              </div>
+            </div>
+            <div class="row">
+              <button id="btnPlList">List (tools)</button>
+              <button id="btnPlLoad">Load Pipelines</button>
               <button id="btnPlRun" title="Stream run output (NDJSON)">Run Stream</button>
+              <button id="btnPlStatus" title="Fetch pipeline status">Status</button>
+              <button id="btnPlRuns" title="List recent runs">Runs</button>
+              <button id="btnPlRunDetail" title="Fetch run detail">Run Detail</button>
             </div>
             <pre class="mono" id="plOut">Run output will appear here…</pre>
           </div>
@@ -286,6 +304,19 @@
         $('plOut').textContent = JSON.stringify(out, null, 2);
       }
 
+      async function loadPipelines() {
+        const res = await getJSON(api('/api/v1/pipelines'));
+        const items = res?.data?.pipelines || [];
+        const sel = $('pl-id-sel');
+        sel.innerHTML = '';
+        for (const p of items) {
+          const o = document.createElement('option');
+          o.value = p.id; o.textContent = `${p.id} (${p.enabled ? 'on' : 'off'})`;
+          sel.appendChild(o);
+        }
+        $('plOut').textContent = JSON.stringify(res, null, 2);
+      }
+
       async function runPipelineStream() {
         const id = $('pl-id').value || 'pattern_feedback_cycle';
         $('plOut').textContent = '';
@@ -311,6 +342,29 @@
         if (buf) $('plOut').textContent += buf + '\n';
       }
 
+      async function pipelineStatus() {
+        const id = $('pl-id').value || '';
+        if (!id) { $('plOut').textContent = 'Pipeline id required'; return; }
+        const res = await getJSON(api(`/api/v1/pipelines/status?id=${encodeURIComponent(id)}`));
+        $('plOut').textContent = JSON.stringify(res, null, 2);
+      }
+
+      async function pipelineRuns() {
+        const id = $('pl-id').value || '';
+        const limit = Number($('pl-limit').value || '10') || 10;
+        if (!id) { $('plOut').textContent = 'Pipeline id required'; return; }
+        const res = await getJSON(api(`/api/v1/pipelines/runs?id=${encodeURIComponent(id)}&limit=${limit}`));
+        $('plOut').textContent = JSON.stringify(res, null, 2);
+      }
+
+      async function pipelineRunDetail() {
+        const id = $('pl-id').value || '';
+        const runId = $('pl-runId').value || '';
+        if (!id || !runId) { $('plOut').textContent = 'Pipeline id and runId required'; return; }
+        const res = await getJSON(api(`/api/v1/pipelines/run?id=${encodeURIComponent(id)}&runId=${encodeURIComponent(runId)}`));
+        $('plOut').textContent = JSON.stringify(res, null, 2);
+      }
+
       $('btn-refresh').onclick = refresh;
       $('btnSnapList').onclick = listSnapshots;
       $('btnSnapDiff').onclick = snapDiff;
@@ -321,7 +375,17 @@
       $('btnRename').onclick = wfRename;
       $('btnPatch').onclick = wfPatch;
       $('btnPlList').onclick = listPipelines;
+      $('btnPlLoad').onclick = loadPipelines;
       $('btnPlRun').onclick = runPipelineStream;
+      $('btnPlStatus').onclick = pipelineStatus;
+      $('btnPlRuns').onclick = pipelineRuns;
+      $('btnPlRunDetail').onclick = pipelineRunDetail;
+
+      // Keep text input in sync with dropdown
+      (function(){
+        const sel = $('pl-id-sel');
+        if (sel) sel.addEventListener('change', () => { const v = sel.value; if (v) $('pl-id').value = v; });
+      })();
 
       refresh();
     </script>

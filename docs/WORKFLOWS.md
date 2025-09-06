@@ -46,6 +46,49 @@ Transports
   - Runs: `{ "name":"list_pipeline_runs", "arguments": { "id":"pattern_feedback_cycle", "limit": 5 } }`
 - Stream run output (NDJSON): `POST /api/v1/pipelines/run-stream` and incrementally read lines.
 
+#### HTTP Endpoints (non-tools parity)
+- Start run (non-stream):
+  - `POST /api/v1/pipelines/run` body `{ id: "pattern_feedback_cycle" }`
+  - Returns `{ success: true, data: { ok: boolean, runId: string } }`
+- Run detail (poll-once):
+  - `GET /api/v1/pipelines/run?id=pattern_feedback_cycle&runId=<uuid>`
+  - Returns `{ success: true, data: { pipelineId, runId, run: { ... } | null } }`
+- Pipeline status:
+  - `GET /api/v1/pipelines/status?id=pattern_feedback_cycle`
+  - Returns `{ success: true, data: { id, name, trigger, schedule, enabled, stats } }`
+- Recent runs:
+  - `GET /api/v1/pipelines/runs?id=pattern_feedback_cycle&limit=10`
+  - Returns `{ success: true, data: { runs: [ { id, pipeline_id, started_at, finished_at, status, metrics } ] } }`
+- List pipelines:
+  - `GET /api/v1/pipelines`
+  - Returns `{ success: true, data: { pipelines: [ { id, name, trigger, schedule?, enabled } ] } }`
+- Register pipeline (dev-only):
+  - `POST /api/v1/pipelines` body `{ id, name, components:[...], trigger:'manual|automatic|scheduled|event_driven', schedule?, description?, eventTriggers?, enabled? }`
+  - Returns `{ success: true, data: { id } }`
+
+Examples:
+```bash
+curl -sS -X POST -H 'content-type: application/json' \
+  http://localhost:7000/api/v1/pipelines/run \
+  -d '{"id":"pattern_feedback_cycle"}' | jq .
+
+curl -sS 'http://localhost:7000/api/v1/pipelines/status?id=pattern_feedback_cycle' | jq .
+curl -sS 'http://localhost:7000/api/v1/pipelines/runs?id=pattern_feedback_cycle&limit=5' | jq .
+curl -sS 'http://localhost:7000/api/v1/pipelines/run?id=pattern_feedback_cycle&runId=<uuid>' | jq .
+
+# Dev-only (register):
+curl -sS -X POST -H 'content-type: application/json' \
+  http://localhost:7000/api/v1/pipelines \
+  -d '{
+    "id":"dev_example_1",
+    "name":"Dev Example Pipeline",
+    "components":["pattern_learning","feedback_loop"],
+    "trigger":"manual",
+    "enabled": true
+  }' | jq .
+curl -sS 'http://localhost:7000/api/v1/pipelines/dev_example_1' | jq .
+```
+
 ## Snapshot Resources
 - Diff: `GET /api/v1/snapshots/{id}/diff` → `{ success, data: { id, diff } }`
 - Status: `GET /api/v1/snapshots/{id}/status`
