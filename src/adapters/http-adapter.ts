@@ -269,8 +269,16 @@ export class HTTPAdapter {
             const body = strictJsonParse(request.body || '{}');
             validateRequired(body, ['identifier']);
 
+            // Parity: require a file/URI context for references; return empty results when context is missing or identifier empty
+            const hasContext = !!(body.file || body.uri);
+            const ident = typeof body.identifier === 'string' ? body.identifier.trim() : '';
+            if (!hasContext || ident.length === 0) {
+                const empty = JSON.stringify({ success: true, data: [], performance: {}, requestId: undefined, timestamp: Date.now(), cacheHit: false });
+                return { status: 200, headers: { 'X-Cache': 'SKIP' }, body: empty };
+            }
+
             // Simple cache key for HTTP responses
-            const cacheKey = `ref:${body.identifier}:${body.file || body.uri || ''}:${body.position?.line || 0}:${body.position?.character || 0}`;
+            const cacheKey = `ref:${ident}:${body.file || body.uri || ''}:${body.position?.line || 0}:${body.position?.character || 0}`;
 
             // Check for cached response
             const cached = this.responseCache.get(cacheKey);
@@ -290,7 +298,7 @@ export class HTTPAdapter {
             const coreRequest = buildFindReferencesRequest({
                 uri: normalizeUri(body.file || body.uri || 'file://workspace'),
                 position,
-                identifier: body.identifier,
+                identifier: ident,
                 maxResults: body.maxResults || this.config.maxResults,
                 includeDeclaration: body.includeDeclaration ?? false,
                 precise: !!body.precise,

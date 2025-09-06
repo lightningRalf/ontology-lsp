@@ -131,6 +131,8 @@ export class HTTPServer {
                         const l1m = typeof l1?.getMetrics === 'function' ? l1.getMetrics() : null;
                         const l2m = typeof l2?.getMetrics === 'function' ? l2.getMetrics() : null;
                         const l4 = (this.coreAnalyzer as any).getLayer4StorageMetrics?.();
+                        const lmAll = typeof lm?.getAllMetrics === 'function' ? lm.getAllMetrics() : null;
+                        const lmPerf = typeof lm?.getPerformanceReport === 'function' ? lm.getPerformanceReport() : null;
 
                         if (fmt !== 'prometheus') {
                             // JSON variant for dashboards: include L4 storage extras for richer panels
@@ -144,6 +146,10 @@ export class HTTPServer {
                                     l4: l4 || null,
                                     storageExtras,
                                     storageTotals,
+                                    layerManager: {
+                                        layers: lmAll,
+                                        performance: lmPerf,
+                                    },
                                 }),
                                 {
                                     status: l4 || l1m || l2m ? 200 : 503,
@@ -164,6 +170,14 @@ export class HTTPServer {
                             text += '# HELP ontology_l1_avg_response_ms Average L1 response time.\n';
                             text += '# TYPE ontology_l1_avg_response_ms gauge\n';
                             text += `ontology_l1_avg_response_ms ${Math.round(l1m.layer.avgResponseTime || 0)}\n`;
+                            // Quantiles for L1 (if available)
+                            if (typeof l1m.layer.p50ResponseTime === 'number') {
+                                text += '# HELP ontology_l1_response_ms Quantiles of L1 response time in ms.\n';
+                                text += '# TYPE ontology_l1_response_ms gauge\n';
+                                text += `ontology_l1_response_ms{quantile="p50"} ${Math.round(l1m.layer.p50ResponseTime || 0)}\n`;
+                                text += `ontology_l1_response_ms{quantile="p95"} ${Math.round(l1m.layer.p95ResponseTime || 0)}\n`;
+                                text += `ontology_l1_response_ms{quantile="p99"} ${Math.round(l1m.layer.p99ResponseTime || 0)}\n`;
+                            }
                         }
 
                         // L2 metrics

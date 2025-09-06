@@ -1081,4 +1081,29 @@ Metrics and docs now reflect the new numbering.
 - New endpoint `POST /api/v1/pipelines/run-stream` provides a streamable HTTP tail (no SSE) for pipeline runs.
   - Emits NDJSON events: `started`, `status` (on change), `finished` or `timeout`.
   - Parameters: `id`, optional `pollMs` (100–2000), `timeoutSec` (1–600).
-  - Internally uses tools (`run_pipeline`, `list_pipeline_runs`) under budgets.
+   - Internally uses tools (`run_pipeline`, `list_pipeline_runs`) under budgets.
+
+### 📈 Observability: L1 Quantiles + LayerManager in /metrics
+- Layer 1 (Fast Search) now tracks and exposes tail latency quantiles:
+  - Added metrics: `lastResponseTime`, `p50ResponseTime`, `p95ResponseTime`, `p99ResponseTime`.
+  - Implementation uses a bounded reservoir (1k samples) for stable quantile computation.
+- HTTP `/metrics`:
+  - JSON (`?format=json`) now includes `layerManager` with `layers` and `performance` for dashboards.
+  - Prometheus: added L1 quantile gauges under `ontology_l1_response_ms{quantile="p50|p95|p99"}`.
+- Tests added:
+  - `tests/http-metrics-l1-quantiles.test.ts` – validates presence of new L1 quantiles in JSON.
+  - `tests/http-metrics-layer-manager.test.ts` – validates `layerManager.performance` presence.
+
+### 🔁 Cross‑Protocol Edge‑Case Parity (references)
+- HTTP references (`POST /api/v1/references`): returns `200 { success:true, data:[] }` when:
+  - `identifier` is empty, or
+  - `file/uri` context is missing.
+  This matches the CLI/LSP non‑fatal path and avoids workspace‑wide drift.
+- MCP references: empty `symbol` now returns empty references (not error). Missing file/uri already handled to return an empty array.
+- Tests added: `tests/http-references-edgecases.test.ts`.
+
+### 🥣 Dogfood CI Summary Enrichment
+- `scripts/dogfood-ci.ts` now includes:
+  - metrics snapshot (`/metrics?format=json`): L1/L2 p50/p95/p99, counts, errors (when available).
+  - `toolCounts` summary (calls per tool).
+  - More tolerant HTTP tool error handling (returns `{ ok:false, error, status }` instead of throwing on 400) to keep CI summaries reliable.

@@ -1500,6 +1500,10 @@ export class MCPAdapter {
      * Handle find_references tool call with validation
      */
     private async handleFindReferences(args: Record<string, any>, context: ErrorContext) {
+        // Parity: tolerate empty symbol by returning empty references (not error)
+        if (typeof args?.symbol === 'string' && args.symbol.trim().length === 0) {
+            return { content: [{ type: 'text', text: JSON.stringify({ references: [], performance: { total: 0 }, requestId: 'none', count: 0 }, null, 2) }], isError: false };
+        }
         this.validateArgs(args, ['symbol'], context);
         try { await (this.coreAnalyzer as any)?.initialize?.(); } catch {}
 

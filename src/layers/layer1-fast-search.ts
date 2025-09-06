@@ -180,9 +180,18 @@ export class FastSearchLayer implements Layer<SearchQuery, EnhancedMatches> {
         cacheHits: 0,
         errors: 0,
         avgResponseTime: 0,
+        // Quantile metrics for observability/SLOs
+        lastResponseTime: 0,
+        p50ResponseTime: 0,
+        p95ResponseTime: 0,
+        p99ResponseTime: 0,
         timeouts: 0,
         fallbacks: 0,
     };
+
+    // Bounded reservoir of response times to compute quantiles without unbounded growth
+    private responseSamples: number[] = [];
+    private readonly maxSamples = 1000;
 
     private getErrorMessage(error: unknown): string {
         if (error instanceof Error) {
@@ -1482,6 +1491,22 @@ export class FastSearchLayer implements Layer<SearchQuery, EnhancedMatches> {
         const totalTime =
             this.performanceMetrics.avgResponseTime * (this.performanceMetrics.searches - 1) + responseTime;
         this.performanceMetrics.avgResponseTime = totalTime / this.performanceMetrics.searches;
+        this.performanceMetrics.lastResponseTime = responseTime;
+
+        // Update bounded samples and recompute quantiles
+        if (Number.isFinite(responseTime) && responseTime >= 0) {
+            if (this.responseSamples.length < this.maxSamples) {
+                this.responseSamples.push(responseTime);
+            } else {
+                const idx = Math.floor(Math.random() * this.maxSamples);
+                this.responseSamples[idx] = responseTime;
+            }
+            const sorted = [...this.responseSamples].sort((a, b) => a - b);
+            const pick = (q: number) => (sorted.length ? sorted[Math.floor(q * (sorted.length - 1))] : 0);
+            this.performanceMetrics.p50ResponseTime = pick(0.5);
+            this.performanceMetrics.p95ResponseTime = pick(0.95);
+            this.performanceMetrics.p99ResponseTime = pick(0.99);
+        }
         // Merge global counters from Grep wrapper
         try {
             const g = (globalThis as any).__FAST_SEARCH_METRICS__;

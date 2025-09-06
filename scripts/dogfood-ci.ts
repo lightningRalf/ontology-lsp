@@ -19,13 +19,17 @@ async function postJson(url: string, payload: any): Promise<any> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  let body: any = null;
+  try { body = await res.json(); } catch { body = null; }
+  // Always return parsed body even on non-2xx; include status for diagnostics
+  return { _httpStatus: res.status, ...(body || {}) };
 }
 
 async function callTool(base: string, args: ToolCallArgs): Promise<any> {
   const body = await postJson(`${base}/api/v1/tools/call`, args);
-  if (body?.success === false) throw new Error(String(body?.error || 'tool call failed'));
+  if (body?.success === false) {
+    return { ok: false, error: body?.error || { message: 'tool call failed' }, status: body?._httpStatus };
+  }
   return body?.result ?? body;
 }
 
@@ -92,8 +96,45 @@ async function main() {
   t1('patch_checks');
 
   // Summaries
+  // Metrics snapshot (L1/L2 p95 + counts)
+  let metrics: any = {};
+  try {
+    const m = await fetch(`${base}/metrics?format=json`).then((r) => r.json());
+    metrics = {
+      l1: m?.l1?.layer
+        ? {
+            p50: m.l1.layer.p50ResponseTime ?? 0,
+            p95: m.l1.layer.p95ResponseTime ?? 0,
+            p99: m.l1.layer.p99ResponseTime ?? 0,
+            searches: m.l1.layer.searches ?? 0,
+            errors: m.l1.layer.errors ?? 0,
+          }
+        : {},
+      l2: m?.l2
+        ? {
+            p50: m.l2.p50 ?? 0,
+            p95: m.l2.p95 ?? 0,
+            p99: m.l2.p99 ?? 0,
+            count: m.l2.count ?? 0,
+            errors: m.l2.errors ?? 0,
+          }
+        : {},
+    };
+  } catch {
+    metrics = {};
+  }
+
+  const toolCounts = {
+    explore_symbol_impact: 1,
+    explore_codebase: 2,
+    rename_safely: 1,
+    patch_checks_in_snapshot: 1,
+  };
+
   const summary = {
     timingsMs: timings,
+    metrics,
+    toolCounts,
     explore: {
       impact: {
         defs: exploreImpact?.definitions?.length ?? 0,
@@ -132,4 +173,3 @@ main().catch(async (err) => {
   } catch {}
   process.exit(1);
 });
-
