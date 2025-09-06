@@ -1811,3 +1811,8 @@ build-cli:
 # Build and visualize symbol maps for related tokens discovered via explore
 symbol-map-graphs identifier: build-cli
     @bash -lc 'if ! command -v codex >/dev/null 2>&1; then echo "codex not found in PATH" 1>&2; exit 0; fi; out=$(bun run ./dist/cli/cli.js explore {{identifier}} --json 2>/dev/null || true); echo "$out" | jq -r "[.definitions[].name, .references[].name] | map(select(. != null)) | unique[]" 2>/dev/null | awk -v seed="{{identifier}}" '"'"'NF && $0 != seed'"'"' | while read -r name; do if command -v bunx >/dev/null 2>&1; then codex exec "visualize the following: bunx --bun ./dist/cli/cli.js symbol-map-graph \"$name\"" >/dev/null 2>&1 & else codex exec "visualize the following: bun run ./dist/cli/cli.js symbol-map-graph \"$name\"" >/dev/null 2>&1 & fi; done'
+
+# Show a snapshot diff via delta (fallback to cat)
+# Note: snap_diff is already defined earlier in the justfile; keep a CLI-friendly alias
+snap_diff_cli snap_id:
+    @bash bin/snap-diff.sh {{snap_id}}

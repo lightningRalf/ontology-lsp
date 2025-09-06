@@ -827,6 +827,55 @@ export class HTTPAdapter {
             servers: [{ url: 'http://localhost:7000' }],
             components: {
                 schemas: {
+                    LocateConfirmDefinitionResult: {
+                        type: 'object',
+                        properties: {
+                            ok: { type: 'boolean' },
+                            symbol: { type: 'string' },
+                            attempts: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: { mode: { type: 'string' }, count: { type: 'integer' } },
+                                    required: ['mode', 'count'],
+                                },
+                            },
+                            definitions: { type: 'array', items: { $ref: '#/components/schemas/Definition' } },
+                            decision: { type: 'string' },
+                        },
+                        required: ['ok', 'symbol', 'attempts', 'definitions'],
+                    },
+                    SafeRenameResult: {
+                        type: 'object',
+                        properties: {
+                            ok: { type: 'boolean' },
+                            snapshot: { type: 'string' },
+                            filesAffected: { type: 'integer' },
+                            totalEdits: { type: 'integer' },
+                            elapsedMs: { type: 'integer' },
+                            outputTail: { type: 'string' },
+                            next_actions: { type: 'array', items: { type: 'string' } },
+                        },
+                        required: ['ok', 'snapshot'],
+                    },
+                    PatchChecksInSnapshotResult: {
+                        type: 'object',
+                        properties: {
+                            ok: { type: 'boolean' },
+                            snapshot: { type: 'string' },
+                            stage: { type: 'object' },
+                            checks: {
+                                type: 'object',
+                                properties: {
+                                    ok: { type: 'boolean' },
+                                    elapsedMs: { type: 'integer' },
+                                    output: { type: 'string' },
+                                    outputTail: { type: 'string' },
+                                },
+                            },
+                        },
+                        required: ['ok', 'snapshot'],
+                    },
                     ToolCallRequest: {
                         type: 'object',
                         properties: {
@@ -839,9 +888,13 @@ export class HTTPAdapter {
                         type: 'object',
                         properties: {
                             success: { type: 'boolean' },
-                            result: { description: 'Adapter-shaped result (MCP parity)', additionalProperties: true },
+                            result: { description: 'Normalized tool result (parsed JSON for workflows)', additionalProperties: true },
+                            error: {
+                                type: 'object',
+                                properties: { message: { type: 'string' } },
+                            },
                         },
-                        required: ['success', 'result'],
+                        required: ['success'],
                     },
                     AstQueryResult: {
                         type: 'object',
@@ -1055,37 +1108,89 @@ export class HTTPAdapter {
                                                 value: {
                                                     success: true,
                                                     result: {
-                                                        content: [
+                                                        pipelines: [
                                                             {
-                                                                type: 'text',
-                                                                text: '{"pipelines":[{"id":"pattern_feedback_cycle","name":"Pattern-Feedback Learning Cycle","trigger":"event_driven","schedule":null,"enabled":true}]}'
+                                                                id: 'pattern_feedback_cycle',
+                                                                name: 'Pattern-Feedback Learning Cycle',
+                                                                trigger: 'event_driven',
+                                                                schedule: null,
+                                                                enabled: true,
                                                             },
                                                         ],
-                                                        isError: false,
                                                     },
                                                 },
                                             },
                                             run_pipeline: {
                                                 summary: 'Run pipeline',
-                                                value: {
-                                                    success: true,
-                                                    result: {
-                                                        content: [
-                                                            { type: 'text', text: '{"ok":true,"runId":"<uuid>"}' },
-                                                        ],
-                                                        isError: false,
-                                                    },
-                                                },
+                                                value: { success: true, result: { ok: true, runId: '<uuid>' } },
                                             },
                                             list_runs: {
                                                 summary: 'List recent pipeline runs',
                                                 value: {
                                                     success: true,
                                                     result: {
-                                                        content: [
-                                                            { type: 'text', text: '{"runs":[{"id":"<uuid>","pipeline_id":"pattern_feedback_cycle","started_at":1710000000,"finished_at":1710000005,"status":"success","metrics":{"totalTimeMs":42}}]}' },
+                                                        runs: [
+                                                            {
+                                                                id: '<uuid>',
+                                                                pipeline_id: 'pattern_feedback_cycle',
+                                                                started_at: 1710000000,
+                                                                finished_at: 1710000005,
+                                                                status: 'success',
+                                                                metrics: { totalTimeMs: 42 },
+                                                            },
                                                         ],
-                                                        isError: false,
+                                                    },
+                                                },
+                                            },
+                                            locate_confirm_definition: {
+                                                summary: 'Locate & confirm definition',
+                                                value: {
+                                                    success: true,
+                                                    result: {
+                                                        $schema: '#/components/schemas/LocateConfirmDefinitionResult',
+                                                        ok: true,
+                                                        symbol: 'TestClass',
+                                                        attempts: [{ mode: 'precise', count: 1 }],
+                                                        definitions: [
+                                                            {
+                                                                uri: 'file:///workspace/tests/fixtures/example.ts',
+                                                                range: { start: { line: 4, character: 7 }, end: { line: 4, character: 16 } },
+                                                                kind: 'class',
+                                                                confidence: 0.95,
+                                                            },
+                                                        ],
+                                                        decision: 'precise_retry',
+                                                    },
+                                                },
+                                            },
+                                            rename_safely: {
+                                                summary: 'Safe rename (snapshot + checks)',
+                                                value: {
+                                                    success: true,
+                                                    result: {
+                                                        $schema: '#/components/schemas/SafeRenameResult',
+                                                        ok: true,
+                                                        snapshot: '<snapshot-id>',
+                                                        filesAffected: 1,
+                                                        totalEdits: 3,
+                                                        elapsedMs: 850,
+                                                        next_actions: [
+                                                            'Optionally apply this patch to working tree',
+                                                            'Open snapshot diff: snapshot://<snapshot-id>/overlay.diff',
+                                                        ],
+                                                    },
+                                                },
+                                            },
+                                            patch_checks_in_snapshot: {
+                                                summary: 'Patch + checks in snapshot',
+                                                value: {
+                                                    success: true,
+                                                    result: {
+                                                        $schema: '#/components/schemas/PatchChecksInSnapshotResult',
+                                                        ok: true,
+                                                        snapshot: '<snapshot-id>',
+                                                        stage: { accepted: true, diffCount: 1 },
+                                                        checks: { ok: true, elapsedMs: 640, outputTail: '...last lines of checks...' },
                                                     },
                                                 },
                                             },

@@ -89,9 +89,17 @@ export class HTTPServer {
                 try {
                     const url = new URL(request.url);
 
-                    // Serve static web UI from web-ui/dist under /ui
+                    // Serve static web UI from web-ui/dist under /ui; fallback to unbundled web-ui/index.html
                     if (url.pathname === '/ui' || url.pathname === '/ui/') {
-                        return await this.serveStaticFile('web-ui/dist/index.html', 'text/html');
+                        const dist = Bun.file('web-ui/dist/index.html');
+                        if (await dist.exists()) {
+                            return new Response(dist, { status: 200, headers: { 'Content-Type': 'text/html' } });
+                        }
+                        const fallback = Bun.file('web-ui/index.html');
+                        if (await fallback.exists()) {
+                            return new Response(fallback, { status: 200, headers: { 'Content-Type': 'text/html' } });
+                        }
+                        return new Response('Not found', { status: 404 });
                     }
                     if (url.pathname.startsWith('/ui/')) {
                         const rel = url.pathname.replace(/^\/ui\//, '');
@@ -253,25 +261,79 @@ export class HTTPServer {
                             const raw = await this.getRequestBody(request);
                             const body: any = raw ? JSON.parse(raw) : {};
                             const name = String(body?.name || '').trim();
-                            const args = (body?.arguments && typeof body.arguments === 'object') ? body.arguments : {};
+                            const args =
+                                body?.arguments && typeof body.arguments === 'object' ? (body.arguments as Record<string, any>) : {};
                             if (!name) {
-                                return new Response(JSON.stringify({ error: 'Missing tool name' }), {
-                                    status: 400,
-                                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-                                });
+                                return new Response(
+                                    JSON.stringify({ success: false, error: { message: 'Missing tool name' } }),
+                                    {
+                                        status: 400,
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'Access-Control-Allow-Origin': '*',
+                                        },
+                                    }
+                                );
                             }
+
                             const mcpAdapter = new MCPAdapter(this.coreAnalyzer);
                             const executor = new ToolExecutor();
-                            const result = await executor.execute(mcpAdapter as any, name, args as Record<string, any>);
-                            return new Response(JSON.stringify({ success: true, result }), {
-                                status: 200,
-                                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-                            });
-                        } catch (err) {
-                            return new Response(JSON.stringify({ success: false, error: 'tool call failed' }), {
-                                status: 500,
-                                headers: { 'Content-Type': 'application/json' },
-                            });
+                            const mcpResult: any = await executor.execute(mcpAdapter as any, name, args);
+
+                            // Normalize/unwrap MCP result to a stable JSON shape for HTTP clients
+                            const unwrap = (res: any) => {
+                                try {
+                                    // If MCP returned an explicit error shape, surface it via success:false
+                                    if (res && typeof res === 'object' && (res.error === true || res.isError)) {
+                                        const msg = (() => {
+                                            if (typeof res.message === 'string') return res.message;
+                                            const txt = res?.content?.[0]?.text;
+                                            if (typeof txt === 'string') return txt.slice(0, 2000);
+                                            return 'Tool execution failed';
+                                        })();
+                                        return { ok: false, error: { message: msg } };
+                                    }
+
+                                    // Try to parse content[0].text as JSON when present
+                                    const txt = res?.content?.[0]?.text;
+                                    if (typeof txt === 'string') {
+                                        try {
+                                            return JSON.parse(txt);
+                                        } catch {
+                                            // Fallback to passthrough text
+                                            return { ok: true, content: txt };
+                                        }
+                                    }
+                                    // If adapter already returned a plain object result, pass it through
+                                    if (res && typeof res === 'object') return res;
+                                    // Primitive fallback
+                                    return { ok: true, value: res };
+                                } catch {
+                                    return { ok: false, error: { message: 'Failed to normalize tool result' } };
+                                }
+                            };
+
+                            const normalized = unwrap(mcpResult);
+                            const isError = !!(normalized && typeof normalized === 'object' && normalized.ok === false);
+                            return new Response(
+                                JSON.stringify({ success: !isError, result: isError ? undefined : normalized, error: isError ? normalized.error : undefined }),
+                                {
+                                    status: isError ? 400 : 200,
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Access-Control-Allow-Origin': '*',
+                                    },
+                                }
+                            );
+                        } catch (err: any) {
+                            const message = err?.message || String(err || 'tool call failed');
+                            return new Response(
+                                JSON.stringify({ success: false, error: { message } }),
+                                {
+                                    status: 500,
+                                    headers: { 'Content-Type': 'application/json' },
+                                }
+                            );
                         }
                     }
 

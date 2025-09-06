@@ -157,22 +157,23 @@ Goal: make the Layer Performance pane reliable on cold start and after restart.
 - Optional tooling: `just ports` lists the external registry when present.
 - Note: the stdio Fast MCP server (`src/servers/mcp-fast.ts`) does not bind a port.
 
-### 0.6 MCP Workflows GA (Near‑term)
+### 0.6 MCP/HTTP Workflows GA (Near‑term)
 
 Goal: ship a small library of safe, composable workflows and make them discoverable.
 
 - Workflows (server):
-  - `workflow_safe_rename` delivered (plan_rename → snapshot → propose_patch → run_checks; optional checks via `runChecks`).
-  - `workflow_locate_confirm_definition` delivered (fast → precise retry with compact JSON).
-  - Ensure stable JSON outputs: `{ ok, summary, artifacts, next_actions }` across all workflows; add docs/examples.
+  - `workflow_safe_rename` (plan_rename → snapshot → propose_patch → run_checks; optional checks via `runChecks`).
+  - `workflow_locate_confirm_definition` (fast → precise retry with compact JSON).
+  - Status: HTTP tools outputs normalized; OpenAPI schemas added for key workflows; examples present.
 - Prompts (server):
   - Register `workflow-explore-symbol` and `workflow-safe-rename` prompts with Use/Avoid/Returns guidance.
   - Add completable() suggestions for common symbols and edges.
-- UI integration (optional):
-  - Expose snapshot overlay.diff/status via HTTP passthrough or MCP client bridge for preview.
-  - “Apply Preview” button gated behind checks ok (dev-only).
+- UI integration:
+  - DONE: snapshot overlay.diff/status preview at `/ui` with client‑side diff highlighting.
+  - Next: small affordances (copy snapshot id, open diff in new tab, lightweight “rerun checks” control).
 - Docs:
-  - “Workflows & Recipes” section with examples and expected JSON outputs.
+  - DONE: OpenAPI `/openapi.json` extended with named workflow schemas.
+  - Next: short “Tool‑First Editing” reminder and examples in docs/WORKFLOWS.md.
 
 ### 1. Execute Production Deployment
 

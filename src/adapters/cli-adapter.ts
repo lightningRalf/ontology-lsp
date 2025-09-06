@@ -150,6 +150,13 @@ export class CLIAdapter {
         }
     ): Promise<any> {
         try {
+            // Parity + UX: when identifier is empty
+            if (!identifier || !String(identifier).trim()) {
+                // If a file context is provided, return an empty structured array for consistency checks
+                if (options.file) return [];
+                // Otherwise return a concise message for CLI UX
+                return 'Find failed: identifier required';
+            }
             const request = buildFindDefinitionRequest({
                 uri: normalizeUri(options.file || 'file://workspace'),
                 position: createPosition(0, 0),

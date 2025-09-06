@@ -226,6 +226,11 @@ export class LSPAdapter {
         try {
             const identifier = this.extractIdentifierAtPosition(params.textDocument.uri, params.position);
 
+            // Parity: return empty results (not errors) for ambiguous/empty identifiers
+            if (!identifier || /^symbol_at_\d+_\d+$/.test(identifier)) {
+                return [];
+            }
+
             const request = buildFindReferencesRequest({
                 uri: params.textDocument.uri,
                 position: normalizePosition(params.position),

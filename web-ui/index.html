@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ontology‑LSP Dashboard</title>
+    <style>
+      :root { --indigo:#4f46e5; --fg:#111827; --muted:#6b7280; --br:#e5e7eb; --bg:#f9fafb; }
+      html,body { margin:0; padding:0; background:#fff; color:var(--fg); font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+      header { padding:16px 20px; border-bottom:1px solid var(--br); display:flex; align-items:center; gap:12px; }
+      header h1 { font-size:16px; margin:0; }
+      main { padding:16px 20px; display:flex; gap:16px; flex-wrap:wrap; }
+      .col { flex: 1 1 420px; min-width: 340px; }
+      .card { border:1px solid var(--br); border-radius:10px; background:#fff; margin-bottom:16px; }
+      .card header { padding:10px 12px; border-bottom:1px solid var(--br); background:#fafafa; }
+      .card header h2 { margin:0; font-size:14px; }
+      .card .body { padding:12px; }
+      .row { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; }
+      label { display:block; font-size:12px; color:#374151; margin-bottom:4px; }
+      input, textarea, select { border:1px solid #d1d5db; border-radius:8px; padding:8px; font:inherit; }
+      textarea { width:100%; min-height:120px; }
+      button { background:var(--indigo); color:#fff; border:none; border-radius:8px; padding:8px 12px; cursor:pointer; }
+      button.secondary { background:#111827; }
+      button:disabled { opacity:.6; cursor:default; }
+      .muted { color:var(--muted); font-size:12px; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; line-height:1.35; }
+      pre { background:#f9fafb; border:1px solid var(--br); border-radius:8px; padding:10px; overflow:auto; max-height:420px; }
+      /* diff highlighting */
+      .diff-add { background:#ecfdf5; color:#065f46; }
+      .diff-del { background:#fef2f2; color:#991b1b; }
+      .diff-hunk { background:#eff6ff; color:#1e3a8a; font-weight:600; }
+      .diff-file { background:#f3f4f6; color:#374151; font-weight:600; }
+      table.kv { border-collapse: collapse; width:100%; }
+      table.kv td { padding:4px 6px; border-bottom:1px solid #f3f4f6; }
+      table.kv td:first-child { color:#374151; width:40%; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Ontology‑LSP Dashboard</h1>
+      <span class="muted" id="hdr-status">Initializing…</span>
+      <button id="btn-refresh" title="Refresh metrics">Refresh</button>
+    </header>
+    <main>
+      <section class="col">
+        <div class="card">
+          <header><h2>System Health</h2></header>
+          <div class="body">
+            <table class="kv" id="health-kv"></table>
+            <div class="muted">Endpoints: GET /health, GET /api/v1/monitoring</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <header><h2>Layers (p50/p95/p99)</h2></header>
+          <div class="body">
+            <div id="layers"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <header><h2>Learning Stats</h2></header>
+          <div class="body">
+            <table class="kv" id="learning-kv"></table>
+          </div>
+        </div>
+      </section>
+
+      <section class="col">
+        <div class="card">
+          <header><h2>Snapshots</h2></header>
+          <div class="body">
+            <div class="row">
+              <div>
+                <label for="snapSelect">Snapshot</label>
+                <select id="snapSelect"></select>
+              </div>
+              <button id="btnSnapList">List</button>
+              <button id="btnSnapDiff">View Diff</button>
+              <button id="btnSnapStatus">View Status</button>
+            </div>
+            <pre class="mono" id="snapOut">Select snapshot and click View Diff or View Status</pre>
+          </div>
+        </div>
+
+        <div class="card">
+          <header><h2>Workflows</h2></header>
+          <div class="body">
+            <div class="row">
+              <div>
+                <label>Locate Confirm (symbol)</label>
+                <input id="w-symbol" type="text" placeholder="TestClass" />
+              </div>
+              <div>
+                <label>File (optional)</label>
+                <input id="w-file" type="text" placeholder="tests/fixtures/example.ts" />
+              </div>
+              <button id="btnLocate">Run</button>
+            </div>
+            <pre class="mono" id="wfOut1"></pre>
+
+            <div class="row" style="margin-top:8px;">
+              <div>
+                <label>Safe Rename (old → new)</label>
+                <input id="w-old" type="text" placeholder="HTTPServer" />
+              </div>
+              <div>
+                <label>&nbsp;</label>
+                <input id="w-new" type="text" placeholder="HTTPServerX" />
+              </div>
+              <div>
+                <label>File</label>
+                <input id="w-file2" type="text" placeholder="src/servers/http.ts" />
+              </div>
+              <button id="btnRename">Run</button>
+            </div>
+            <pre class="mono" id="wfOut2"></pre>
+
+            <div style="margin-top:8px;">
+              <label>Patch + Checks (apply_patch or unified diff)</label>
+              <textarea id="w-patch" placeholder="*** Begin Patch
+*** Update File: tests/fixtures/example.ts
+@@
+ export class TestClass {
+-    private value: number = 0;
++    // UI: noop comment
++    private value: number = 0;
+*** End Patch
+"></textarea>
+              <div class="row">
+                <button id="btnPatch">Stage + Checks</button>
+              </div>
+            </div>
+            <pre class="mono" id="wfOut3"></pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="col">
+        <div class="card">
+          <header><h2>Pipelines (Streamable HTTP)</h2></header>
+          <div class="body">
+            <div class="row">
+              <div>
+                <label>Pipeline ID</label>
+                <input id="pl-id" type="text" placeholder="pattern_feedback_cycle" />
+              </div>
+              <button id="btnPlList">List</button>
+              <button id="btnPlRun" title="Stream run output (NDJSON)">Run Stream</button>
+            </div>
+            <pre class="mono" id="plOut">Run output will appear here…</pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const api = (p) => `${location.origin}${p}`;
+      const $ = (id) => document.getElementById(id);
+      const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+      function kv(el, obj) {
+        el.innerHTML = Object.entries(obj || {}).map(([k,v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('');
+      }
+
+      function renderLayers(el, breakdown) {
+        const keys = Object.keys(breakdown||{});
+        el.innerHTML = keys.length ? keys.map(k => {
+          const d = breakdown[k] || {}; const p50 = d.p50||0, p95=d.p95||0, p99=d.p99||0, c=d.count||0;
+          return `<div style="margin:4px 0;">
+            <strong>${esc(k)}</strong>
+            <div class="muted">count=${c}, p50=${p50}ms, p95=${p95}ms, p99=${p99}ms</div>
+          </div>`;
+        }).join('') : '<span class="muted">No data</span>';
+      }
+
+      function highlightUnifiedDiff(text) {
+        const lines = text.split(/\r?\n/);
+        return lines.map((ln) => {
+          if (ln.startsWith('+++ ') || ln.startsWith('--- ')) return `<span class="diff-file">${esc(ln)}</span>`;
+          if (ln.startsWith('@@')) return `<span class="diff-hunk">${esc(ln)}</span>`;
+          if (ln.startsWith('+')) return `<span class="diff-add">${esc(ln)}</span>`;
+          if (ln.startsWith('-')) return `<span class="diff-del">${esc(ln)}</span>`;
+          return esc(ln);
+        }).join('\n');
+      }
+
+      async function getJSON(u, opts) {
+        const res = await fetch(u, opts);
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        return res.json();
+      }
+
+      async function refresh() {
+        try {
+          const health = await getJSON(api('/health'));
+          $('hdr-status').textContent = `${health.status} @ ${health.timestamp}`;
+          kv($('health-kv'), { status: health.status, timestamp: health.timestamp });
+        } catch(e) { $('hdr-status').textContent = 'health error'; }
+
+        try {
+          const mon = await getJSON(api('/api/v1/monitoring'));
+          const perf = mon?.data?.performance || {}; const layers = mon?.data?.layers || {};
+          kv($('health-kv'), { status: 'OK', totalRequests: perf.totalRequests||0, p95: (perf.p95Latency||0)+'ms' });
+          renderLayers($('layers'), layers);
+        } catch(e) {}
+
+        try {
+          const ls = await getJSON(api('/api/v1/learning-stats'));
+          const s = ls?.data || {};
+          kv($('learning-kv'), { patterns: s.patterns ?? 0, concepts: s.concepts ?? 0, updatedAt: s.updatedAt ?? '' });
+        } catch(e) {}
+      }
+
+      async function listSnapshots() {
+        const res = await getJSON(api('/api/v1/snapshots'));
+        const snaps = res?.data?.snapshots || [];
+        const sel = $('snapSelect'); sel.innerHTML = '';
+        for (const s of snaps) {
+          const o = document.createElement('option'); o.value = s.id; o.textContent = `${s.id} (${s.diffCount} diffs)`; sel.appendChild(o);
+        }
+        if (!snaps.length) $('snapOut').textContent = 'No snapshots';
+      }
+
+      async function snapDiff() {
+        const id = $('snapSelect').value; if (!id) return;
+        const res = await getJSON(api(`/api/v1/snapshots/${id}/diff`));
+        $('snapOut').innerHTML = highlightUnifiedDiff(res?.data?.diff || '');
+      }
+      async function snapStatus() {
+        const id = $('snapSelect').value; if (!id) return;
+        const res = await getJSON(api(`/api/v1/snapshots/${id}/status`));
+        $('snapOut').textContent = JSON.stringify(res, null, 2);
+      }
+
+      async function toolsCall(name, args) {
+        const res = await fetch(api('/api/v1/tools/call'), {
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, arguments: args||{} })
+        });
+        const body = await res.json();
+        if (!body.success) throw new Error(body?.error?.message || 'tool failed');
+        return body.result;
+      }
+
+      async function wfLocate() {
+        const symbol = $('w-symbol').value || 'TestClass';
+        const file = $('w-file').value || undefined;
+        const out = await toolsCall('locate_confirm_definition', { symbol, file });
+        $('wfOut1').textContent = JSON.stringify(out, null, 2);
+      }
+      async function wfRename() {
+        const oldName = $('w-old').value || 'HTTPServer';
+        const newName = $('w-new').value || 'HTTPServerX';
+        const file = $('w-file2').value || 'src/servers/http.ts';
+        const out = await toolsCall('rename_safely', { oldName, newName, file, runChecks: false });
+        $('wfOut2').textContent = JSON.stringify(out, null, 2);
+      }
+      async function wfPatch() {
+        const patch = $('w-patch').value||'';
+        const out = await toolsCall('patch_checks_in_snapshot', { patch, onlyTouched: true, commands: ['true'] });
+        $('wfOut3').textContent = JSON.stringify(out, null, 2);
+      }
+
+      async function listPipelines() {
+        const out = await toolsCall('list_pipelines', {});
+        $('plOut').textContent = JSON.stringify(out, null, 2);
+      }
+
+      async function runPipelineStream() {
+        const id = $('pl-id').value || 'pattern_feedback_cycle';
+        $('plOut').textContent = '';
+        const res = await fetch(api('/api/v1/pipelines/run-stream'), {
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, pollMs: 300, timeoutSec: 60 })
+        });
+        if (!res.body) { $('plOut').textContent = 'No body'; return; }
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = '';
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop() || '';
+          for (const ln of lines) {
+            if (!ln.trim()) continue;
+            try { const obj = JSON.parse(ln); $('plOut').textContent += (obj.event?`[${obj.event}] `:'') + JSON.stringify(obj) + '\n'; }
+            catch { $('plOut').textContent += ln + '\n'; }
+          }
+        }
+        if (buf) $('plOut').textContent += buf + '\n';
+      }
+
+      $('btn-refresh').onclick = refresh;
+      $('btnSnapList').onclick = listSnapshots;
+      $('btnSnapDiff').onclick = snapDiff;
+      $('btnSnapStatus').onclick = snapStatus;
+      $('btnLocate').onclick = wfLocate;
+      $('btnRename').onclick = wfRename;
+      $('btnPatch').onclick = wfPatch;
+      $('btnPlList').onclick = listPipelines;
+      $('btnPlRun').onclick = runPipelineStream;
+
+      refresh();
+    </script>
+  </body>
+  </html>

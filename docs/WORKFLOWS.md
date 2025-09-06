@@ -14,6 +14,7 @@ Purpose: quickly locate a symbol’s definition with a fast pass and a precise r
   - Initialize → `tools/call` with the same payload; reuse `Mcp-Session-Id`.
 
 Returns (shape): `{ ok, symbol, attempts: [{mode,count}...], definitions: [...], decision }`.
+Note: via HTTP `tools/call`, the `result` field already contains parsed JSON (not a string-wrapped payload).
 
 ## Safe Rename (Snapshot + Optional Checks)
 
@@ -27,6 +28,7 @@ Purpose: plan rename, stage a unified diff to a snapshot, then run checks in the
 - MCP (HTTP): same as HTTP via `tools/call`.
 
 Returns (shape): `{ ok, snapshot, filesAffected, totalEdits, elapsedMs?, outputTail?, next_actions }`.
+Note: HTTP returns this directly under `result`; MCP transports return a text payload which clients may parse.
 
 ## Patch + Checks in Snapshot
 
@@ -40,6 +42,7 @@ Purpose: stage a unified diff (supports apply_patch format) and run checks in th
 - MCP (HTTP): same via `tools/call`.
 
 Returns (shape): `{ ok, snapshot, elapsedMs, output }`.
+Note: HTTP returns parsed JSON in `result`; MCP transports return JSON text content.
 
 ## Explore Codebase
 
@@ -51,6 +54,7 @@ Purpose: gather definitions, references, and (optionally) conceptual hints.
   - `tools/call` with `{ "name":"explore_codebase", "arguments": { "symbol":"TestClass", "file":"tests/fixtures/example.ts", "conceptual": true } }`
 
 Returns (shape): `{ definitions, references, (optional) concepts }`.
+Note: HTTP `tools/call` unwraps and returns parsed JSON in `result`.
 
 ## Learning Pipelines (L5)
 

@@ -61,6 +61,13 @@ layer mapping, safety rules, and delivery expectations.
 - Add or adjust tests narrowly around the fix (when applicable).
 - Keep public types stable unless a breaking change is approved.
 
+### Tool‑First Editing Policy (mandatory)
+
+- Stage edits via Ontology‑LSP tools (snapshots + checks), not direct file writes.
+- Use `patch_checks_in_snapshot` to propose diffs and run checks inside the snapshot; apply only when allowed.
+- Prefer HTTP tools in CI; MCP (HTTP or stdio) is fine for local dev (keep stdout clean in stdio).
+- Helpers: `just dogfood[_full]`, `just snap_diff_cli <SNAP_ID>`.
+
 3) Validate
 - Build: `bun run build:all`.
 - Type‑check: `tsc` (or a core‑only `tsconfig.build.json` once added).

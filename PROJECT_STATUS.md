@@ -465,6 +465,33 @@ Status: adapters/LSP integration tests are green. E2E local run improved reliabi
 - Default behavior unchanged; the knob is a low‑risk, reversible lever for CI and perf runs.
 - Recommended CI tune for consistency: `PERF=1 L2_MAX_PARSE_FILES=10..15` on perf‑gated suites.
 
+### 🔧 Tools, OpenAPI, and UI Enhancements
+- HTTP tools normalization (parity with MCP):
+  - `POST /api/v1/tools/call` now unwraps tool results into parsed JSON under `result`, with a consistent error shape `{ success:false, error:{ message } }`.
+  - Effect: simpler client code paths across CLI/HTTP/MCP; predictable workflow outputs.
+- OpenAPI upgrades:
+  - Added named workflow schemas: `LocateConfirmDefinitionResult`, `SafeRenameResult`, `PatchChecksInSnapshotResult`.
+  - Normalized `ToolCallResponse` schema (`success`, `result`, optional `error`).
+  - New test: `tests/http-openapi-workflows.test.ts` validates presence of schemas and response shape.
+- Web UI (/ui):
+  - Installer‑free dashboard (no deps): health, layer metrics (p50/p95/p99), learning stats.
+  - Snapshots panel with client‑side unified diff highlighter and status view.
+  - Workflows panel (locate, safe‑rename, patch‑checks) calling HTTP tools.
+  - Pipelines panel using streamable HTTP run‑stream (NDJSON) with incremental rendering.
+  - Server fallback: if `web-ui/dist/index.html` is absent, serve `web-ui/index.html` (unbundled) to avoid 404s.
+- CLI dogfooding:
+  - `bin/snap-diff.sh` + `just snap_diff_cli <SNAP_ID>` use `delta` when available (fallback to `cat`) to preview snapshot diffs.
+- Adapter polish (parity):
+  - LSP: return `[]` (not error) for empty/synthetic identifiers in references.
+  - CLI: empty identifier returns `[]` with file context (consistency tests) or a concise message for UX.
+- Process hygiene:
+  - Fixed duplicate `snap_diff` task by adding `snap_diff_cli` alias.
+
+### 🛡️ Policy
+- AGENTS.md updated with a concise, mandatory Tool‑First Editing Policy:
+  - Stage edits via Ontology‑LSP tools (snapshots + checks), not direct writes.
+  - Prefer HTTP tools in CI; MCP (HTTP/stdio) for local dev with clean stdout.
+
 ## 📅 Earlier Snapshot (2025-08-28)
 
 ### 🧪 Test Suite Validation (Local Run)
