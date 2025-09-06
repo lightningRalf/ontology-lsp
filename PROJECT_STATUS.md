@@ -444,6 +444,27 @@ Status: adapters/LSP integration tests are green. E2E local run improved reliabi
 
 ---
 
+## 📅 Latest Updates (2025-09-06)
+
+### ⚡️ Perf Stabilization (Layer 2 AST cap)
+- Added env knob `L2_MAX_PARSE_FILES` to cap files parsed by Layer 2 (Tree‑sitter) per request.
+  - Default 20; clamped to 1–100; opt‑in via env for CI/perf.
+  - Purpose: reduce variance and stabilize p95 under constrained hosts.
+- Documentation updated:
+  - `CONFIG.md` includes `L2_MAX_PARSE_FILES` under Performance Settings.
+  - `tests/README.md` lists perf/flake control knobs with examples.
+
+### ✅ Validation (targeted)
+- Integration + AST query compile suites passed.
+- HTTP/MCP adapter suites passed (tools/call, metrics, graph‑expand fallbacks, pipelines tools).
+- Layer 3 symbol‑map/rename‑plan smoke tests passed.
+- Learning system + feedback‑loop integration passed.
+- Perf spot‑check (PERF=1) for Layer 2 with `L2_MAX_PARSE_FILES=10` met the ≤100ms p95 gate for overall operation in the test harness.
+
+### Notes
+- Default behavior unchanged; the knob is a low‑risk, reversible lever for CI and perf runs.
+- Recommended CI tune for consistency: `PERF=1 L2_MAX_PARSE_FILES=10..15` on perf‑gated suites.
+
 ## 📅 Earlier Snapshot (2025-08-28)
 
 ### 🧪 Test Suite Validation (Local Run)

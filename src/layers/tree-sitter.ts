@@ -497,7 +497,10 @@ export class TreeSitterLayer implements Layer<EnhancedMatches, TreeSitterResult>
 
         // Limit files for performance (only parse most relevant)
         const sortedFiles = this.sortFilesByRelevance([...filesToParse], matches);
-        const filesToProcess = sortedFiles.slice(0, 20); // Limit to 20 files
+        // Allow env override for max parsed files to help stabilize perf during CI/perf runs
+        const envMax = Number.parseInt(process.env.L2_MAX_PARSE_FILES || '', 10);
+        const maxFiles = Number.isFinite(envMax) && envMax > 0 ? Math.min(Math.max(envMax, 1), 100) : 20;
+        const filesToProcess = sortedFiles.slice(0, maxFiles);
 
         // Parse files in parallel
         const parsePromises = filesToProcess.map((file) => this.parseFile(file));

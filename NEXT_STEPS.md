@@ -15,7 +15,10 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 
 ### 0.1 Fix‑Bugs‑First: Perf stabilization (Immediate)
 
-Monitoring perf and metrics; continue to gate perf/benchmarks behind env and iterate if regressions are observed.
+- New: Introduce `L2_MAX_PARSE_FILES` env knob (default 20; clamp 1–100) to cap Layer 2 AST parsed files per request; reduces variance and stabilizes p95 in constrained environments.
+- Docs: Added to `CONFIG.md`; `tests/README.md` shows example usage alongside `PERF=1`.
+- Validation: Targeted integration + adapter suites green; perf spot‑check with `PERF=1 L2_MAX_PARSE_FILES=10` meets ≤100ms p95 in harness.
+- Next: Calibrate recommended CI defaults (e.g., 10–15) for perf‑gated jobs; monitor metrics and adjust.
 
 ### 0.15 Minimal Viable L1→L5 (Working Paths)
 - L1 Fast Search: validate `text_search` tool; cap results; p95≤50ms on fixture
@@ -190,6 +193,7 @@ Proceed with staged rollout while storage adapters and type-safety improvements 
 - **Config Toggles**: Expose race budget, per‑pattern timeouts, depth and file caps in config (done for env overrides; see below).
 - **Race Merge Policy**: Optional merge of content + file discovery results when both finish within budget.
 - **Env Overrides (Doc)**: Document quick‑tune vars: `ESCALATION_L2_BUDGET_MS`, `ESCALATION_L1_CONFIDENCE_THRESHOLD`, `ESCALATION_L1_AMBIGUITY_MAX_FILES`, `ESCALATION_L1_REQUIRE_FILENAME_MATCH`.
+  - Add: `L2_MAX_PARSE_FILES` to cap AST parsed files per request (1–100; default 20) for predictable p95.
 
 ### 2.2 Output and UX (New)
 - **Summary Mode**: Keep enhancing examples and consistency

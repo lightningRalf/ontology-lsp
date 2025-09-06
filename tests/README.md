@@ -160,6 +160,14 @@ The performance tests use realistic configurations:
 - **Concurrent Connections**: Up to 20 for concurrent testing
 - **Response Time Targets**: 95% < 100ms
 
+### Perf/Flake Control (Env Knobs)
+- `PERF=1` enables performance-only suites and sections guarded for perf runs.
+- `E2E=1` enables end-to-end tests; keep off for fast local runs.
+- `L2_MAX_PARSE_FILES` caps how many files Layer 2 (AST) parses per request (default 20; clamp 1–100). Lowering this can reduce variance on constrained hosts during perf runs.
+  - Examples:
+    - `PERF=1 L2_MAX_PARSE_FILES=10 bun test tests/performance.test.ts --test-name-pattern "Layer 2 (AST Analysis)"`
+    - `PERF=1 L2_MAX_PARSE_FILES=15 bun test tests/enhanced-search-async.test.ts`
+
 ### Large Codebase Simulation
 Performance tests simulate large codebases:
 - **File Count**: 1K-10K TypeScript files
