@@ -563,6 +563,73 @@ class CLI {
                 await this.shutdown();
                 process.exit(0);
             });
+
+        // Pipelines (L5) helpers
+        const pipelines = this.program.command('pipelines').description('Learning pipelines tools');
+
+        // pipelines list
+        pipelines
+            .command('list')
+            .description('List learning pipelines (id, name, trigger, schedule, enabled)')
+            .option('-j, --json', 'Print raw JSON response')
+            .action(async (options) => {
+                await this.ensureInitialized(options);
+                const [{ MCPAdapter }, { ToolExecutor }] = await Promise.all([
+                    import('../adapters/mcp-adapter.js'),
+                    import('../core/tools/executor.js'),
+                ]);
+                const mcp = new MCPAdapter(this.coreAnalyzer);
+                const exec = new ToolExecutor();
+                const result = await exec.execute(mcp as any, 'list_pipelines', {});
+                const printed = this.printToolResult(result, !!options.json);
+                console.log(printed);
+                await this.shutdown();
+                process.exit(0);
+            });
+
+        // pipelines run <id>
+        pipelines
+            .command('run <id>')
+            .description('Run a learning pipeline and return a run id')
+            .option('-j, --json', 'Print raw JSON response')
+            .action(async (id, options) => {
+                await this.ensureInitialized(options);
+                const [{ MCPAdapter }, { ToolExecutor }] = await Promise.all([
+                    import('../adapters/mcp-adapter.js'),
+                    import('../core/tools/executor.js'),
+                ]);
+                const mcp = new MCPAdapter(this.coreAnalyzer);
+                const exec = new ToolExecutor();
+                const result = await exec.execute(mcp as any, 'run_pipeline', { id: String(id) });
+                const printed = this.printToolResult(result, !!options.json);
+                console.log(printed);
+                await this.shutdown();
+                process.exit(0);
+            });
+
+        // pipelines runs <id>
+        pipelines
+            .command('runs <id>')
+            .description('List recent runs for a learning pipeline')
+            .option('-l, --limit <n>', 'Number of recent runs to list', '10')
+            .option('-j, --json', 'Print raw JSON response')
+            .action(async (id, options) => {
+                await this.ensureInitialized(options);
+                const [{ MCPAdapter }, { ToolExecutor }] = await Promise.all([
+                    import('../adapters/mcp-adapter.js'),
+                    import('../core/tools/executor.js'),
+                ]);
+                const mcp = new MCPAdapter(this.coreAnalyzer);
+                const exec = new ToolExecutor();
+                const result = await exec.execute(mcp as any, 'list_pipeline_runs', {
+                    id: String(id),
+                    limit: parseInt(String(options.limit) || '10', 10),
+                });
+                const printed = this.printToolResult(result, !!options.json);
+                console.log(printed);
+                await this.shutdown();
+                process.exit(0);
+            });
     }
 
     private printToolResult(res: any, rawJson: boolean): string {

@@ -827,6 +827,22 @@ export class HTTPAdapter {
             servers: [{ url: 'http://localhost:7000' }],
             components: {
                 schemas: {
+                    ToolCallRequest: {
+                        type: 'object',
+                        properties: {
+                            name: { type: 'string', description: 'Registered tool/workflow name' },
+                            arguments: { type: 'object', additionalProperties: true },
+                        },
+                        required: ['name'],
+                    },
+                    ToolCallResponse: {
+                        type: 'object',
+                        properties: {
+                            success: { type: 'boolean' },
+                            result: { description: 'Adapter-shaped result (MCP parity)', additionalProperties: true },
+                        },
+                        required: ['success', 'result'],
+                    },
                     AstQueryResult: {
                         type: 'object',
                         properties: {
@@ -1016,6 +1032,74 @@ export class HTTPAdapter {
                 },
             },
             paths: {
+                [api('/tools/call')]: {
+                    post: {
+                        summary: 'Execute a registered tool/workflow (MCP parity)',
+                        description:
+                            'Generic tools endpoint. Body provides the tool name and arguments. Examples: list_pipelines, run_pipeline, list_pipeline_runs, locate_confirm_definition, rename_safely, patch_checks_in_snapshot.',
+                        requestBody: {
+                            required: true,
+                            content: {
+                                'application/json': { schema: { $ref: '#/components/schemas/ToolCallRequest' } },
+                            },
+                        },
+                        responses: {
+                            '200': {
+                                description: 'OK',
+                                content: {
+                                    'application/json': {
+                                        schema: { $ref: '#/components/schemas/ToolCallResponse' },
+                                        examples: {
+                                            list_pipelines: {
+                                                summary: 'List pipelines',
+                                                value: {
+                                                    success: true,
+                                                    result: {
+                                                        content: [
+                                                            {
+                                                                type: 'text',
+                                                                text: '{"pipelines":[{"id":"pattern_feedback_cycle","name":"Pattern-Feedback Learning Cycle","trigger":"event_driven","schedule":null,"enabled":true}]}'
+                                                            },
+                                                        ],
+                                                        isError: false,
+                                                    },
+                                                },
+                                            },
+                                            run_pipeline: {
+                                                summary: 'Run pipeline',
+                                                value: {
+                                                    success: true,
+                                                    result: {
+                                                        content: [
+                                                            { type: 'text', text: '{"ok":true,"runId":"<uuid>"}' },
+                                                        ],
+                                                        isError: false,
+                                                    },
+                                                },
+                                            },
+                                            list_runs: {
+                                                summary: 'List recent pipeline runs',
+                                                value: {
+                                                    success: true,
+                                                    result: {
+                                                        content: [
+                                                            { type: 'text', text: '{"runs":[{"id":"<uuid>","pipeline_id":"pattern_feedback_cycle","started_at":1710000000,"finished_at":1710000005,"status":"success","metrics":{"totalTimeMs":42}}]}' },
+                                                        ],
+                                                        isError: false,
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                            '400': {
+                                description: 'Bad Request',
+                                content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+                            },
+                        },
+                    },
+                },
                 [api('/explore')]: {
                     post: {
                         summary: 'Explore codebase: aggregate definitions and references',

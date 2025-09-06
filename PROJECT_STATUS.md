@@ -265,14 +265,14 @@ ontology-lsp/
 - L5 Learning (pipelines)
   - Minimal persistence added: tables `pipelines` and `pipeline_runs` with basic indexes
   - LearningOrchestrator now saves/loads pipelines from DB
-  - Tools surfaced: `list_pipelines`, `pipeline_status`
+  - Tools surfaced: `list_pipelines`, `pipeline_status`, `run_pipeline`, `list_pipeline_runs`
 
 - Docs
   - CONFIG.md corrected server-config path; documented HTTP tools endpoint and CLI workflows
   - docs/WORKFLOWS.md added; docs/README.md updated with quick start and parity overview
 
 ### Known Gaps (tool‑first gating)
-- `run_pipeline` tool (manual trigger) not yet exposed; add tool + simple status tail
+- Pipeline run status tail/streaming: add simple status tail (and optional SSE) for run output; integrate into UI
 - `list_symbols` currently regex‑based (fast). Optional AST‑backed listing can be added behind a feature flag
 - Some `tsc` checks fail in this repository due to missing type defs (jest, estree, etc.) — expected in dev; structure and tool flow are correct
 
@@ -340,6 +340,13 @@ ontology-lsp/
 - New script `bin/dogfood-workflows.sh` exercises investigate, safe‑rename, patch checks via MCP HTTP.
 
 ## 📅 Latest Updates (2025-09-06)
+
+### ✅ L5 Pipelines Tool Surface (HTTP/MCP/CLI)
+- Exposed new tools via ToolRegistry and MCP/HTTP: `run_pipeline { id }` → `{ ok, runId }`, `list_pipeline_runs { id, limit? }` → recent runs with status/metrics.
+- CLI: added `pipelines` subcommands — `pipelines list`, `pipelines run <id>`, `pipelines runs <id> [--limit N]`.
+- OpenAPI: documented generic tools endpoint with schemas `ToolCallRequest`/`ToolCallResponse` and examples for pipelines tools.
+- Docs: `docs/WORKFLOWS.md` and `CONFIG.md` updated with pipeline usage; `docs/README.md` references `/openapi.json`.
+- Tests: added `tests/http-pipelines-tools.test.ts` to validate list/run/list-runs via `POST /api/v1/tools/call`.
 
 ### ✅ Tool‑First Gate (HTTP tools) — Completed and Stabilized
 - Added an HTTP tools/call test covering the three primary flows:

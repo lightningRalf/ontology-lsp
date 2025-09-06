@@ -342,6 +342,24 @@ export class ToolRegistry {
             inputSchema: { type: 'object', properties: {} },
         },
         {
+            name: 'run_pipeline',
+            description: 'Run a learning pipeline by id and return a run id',
+            inputSchema: {
+                type: 'object',
+                properties: { id: { type: 'string' } },
+                required: ['id'],
+            },
+        },
+        {
+            name: 'list_pipeline_runs',
+            description: 'List recent runs for a learning pipeline',
+            inputSchema: {
+                type: 'object',
+                properties: { id: { type: 'string' }, limit: { type: 'number', default: 10 } },
+                required: ['id'],
+            },
+        },
+        {
             name: 'pipeline_status',
             description: 'Get status for a learning pipeline',
             inputSchema: {

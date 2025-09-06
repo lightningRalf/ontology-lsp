@@ -27,12 +27,10 @@ Monitoring perf and metrics; continue to gate perf/benchmarks behind env and ite
 - L5 Learning: validate `pattern_stats`; add a tiny `learn/provide_feedback` round‑trip and assert counters
 - All via `tools/call` or CLI `workflow` with e2e tests; add layer tags to logs
 
-### 0.18 Pipelines Tool Surface (L5)
-- Expose `run_pipeline` (manual trigger) and `list_pipeline_runs` tools
-  - `run_pipeline { id }` → `{ ok, runId }`
-  - `list_pipeline_runs { id, limit? }` → recent runs with status/metrics
-- Add a quick smoke test that triggers `pattern_feedback_cycle` and returns a run id
-- Keep schedules as no‑ops unless explicitly enabled (dev only)
+### 0.181 Pipeline Run UX (Follow‑up)
+- Add status tail and/or SSE stream for pipeline run output (dev only)
+- Surface basic run detail endpoint and UI wiring (optional)
+- Document typical troubleshooting and budgets for long‑running pipelines
 
 ### 0.2 Dogfood‑Every‑Change (Immediate)
 - Add `just dogfood_ci` to run three primary flows and print concise JSON summaries

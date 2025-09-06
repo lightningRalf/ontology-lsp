@@ -52,9 +52,27 @@ Purpose: gather definitions, references, and (optionally) conceptual hints.
 
 Returns (shape): `{ definitions, references, (optional) concepts }`.
 
+## Learning Pipelines (L5)
+
+Purpose: manually trigger and inspect learning pipelines (dev/dogfooding).
+
+- CLI:
+  - List: `ontology-lsp pipelines list [--json]`
+  - Run: `ontology-lsp pipelines run pattern_feedback_cycle [--json]`
+  - Runs: `ontology-lsp pipelines runs pattern_feedback_cycle --limit 5 [--json]`
+- HTTP (parity):
+  - `POST /api/v1/tools/call` with `{ "name":"list_pipelines", "arguments": {} }`
+  - `POST /api/v1/tools/call` with `{ "name":"run_pipeline", "arguments": { "id":"pattern_feedback_cycle" } }`
+  - `POST /api/v1/tools/call` with `{ "name":"list_pipeline_runs", "arguments": { "id":"pattern_feedback_cycle", "limit": 5 } }`
+- MCP (HTTP): same via `tools/call`.
+
+Returns:
+- `list_pipelines`: `{ pipelines: [{ id, name, trigger, schedule, enabled }] }`
+- `run_pipeline`: `{ ok, runId }`
+- `list_pipeline_runs`: `{ runs: [{ id, pipeline_id, started_at, finished_at?, status, metrics }] }`
+
 ## Tips
 
 - Prefer stdio MCP (`./mcp-wrapper.sh`) for Codex/Claude; no headers or session management required.
 - For HTTP MCP testing, include `Accept: application/json, text/event-stream` and reuse `Mcp-Session-Id` header across calls.
 - Use `FAST_STDIO_CHECKS=touched` to keep checks fast within snapshots; it prepends a quick `tsc --noEmit` for touched TS files.
-

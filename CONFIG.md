@@ -236,6 +236,25 @@ Layer 4 persists concepts and relations through a pluggable StoragePort. Select 
 - `SNAPSHOT_PARTIAL=1`: partial snapshot materialization (only touched files + essentials).
 - `L4_AUGMENT_EXPLORE=1`: opt-in conceptual hints for explore flows.
 
+### Learning Pipelines (Dev)
+
+Pipelines are enabled by default in dev. They persist to the same SQLite database used by L4/L5 and are safe to run locally.
+
+- List pipelines:
+  - CLI: `ontology-lsp pipelines list`
+  - HTTP: `POST /api/v1/tools/call` body `{ "name": "list_pipelines", "arguments": {} }`
+- Run a pipeline manually (returns a run id):
+  - CLI: `ontology-lsp pipelines run pattern_feedback_cycle`
+  - HTTP: `POST /api/v1/tools/call` body `{ "name": "run_pipeline", "arguments": { "id": "pattern_feedback_cycle" } }`
+- Inspect recent runs:
+  - CLI: `ontology-lsp pipelines runs pattern_feedback_cycle --limit 5`
+  - HTTP: `POST /api/v1/tools/call` body `{ "name": "list_pipeline_runs", "arguments": { "id": "pattern_feedback_cycle", "limit": 5 } }`
+
+Notes:
+- No special env flags are required; the orchestrator initializes with default pipelines in dev/test.
+- Set `SILENT_MODE=1` to reduce logs during CLI/MCP workflows.
+- All pipeline execution occurs within the process with budgeted times; results are summarized in `pipeline_runs`.
+
 - Triple Store options:
   - Adapter is scaffolded but CRUD is not implemented yet.
 

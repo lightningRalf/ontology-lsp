@@ -24,6 +24,11 @@ This repository implements a protocol‑agnostic core with thin adapters for MCP
 
 - Generic tools (MCP parity): `POST /api/v1/tools/call`
   - Body: `{ "name": "<tool>", "arguments": { ... } }`
+- OpenAPI spec: `GET /openapi.json`
+  - Example:
+    ```bash
+    curl -sS http://localhost:${HTTP_API_PORT:-7000}/openapi.json | jq .info
+    ```
 - AST Query: `POST /api/v1/ast-query`
 - Graph Expand: `POST /api/v1/graph-expand`
 - Snapshots: `GET /api/v1/snapshots`, `GET /api/v1/snapshots/{id}/diff`, `POST /api/v1/snapshots/clean`
@@ -41,6 +46,10 @@ This repository implements a protocol‑agnostic core with thin adapters for MCP
   - Generic: `ontology-lsp workflow <name> --args '<json>' [--json]`
   - Rename safely: `ontology-lsp rename-safely <old> <new> [-f file] [--no-checks] [--cmd <...>] [-t sec] [--json]`
   - Patch + checks (snapshot‑safe): `ontology-lsp patch-checks-in-snapshot [-s snapshot] [-p patch.diff] [--cmd <...>] [-t sec] [--only-touched] [--json]`
+  - Pipelines (L5):
+    - List: `ontology-lsp pipelines list [--json]`
+    - Run: `ontology-lsp pipelines run <id> [--json]`
+    - Runs: `ontology-lsp pipelines runs <id> --limit 5 [--json]`
 
 See `CONFIG.md` for env defaults like `FAST_STDIO_CHECKS=touched` and `SNAPSHOT_PARTIAL=1`.
 

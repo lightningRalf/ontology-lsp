@@ -181,6 +181,10 @@ export class MCPAdapter {
                 switch (name) {
                     case 'list_pipelines':
                         return this.handleListPipelines();
+                    case 'run_pipeline':
+                        return this.handleRunPipeline(arguments_);
+                    case 'list_pipeline_runs':
+                        return this.handleListPipelineRuns(arguments_);
                     case 'pipeline_status':
                         return this.handlePipelineStatus(arguments_);
                     case 'list_symbols':
@@ -377,6 +381,41 @@ export class MCPAdapter {
             return { content: [{ type: 'text', text: JSON.stringify(status, null, 2) }], isError: false };
         } catch {
             return { content: [{ type: 'text', text: 'failed to get pipeline status' }], isError: true };
+        }
+    }
+
+    private async handleRunPipeline(args: Record<string, any>) {
+        const id = String(args?.id || '').trim();
+        if (!id) return { content: [{ type: 'text', text: 'id required' }], isError: true };
+        const lo = this.getLearningOrchestrator();
+        if (!lo) return { content: [{ type: 'text', text: 'learning orchestrator unavailable' }], isError: true };
+        try {
+            const context = {
+                requestId: String(Date.now()),
+                operation: 'pipeline_run',
+                timestamp: new Date(),
+                metadata: {},
+            };
+            const res = await (lo as any).runPipeline(id, context);
+            return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }], isError: !res?.ok };
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: 'text', text: `run_pipeline failed: ${msg}` }], isError: true };
+        }
+    }
+
+    private async handleListPipelineRuns(args: Record<string, any>) {
+        const id = String(args?.id || '').trim();
+        const limit = Math.max(1, Math.min(100, Number(args?.limit || 10)));
+        if (!id) return { content: [{ type: 'text', text: 'id required' }], isError: true };
+        const lo = this.getLearningOrchestrator();
+        if (!lo) return { content: [{ type: 'text', text: 'learning orchestrator unavailable' }], isError: true };
+        try {
+            const rows = await (lo as any).listPipelineRuns(id, limit);
+            return { content: [{ type: 'text', text: JSON.stringify({ runs: rows }, null, 2) }], isError: false };
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            return { content: [{ type: 'text', text: `list_pipeline_runs failed: ${msg}` }], isError: true };
         }
     }
 

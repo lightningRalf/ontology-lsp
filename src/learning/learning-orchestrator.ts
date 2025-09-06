@@ -460,6 +460,100 @@ export class LearningOrchestrator {
     }
 
     /**
+     * Run a pipeline with persistence to `pipeline_runs` (minimal surface for tools)
+     * Returns a run id immediately after recording start, then executes and records status/metrics.
+     */
+    async runPipeline(pipelineId: string, context: LearningContext): Promise<{ ok: boolean; runId: string }> {
+        const runId = uuidv4();
+        const startedAt = Math.floor(Date.now() / 1000);
+        // Best-effort insert; keep tool path resilient in dev/test
+        try {
+            const db = (this.sharedServices as any).database;
+            await db.execute(
+                `INSERT INTO pipeline_runs (id, pipeline_id, started_at, status, metrics)
+                 VALUES (?, ?, ?, 'running', ?)`,
+                [runId, pipelineId, startedAt, JSON.stringify({})]
+            );
+        } catch (e) {
+            if (!process.env.SILENT_MODE && !process.env.STDIO_MODE) {
+                console.warn('runPipeline: failed to insert start row:', e instanceof Error ? e.message : String(e));
+            }
+        }
+
+        // Execute without blocking caller (fire-and-forget), but record completion
+        // For tests, we still wait for completion before returning ok=true to ensure determinism
+        try {
+            const result = await this.executePipeline(pipelineId, context);
+            const finishedAt = Math.floor(Date.now() / 1000);
+            const status = result.success ? 'success' : 'failed';
+            const metrics = {
+                totalTimeMs: result.performance?.totalTimeMs ?? 0,
+                componentsTime: result.performance?.componentsTime ?? {},
+                errors: result.errors ?? [],
+            };
+            try {
+                const db = (this.sharedServices as any).database;
+                await db.execute(
+                    `UPDATE pipeline_runs SET finished_at = ?, status = ?, metrics = ? WHERE id = ?`,
+                    [finishedAt, status, JSON.stringify(metrics), runId]
+                );
+            } catch (e) {
+                if (!process.env.SILENT_MODE && !process.env.STDIO_MODE) {
+                    console.warn('runPipeline: failed to update finish row:', e instanceof Error ? e.message : String(e));
+                }
+            }
+            return { ok: true, runId };
+        } catch (err) {
+            const finishedAt = Math.floor(Date.now() / 1000);
+            try {
+                const db = (this.sharedServices as any).database;
+                await db.execute(
+                    `UPDATE pipeline_runs SET finished_at = ?, status = 'failed', metrics = ? WHERE id = ?`,
+                    [finishedAt, JSON.stringify({ errors: [err instanceof Error ? err.message : String(err)] }), runId]
+                );
+            } catch {}
+            return { ok: false, runId };
+        }
+    }
+
+    /**
+     * List recent runs for a pipeline (defaults to 10)
+     */
+    async listPipelineRuns(pipelineId: string, limit: number = 10): Promise<Array<{
+        id: string;
+        pipeline_id: string;
+        started_at: number;
+        finished_at?: number | null;
+        status: string;
+        metrics?: any;
+    }>> {
+        try {
+            const db = (this.sharedServices as any).database;
+            const rows = await db.query<any>(
+                `SELECT id, pipeline_id, started_at, finished_at, status, metrics
+                 FROM pipeline_runs
+                 WHERE pipeline_id = ?
+                 ORDER BY started_at DESC
+                 LIMIT ?`,
+                [pipelineId, Math.max(1, Math.min(100, limit))]
+            );
+            return rows.map((r: any) => ({
+                id: String(r.id),
+                pipeline_id: String(r.pipeline_id),
+                started_at: Number(r.started_at),
+                finished_at: r.finished_at != null ? Number(r.finished_at) : null,
+                status: String(r.status || 'unknown'),
+                metrics: (() => { try { return JSON.parse(r.metrics || '{}'); } catch { return {}; } })(),
+            }));
+        } catch (e) {
+            if (!process.env.SILENT_MODE && !process.env.STDIO_MODE) {
+                console.warn('listPipelineRuns failed:', e instanceof Error ? e.message : String(e));
+            }
+            return [];
+        }
+    }
+
+    /**
      * Register a learning pipeline
      */
     async registerPipeline(pipeline: Omit<LearningPipeline, 'stats'>): Promise<string> {
