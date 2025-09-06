@@ -275,6 +275,96 @@ export class HTTPServer {
                         }
                     }
 
+                    // Pipelines: run with streamable HTTP tail (NDJSON)
+                    if (url.pathname === '/api/v1/pipelines/run-stream' && request.method === 'POST') {
+                        const encoder = new TextEncoder();
+                        try {
+                            const raw = await this.getRequestBody(request);
+                            const body: any = raw ? JSON.parse(raw) : {};
+                            const pipelineId = String(body?.id || '').trim();
+                            const pollMs = Math.max(100, Math.min(2000, Number(body?.pollMs || 300)));
+                            const timeoutSec = Math.max(1, Math.min(600, Number(body?.timeoutSec || 30)));
+                            if (!pipelineId) {
+                                return new Response(JSON.stringify({ error: 'id required' }), {
+                                    status: 400,
+                                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                                });
+                            }
+
+                            const mcpAdapter = new MCPAdapter(this.coreAnalyzer);
+                            const executor = new ToolExecutor();
+                            // Kick off the pipeline run
+                            const runRes = await executor.execute(mcpAdapter as any, 'run_pipeline', { id: pipelineId });
+                            const txt = (() => { try { return runRes?.content?.[0]?.text ?? ''; } catch { return ''; } })();
+                            const runJson = (() => { try { return JSON.parse(txt); } catch { return {}; } })();
+                            const runId = String(runJson?.runId || '').trim();
+                            if (!runId) {
+                                return new Response(JSON.stringify({ error: 'failed to start pipeline' }), {
+                                    status: 500,
+                                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                                });
+                            }
+
+                            const stream = new ReadableStream<Uint8Array>({
+                                start: async (controller) => {
+                                    const begun = { event: 'started', pipelineId, runId, t: Date.now() };
+                                    try { controller.enqueue(encoder.encode(JSON.stringify(begun) + '\n')); } catch {}
+                                    const t0 = Date.now();
+                                    let lastStatus = '';
+                                    // Poll for status using list_pipeline_runs (filter by runId)
+                                    while (true) {
+                                        try {
+                                            const listRes = await executor.execute(mcpAdapter as any, 'list_pipeline_runs', {
+                                                id: pipelineId,
+                                                limit: 10,
+                                            });
+                                            const ltxt = (() => { try { return listRes?.content?.[0]?.text ?? ''; } catch { return ''; } })();
+                                            const ljson = (() => { try { return JSON.parse(ltxt); } catch { return { runs: [] }; } })();
+                                            const runs = Array.isArray(ljson?.runs) ? ljson.runs : [];
+                                            const row = runs.find((r: any) => String(r?.id) === runId);
+                                            if (row) {
+                                                const status = String(row?.status || 'unknown');
+                                                const finished = row?.finished_at != null;
+                                                if (status !== lastStatus) {
+                                                    lastStatus = status;
+                                                    const ev = { event: 'status', runId, status, finished, metrics: row?.metrics ?? {}, t: Date.now() };
+                                                    try { controller.enqueue(encoder.encode(JSON.stringify(ev) + '\n')); } catch {}
+                                                }
+                                                if (finished) {
+                                                    const ev = { event: 'finished', runId, status, t: Date.now() };
+                                                    try { controller.enqueue(encoder.encode(JSON.stringify(ev) + '\n')); } catch {}
+                                                    try { controller.close(); } catch {}
+                                                    break;
+                                                }
+                                            }
+                                        } catch {}
+                                        if (Date.now() - t0 > timeoutSec * 1000) {
+                                            const ev = { event: 'timeout', runId, t: Date.now() };
+                                            try { controller.enqueue(encoder.encode(JSON.stringify(ev) + '\n')); } catch {}
+                                            try { controller.close(); } catch {}
+                                            break;
+                                        }
+                                        await new Promise((r) => setTimeout(r, pollMs));
+                                    }
+                                },
+                            });
+
+                            return new Response(stream, {
+                                status: 200,
+                                headers: {
+                                    'Content-Type': 'application/x-ndjson',
+                                    'Cache-Control': 'no-cache',
+                                    'Access-Control-Allow-Origin': '*',
+                                },
+                            });
+                        } catch (err) {
+                            return new Response(JSON.stringify({ success: false, error: 'run-stream failed' }), {
+                                status: 500,
+                                headers: { 'Content-Type': 'application/json' },
+                            });
+                        }
+                    }
+
                     // Graph Expand endpoint (graceful fallback)
                     if (url.pathname === '/api/v1/graph-expand' && request.method === 'POST') {
                         const raw = await this.getRequestBody(request);

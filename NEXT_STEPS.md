@@ -29,16 +29,20 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 - L5 Learning: validate `pattern_stats`; add a tiny `learn/provide_feedback` round‑trip and assert counters
 - All via `tools/call` or CLI `workflow` with e2e tests; add layer tags to logs
 
+Status: `list_symbols` now supports an AST‑backed path behind a feature flag (env `LIST_SYMBOLS_AST=1` or `{"ast":true}`), with regex fallback preserved. Targeted HTTP test added.
+
 ### 0.181 Pipeline Run UX (Follow‑up)
-- Add status tail and/or SSE stream for pipeline run output (dev only)
-- Surface basic run detail endpoint and UI wiring (optional)
-- Document typical troubleshooting and budgets for long‑running pipelines
+- DONE: Add streamable HTTP tail for pipeline run output (NDJSON) — `POST /api/v1/pipelines/run-stream`.
+- Next: Surface non‑streaming run detail endpoint (optional) and light UI wiring.
+- Document typical troubleshooting and budgets for long‑running pipelines.
 
 ### 0.2 Dogfood‑Every‑Change (Immediate)
 - Integrate `just dogfood_ci` into CI: publish JSON summary as artifact and/or PR comment
 - Prefer HTTP `/api/v1/tools/call` for portability; MCP stdio acceptable for local iteration
 - Gate PRs on dogfood_ci success; include link to artifact/summary for tool‑first validation
 - Optional: document JSON summary shape and add a minimal schema check in CI
+
+Status: CI runs `just dogfood_ci` and uploads `dogfood-summary.json` as an artifact.
 
 ### 0.25 Observability & SLO Conformance
 - Ensure `/metrics` JSON includes p50/p95/p99 per layer and op counts/errors

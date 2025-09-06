@@ -101,6 +101,18 @@ jobs:
           echo "🛑 Stopping HTTP server"
           kill $(cat http-smoke.pid) 2>/dev/null || true
 
+      - name: Dogfood (HTTP tools) summary
+        run: |
+          echo "🥣 Running dogfood_ci (HTTP tools)"
+          just dogfood_ci | tee dogfood-summary.json
+
+      - name: Upload dogfood summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: dogfood-summary
+          path: dogfood-summary.json
+          retention-days: 7
+
       - name: Performance Tests (gated)
         if: ${{ inputs.run_perf == true || vars.RUN_PERF == '1' }}
         run: |

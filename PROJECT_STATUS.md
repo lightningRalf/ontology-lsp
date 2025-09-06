@@ -272,8 +272,8 @@ ontology-lsp/
   - docs/WORKFLOWS.md added; docs/README.md updated with quick start and parity overview
 
 ### Known Gaps (tool‑first gating)
-- Pipeline run status tail/streaming: add simple status tail (and optional SSE) for run output; integrate into UI
-- `list_symbols` currently regex‑based (fast). Optional AST‑backed listing can be added behind a feature flag
+- Pipeline run status tail/streaming: DONE via HTTP run-stream (NDJSON). UI integration optional.
+- `list_symbols` AST option: DONE behind feature flag; regex fallback remains default.
 - Some `tsc` checks fail in this repository due to missing type defs (jest, estree, etc.) — expected in dev; structure and tool flow are correct
 
 ### Unified Prompts/Resources (No Drift)
@@ -984,6 +984,7 @@ Metrics and docs now reflect the new numbering.
   - Script: `scripts/dogfood-ci.ts` starts a local HTTP server (bounded to `tests/fixtures`) and calls `/api/v1/tools/call` to run three flows: `explore_symbol_impact`, `rename_safely` (checks disabled for speed), and `patch_checks_in_snapshot` (typecheck).
   - Task: `just dogfood_ci` prints a concise JSON summary with timings and counts for CI/PR visibility.
 - Rationale: fulfills NEXT_STEPS 0.2 “Dogfood‑Every‑Change” by providing a portable, reproducible tool-first validation path without relying on long suites.
+- CI Integration: workflow now runs `just dogfood_ci` and uploads `dogfood-summary.json` as an artifact for PRs/branches.
 - Validation: targeted HTTP adapter tests pass locally (`http-tools-call`, `http-explore-conceptual`, `http-graph-expand`).
 ### ADR-0001: Prime Ontology + Triple Graph (Recorded)
 - Added ADR: docs/adr/0001-prime-ontology-triple-graph.md
@@ -1018,3 +1019,14 @@ Metrics and docs now reflect the new numbering.
 - HTTP server’s streaming definitions now use shared mapping helpers: `definitionToApiResponse` from `src/adapters/utils.ts`.
 - Effect: SSE payloads match HTTP/MCP/LSP normalized shapes (uri/range/kind/name), reducing drift across adapters.
 - Files: `src/servers/http.ts` (SSE mapping), existing adapters already rely on shared mappers.
+
+### ✅ AST‑Backed list_symbols (Opt‑in)
+- MCP/HTTP tools support AST‑backed symbol listing behind a feature flag for better coverage.
+  - Enable via env `LIST_SYMBOLS_AST=1` or set `{"ast":true}` in tool arguments.
+  - Graceful fallback to fast regex scanning when grammars are unavailable or AST yields no results.
+
+### ✅ Pipelines Run Stream (HTTP; NDJSON)
+- New endpoint `POST /api/v1/pipelines/run-stream` provides a streamable HTTP tail (no SSE) for pipeline runs.
+  - Emits NDJSON events: `started`, `status` (on change), `finished` or `timeout`.
+  - Parameters: `id`, optional `pollMs` (100–2000), `timeoutSec` (1–600).
+  - Internally uses tools (`run_pipeline`, `list_pipeline_runs`) under budgets.

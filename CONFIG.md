@@ -54,6 +54,7 @@ Settings are loaded in this priority order:
 - `LSP_CACHE_ENABLED` - Enable response caching (default: true)
 - `LSP_CACHE_TTL` - Cache time-to-live in milliseconds (default: 300000)
  - `L2_MAX_PARSE_FILES` - Max files Layer 2 (AST) parses per request (default: 20; clamp 1–100). Useful to reduce variance in perf/CI.
+ - `LIST_SYMBOLS_AST` - When set to `1`, `list_symbols` tool uses an AST-backed path (Tree-sitter) for improved coverage; gracefully falls back to a fast regex scanner when grammars are unavailable.
 
 ### Circuit Breaker
 - `CIRCUIT_BREAKER_THRESHOLD` - Failures before opening circuit (default: 5)

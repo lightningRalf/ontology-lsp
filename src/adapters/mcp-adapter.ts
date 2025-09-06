@@ -310,29 +310,112 @@ export class MCPAdapter {
             const fs = await import('node:fs/promises');
             const path = await import('node:path');
             const abs = path.isAbsolute(file) ? file : path.resolve(process.cwd(), file);
+
             const text = await fs.readFile(abs, 'utf8');
             const lines = text.split(/\r?\n/);
             const out: Array<{ name: string; kind: string; line: number; character: number }> = [];
             const push = (name: string, kind: string, line: number, character: number) => {
                 out.push({ name, kind, line, character });
             };
-            // Simple, file-scoped regex extraction (fast and bounded)
-            for (let i = 0; i < lines.length; i++) {
-                const l = lines[i];
-                let m = /\bclass\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(l);
-                if (m) push(m[1], 'class', i, Math.max(0, l.indexOf(m[1])));
-                m = /\bfunction\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/.exec(l);
-                if (m) push(m[1], 'function', i, Math.max(0, l.indexOf(m[1])));
-                m = /\binterface\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(l);
-                if (m) push(m[1], 'interface', i, Math.max(0, l.indexOf(m[1])));
-                m = /\bconst\s+([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(l);
-                if (m) push(m[1], 'const', i, Math.max(0, l.indexOf(m[1])));
-                m = /\bexport\s+\{\s*([^}]+)\}/.exec(l);
-                if (m) {
-                    const names = m[1].split(',').map((s) => s.trim()).filter(Boolean);
-                    for (const n of names) push(n.split(/\s+as\s+/i)[0], 'export', i, Math.max(0, l.indexOf(n)));
+
+            // Optional AST-backed path (feature flag or explicit arg)
+            const wantAst = String(args?.ast || '').toLowerCase() === 'true' || process.env.LIST_SYMBOLS_AST === '1';
+            if (wantAst) {
+                try {
+                    const { runAstQuery } = await import('../core/ast-query.js');
+                    // Infer language from extension
+                    const ext = abs.toLowerCase();
+                    let language: 'typescript' | 'javascript' | 'python' | null = null;
+                    if (/(\.ts|\.tsx)$/.test(ext)) language = 'typescript';
+                    else if (/(\.js|\.jsx)$/.test(ext)) language = 'javascript';
+                    else if (/\.py$/.test(ext)) language = 'python';
+
+                    if (language) {
+                        // Build a simple language-appropriate query that captures identifier nodes as names
+                        let query = '';
+                        if (language === 'typescript') {
+                            query = `
+                                (function_declaration name: (identifier) @sym.func)
+                                (method_definition name: (property_identifier) @sym.method)
+                                (class_declaration name: (type_identifier) @sym.class)
+                                (interface_declaration name: (type_identifier) @sym.interface)
+                                (variable_declaration (variable_declarator name: (identifier) @sym.var))
+                                (export_statement (export_clause (export_specifier name: (identifier) @sym.export)))
+                            `;
+                        } else if (language === 'javascript') {
+                            query = `
+                                (function_declaration name: (identifier) @sym.func)
+                                (method_definition name: (property_identifier) @sym.method)
+                                (class_declaration name: (identifier) @sym.class)
+                                (variable_declaration (variable_declarator name: (identifier) @sym.var))
+                                (export_statement (export_clause (export_specifier name: (identifier) @sym.export)))
+                            `;
+                        } else if (language === 'python') {
+                            query = `
+                                (function_definition name: (identifier) @sym.func)
+                                (class_definition name: (identifier) @sym.class)
+                            `;
+                        }
+
+                        const res = await runAstQuery({ language, query, paths: [abs], limit: 2000 });
+                        if (Array.isArray(res?.results)) {
+                            for (const r of res.results) {
+                                if (!r || !r.start || !r.end) continue;
+                                const start = r.start;
+                                const end = r.end;
+                                let name = '';
+                                if (start.line === end.line) {
+                                    const line = lines[start.line] || '';
+                                    name = line.slice(start.column, end.column).trim();
+                                } else {
+                                    // Multi-line identifier is unlikely; best effort
+                                    const first = (lines[start.line] || '').slice(start.column);
+                                    const last = (lines[end.line] || '').slice(0, end.column);
+                                    name = `${first}${last}`.trim();
+                                }
+                                if (!name) continue;
+                                // Map capture to kind
+                                const cap: string = String(r.capture || '');
+                                let kind = 'symbol';
+                                if (cap.includes('func')) kind = 'function';
+                                else if (cap.includes('method')) kind = 'method';
+                                else if (cap.includes('class')) kind = 'class';
+                                else if (cap.includes('interface')) kind = 'interface';
+                                else if (cap.includes('export')) kind = 'export';
+                                else if (cap.includes('var')) kind = 'const';
+                                push(name, kind, start.line, start.column);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // AST path failed or grammars missing — fall back to regex below
+                    if (process.env.DEBUG && !process.env.SILENT_MODE) {
+                        // eslint-disable-next-line no-console
+                        console.error('list_symbols AST path failed; falling back to regex:', e instanceof Error ? e.message : e);
+                    }
                 }
             }
+
+            // Fallback or supplement with simple, file-scoped regex extraction (fast and bounded)
+            if (out.length === 0) {
+                for (let i = 0; i < lines.length; i++) {
+                    const l = lines[i];
+                    let m = /\bclass\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(l);
+                    if (m) push(m[1], 'class', i, Math.max(0, l.indexOf(m[1])));
+                    m = /\bfunction\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/.exec(l);
+                    if (m) push(m[1], 'function', i, Math.max(0, l.indexOf(m[1])));
+                    m = /\binterface\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(l);
+                    if (m) push(m[1], 'interface', i, Math.max(0, l.indexOf(m[1])));
+                    m = /\bconst\s+([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(l);
+                    if (m) push(m[1], 'const', i, Math.max(0, l.indexOf(m[1])));
+                    m = /\bexport\s+\{\s*([^}]+)\}/.exec(l);
+                    if (m) {
+                        const names = m[1].split(',').map((s) => s.trim()).filter(Boolean);
+                        for (const n of names) push(n.split(/\s+as\s+/i)[0], 'export', i, Math.max(0, l.indexOf(n)));
+                    }
+                }
+            }
+
             const result = { file: abs, symbols: out.slice(0, 500) };
             return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], isError: false };
         } catch (e) {
