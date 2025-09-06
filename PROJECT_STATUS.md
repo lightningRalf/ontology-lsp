@@ -264,7 +264,7 @@ ontology-lsp/
 
 - L5 Learning (pipelines)
   - Minimal persistence added: tables `pipelines` and `pipeline_runs` with basic indexes
-  - LearningOrchestrator now saves/loads pipelines from DB
+  - LearningOrchestrator now saves and loads pipelines from DB
   - Tools surfaced: `list_pipelines`, `pipeline_status`, `run_pipeline`, `list_pipeline_runs`
 
 - Docs
