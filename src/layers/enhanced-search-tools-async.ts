@@ -533,8 +533,10 @@ export class AsyncEnhancedGrep {
                 const results: StreamingGrepResult[] = [];
 
                 let emitted = 0;
+                // Guard to prevent emitting beyond caps when close/kill races with buffered lines
+                let stopped = false;
                 rl.on('line', (line) => {
-                    if (cancelled) {
+                    if (cancelled || stopped) {
                         rl.close();
                         return;
                     }
@@ -542,16 +544,14 @@ export class AsyncEnhancedGrep {
                     const result = this.parseLine(line, options);
                     if (result) {
                         results.push(result);
-                        if (emitted === 0) {
-                            emitter.emit('data', result);
-                        } else {
-                            setTimeout(() => emitter.emit('data', result), 1);
-                        }
+                        // Emit synchronously to prevent overshoot beyond maxResults due to queued timers
+                        emitter.emit('data', result);
                         emitted++;
                         matchesFound++;
 
                         // Check max results
                         if (options.maxResults && matchesFound >= options.maxResults) {
+                            stopped = true;
                             rl.close();
                             process?.kill('SIGTERM');
                         }

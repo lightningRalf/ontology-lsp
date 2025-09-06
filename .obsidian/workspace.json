@@ -164,6 +164,7 @@
   },
   "active": "b50f4ac68bdf0f49",
   "lastOpenFiles": [
+    "test-cache-invalidation.ts",
     "test-patterns-integration.db-journal",
     "test-feedback-integration.db-journal",
     "test-empty-feedback.db-journal",
@@ -174,7 +175,6 @@
     "test-team-knowledge.db-journal",
     "test-team-knowledge.db",
     "test-feedback-integration.db-wal",
-    "tests/http-pipelines-tools.test.ts",
     "docs/WORKFLOWS.md",
     "web-ui/README.md",
     "vscode-client/README.md",
