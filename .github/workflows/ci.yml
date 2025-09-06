@@ -106,7 +106,9 @@ jobs:
         run: |
           echo "⚡ Running PERF-gated performance benchmarks in batches..."
           chmod +x bin/test-run-perf-and-analyze.sh
-          PERF=1 TIMEOUT=180000 BUN_JOBS=1 bin/test-run-perf-and-analyze.sh
+          # Calibrate Layer 2 AST parse cap to stabilize p95 in CI
+          # See NEXT_STEPS 0.1 and CONFIG.md (L2_MAX_PARSE_FILES)
+          PERF=1 L2_MAX_PARSE_FILES=12 TIMEOUT=180000 BUN_JOBS=1 bin/test-run-perf-and-analyze.sh
 
       - name: Upload PERF artifacts
         if: ${{ inputs.run_perf == true || vars.RUN_PERF == '1' }}

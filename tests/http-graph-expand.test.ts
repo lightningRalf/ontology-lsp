@@ -45,4 +45,39 @@ describe('HTTP /api/v1/graph-expand fallback', () => {
     expect(body.data).toBeDefined();
     expect(body.data.neighbors).toBeDefined();
   });
+
+  test('nonexistent file returns success with empty neighbors (fallback)', async () => {
+    const res = await fetch(`${base}/api/v1/graph-expand`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ file: 'this/does/not/exist.ts', edges: ['imports','exports','callers','callees'], depth: 1, limit: 10 })
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.data).toBeDefined();
+    expect(body.data.neighbors).toBeDefined();
+    expect(Array.isArray(body.data.neighbors.imports)).toBe(true);
+    expect(Array.isArray(body.data.neighbors.exports)).toBe(true);
+    expect(Array.isArray(body.data.neighbors.callers)).toBe(true);
+    expect(Array.isArray(body.data.neighbors.callees)).toBe(true);
+  });
+
+  test('invalid symbol returns success with neighbors object (non-fatal)', async () => {
+    const res = await fetch(`${base}/api/v1/graph-expand`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ symbol: 'DefinitelyNotASymbol', edges: ['imports','exports','callers','callees'], depth: 1, limit: 5 })
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.data).toBeDefined();
+    expect(body.data.neighbors).toBeDefined();
+    // Edges arrays should exist; may be empty depending on fallback path
+    expect(body.data.neighbors).toHaveProperty('imports');
+    expect(body.data.neighbors).toHaveProperty('exports');
+    expect(body.data.neighbors).toHaveProperty('callers');
+    expect(body.data.neighbors).toHaveProperty('callees');
+  });
 });

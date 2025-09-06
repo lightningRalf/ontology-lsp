@@ -13,7 +13,7 @@ import { serve } from 'bun';
 import { HTTPAdapter, type HTTPRequest } from '../adapters/http-adapter.js';
 import { MCPAdapter } from '../adapters/mcp-adapter.js';
 import { ToolExecutor } from '../core/tools/executor.js';
-import { createDefaultCoreConfig } from '../adapters/utils.js';
+import { createDefaultCoreConfig, definitionToApiResponse } from '../adapters/utils.js';
 import { getEnvironmentConfig, type ServerConfig } from '../core/config/server-config.js';
 import { createCodeAnalyzer } from '../core/index';
 import type { CodeAnalyzer } from '../core/unified-analyzer';
@@ -702,24 +702,22 @@ export class HTTPServer {
 
         // Use regular definition search for now - could be enhanced with streaming later
         try {
-            const result = await (this.coreAnalyzer as any).findDefinitionAsync({
-                uri: file || 'file://unknown',
-                position: { line: 0, character: 0 },
-                identifier,
-                maxResults,
-            });
+                const result = await (this.coreAnalyzer as any).findDefinitionAsync({
+                    uri: file || 'file://unknown',
+                    position: { line: 0, character: 0 },
+                    identifier,
+                    maxResults,
+                });
 
             // Stream the results one by one to simulate streaming
             for (let i = 0; i < result.data.length; i++) {
                 const definition = result.data[i];
+                const mapped = definitionToApiResponse(definition);
                 sendMessage({
                     type: 'definition',
-                    uri: definition.uri,
-                    range: definition.range,
-                    kind: definition.kind,
-                    name: definition.name,
-                    confidence: definition.confidence,
-                    layer: definition.layer,
+                    ...mapped,
+                    confidence: (definition as any).confidence,
+                    layer: (definition as any).layer,
                 });
 
                 // Small delay to simulate streaming

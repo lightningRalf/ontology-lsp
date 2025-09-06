@@ -19,6 +19,7 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 - Docs: Added to `CONFIG.md`; `tests/README.md` shows example usage alongside `PERF=1`.
 - Validation: Targeted integration + adapter suites green; perf spot‑check with `PERF=1 L2_MAX_PARSE_FILES=10` meets ≤100ms p95 in harness.
 - Next: Calibrate recommended CI defaults (e.g., 10–15) for perf‑gated jobs; monitor metrics and adjust.
+- Status (CI): PERF‑gated job now sets `L2_MAX_PARSE_FILES=12` to stabilize p95 on CI runners (scoped to perf step).
 
 ### 0.15 Minimal Viable L1→L5 (Working Paths)
 - L1 Fast Search: validate `text_search` tool; cap results; p95≤50ms on fixture
@@ -70,13 +71,16 @@ Follow‑ups (Immediate):
   - Add AST‑only fallback for imports/exports when graphlib/code‑graph fails.
   - Tests: add HTTP graph‑expand smoke tests (file + symbol).
 
-Status: Fallback implemented in MCP adapter (non‑fatal; empty neighbors with note). HTTP fallback already present. Add HTTP smoke tests next.
+Status: Fallback implemented in MCP adapter (non‑fatal; empty neighbors with note). HTTP fallback present and smoke tests added (`tests/http-graph-expand.test.ts`).
+Next: Consider strengthening callers/callees detection under fallback and track error-note incidence in `/metrics`.
 
 ### 0.355 MCP Adapter Mapping Consistency (Short)
 - Ensure all adapters share a single mapping surface:
   - Use `definitionToApiResponse`/`referenceToApiResponse` across HTTP/MCP/CLI/LSP where applicable.
 - Add a unit test to prevent reintroduction of MCP‑specific mapping exports.
 - Align error semantics across adapters (unknown tool, validation): return JSON‑RPC errors with consistent `data`.
+- Status: HTTP SSE streaming for definitions now uses the shared mapper; REST endpoints (HTTP) and MCP/LSP already rely on shared helpers. CLI prints are stable via formatters.
+- Next: Audit completion item mapping parity across adapters and unify where needed (map to LSP numeric kinds consistently; ensure HTTP tool and MCP return aligned fields).
 
 ### 0.36 Learning Pipelines Persistence (Soon, after L1–L3 stabilization)
 - Replace stub logs with real persistence for learning pipelines:

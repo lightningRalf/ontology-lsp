@@ -1001,3 +1001,20 @@ Metrics and docs now reflect the new numbering.
 - Updated `scripts/test-integration.sh` to use Bun’s supported `--reporter=junit` (JSON reporter not supported).
 - Results are written to `.test-results/*.xml`; summary at `.test-results/integration-test-summary.md`.
 - Comprehensive suites pass locally after the change (unified-core, adapters, learning-system, consistency; perf ran with extended timeout).
+
+### ⚙️ CI Perf Calibration (Layer 2 cap)
+- PERF-gated job now exports `L2_MAX_PARSE_FILES=12` to stabilize p95 in constrained CI runners.
+- Scope: Only the perf/benchmarks batch runner step; does not affect non-perf suites.
+- Rationale: Aligns with NEXT_STEPS 0.1; matches documented clamp (1–100) and default (20) in `CONFIG.md`.
+
+### 🧪 HTTP Graph-Expand Smoke Tests
+- Added `tests/http-graph-expand.test.ts` with fallback coverage:
+  - Nonexistent file → 200 with `{neighbors:{imports:[],exports:[],callers:[],callees:[]}}` (never 500).
+  - Invalid symbol → 200 with neighbors object present.
+  - File/symbol flows validated under dedicated ports.
+- Impact: Confirms non-fatal behavior promised by Graph Expand hardening; raises confidence for tool-first flows.
+
+### ♻️ Adapter Mapping Consistency (SSE definitions)
+- HTTP server’s streaming definitions now use shared mapping helpers: `definitionToApiResponse` from `src/adapters/utils.ts`.
+- Effect: SSE payloads match HTTP/MCP/LSP normalized shapes (uri/range/kind/name), reducing drift across adapters.
+- Files: `src/servers/http.ts` (SSE mapping), existing adapters already rely on shared mappers.
