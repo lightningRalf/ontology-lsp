@@ -485,6 +485,37 @@ test-coverage:
 test-watch:
     {{bun}} test --watch tests/
 
+# Progressive batch runner (prints per-batch progress)
+test-batch:
+    @echo "🧪 Running tests in batches (progress after each batch)"
+    @echo "   Env: BATCH_SIZE (default 8), TIMEOUT (ms, default 180000), BUN_JOBS (default 1)"
+    @BATCH_SIZE=${BATCH_SIZE:-8} TIMEOUT=${TIMEOUT:-180000} BUN_JOBS=${BUN_JOBS:-1} bin/test-progress-batch.sh
+
+# Slice the test suite into N parts and run one slice
+test-sliced slices="4" slice="1":
+    @echo "🧪 Running test slice {{slice}}/{{slices}} (batched with progress)"
+    @echo "   Override with: just test-sliced slices=<N> slice=<K> [BATCH_SIZE=8 TIMEOUT=180000]"
+    @SLICES={{slices}} SLICE={{slice}} BATCH_SIZE=${BATCH_SIZE:-8} TIMEOUT=${TIMEOUT:-180000} BUN_JOBS=${BUN_JOBS:-1} bin/test-slicer.sh
+
+# Run all slices sequentially (useful locally to get periodic feedback)
+test-slices slices="4":
+    @for i in `seq 1 {{slices}}`; do \
+        echo "================ SLICE $$i/{{slices}} ================"; \
+        SLICES={{slices}} SLICE=$$i BATCH_SIZE=${BATCH_SIZE:-8} TIMEOUT=${TIMEOUT:-180000} BUN_JOBS=${BUN_JOBS:-1} bin/test-slicer.sh || exit $$?; \
+      done
+
+# Batch + analyze (local)
+test-batch-analyze:
+    @echo "🧪 Running batch + analysis" 
+    @BATCH_SIZE=${BATCH_SIZE:-8} TIMEOUT=${TIMEOUT:-180000} BUN_JOBS=${BUN_JOBS:-1} bin/test-progress-batch.sh
+    @bun run scripts/analyze-batch-report.ts
+
+# Slice + analyze (local)
+test-sliced-analyze slices="4" slice="1":
+    @echo "🧪 Running test slice {{slice}}/{{slices}} + analysis"
+    @SLICES={{slices}} SLICE={{slice}} BATCH_SIZE=${BATCH_SIZE:-8} TIMEOUT=${TIMEOUT:-180000} BUN_JOBS=${BUN_JOBS:-1} bin/test-slicer.sh
+    @bun run scripts/analyze-batch-report.ts .test-results/batch-report.jsonl
+
 # === E2E INTEGRATION TESTS ===
 
 # Run End-to-End integration tests with real codebases (local workspace only)
@@ -537,6 +568,77 @@ test-vision-compliance:
     @echo "🎉 VISION.md compliance verified!"
 
 # === DEVELOPMENT ===
+
+# Slice only E2E tests for faster feedback
+e2e-sliced slices="2" slice="1":
+    @echo "🔬 Running E2E slice {{slice}}/{{slices}} (batched with progress)"
+    @SLICES={{slices}} SLICE={{slice}} SUITE_DIR=tests/e2e BATCH_SIZE=${BATCH_SIZE:-6} TIMEOUT=${TIMEOUT:-600000} BUN_JOBS=${BUN_JOBS:-1} bin/test-slicer.sh
+
+e2e-slices slices="2":
+    @for i in `seq 1 {{slices}}`; do \
+        echo "================ E2E SLICE $$i/{{slices}} ================"; \
+        SLICES={{slices}} SLICE=$$i SUITE_DIR=tests/e2e BATCH_SIZE=${BATCH_SIZE:-6} TIMEOUT=${TIMEOUT:-600000} BUN_JOBS=${BUN_JOBS:-1} bin/test-slicer.sh || exit $$?; \
+      done
+
+# Build slice list only (no test execution)
+slice-list slices="6" slice="1" suite="tests":
+    @echo "🗂️ Generating slice list {{slice}}/{{slices}} for suite '{{suite}}' (DRY)"
+    @SLICES={{slices}} SLICE={{slice}} SUITE_DIR={{suite}} DRY=1 bin/test-slicer.sh
+
+# Run a custom suite path in slices
+suite-sliced slices="4" slice="1" suite="tests":
+    @echo "🧪 Running suite '{{suite}}' slice {{slice}}/{{slices}} (batched)"
+    @SLICES={{slices}} SLICE={{slice}} SUITE_DIR={{suite}} BATCH_SIZE=${BATCH_SIZE:-8} TIMEOUT=${TIMEOUT:-180000} BUN_JOBS=${BUN_JOBS:-1} bin/test-slicer.sh
+
+suite-slices slices="4" suite="tests":
+    @for i in `seq 1 {{slices}}`; do \
+        echo "================ SUITE '{{suite}}' SLICE $$i/{{slices}} ================"; \
+        SLICES={{slices}} SLICE=$$i SUITE_DIR={{suite}} BATCH_SIZE=${BATCH_SIZE:-8} TIMEOUT=${TIMEOUT:-180000} BUN_JOBS=${BUN_JOBS:-1} bin/test-slicer.sh || exit $$?; \
+      done
+
+# Aggregate analysis for local slices directory (downloaded CI artifacts or local runs)
+analyze-slices dir="slices":
+    @echo "📈 Aggregate slice analysis from '{{dir}}'"
+    @bun run scripts/analyze-slices.ts {{dir}}
+
+# Analyze local .test-results per-slice batch reports (written by bin/test-slicer.sh)
+analyze-local-slices dir=".test-results":
+    @echo "📈 Aggregate LOCAL slices from '{{dir}}'"
+    @bun run scripts/analyze-slices.ts {{dir}}
+
+# Run N slices sequentially and analyze (main tests)
+test-slices-analyze slices="6":
+    @just test-slices slices={{slices}}
+    @just analyze-local-slices dir=.test-results
+
+# Run E2E slices sequentially and analyze
+e2e-slices-analyze slices="2":
+    @just e2e-slices slices={{slices}}
+    @just analyze-local-slices dir=.test-results
+
+# Run slices in parallel (main tests)
+test-slices-par slices="6" jobs="3":
+    @echo "🧪 Running {{slices}} slices in parallel (jobs={{jobs}})"
+    @seq 1 {{slices}} | xargs -n1 -P {{jobs}} -I{} bash -lc 'echo "== SLICE {} / {{slices}} =="; SLICES={{slices}} SLICE={} BATCH_SIZE=${BATCH_SIZE:-8} TIMEOUT=${TIMEOUT:-180000} BUN_JOBS=${BUN_JOBS:-1} bin/test-slicer.sh'
+
+# Run E2E slices in parallel
+e2e-slices-par slices="2" jobs="2":
+    @echo "🔬 Running E2E {{slices}} slices in parallel (jobs={{jobs}})"
+    @seq 1 {{slices}} | xargs -n1 -P {{jobs}} -I{} bash -lc 'echo "== E2E SLICE {} / {{slices}} =="; SLICES={{slices}} SLICE={} SUITE_DIR=tests/e2e BATCH_SIZE=${BATCH_SIZE:-6} TIMEOUT=${TIMEOUT:-600000} BUN_JOBS=${BUN_JOBS:-1} bin/test-slicer.sh'
+
+# Parallel slices then aggregate locally
+test-slices-par-analyze slices="6" jobs="3":
+    @just test-slices-par slices={{slices}} jobs={{jobs}}
+    @just analyze-local-slices dir=.test-results
+
+# Gated analysis examples (local)
+test-batch-gated warn_ms="120000" warn_max="6" fail_on_slow="0":
+    @BATCH_SIZE=${BATCH_SIZE:-8} TIMEOUT=${TIMEOUT:-180000} BUN_JOBS=${BUN_JOBS:-1} bin/test-progress-batch.sh
+    @WARN_MS={{warn_ms}} WARN_MAX={{warn_max}} FAIL_ON_SLOW={{fail_on_slow}} bun run scripts/analyze-batch-report.ts
+
+suite-sliced-gated slices="4" slice="1" suite="tests" warn_ms="120000" warn_max="6" fail_on_slow="0":
+    @SLICES={{slices}} SLICE={{slice}} SUITE_DIR={{suite}} BATCH_SIZE=${BATCH_SIZE:-8} TIMEOUT=${TIMEOUT:-180000} BUN_JOBS=${BUN_JOBS:-1} bin/test-slicer.sh
+    @WARN_MS={{warn_ms}} WARN_MAX={{warn_max}} FAIL_ON_SLOW={{fail_on_slow}} bun run scripts/analyze-batch-report.ts .test-results/batch-report.jsonl
 
 # Development mode - start with auto-reload (VISION.md compliant)
 dev: stop-quiet

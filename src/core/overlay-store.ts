@@ -258,6 +258,11 @@ export class OverlayStore {
                 }
             }
         } catch {}
+        // Enforce a global safety clamp for per-command timeout seconds across all adapters.
+        // Rationale: values >600s lead to excessively long CI/dev runs and can hang pipelines.
+        // HTTP already clamps to 600; this keeps MCP/CLI parity and centralizes the guard.
+        const perCommandTimeoutSec = Math.max(1, Math.min(600, Math.floor(Number(timeoutSec) || 120)));
+
         for (const cmd of cmdList) {
             await this.logProgress(snapshotId, `run:${cmd}:start`);
             const [bin, ...args] = cmd.split(' ');
@@ -271,7 +276,7 @@ export class OverlayStore {
                     } catch {}
                     void this.logProgress(snapshotId, `run:${cmd}:timeout`);
                     resolve(false);
-                }, Math.max(1, timeoutSec) * 1000);
+                }, perCommandTimeoutSec * 1000);
                 child.on('close', (code) => {
                     clearTimeout(timer);
                     void this.logProgress(snapshotId, `run:${cmd}:done code=${code}`);

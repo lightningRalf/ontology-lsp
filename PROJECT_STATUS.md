@@ -1123,6 +1123,39 @@ Metrics and docs now reflect the new numbering.
 
 ### 🥣 Dogfood CI Summary Enrichment
 - `scripts/dogfood-ci.ts` now includes:
-  - metrics snapshot (`/metrics?format=json`): L1/L2 p50/p95/p99, counts, errors (when available).
-  - `toolCounts` summary (calls per tool).
-  - More tolerant HTTP tool error handling (returns `{ ok:false, error, status }` instead of throwing on 400) to keep CI summaries reliable.
+    - metrics snapshot (`/metrics?format=json`): L1/L2 p50/p95/p99, counts, errors (when available).
+    - `toolCounts` summary (calls per tool).
+    - More tolerant HTTP tool error handling (returns `{ ok:false, error, status }` instead of throwing on 400) to keep CI summaries reliable.
+
+### 🧪 CI Sliced Tests + Batch Analysis (Main & E2E)
+- Introduced a sliced test matrix for main tests (default 6 slices) with per‑batch progress and artifacts.
+  - Job: `tests-sliced` (matrix slices: `[1..6]`).
+  - Each slice writes artifacts under `.test-results/slice-<k>-of-6/`:
+    - `files.lst` and `batch-report.jsonl` (valid JSONL with per‑batch metadata).
+  - Per‑slice summary appends pass/skip/fail counts and “Batch Analysis” to the job summary.
+- Added aggregate analysis job `analyze-slices`:
+  - Downloads all `slice-*` artifacts, aggregates slowest batches and “hot files”, prints combined summary.
+  - Uploads `slices/aggregate-summary.md` and appends highlights to the notify step.
+- E2E sliced (gated) mirrors the pattern (2 slices) with higher thresholds.
+- Dedicated coverage job `coverage` (runs once post‑slices) removes duplication from quality job.
+- Optional gating: slow‑batch thresholds read from repo variables (disabled by default).
+  - Main: `WARN_MAX_MAIN`, `FAIL_ON_SLOW_MAIN` (threshold: `WARN_MS=120000`).
+  - E2E: `WARN_MAX_E2E`, `FAIL_ON_SLOW_E2E` (threshold: `WARN_MS=300000`).
+  - Both analyzers emit `::warning` annotations; can fail if `FAIL_ON_SLOW=1` and slow count > `WARN_MAX`.
+- Local helpers (Just recipes) added to mirror CI flows and support parallel slicing.
+
+Artifacts & Scripts
+- New scripts:
+  - `scripts/analyze-batch-report.ts` – per‑slice analysis (JSONL → markdown summary + warnings).
+  - `scripts/analyze-slices.ts` – aggregate analysis across slices.
+- Runners:
+  - `bin/test-progress-batch.sh` – batch runner (REPORT_FILE env, prints per‑batch progress, writes JSONL).
+  - `bin/test-slicer.sh` – builds per‑slice lists and runs batches; supports `DRY=1` list‑only mode.
+- Justfile additions:
+  - `test-batch`, `test-batch-analyze`, `test-sliced`, `test-slices`, `test-sliced-analyze`.
+  - E2E: `e2e-sliced`, `e2e-slices`, `e2e-slices-analyze`.
+  - Suite utilities: `slice-list`, `suite-sliced`, `suite-slices`, `analyze-local-slices`.
+  - Parallel local runs: `test-slices-par`, `e2e-slices-par`, `test-slices-par-analyze`.
+
+Policy & Safety
+- Centralized per‑command timeout clamp for snapshot checks (1–600s) in `OverlayStore.runChecks()` to avoid long‑running/hanging steps; adapters remain lean. HTTP already enforced this range; MCP/CLI now match.

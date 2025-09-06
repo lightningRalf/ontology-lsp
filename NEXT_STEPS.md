@@ -60,6 +60,20 @@ Developer ergonomics (available):
 - Ensure `/metrics` JSON includes p50/p95/p99 per layer and op counts/errors
 - Adapter logs include per‑layer timing for each workflow invocation
 
+### 0.27 Test Slicer & Batch Observability (Now Live)
+- Main test matrix sliced (6) with per‑batch progress and JSONL artifacts; E2E sliced (2) gated.
+- Dedicated coverage job runs once post‑slices to avoid duplication.
+- Aggregate slice analysis summarizes slowest batches and “hot files” in CI summaries.
+- Local parity via Just recipes (`test-sliced(-analyze)`, `test-slices(-analyze)`, `test-slices-par(-analyze)`).
+- Optional slow‑batch gating via repo variables (disabled by default):
+  - Main: `WARN_MAX_MAIN`, `FAIL_ON_SLOW_MAIN`; E2E: `WARN_MAX_E2E`, `FAIL_ON_SLOW_E2E`.
+  - Thresholds: `WARN_MS=120000` (main), `WARN_MS=300000` (E2E). Configure as needed.
+
+Next:
+- Decide soft vs hard gates for slow batches; set repo variables accordingly.
+- Tune matrix size (6→8) if runners available to reduce wall‑clock further.
+- Add “top offenders” comment bot (optional) sourced from aggregate summary.
+
 ### 0.28 L4/L5 Robustness (Ongoing)
 - L4 (SQLite): keep forward‑only auto‑migrate in dev; guard evolution reads/writes; add indices for hot paths
 - L5: pipelines persisted (minimal). Next: `run_pipeline`, run history listing, and simple retry/backoff
@@ -237,9 +251,11 @@ Proceed with staged rollout while storage adapters and type-safety improvements 
 - **Test paths & outputs**: Consolidate under `tests/`; place developer
   scripts in `tests/manual/`; write outputs to `.test-results/` and keep
   ignored by Git.
- - **Reporter standardization**: Use Bun’s `--reporter=junit` with
-   `--reporter-outfile` in scripts to produce CI‑friendly XML artifacts
-   under `.test-results/`; avoid unsupported JSON reporters.
+- **Reporter standardization**: Use Bun’s `--reporter=junit` with
+  `--reporter-outfile` in scripts to produce CI‑friendly XML artifacts
+  under `.test-results/`; avoid unsupported JSON reporters.
+  - Add sliced/batched runner docs to TESTING_STRATEGY and README (local & CI patterns).
+  - Ensure per‑slice artifacts are consistent across local/CI (`.test-results/slice-<k>-of-<n>/files.lst|batch-report.jsonl`).
 
 ### 2.4 Smart Escalation v2 (New)
 - **Policy (Configurable)**: Add `core.performance.escalation.policy` = `auto | always | never` (default: `auto`).
@@ -630,3 +646,4 @@ Goal: implement ADR-0001 (PrimeEngine and triple-graph-compatible storage), with
 - Docs
   - [ ] Write ADR-0001 (done) and link from README/NEXT_STEPS. See docs/adr/0001-prime-ontology-triple-graph.md
   - [ ] Authoring guide for strategy/plugin creators (categories, examples, budgets, telemetry).
+  - [ ] Extend CI docs with sliced matrix, coverage job, and gating variables (WARN_MAX_MAIN/E2E, FAIL_ON_SLOW_MAIN/E2E).

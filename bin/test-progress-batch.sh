@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+echo "[test-progress-batch] starting" 1>&2
 set -ueo pipefail
 
 # Batch progressive test runner
@@ -15,8 +16,18 @@ BATCH_SIZE=${BATCH_SIZE:-10}
 TIMEOUT_MS=${TIMEOUT:-300000}
 MAX_FILES=${MAX_FILES:-}
 
-# Collect test files; adjust the glob if you want to include perf by default
-mapfile -t FILES < <(find test tests -type f \( -name "*.test.ts" -o -name "*.test.js" \) | sort)
+# Collect test files. Prefer explicit list via FILE_LIST; otherwise discover.
+if [[ -n "${FILE_LIST:-}" && -f "${FILE_LIST}" ]]; then
+  mapfile -t FILES < "${FILE_LIST}"
+else
+  # Discover tests from the tree (tolerate missing dirs)
+  TMP_LIST=$(mktemp)
+  if [ -d tests ]; then find tests -type f \( -name "*.test.ts" -o -name "*.test.js" \) >> "$TMP_LIST"; fi
+  if [ -d test ]; then find test -type f \( -name "*.test.ts" -o -name "*.test.js" \) >> "$TMP_LIST"; fi
+  sort "$TMP_LIST" -o "$TMP_LIST"
+  mapfile -t FILES < "$TMP_LIST"
+  rm -f "$TMP_LIST"
+fi
 
 if [[ -n "${MAX_FILES}" ]]; then
   FILES=("${FILES[@]:0:${MAX_FILES}}")
@@ -29,6 +40,11 @@ if [[ ${TOTAL} -eq 0 ]]; then
 fi
 
 echo "Running ${TOTAL} files in batches of ${BATCH_SIZE} (timeout ${TIMEOUT_MS}ms, BUN_JOBS=${BUN_JOBS:-1})"
+REPORT_FILE_DEFAULT=".test-results/batch-report.jsonl"
+REPORT_FILE="${REPORT_FILE:-$REPORT_FILE_DEFAULT}"
+REPORT_DIR=$(dirname "$REPORT_FILE")
+mkdir -p "$REPORT_DIR"
+echo -n > "$REPORT_FILE"
 
 passes=0
 fails=0
@@ -49,6 +65,16 @@ for ((i=0; i<TOTAL; i+=BATCH_SIZE)); do
   END=$(date +%s%3N)
   DUR=$((END-START))
 
+  # Persist batch metrics (JSONL)
+  FILES_JSON="["
+  for f in "${batch[@]}"; do
+    esc=${f//"/\"}
+    FILES_JSON+="\"$esc\",";
+  done
+  FILES_JSON="${FILES_JSON%,}]"
+  printf '{"batch":%d,"start":%d,"end":%d,"duration_ms":%d,"exit_code":%d,"files":%s}\n' \
+    "$batch_index" "$i" "$end" "$DUR" "$code" "$FILES_JSON" >> "$REPORT_FILE"
+
   if [[ $code -eq 0 ]]; then
     passes=$((passes+1))
     echo "=== BATCH PASS  $(date -Is) :: [${batch_index}] duration ${DUR}ms"
@@ -61,4 +87,3 @@ done
 
 echo "Batches summary: ${passes} passed, ${fails} failed, total $((passes+fails))"
 exit $([[ ${fails} -eq 0 ]] && echo 0 || echo 1)
-

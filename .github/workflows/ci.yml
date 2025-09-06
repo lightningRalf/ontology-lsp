@@ -140,24 +140,123 @@ jobs:
           echo "🧪 Running VS Code extension tests..."
           cd vscode-client && npm test
 
-      - name: Test Coverage
-        run: |
-          echo "📊 Generating test coverage..."
-          bun test --coverage tests/ --timeout 300000
+      # Coverage moved to dedicated job to avoid duplication
 
-      - name: Upload Coverage Reports
-        uses: codecov/codecov-action@v4
-        if: github.event_name == 'push'
+  tests-sliced:
+    name: Tests (Sliced Matrix)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        slice: [1, 2, 3, 4, 5, 6]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          file: ./coverage/lcov.info
-          fail_ci_if_error: false
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+            vscode-client/node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: |
+          bun install --frozen-lockfile
+          cd vscode-client && npm ci
+
+      - name: Run sliced tests with batch progress
         env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          SLICES: 6
+          SLICE: ${{ matrix.slice }}
+          BATCH_SIZE: 10
+          TIMEOUT: 180000
+          BUN_JOBS: 1
+        run: |
+          echo "🧪 Running test slice $SLICE/$SLICES (batched)"
+          chmod +x bin/test-slicer.sh bin/test-progress-batch.sh
+          bin/test-slicer.sh | tee ".test-results/slice-${SLICE}.log"
+
+      - name: Upload slice artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: slice-${{ matrix.slice }}
+          path: |
+            .test-results/slice-${{ matrix.slice }}.log
+            .test-results/slice-${{ matrix.slice }}-of-6/files.lst
+            .test-results/slice-${{ matrix.slice }}-of-6/batch-report.jsonl
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Slice summary
+        run: |
+          echo "# 🧪 Test Slice $SLICE/$SLICES" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Batch size: ${BATCH_SIZE}" >> $GITHUB_STEP_SUMMARY
+          echo "- Timeout (per bun): ${TIMEOUT} ms" >> $GITHUB_STEP_SUMMARY
+          echo "- Files: $(wc -l < .test-results/slice-${SLICE}-of-6/files.lst 2>/dev/null || echo 0)" >> $GITHUB_STEP_SUMMARY
+          PASSES=$(grep -c "^(pass)" .test-results/slice-${SLICE}.log 2>/dev/null || echo 0)
+          SKIPS=$(grep -c "^(skip)" .test-results/slice-${SLICE}.log 2>/dev/null || echo 0)
+          FAILS=$(grep -c "^(fail)" .test-results/slice-${SLICE}.log 2>/dev/null || echo 0)
+          echo "- Results: ${PASSES} pass, ${SKIPS} skip, ${FAILS} fail" >> $GITHUB_STEP_SUMMARY
+      - name: Analyze batch report (slice)
+        env:
+          WARN_MS: 120000
+          WARN_MAX: ${{ vars.WARN_MAX_MAIN }}
+          FAIL_ON_SLOW: ${{ vars.FAIL_ON_SLOW_MAIN }}
+        run: |
+          bun run scripts/analyze-batch-report.ts .test-results/slice-${SLICE}-of-6/batch-report.jsonl >> $GITHUB_STEP_SUMMARY || true
+
+  analyze-slices:
+    name: Analyze Slices (Aggregate)
+    runs-on: ubuntu-latest
+    needs: tests-sliced
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - name: Download slice artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: slice-*
+          path: slices
+          merge-multiple: false
+      - name: Aggregate analysis
+        env:
+          WARN_MS: 120000
+          WARN_MAX: ${{ vars.WARN_MAX_MAIN }}
+          FAIL_ON_SLOW: ${{ vars.FAIL_ON_SLOW_MAIN }}
+        run: |
+          bun run scripts/analyze-slices.ts slices | tee slices/aggregate-summary.md
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# 🧪 Aggregate Slice Analysis" >> $GITHUB_STEP_SUMMARY
+          cat slices/aggregate-summary.md >> $GITHUB_STEP_SUMMARY
+      - name: Upload aggregate analysis
+        uses: actions/upload-artifact@v4
+        with:
+          name: slices-aggregate
+          path: slices/aggregate-summary.md
+          retention-days: 7
 
   build:
     name: Build Production Artifacts
     runs-on: ubuntu-latest
-    needs: quality
+    needs: [quality, tests-sliced]
     timeout-minutes: 20
 
     steps:
@@ -361,7 +460,7 @@ jobs:
   notify:
     name: Notify Results
     runs-on: ubuntu-latest
-    needs: [quality, build, docker, health-check]
+    needs: [quality, tests-sliced, analyze-slices, coverage, build, docker, health-check, e2e-sliced]
     if: always() && github.event_name == 'push'
 
     steps:
@@ -373,12 +472,72 @@ jobs:
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Quality & Testing | ${{ needs.quality.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Build | ${{ needs.build.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Sliced Tests | ${{ needs.tests-sliced.result == 'success' && '✅ Passed' || needs.tests-sliced.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Slices Analysis | ${{ needs.analyze-slices.result == 'success' && '✅ Done' || needs.analyze-slices.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Coverage | ${{ needs.coverage.result == 'success' && '✅ Passed' || needs.coverage.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E (Sliced) | ${{ needs.e2e-sliced.result == 'success' && '✅ Passed' || needs.e2e-sliced.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+
+  coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+    needs: tests-sliced
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate coverage (single run)
+        run: |
+          echo "📊 Generating test coverage in a dedicated job..."
+          bun test --coverage tests/ --timeout 300000
+
+      - name: Upload Coverage Reports
+        uses: codecov/codecov-action@v4
+        if: github.event_name == 'push'
+        with:
+          file: ./coverage/lcov.info
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
           echo "| Docker | ${{ needs.docker.result == 'success' && '✅ Passed' || needs.docker.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Health Check | ${{ needs.health-check.result == 'success' && '✅ Passed' || needs.health-check.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+      - name: Append slow batch highlights (aggregate)
+        uses: actions/download-artifact@v4
+        with:
+          name: slices-aggregate
+          path: slices-aggregate
+        continue-on-error: true
+      - name: Show highlights
+        if: always()
+        run: |
+          if [ -f slices-aggregate/aggregate-summary.md ]; then \
+            echo "" >> $GITHUB_STEP_SUMMARY; \
+            echo "## 🐢 Slow Batch Highlights" >> $GITHUB_STEP_SUMMARY; \
+            head -n 30 slices-aggregate/aggregate-summary.md >> $GITHUB_STEP_SUMMARY; \
+          else \
+            echo "" >> $GITHUB_STEP_SUMMARY; \
+            echo "(No aggregate summary to display)" >> $GITHUB_STEP_SUMMARY; \
+          fi
 
   e2e:
     name: Gated E2E Suite
@@ -424,5 +583,72 @@ jobs:
           name: e2e-results
           path: |
             tests/e2e/results/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+  e2e-sliced:
+    name: Gated E2E (Sliced)
+    runs-on: ubuntu-latest
+    needs: quality
+    if: ${{ inputs.run_e2e == true || vars.RUN_E2E == '1' }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        slice: [1, 2]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run E2E slice with batch progress
+        env:
+          SLICES: 2
+          SLICE: ${{ matrix.slice }}
+          SUITE_DIR: tests/e2e
+          BATCH_SIZE: 6
+          TIMEOUT: 900000
+          BUN_JOBS: 1
+          E2E: '1'
+          USE_LOCAL_REPOS: 'true'
+          E2E_SKIP_CLONE: 'true'
+          E2E_MEMORY_LIMIT: '2048'
+        run: |
+          echo "🔬 E2E slice $SLICE/$SLICES (batched)"
+          chmod +x bin/test-slicer.sh bin/test-progress-batch.sh
+          bin/test-slicer.sh | tee ".test-results/e2e-slice-${SLICE}.log"
+
+      - name: Analyze E2E batch report (slice)
+        env:
+          WARN_MS: 300000
+          WARN_MAX: ${{ vars.WARN_MAX_E2E }}
+          FAIL_ON_SLOW: ${{ vars.FAIL_ON_SLOW_E2E }}
+        run: |
+          bun run scripts/analyze-batch-report.ts .test-results/slice-${SLICE}-of-2/batch-report.jsonl >> $GITHUB_STEP_SUMMARY || true
+
+      - name: Upload E2E slice artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-slice-${{ matrix.slice }}
+          path: |
+            .test-results/e2e-slice-${{ matrix.slice }}.log
+            .test-results/slice-${{ matrix.slice }}-of-2/files.lst
+            .test-results/slice-${{ matrix.slice }}-of-2/batch-report.jsonl
           if-no-files-found: ignore
           retention-days: 7

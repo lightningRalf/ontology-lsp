@@ -258,6 +258,19 @@ describe("MCP Server Integration", () => {
 })
 ```
 
+## Fast Feedback: Batched + Sliced Test Runs
+
+To avoid long, silent test runs, use the built-in batch runner and slicer:
+
+- Batch with progress:
+  - `BATCH_SIZE=8 TIMEOUT=180000 just test-batch`
+
+- Slice the suite (1-of-N):
+  - `just test-sliced slices=4 slice=1`
+  - Run all slices sequentially: `just test-slices slices=4`
+
+CI uses a 6-way matrix for main tests (`tests-sliced`) and a 2-way matrix for E2E (`e2e-sliced`), both with per-batch progress and artifacts. Coverage runs once in a dedicated `coverage` job post-slices. Each slice emits a batch-report.jsonl that is summarized per-slice and then aggregated by `analyze-slices` into the job summary; warnings are produced for batches exceeding a threshold (default WARN_MS=120000 for main, 300000 for E2E).
+
 ### Core to MCP Round-Trip
 
 ```typescript
