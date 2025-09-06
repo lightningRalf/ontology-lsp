@@ -971,3 +971,12 @@ Metrics and docs now reflect the new numbering.
 
 ### Ontology‑First Workflow Tweaks
 - MCP workflows (`workflow_explore_symbol`, `workflow_locate_confirm_definition`, `workflow_safe_rename`) consult L4 first to infer a seed file when `file` is omitted; improves precision under the same budgets; graceful fallback when L4 lacks data.
+### 🔌 Ports & DevX Simplification
+- justfile start/health/status/check/clean now read ports from `.env` and pass them to servers; no hard‑coded port assumptions in orchestration.
+- `stats` and `learning-stats` tasks also honor `HTTP_API_PORT`.
+- Clarified “no runtime port registry” stance remains: servers bind defaults with env overrides; helpers may sync `.env` but are optional.
+
+### 🧪 Integration Runner Reporter Fix
+- Updated `scripts/test-integration.sh` to use Bun’s supported `--reporter=junit` (JSON reporter not supported).
+- Results are written to `.test-results/*.xml`; summary at `.test-results/integration-test-summary.md`.
+- Comprehensive suites pass locally after the change (unified-core, adapters, learning-system, consistency; perf ran with extended timeout).

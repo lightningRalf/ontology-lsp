@@ -69,7 +69,7 @@ run_test_suite() {
     local suite_name=$1
     local suite_description=$2
     local test_file="$TEST_DIR/${suite_name}.test.ts"
-    local result_file="$RESULTS_DIR/${suite_name}-results.json"
+    local result_file="$RESULTS_DIR/${suite_name}-results.xml"
     
     echo -e "${BLUE}🧪 Running: ${suite_description}${NC}"
     echo "   File: $test_file"
@@ -87,7 +87,9 @@ run_test_suite() {
     local start_time=$(date +%s)
     
     # Run the test and capture output
-    if bun test "$test_file" --timeout $timeout --reporter json > "$result_file" 2>&1; then
+    # Bun currently supports 'junit' reporter; JSON is not supported.
+    # Write JUnit XML to results file for CI artifacts.
+    if bun test "$test_file" --timeout $timeout --reporter=junit --reporter-outfile "$result_file" > /dev/null 2>&1; then
         local end_time=$(date +%s)
         local duration=$((end_time - start_time))
         
@@ -107,7 +109,12 @@ run_test_suite() {
         
         # Show last few lines of error output
         echo -e "${YELLOW}Last 10 lines of test output:${NC}"
-        tail -n 10 "$result_file" | sed 's/^/   /'
+        # Show last lines from console if available; otherwise, point to XML
+        if [ -f "$result_file" ]; then
+            tail -n 10 "$result_file" | sed 's/^/   /' || true
+        else
+            echo "   (No console log captured; see $result_file for JUnit XML)"
+        fi
     fi
     
     echo ""

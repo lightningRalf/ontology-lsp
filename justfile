@@ -51,14 +51,18 @@ start: stop-quiet
     @echo "🚀 Starting Ontology LSP System..."
     @echo "=================================="
     @mkdir -p .ontology/pids .ontology/logs
-    @echo "Checking port availability..."
-    @just check-ports-available
-    @echo "Starting LSP Server (port 7002)..."
-    @{{bun}} run src/servers/lsp.ts > .ontology/logs/lsp.log 2>&1 & printf '%s\n' $$! > .ontology/pids/lsp.pid
-    @echo "Starting HTTP API Server (port 7000)..."
-    @{{bun}} run src/servers/http.ts > .ontology/logs/http-api.log 2>&1 & printf '%s\n' $$! > .ontology/pids/http-api.pid
-    @echo "Starting MCP HTTP (Streamable) Server (port 7001)..."
-    @{{bun}} run src/servers/mcp-http.ts > .ontology/logs/mcp-http.log 2>&1 & printf '%s\n' $$! > .ontology/pids/mcp-http.pid
+    @# Read effective ports from .env (fallback to defaults)
+    @HTTP_PORT=$$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
+    MCP_PORT=$$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7001); \
+    LSP_PORT=$$(grep -E '^LSP_SERVER_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7002); \
+    echo "Checking port availability..."; \
+    just check-ports-available; \
+    echo "Starting LSP Server (port $$LSP_PORT)..."; \
+    LSP_SERVER_PORT=$$LSP_PORT {{bun}} run src/servers/lsp.ts > .ontology/logs/lsp.log 2>&1 & printf '%s\n' $$! > .ontology/pids/lsp.pid; \
+    echo "Starting HTTP API Server (port $$HTTP_PORT)..."; \
+    HTTP_API_PORT=$$HTTP_PORT {{bun}} run src/servers/http.ts > .ontology/logs/http-api.log 2>&1 & printf '%s\n' $$! > .ontology/pids/http-api.pid; \
+    echo "Starting MCP HTTP (Streamable) Server (port $$MCP_PORT)..."; \
+    MCP_HTTP_PORT=$$MCP_PORT {{bun}} run src/servers/mcp-http.ts > .ontology/logs/mcp-http.log 2>&1 & printf '%s\n' $$! > .ontology/pids/mcp-http.pid
     @sleep 3
     @just health
     @echo ""
@@ -175,19 +179,25 @@ sync-ports:
 
 # === PORT MANAGEMENT ===
 
-# Check if required ports are available
+# Check if required ports are available (reads .env overrides)
 check-ports-available:
-    @echo "  Checking port 7000..." && (ss -tulnp 2>/dev/null | grep ":7000 " >/dev/null && echo "  ❌ Port 7000 is in use" && exit 1 || echo "  ✅ Port 7000 is available")
-    @echo "  Checking port 7001..." && (ss -tulnp 2>/dev/null | grep ":7001 " >/dev/null && echo "  ❌ Port 7001 is in use" && exit 1 || echo "  ✅ Port 7001 is available")
-    @echo "  Checking port 7002..." && (ss -tulnp 2>/dev/null | grep ":7002 " >/dev/null && echo "  ❌ Port 7002 is in use" && exit 1 || echo "  ✅ Port 7002 is available")
-    @echo "  🎯 All required ports are available"
+    @HTTP_PORT=$$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
+    MCP_PORT=$$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7001); \
+    LSP_PORT=$$(grep -E '^LSP_SERVER_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7002); \
+    echo "  Checking port $$HTTP_PORT..." && (ss -tulnp 2>/dev/null | grep ":$$HTTP_PORT " >/dev/null && echo "  ❌ Port $$HTTP_PORT is in use" && exit 1 || echo "  ✅ Port $$HTTP_PORT is available"); \
+    echo "  Checking port $$MCP_PORT..." && (ss -tulnp 2>/dev/null | grep ":$$MCP_PORT " >/dev/null && echo "  ❌ Port $$MCP_PORT is in use" && exit 1 || echo "  ✅ Port $$MCP_PORT is available"); \
+    echo "  Checking port $$LSP_PORT..." && (ss -tulnp 2>/dev/null | grep ":$$LSP_PORT " >/dev/null && echo "  ❌ Port $$LSP_PORT is in use" && exit 1 || echo "  ✅ Port $$LSP_PORT is available"); \
+    echo "  🎯 All required ports are available"
 
-# Check status of all ports  
+# Check status of all ports (reads .env overrides)
 check-ports-status:
-    @echo "  Port 7000:" && (ss -tulnp 2>/dev/null | grep ":7000 " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE")
-    @echo "  Port 7001:" && (ss -tulnp 2>/dev/null | grep ":7001 " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE")
-    @echo "  Port 7002:" && (ss -tulnp 2>/dev/null | grep ":7002 " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE")
-    @echo "  Port 8081:" && (ss -tulnp 2>/dev/null | grep ":8081 " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE")
+    @HTTP_PORT=$$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
+    MCP_PORT=$$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7001); \
+    LSP_PORT=$$(grep -E '^LSP_SERVER_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7002); \
+    echo "  Port $$HTTP_PORT:" && (ss -tulnp 2>/dev/null | grep ":$$HTTP_PORT " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE"); \
+    echo "  Port $$MCP_PORT:" && (ss -tulnp 2>/dev/null | grep ":$$MCP_PORT " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE"); \
+    echo "  Port $$LSP_PORT:" && (ss -tulnp 2>/dev/null | grep ":$$LSP_PORT " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE"); \
+    echo "  Port 8081:" && (ss -tulnp 2>/dev/null | grep ":8081 " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE")
 
 # Force clean all target ports (use with caution)
 clean-ports:
@@ -203,10 +213,13 @@ clean-ports-quiet:
 
 # Force port cleanup implementation  
 clean-ports-force:
-    @echo "    Cleaning port 7000..." && (ss -tulnp 2>/dev/null | grep ":7000 " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true)
-    @echo "    Cleaning port 7001..." && (ss -tulnp 2>/dev/null | grep ":7001 " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true)
-    @echo "    Cleaning port 7002..." && (ss -tulnp 2>/dev/null | grep ":7002 " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true)
-    @echo "    Cleaning port 8081..." && (ss -tulnp 2>/dev/null | grep ":8081 " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true)
+    @HTTP_PORT=$$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
+    MCP_PORT=$$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7001); \
+    LSP_PORT=$$(grep -E '^LSP_SERVER_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7002); \
+    echo "    Cleaning port $$HTTP_PORT..." && (ss -tulnp 2>/dev/null | grep ":$$HTTP_PORT " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true); \
+    echo "    Cleaning port $$MCP_PORT..." && (ss -tulnp 2>/dev/null | grep ":$$MCP_PORT " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true); \
+    echo "    Cleaning port $$LSP_PORT..." && (ss -tulnp 2>/dev/null | grep ":$$LSP_PORT " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true); \
+    echo "    Cleaning port 8081..." && (ss -tulnp 2>/dev/null | grep ":8081 " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true); \
     @-pkill -f "src/servers" 2>/dev/null || true
     @-pkill -f "ontology-lsp" 2>/dev/null || true
     @-pkill -f "http.server.*8081" 2>/dev/null || true
@@ -215,12 +228,14 @@ clean-ports-force:
 # Get stats from servers
 stats:
     @echo "📊 Server Statistics"
-    @curl -s http://localhost:7000/stats | jq . || echo "Server not responding"
+    @HTTP_PORT=$$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
+    curl -s http://localhost:$$HTTP_PORT/stats | jq . || echo "Server not responding"
 
 # Learning stats (Layer 5 summary)
 learning-stats:
     @echo "🧠 Learning (L5) Stats"
-    @curl -s http://localhost:7000/api/v1/learning-stats | jq . || echo "Server not responding"
+    @HTTP_PORT=$$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
+    curl -s http://localhost:$$HTTP_PORT/api/v1/learning-stats | jq . || echo "Server not responding"
 
 # === E2E LOCAL RUNNER ===
 

@@ -11,9 +11,7 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 
 <!-- 0.0 Tool‑First Gate: Completed (2025‑09‑06). See PROJECT_STATUS.md for details. -->
 
-### 0.05 Port Management Simplification (Keep Simple)
-- No runtime port registry; fixed defaults with `.env` overrides
-- `just health/status` read `.env` and print effective ports (done)
+<!-- 0.05 Port Management Simplification moved to PROJECT_STATUS after completion -->
 
 ### 0.1 Fix‑Bugs‑First: Perf stabilization (Immediate)
 
@@ -213,6 +211,9 @@ Proceed with staged rollout while storage adapters and type-safety improvements 
 - **Test paths & outputs**: Consolidate under `tests/`; place developer
   scripts in `tests/manual/`; write outputs to `.test-results/` and keep
   ignored by Git.
+ - **Reporter standardization**: Use Bun’s `--reporter=junit` with
+   `--reporter-outfile` in scripts to produce CI‑friendly XML artifacts
+   under `.test-results/`; avoid unsupported JSON reporters.
 
 ### 2.4 Smart Escalation v2 (New)
 - **Policy (Configurable)**: Add `core.performance.escalation.policy` = `auto | always | never` (default: `auto`).
