@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Self-apply helper: stage a unified diff via CLI propose-patch and run checks.
+# Self-apply helper: stage a unified diff (or apply_patch format) inside a snapshot and run checks.
 # Usage:
-#   bin/self-apply.sh -f my.diff -- bun run typecheck "bun test -q"
-#   git diff | bin/self-apply.sh -- bun run typecheck
+#   # From a file
+#   bin/self-apply.sh -f my.diff -- bun run build:tsc "bun test --bail=1"
+#   # From stdin
+#   git diff | bin/self-apply.sh -- bun run build:tsc
 
 PATCH_FILE=""
 CMDS=()
+ONLY_TOUCHED=1
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -29,12 +32,29 @@ if [[ -z "$PATCH_FILE" ]]; then
   PATCH_FILE="$TMP"
 fi
 
-ARGS=("--snapshot" "$SNAP" "--file" "$PATCH_FILE" "--run-checks")
-for c in "${CMDS[@]:-}"; do
-  [[ -n "$c" ]] && ARGS+=("--cmd" "$c")
-done
+# Validate the patch looks like a diff before invoking tools
+# Accept: apply_patch (*** Begin Patch), git diff (diff --git), or unified diff headers (---/+++ a/b)
+if ! head -n 50 "$PATCH_FILE" | grep -Eq "^\*\*\* Begin Patch|^\*\*\* (Update|Add|Delete) File:|^diff --git |^---\s+[ab]/|^\+\+\+\s+[ab]/"; then
+  echo "✗ Invalid patch: expected unified diff or apply_patch format." >&2
+  echo "  Tip: Use apply_patch heredoc or pipe \`git diff\`/\`git diff --no-index\` output." >&2
+  [[ -n "${TMP:-}" && -f "$TMP" ]] && rm -f "$TMP"
+  exit 2
+fi
 
-ontology-lsp propose-patch "${ARGS[@]}"
+export FAST_STDIO_CHECKS=touched
+
+# If no explicit commands were provided, prefer quick checks for touched TS files
+if [[ ${#CMDS[@]} -eq 0 ]]; then
+  # Default to a no-op command; quick typecheck for touched files is prepended automatically
+  CMDS=("true")
+fi
+
+# Prefer the workflow alias which reads the patch and runs checks inside the snapshot
+if ontology-lsp patch-checks-in-snapshot --snapshot "$SNAP" --patch-file "$PATCH_FILE" --only-touched $(printf ' --cmd %q' "${CMDS[@]}") --timeout 240; then
+  :
+else
+  echo "✗ Patch checks failed (snapshot: $SNAP). See output above." >&2
+fi
 
 if [[ -n "${TMP:-}" && -f "$TMP" ]]; then rm -f "$TMP"; fi
 

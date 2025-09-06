@@ -164,6 +164,8 @@
   },
   "active": "b50f4ac68bdf0f49",
   "lastOpenFiles": [
+    "tests/patch-invalid-input.test.ts",
+    "tests/layer2-parse-cap.test.ts",
     "tests/http-references-edgecases.test.ts",
     "tests/http-metrics-layer-manager.test.ts",
     "tests/http-metrics-l1-quantiles.test.ts",
@@ -173,8 +175,6 @@
     "tests/http-openapi-pipelines.test.ts",
     "tests/http-pipelines-status-runs.test.ts",
     "tests/http-pipelines-run-detail.test.ts",
-    "web-ui/dist/index.html",
-    "web-ui/index.html",
     "docs/WORKFLOWS.md",
     "web-ui/README.md",
     "vscode-client/README.md",

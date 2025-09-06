@@ -37,6 +37,7 @@ default:
     @echo "  just symbol-map <symbol>       - Symbol: build symbol map"
     @echo "  just symbol-map-graph <symbol> - Symbol: Mermaid graph output"
     @echo "  just plan-rename <old> <new>   - Refactor: plan rename (preview)"
+    @echo "  just safe-apply [file] [-- <cmd...>] - Stage diff safely in snapshot + checks"
     @echo ""
     @echo "Run 'just --list' for complete command list"
 
@@ -1816,3 +1817,18 @@ symbol-map-graphs identifier: build-cli
 # Note: snap_diff is already defined earlier in the justfile; keep a CLI-friendly alias
 snap_diff_cli snap_id:
     @bash bin/snap-diff.sh {{snap_id}}
+
+# Safely stage and validate a patch inside a snapshot (Tool-First)
+# Usage:
+#   just safe-apply ./my.diff -- bun run build:tsc "bun test --bail=1"
+#   git diff | just safe-apply-stdin -- bun run build:tsc
+safe-apply file +cmds:
+    @if [ -n "{{file}}" ]; then \
+        bash bin/self-apply.sh -f {{file}} -- {{cmds}}; \
+    else \
+        echo "✗ Please provide a diff file or use: git diff | just safe-apply-stdin -- <commands>" 1>&2; \
+        exit 2; \
+    fi
+
+safe-apply-stdin +cmds:
+    @bash -lc 'cat | bin/self-apply.sh -- {{cmds}}'

@@ -32,6 +32,27 @@ Transports
   - `POST /api/v1/tools/call` with `{ "name":"patch_checks_in_snapshot", "arguments": { "patch":"<diff>", "onlyTouched": true, "timeoutSec": 180 } }`
 - Returns (PatchChecksInSnapshotResult): `{ ok, snapshot, stage?, checks? }`
 
+#### Common error: invalid_patch
+Occurs when the payload is not a recognized diff. Accepted formats are:
+- apply_patch format (`*** Begin Patch` … `*** End Patch`)
+- git diff (`diff --git a/... b/...`)
+- unified diff headers (`--- a/...` and `+++ b/...`)
+
+Examples
+- CLI (stdio):
+  ```bash
+  echo "console.log('oops')" > not-a-diff.txt
+  ontology-lsp patch-checks-in-snapshot --patch-file not-a-diff.txt
+  # → {"ok":false,"reason":"invalid_patch","message":"Expected unified diff or apply_patch format. Use apply_patch heredoc or pass a diff file (-f)."}
+  ```
+- HTTP:
+  ```bash
+  curl -sS -X POST -H 'content-type: application/json' \
+    http://localhost:7000/api/v1/tools/call \
+    -d '{"name":"patch_checks_in_snapshot","arguments":{"patch":"console.log(\"oops\")"}}' | jq .
+  # → { "success": false, "error": { "message": "invalid_patch: Expected unified diff or apply_patch format..." } }
+  ```
+
 ### Explore Codebase
 - Purpose: retrieve definitions, references, and optionally conceptual hints.
 - HTTP:
@@ -105,3 +126,4 @@ curl -sS 'http://localhost:7000/api/v1/pipelines/dev_example_1' | jq .
 ## Tips
 - Prefer HTTP tools in CI; for local dev, MCP stdio via `./mcp-wrapper.sh` is convenient (ensure clean stdout).
 - `FAST_STDIO_CHECKS=touched` keeps snapshot checks fast (typecheck touched TS files).
+- Use `just safe-apply <file> -- <commands>` or pipe via `just safe-apply-stdin` to stage patches safely inside snapshots.

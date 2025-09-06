@@ -52,6 +52,10 @@ Status: `list_symbols` now supports an AST‑backed path behind a feature flag (
 
 Status: CI runs `just dogfood_ci` and uploads `dogfood-summary.json` as an artifact.
 
+Developer ergonomics (available):
+- Use `just safe-apply <file> -- <commands>` or `git diff | just safe-apply-stdin -- <commands>` to stage diffs safely in a snapshot and run checks.
+- Invalid patch inputs are rejected early by the core executor with a clear `invalid_patch` message; adapters remain lean.
+
 ### 0.25 Observability & SLO Conformance
 - Ensure `/metrics` JSON includes p50/p95/p99 per layer and op counts/errors
 - Adapter logs include per‑layer timing for each workflow invocation
@@ -288,6 +292,11 @@ Proceed with staged rollout while storage adapters and type-safety improvements 
 - **MCP**: Ensure `explore_codebase` supports limit parameters and returns compact JSON by default
 
 Done: HTTP `/api/v1/refactor` endpoint and MCP `suggest_refactoring` tool added for parity.
+
+### 5.1 Tool‑First Input Validation (New)
+- Centralize patch input validation in the core executor for `patch_checks_in_snapshot`, `propose_patch`, and `apply_after_checks` (done).
+- Map `InvalidParams` to appropriate protocol error responses (HTTP mapping done: status 400 with `{ success:false, error:{ message } }`).
+- Keep adapters thin; avoid duplicating validation logic per adapter (MCP cleaned up).
 
 ### 6. Security Hardening (New)
 - **AuthN/Z**: Add token-based auth for HTTP endpoints; scope tokens per adapter

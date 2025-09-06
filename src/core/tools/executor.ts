@@ -47,7 +47,30 @@ export class ToolExecutor {
       throw new CoreError('UnknownTool', `Unknown tool: ${name}`);
     }
     validateArgs(args || {}, spec);
+    // Extra validation for patch-bearing tools to keep adapters lean
+    if (this.requiresPatchValidation(name)) {
+      const patch = typeof args?.patch === 'string' ? String(args.patch) : '';
+      if (!this.isLikelyDiffOrApplyPatch(patch)) {
+        throw new CoreError(
+          'InvalidParams',
+          'invalid_patch: Expected unified diff or apply_patch format. Use apply_patch heredoc or pass a diff file.'
+        );
+      }
+    }
     return adapter.handleToolCall(name, args || {});
   }
-}
 
+  private requiresPatchValidation(name: string): boolean {
+    return (
+      name === 'patch_checks_in_snapshot' ||
+      name === 'propose_patch' ||
+      name === 'apply_after_checks'
+    );
+  }
+
+  private isLikelyDiffOrApplyPatch(patch: string): boolean {
+    if (typeof patch !== 'string' || patch.trim().length === 0) return false;
+    const head = patch.slice(0, 4096);
+    return /\*\*\* Begin Patch|\*\*\*\s+(?:Update|Add|Delete) File:|^diff --git |^---\s+[ab]\//m.test(head);
+  }
+}

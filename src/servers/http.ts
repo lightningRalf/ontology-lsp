@@ -13,6 +13,7 @@ import { serve } from 'bun';
 import { HTTPAdapter, type HTTPRequest } from '../adapters/http-adapter.js';
 import { MCPAdapter } from '../adapters/mcp-adapter.js';
 import { ToolExecutor } from '../core/tools/executor.js';
+import { isCoreError } from '../core/errors.js';
 import { createDefaultCoreConfig, definitionToApiResponse } from '../adapters/utils.js';
 import { getEnvironmentConfig, type ServerConfig } from '../core/config/server-config.js';
 import { createCodeAnalyzer } from '../core/index';
@@ -341,13 +342,17 @@ export class HTTPServer {
                             );
                         } catch (err: any) {
                             const message = err?.message || String(err || 'tool call failed');
-                            return new Response(
-                                JSON.stringify({ success: false, error: { message } }),
-                                {
-                                    status: 500,
-                                    headers: { 'Content-Type': 'application/json' },
-                                }
-                            );
+                            const status = isCoreError(err)
+                                ? err.code === 'InvalidParams'
+                                    ? 400
+                                    : err.code === 'UnknownTool'
+                                        ? 404
+                                        : 500
+                                : 500;
+                            return new Response(JSON.stringify({ success: false, error: { message } }), {
+                                status,
+                                headers: { 'Content-Type': 'application/json' },
+                            });
                         }
                     }
 

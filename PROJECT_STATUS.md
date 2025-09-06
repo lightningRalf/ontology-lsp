@@ -512,6 +512,25 @@ Status: adapters/LSP integration tests are green. E2E local run improved reliabi
   - Unknown pipeline IDs are handled non‑fatally (DB may log FK constraint warnings in dev; endpoints still return stable JSON).
   - Registration is intended for dev/dogfooding to avoid manual DB/model seeding.
 
+### 🛡️ Tool‑First Editing: Centralized Patch Validation + Lean Adapters
+- Core executor guard (InvalidParams):
+  - Added patch format validation in `ToolExecutor` for `patch_checks_in_snapshot`, `propose_patch`, and `apply_after_checks`.
+  - Rejects non‑diff input early with `invalid_patch: Expected unified diff or apply_patch format...`.
+  - Keeps adapters thin; policy is enforced centrally and consistently across HTTP/MCP/CLI.
+- HTTP error mapping:
+  - HTTP server now maps `CoreError` to status codes (400 for `InvalidParams`, 404 for `UnknownTool`).
+  - Results in stable JSON `{ success:false, error:{ message } }` for invalid inputs.
+- MCP adapter lean‑up:
+  - Removed duplicate invalid_patch guard; relies on core validation.
+- Safer local workflow:
+  - New Just tasks: `safe-apply` (file) and `safe-apply-stdin` (pipe) wrap `bin/self-apply.sh`.
+  - `bin/self-apply.sh` validates patch format, prefers only‑touched checks, and uses a no‑op default command unless provided.
+- Documentation and tests:
+  - docs/WORKFLOWS.md: Added `invalid_patch` examples (CLI/HTTP) and `just safe-apply` tips.
+  - CONFIG.md: CI recommendation for `L2_MAX_PARSE_FILES=12` kept; aligned with workflow.
+  - New tests: `tests/patch-invalid-input.test.ts` (invalid patch handling), `tests/layer2-parse-cap.test.ts` (AST cap).
+  - Quick validation: `just test` green locally (step+integration); HTTP tool‑first gate tests pass.
+
 ### 🛡️ Policy
 - AGENTS.md updated with a concise, mandatory Tool‑First Editing Policy:
   - Stage edits via Ontology‑LSP tools (snapshots + checks), not direct writes.
