@@ -170,7 +170,8 @@ Goal: ship a small library of safe, composable workflows and make them discovera
   - Add completable() suggestions for common symbols and edges.
 - UI integration:
   - DONE: snapshot overlay.diff/status preview at `/ui` with client‑side diff highlighting.
-  - Next: small affordances (copy snapshot id, open diff in new tab, lightweight “rerun checks” control).
+  - DONE: UI affordances (copy snapshot id, open diff in new tab).
+  - Next: lightweight “rerun checks” control and apply‑guarded preview (dev‑only).
 - Docs:
   - DONE: OpenAPI `/openapi.json` extended with named workflow schemas.
   - Next: short “Tool‑First Editing” reminder and examples in docs/WORKFLOWS.md.

@@ -479,6 +479,7 @@ Status: adapters/LSP integration tests are green. E2E local run improved reliabi
   - Workflows panel (locate, safe‑rename, patch‑checks) calling HTTP tools.
   - Pipelines panel using streamable HTTP run‑stream (NDJSON) with incremental rendering.
   - Server fallback: if `web-ui/dist/index.html` is absent, serve `web-ui/index.html` (unbundled) to avoid 404s.
+  - UI affordances: added “Copy ID” and “Open Diff (tab)” controls in Snapshots panel.
 - CLI dogfooding:
   - `bin/snap-diff.sh` + `just snap_diff_cli <SNAP_ID>` use `delta` when available (fallback to `cat`) to preview snapshot diffs.
 - Adapter polish (parity):
