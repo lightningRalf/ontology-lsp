@@ -13,14 +13,14 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 
 <!-- 0.05 Port Management Simplification moved to PROJECT_STATUS after completion -->
 
-### 0.1 Fix‑Bugs‑First: Perf stabilization (Immediate)
+### ✅ 0.1 Fix‑Bugs‑First: Perf stabilization (COMPLETED - 2025-09-07)
 
-- New: Introduce `L2_MAX_PARSE_FILES` env knob (default 20; clamp 1–100) to cap Layer 2 AST parsed files per request; reduces variance and stabilizes p95 in constrained environments.
-- Docs: Added to `CONFIG.md`; `tests/README.md` shows example usage alongside `PERF=1`.
-- Validation: Targeted integration + adapter suites green; perf spot‑check with `PERF=1 L2_MAX_PARSE_FILES=10` meets ≤100ms p95 in harness.
-- Update (2025‑09‑07): Clamp semantics finalized and tested. Numeric values clamp to [1,100]; invalid inputs fall back to 20. New boundary tests added.
-- Next: Calibrate recommended CI defaults (e.g., 10–12) for perf‑gated jobs; monitor metrics and adjust.
-- Status (CI): PERF‑gated job now sets `L2_MAX_PARSE_FILES=12` to stabilize p95 on CI runners (scoped to perf step).
+- ✅ Introduced `L2_MAX_PARSE_FILES` env knob (default 20; clamp 1–100) to cap Layer 2 AST parsed files per request
+- ✅ Clamp semantics finalized: Numeric values clamp to [1,100]; invalid inputs fall back to 20
+- ✅ Added comprehensive boundary tests (`tests/layer2-parse-cap-boundaries.test.ts`) - all passing
+- ✅ Updated test runners to propagate L2_MAX_PARSE_FILES consistently
+- ✅ Documentation updated in `CONFIG.md` and `tests/README.md` 
+- ✅ CI defaults calibrated: PERF‑gated jobs use `L2_MAX_PARSE_FILES=12` for stable p95
 
 ### 0.15 Minimal Viable L1→L5 (Working Paths)
 - L1 Fast Search: validate `text_search` tool; cap results; p95≤50ms on fixture

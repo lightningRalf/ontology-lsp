@@ -561,25 +561,32 @@ Status: adapters/LSP integration tests are green. E2E local run improved reliabi
 
 ## 📅 Latest Updates (2025-09-07)
 
-### Layer 2 AST Cap — Clamp Semantics Finalized
+### Layer 2 AST Cap — Clamp Semantics Finalized ✅
 - Clarified and enforced clamp behavior for `L2_MAX_PARSE_FILES` in Layer 2 (Tree‑sitter):
   - Numeric values are clamped to [1, 100]. Values ≤ 0 become 1; values > 100 become 100.
   - Non‑numeric/invalid inputs fall back to the default of 20.
 - Tests:
   - Added `tests/layer2-parse-cap-boundaries.test.ts` (below‑min, invalid, and above‑max behavior).
   - Existing cap test `tests/layer2-parse-cap.test.ts` continues to pass.
+  - All boundary tests passing (3/3) with comprehensive coverage.
+- Implementation:
+  - Updated clamp logic in `src/layers/tree-sitter.ts` to use simpler, clearer semantics
+  - Enhanced test runners with L2_MAX_PARSE_FILES propagation
 - Docs:
   - CONFIG.md updated to reflect clamp semantics precisely.
 
-### Test Runner Stabilization (Slices + Batches)
+### Test Runner Stabilization (Slices + Batches) — Enhanced
 - Slicing and batching improvements aimed at reducing long, silent runs:
   - `just test-slices` now uses a shell‑safe loop (no `seq` interpolation artifacts); works with positional numeric args only.
+  - Fixed shell portability issues by replacing `seq` with portable while loop
   - Batch runner (`bin/test-progress-batch.sh`):
     - Optional `BAIL=1` adds `--bail=1` to stop on first failure per batch for fast feedback.
     - Optional keep‑alive heartbeat prints a line every ~15s while a batch runs; uses line‑buffering when `stdbuf` is available.
     - Optional `BATCH_HARD_TIMEOUT_SEC` to bound a single bun invocation (uses `timeout` if present).
+    - Enhanced progress reporting with clearer batch status indicators
   - Slicer (`bin/test-slicer.sh`):
     - Defaults exclude perf/benchmarks and e2e unless `WITH_PERF=1` / `WITH_E2E=1` is provided.
+    - Improved file selection logic for more balanced slicing
   - Recipes:
     - `test-ci-like` tightened defaults: `BATCH_SIZE=6 TIMEOUT=90000 BAIL=1 L2_MAX_PARSE_FILES=10 ESCALATION_POLICY=never`.
     - Environment knobs flow through to slicer/batcher.
