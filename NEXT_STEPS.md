@@ -39,7 +39,9 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 - ⚠️ L5 Output: stats command lacks JSON output
 
 **Next Actions**:
-- Optimize L1 Fast Search performance (investigate ripgrep settings)
+- ✅ Lazy L4 initialization implemented (86ms vs 650ms startup)
+- Optimize L1 Fast Search performance (ripgrep scan still ~1s)
+  - Consider: search indexing, daemon mode, parallel search
 - Fix L3 symbol-map and plan-rename timeouts
 - Add JSON output to stats command
 - Add proper performance benchmarks with realistic targets
