@@ -14,6 +14,7 @@ set -ueo pipefail
 
 BATCH_SIZE=${BATCH_SIZE:-10}
 TIMEOUT_MS=${TIMEOUT:-300000}
+BAIL=${BAIL:-}
 MAX_FILES=${MAX_FILES:-}
 
 # Collect test files. Prefer explicit list via FILE_LIST; otherwise discover.
@@ -60,9 +61,34 @@ for ((i=0; i<TOTAL; i+=BATCH_SIZE)); do
   echo "=== BATCH START ${ts} :: [${batch_index}] files ${i}-${end}/${TOTAL}"
   printf "Files: %s\n" "${batch[*]}"
   START=$(date +%s%3N)
-  # Run bun once for the entire batch; do not bail so we capture all failures in the batch
-  BUN_JOBS=${BUN_JOBS:-1} bun test "${batch[@]}" --timeout ${TIMEOUT_MS}
+  # Build command with optional stdbuf (line-buffering) and hard timeout
+  CMD=(bun test)
+  for f in "${batch[@]}"; do CMD+=("$f"); done
+  CMD+=(--timeout "${TIMEOUT_MS}")
+  if [[ -n "${BAIL}" && "${BAIL}" != "0" ]]; then
+    CMD+=(--bail=1)
+  fi
+  PREFIX=()
+  if command -v stdbuf >/dev/null 2>&1; then
+    PREFIX+=(stdbuf -oL -eL)
+  fi
+  if [[ -n "${BATCH_HARD_TIMEOUT_SEC:-}" && "${BATCH_HARD_TIMEOUT_SEC}" -gt 0 ]] && command -v timeout >/dev/null 2>&1; then
+    PREFIX=(timeout "${BATCH_HARD_TIMEOUT_SEC}s" "${PREFIX[@]}")
+  fi
+
+  # Keep-alive heartbeat while tests run
+  (
+    while :; do
+      echo "[test-batch ${batch_index}] still running... $(date -Is)" 1>&2
+      sleep 15 || exit 0
+    done
+  ) &
+  KA_PID=$!
+
+  # Execute
+  BUN_JOBS=${BUN_JOBS:-1} "${PREFIX[@]}" "${CMD[@]}"
   code=$?
+  kill "$KA_PID" >/dev/null 2>&1 || true
   END=$(date +%s%3N)
   DUR=$((END-START))
 

@@ -29,6 +29,7 @@ BATCH_SIZE=${BATCH_SIZE:-8}
 TIMEOUT_MS=${TIMEOUT:-180000}
 MAX_FILES=${MAX_FILES:-}
 WITH_PERF=${WITH_PERF:-}
+WITH_E2E=${WITH_E2E:-}
 
 # Collect test files (default excludes perf/benchmarks unless WITH_PERF=1)
 SUITE_DIR=${SUITE_DIR:-}
@@ -40,11 +41,21 @@ if [[ -n "${WITH_PERF}" && "${WITH_PERF}" != "0" ]]; then
   fi
 else
   if [[ -n "${SUITE_DIR}" ]]; then
-    mapfile -t ALL < <(find "${SUITE_DIR}" -type f \( -name "*.test.ts" -o -name "*.test.js" \) \
-      ! -path "*/performance/*" ! -path "*/benchmarks/*" | sort)
+    if [[ -n "${WITH_E2E}" && "${WITH_E2E}" != "0" ]]; then
+      mapfile -t ALL < <(find "${SUITE_DIR}" -type f \( -name "*.test.ts" -o -name "*.test.js" \) \
+        ! -path "*/performance/*" ! -path "*/benchmarks/*" | sort)
+    else
+      mapfile -t ALL < <(find "${SUITE_DIR}" -type f \( -name "*.test.ts" -o -name "*.test.js" \) \
+        ! -path "*/performance/*" ! -path "*/benchmarks/*" ! -path "*/e2e/*" | sort)
+    fi
   else
-    mapfile -t ALL < <(find tests test -type f \( -name "*.test.ts" -o -name "*.test.js" \) \
-      ! -path "*/performance/*" ! -path "*/benchmarks/*" | sort)
+    if [[ -n "${WITH_E2E}" && "${WITH_E2E}" != "0" ]]; then
+      mapfile -t ALL < <(find tests test -type f \( -name "*.test.ts" -o -name "*.test.js" \) \
+        ! -path "*/performance/*" ! -path "*/benchmarks/*" | sort)
+    else
+      mapfile -t ALL < <(find tests test -type f \( -name "*.test.ts" -o -name "*.test.js" \) \
+        ! -path "*/performance/*" ! -path "*/benchmarks/*" ! -path "*/e2e/*" | sort)
+    fi
   fi
 fi
 

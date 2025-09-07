@@ -512,15 +512,17 @@ test-sliced slices="4" slice="1":
 
 # Run all slices sequentially (useful locally to get periodic feedback)
 test-slices slices="4":
-    @for i in `seq 1 {{slices}}`; do \
-        echo "================ SLICE $$i/{{slices}} ================"; \
-        SLICES={{slices}} SLICE=$$i BATCH_SIZE=${BATCH_SIZE:-8} TIMEOUT=${TIMEOUT:-180000} BUN_JOBS=${BUN_JOBS:-1} bin/test-slicer.sh || exit $$?; \
-      done
+    @n={{slices}}; i=1; \
+    while [ "$i" -le "$n" ]; do \
+        echo "================ SLICE $i/$n ================"; \
+        SLICES="$n" SLICE="$i" BATCH_SIZE=${BATCH_SIZE:-8} TIMEOUT=${TIMEOUT:-180000} BUN_JOBS=${BUN_JOBS:-1} L2_MAX_PARSE_FILES=${L2_MAX_PARSE_FILES:-10} ESCALATION_POLICY=${ESCALATION_POLICY:-never} BAIL=${BAIL:-} bin/test-slicer.sh || exit $?; \
+        i=`expr $i + 1`; \
+    done
 
 # CI-like local run: 6 slices sequentially with steadier batch size
 test-ci-like:
     @echo "🧪 Running CI-like sliced tests (6 slices)"
-    @SLICES=${SLICES:-6}; BATCH_SIZE=${BATCH_SIZE:-10}; TIMEOUT=${TIMEOUT:-180000}; BUN_JOBS=${BUN_JOBS:-1}; just test-slices slices=$$SLICES
+    @BAIL=${BAIL:-1} BATCH_SIZE=${BATCH_SIZE:-6} TIMEOUT=${TIMEOUT:-90000} BUN_JOBS=${BUN_JOBS:-1} L2_MAX_PARSE_FILES=${L2_MAX_PARSE_FILES:-10} ESCALATION_POLICY=${ESCALATION_POLICY:-never} just test-slices 6
 
 # Auto-sliced test runner (detect CPU, clamp slices; sequential for clean output)
 test-fast:
