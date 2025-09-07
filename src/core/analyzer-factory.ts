@@ -100,21 +100,70 @@ class Layer2Adapter extends LayerAdapter {
 
 /**
  * Adapter for existing OntologyEngine (Layer 4)
+ * Now with lazy initialization to avoid 567ms startup cost
  */
 class Layer3Adapter extends LayerAdapter {
     name = 'layer4';
     version = '1.0.0';
     targetLatency = 10; // 10ms target
 
-    private ontology: OntologyEngine;
+    private ontology: OntologyEngine | null = null;
+    private storage: any;
+    private initPromise: Promise<void> | null = null;
+    private lazyInit: boolean;
 
     constructor(storage: any) {
         super();
-        this.ontology = new OntologyEngine(storage);
+        this.storage = storage;
+        // Check for env flag to control lazy initialization
+        this.lazyInit = process.env.EAGER_L4_INIT !== '1';
+        
+        if (process.env.DEBUG_LAYER_INIT === '1') {
+            console.log(`[Layer4] Lazy init: ${this.lazyInit}`);
+        }
+        
+        if (!this.lazyInit) {
+            // Eager initialization (old behavior)
+            this.ontology = new OntologyEngine(storage);
+        }
+    }
+
+    async initialize(): Promise<void> {
+        if (!this.lazyInit && this.ontology) {
+            // If eager init, initialize the ontology engine now
+            await this.ontology.initialize?.();
+        }
+        // If lazy init, do nothing - will initialize on first use
+    }
+
+    private async ensureInitialized(): Promise<void> {
+        if (this.ontology) return;
+        
+        // Use a promise to prevent multiple initializations
+        if (!this.initPromise) {
+            this.initPromise = (async () => {
+                this.ontology = new OntologyEngine(this.storage);
+                await this.ontology.initialize?.();
+            })();
+        }
+        
+        await this.initPromise;
     }
 
     getOntologyEngine(): OntologyEngine {
-        return this.ontology;
+        if (!this.ontology && !this.lazyInit) {
+            // Fallback for eager mode
+            this.ontology = new OntologyEngine(this.storage);
+        }
+        return this.ontology!;
+    }
+
+    async process(input: any): Promise<any> {
+        if (this.lazyInit) {
+            await this.ensureInitialized();
+        }
+        // Default mock behavior - override in actual implementation
+        return { results: [], processingTime: 0 };
     }
 }
 
@@ -317,12 +366,14 @@ export class AnalyzerFactory {
         } as any);
         const layer4Ont = new Layer3Adapter(storage);
 
+        // Pass null initially if using lazy init for Layer 4
+        // Layer 2 can work without ontology engine
         const layer2 = new Layer2Adapter({
             enabled: fullConfig.layers.layer2.enabled,
             timeout: fullConfig.layers.layer2.timeout,
             languages: fullConfig.layers.layer2.languages,
             maxFileSize: fullConfig.layers.layer2.maxFileSize.toString(),
-        }, layer4Ont.getOntologyEngine());
+        }, process.env.EAGER_L4_INIT === '1' ? layer4Ont.getOntologyEngine() : undefined);
 
         const layer5Pat = new Layer4Adapter(ontologyDbPath, {
             learningThreshold: (fullConfig.layers as any).layer5?.learningThreshold ?? 3,

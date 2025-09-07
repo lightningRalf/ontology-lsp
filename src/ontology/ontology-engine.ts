@@ -56,15 +56,21 @@ export class OntologyEngine extends EventEmitter {
         const s: any = storage as any;
         this.storage = s && typeof s.getMetrics === 'function' ? storage : new InstrumentedStoragePort(storage);
 
-        // Store initialization promise for later awaiting
-        this.initPromise = this.initialize();
+        // Don't initialize immediately - wait for explicit initialization
+        // This avoids the 567ms loadAllConcepts on startup
+        this.initPromise = null;
+        
+        if (process.env.DEBUG_LAYER_INIT === '1') {
+            console.log('[OntologyEngine] Created without initialization');
+        }
     }
 
     async ensureInitialized(): Promise<void> {
-        if (this.initPromise) {
-            await this.initPromise;
-            this.initPromise = null;
+        if (!this.initPromise) {
+            // First time - start initialization
+            this.initPromise = this.initialize();
         }
+        await this.initPromise;
     }
 
     getStorageMetrics(): L4StorageMetrics | null {
@@ -108,6 +114,8 @@ export class OntologyEngine extends EventEmitter {
     }
 
     async findConcept(identifier: string, options?: { inferIfMissing?: boolean }): Promise<Concept | null> {
+        await this.ensureInitialized();
+        
         // 1. Direct lookup by representation
         const directMatch = await this.findByRepresentation(identifier);
         if (directMatch) return directMatch;

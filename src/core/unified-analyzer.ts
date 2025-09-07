@@ -111,10 +111,27 @@ export class CodeAnalyzer {
             return;
         }
 
+        const startTime = Date.now();
+        
+        if (process.env.DEBUG_LAYER_INIT === '1') {
+            console.log('[CodeAnalyzer] Starting initialization...');
+        }
+
         await this.layerManager.initialize();
+        
+        if (process.env.DEBUG_LAYER_INIT === '1') {
+            console.log(`[CodeAnalyzer] LayerManager initialized in ${Date.now() - startTime}ms`);
+        }
+        
+        const sharedStart = Date.now();
         await this.sharedServices.initialize();
+        
+        if (process.env.DEBUG_LAYER_INIT === '1') {
+            console.log(`[CodeAnalyzer] SharedServices initialized in ${Date.now() - sharedStart}ms`);
+        }
 
         // Initialize learning orchestrator
+        const learningStart = Date.now();
         this.learningOrchestrator = new LearningOrchestrator(this.sharedServices, this.eventBus, {
             enabledComponents: {
                 patternLearning: this.config.layers.layer5?.enabled || true,
@@ -124,6 +141,11 @@ export class CodeAnalyzer {
             },
         });
         await this.learningOrchestrator.initialize();
+        
+        if (process.env.DEBUG_LAYER_INIT === '1') {
+            console.log(`[CodeAnalyzer] LearningOrchestrator initialized in ${Date.now() - learningStart}ms`);
+            console.log(`[CodeAnalyzer] Total initialization time: ${Date.now() - startTime}ms`);
+        }
 
         this.initialized = true;
 
