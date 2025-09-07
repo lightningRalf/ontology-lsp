@@ -44,6 +44,10 @@ Status: `list_symbols` now supports an AST‑backed path behind a feature flag (
   - DB hygiene: suppress/no‑op dev FK warnings for unknown IDs when registration isn’t used.
   - Docs: examples for register/list/status/runs and typical troubleshooting (timeouts, budgets).
 
+Status update (2025‑09‑07):
+- DONE: UI status badge + localStorage for last pipeline/run and register form.
+- DONE: Optional bearer token gate (`HTTP_PIPELINES_TOKEN`) for `POST /api/v1/pipelines` (UI token field persisted).
+
 ### 0.2 Dogfood‑Every‑Change (Immediate)
 - Integrate `just dogfood_ci` into CI: publish JSON summary as artifact and/or PR comment
 - Prefer HTTP `/api/v1/tools/call` for portability; MCP stdio acceptable for local iteration
@@ -59,6 +63,10 @@ Developer ergonomics (available):
 ### 0.25 Observability & SLO Conformance
 - Ensure `/metrics` JSON includes p50/p95/p99 per layer and op counts/errors
 - Adapter logs include per‑layer timing for each workflow invocation
+
+Status update (2025‑09‑07):
+- DONE: Per‑tool call counts and a compact recent call list added to monitoring and `/api/v1/monitoring`.
+- UI Tools card renders `toolCounts` and `toolRecent` for quick visibility.
 
 ### 0.27 Test Slicer & Batch Observability (Now Live)
 - Main test matrix sliced (6) with per‑batch progress and JSONL artifacts; E2E sliced (2) gated.
@@ -197,7 +205,9 @@ Goal: ship a small library of safe, composable workflows and make them discovera
 - UI integration:
   - DONE: snapshot overlay.diff/status preview at `/ui` with client‑side diff highlighting.
   - DONE: UI affordances (copy snapshot id, open diff in new tab).
-  - Next: lightweight “rerun checks” control and apply‑guarded preview (dev‑only).
+  - DONE: lightweight “Apply After Checks” control (dev‑guarded) with presets (Fast/Typecheck/Build/No‑op) in Snapshots.
+  - DONE: “Stage+Apply (dev)” (prompts for patch → stage → checks → apply via `apply_after_checks`).
+  - DONE: “Revert Last (dev)” helper (reverse‑apply most recent snapshot overlay.diff).
 - Docs:
   - DONE: OpenAPI `/openapi.json` extended with named workflow schemas.
   - Next: short “Tool‑First Editing” reminder and examples in docs/WORKFLOWS.md.

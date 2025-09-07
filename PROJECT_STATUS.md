@@ -497,7 +497,34 @@ Status: adapters/LSP integration tests are green. E2E local run improved reliabi
   - `GET /api/v1/pipelines/runs?id=&limit=` (recent runs).
   - `GET /api/v1/pipelines` (list pipelines).
   - `POST /api/v1/pipelines` (register pipeline; dev‑only convenience; mirrors LO.registerPipeline).
-- OpenAPI: added schemas and paths for all the above; keeps HTTP parity with MCP tools where applicable.
+  - OpenAPI: added schemas and paths for all the above; keeps HTTP parity with MCP tools where applicable.
+
+## 📅 Latest Updates (2025-09-07)
+
+### 🧰 Tool-First UX: Snapshots + Tools panel
+- Web UI (/ui):
+  - Snapshots card now includes:
+    - Preset selector (Fast/Typecheck/Build/No-op) and “Apply After Checks” (dev-guarded) to run checks then apply to working tree when `ALLOW_SNAPSHOT_APPLY=1`.
+    - “Stage+Apply (dev)” one-click flow that prompts for a patch (reuses the Patch textarea or a modal prompt), then stages → checks → applies via `apply_after_checks`.
+    - “Revert Last (dev)” helper that fetches the most recent snapshot’s overlay.diff and applies it in reverse (dev-guarded).
+  - Tools panel: shows top tool counts and a compact “recent tool calls” list (last 50) for quick observability.
+
+### 📈 Monitoring & HTTP parity
+- MonitoringService now records per-tool counts and a recent tool call ring buffer; surfaced via:
+  - HTTP `/api/v1/monitoring` → adds `toolCounts` and `toolRecent` in JSON.
+  - HTTP tools endpoint (`POST /api/v1/tools/call`) records invocations in monitoring for consistency with MCP.
+
+### 🩹 Patch apply robustness (+ reverse)
+- OverlayStore fallback to `patch` auto-detects `-p` level (uses `-p1` for `a/ b/`-prefixed unified diffs) and supports reverse apply (`-R`) both when applying to working tree and during snapshot materialization checks.
+- MCP `apply_snapshot` and `apply_after_checks` accept `reverse: true`; Tool schema updated accordingly.
+
+### 🔐 Pipelines register (token)
+- Added optional bearer token gate for `POST /api/v1/pipelines` controlled via `HTTP_PIPELINES_TOKEN`. UI provides a persisted token field.
+
+### Impact
+- Faster dogfooding loops: one-click stage→check→apply from UI; safe revert flows in dev.
+- Better visibility: recent tool calls + counts available for dashboards and quick triage.
+- More resilient patching end-to-end (unified diffs apply cleanly across environments).
 - Web UI (/ui): Pipelines panel now supports:
   - Loading pipelines into a dropdown (HTTP list endpoint),
   - Stream run (NDJSON), run status, recent runs, run detail,

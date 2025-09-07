@@ -97,6 +97,10 @@ export class MonitoringService {
     // Health monitoring
     private healthCheckTimer?: NodeJS.Timeout;
 
+    // Tool tracking (counts + recent)
+    private toolCounts = new Map<string, number>();
+    private toolRecent: Array<{ name: string; timestamp: number }> = [];
+
     constructor(config: MonitoringConfig, eventBus: EventBus) {
         this.config = config;
         this.eventBus = eventBus;
@@ -221,6 +225,30 @@ export class MonitoringService {
         }
 
         this.cacheMisses++;
+    }
+
+    /**
+     * Record a tool invocation by name (for HTTP/MCP tool endpoints)
+     */
+    recordToolCall(name: string): void {
+        if (!this.initialized || !this.config.enabled) return;
+        const key = String(name || 'unknown');
+        const prev = this.toolCounts.get(key) || 0;
+        this.toolCounts.set(key, prev + 1);
+        const now = Date.now();
+        this.toolRecent.push({ name: key, timestamp: now });
+        if (this.toolRecent.length > 50) this.toolRecent.splice(0, this.toolRecent.length - 50);
+        this.eventBus.emit('monitoring-service:tool-called', { name: key, count: prev + 1, timestamp: now });
+    }
+
+    getToolCounts(): Record<string, number> {
+        const out: Record<string, number> = {};
+        for (const [k, v] of this.toolCounts.entries()) out[k] = v;
+        return out;
+    }
+
+    getToolRecent(limit = 20): Array<{ name: string; timestamp: number }> {
+        return this.toolRecent.slice(-limit);
     }
 
     /**
@@ -401,6 +429,8 @@ export class MonitoringService {
                 recentErrorCount: this.recentErrors.length,
             },
             healthy: this.isHealthy(),
+            toolCounts: this.getToolCounts(),
+            toolRecent: this.getToolRecent(),
             timestamp: Date.now(),
         };
     }

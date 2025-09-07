@@ -294,6 +294,11 @@ export class HTTPServer {
                             const mcpAdapter = new MCPAdapter(this.coreAnalyzer);
                             const executor = new ToolExecutor();
                             const mcpResult: any = await executor.execute(mcpAdapter as any, name, args);
+                            // Record tool call in monitoring (if enabled)
+                            try {
+                                const mon = (this.coreAnalyzer as any)?.sharedServices?.monitoring;
+                                if (mon && typeof mon.recordToolCall === 'function') mon.recordToolCall(name);
+                            } catch {}
 
                             // Normalize/unwrap MCP result to a stable JSON shape for HTTP clients
                             const unwrap = (res: any) => {

@@ -4,7 +4,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Ontology‑LSP Dashboard</title>
-    <!-- E2E apply test: safe comment -->
     <style>
       :root { --indigo:#4f46e5; --fg:#111827; --muted:#6b7280; --br:#e5e7eb; --bg:#f9fafb; }
       html,body { margin:0; padding:0; background:#fff; color:var(--fg); font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
@@ -63,14 +62,6 @@
         </div>
 
         <div class="card">
-          <header><h2>Tools</h2></header>
-          <div class="body">
-            <div id="tools"></div>
-            <div id="toolsRecent" class="mono" style="margin-top:6px;"></div>
-          </div>
-        </div>
-
-        <div class="card">
           <header><h2>Learning Stats</h2></header>
           <div class="body">
             <table class="kv" id="learning-kv"></table>
@@ -98,8 +89,6 @@
                 <option value="noop">No-op</option>
               </select>
               <button id="btnSnapApplyAfter" title="Run checks (preset) then apply if OK (dev-only)">Apply After Checks</button>
-              <button id="btnSnapStageApplyAfter" title="Stage patch → checks → apply (dev-only)">Stage+Apply (dev)</button>
-              <button id="btnSnapRevertLast" title="Revert last applied patch (dev-only)">Revert Last (dev)</button>
               <button id="btnSnapCopy" title="Copy snapshot id">Copy ID</button>
               <button id="btnSnapOpen" title="Open diff in new tab">Open Diff (tab)</button>
             </div>
@@ -226,19 +215,6 @@
           </div>`;
         }).join('') : '<span class="muted">No data</span>';
       }
-      function renderToolCounts(el, counts) {
-        const keys = Object.keys(counts||{}).sort((a,b)=> (counts[b]||0)-(counts[a]||0));
-        el.innerHTML = keys.length ? keys.slice(0,12).map(k => `<div><strong>${esc(k)}</strong>: ${counts[k]}</div>`).join('') : '<span class="muted">No tool calls yet</span>';
-      }
-      function renderToolRecent(el, items) {
-        const arr = Array.isArray(items)? items.slice(-12) : [];
-        if (!arr.length) { el.innerHTML = '<span class="muted">No recent calls</span>'; return; }
-        const rows = arr.reverse().map(it => {
-          const ts = new Date(it.timestamp||Date.now()).toLocaleTimeString();
-          return `${esc(ts)} · ${esc(it.name||'unknown')}`;
-        });
-        el.innerHTML = rows.join('<br/>');
-      }
 
       function highlightUnifiedDiff(text) {
         const lines = text.split(/\r?\n/);
@@ -269,8 +245,6 @@
           const perf = mon?.data?.performance || {}; const layers = mon?.data?.layers || {};
           kv($('health-kv'), { status: 'OK', totalRequests: perf.totalRequests||0, p95: (perf.p95Latency||0)+'ms' });
           renderLayers($('layers'), layers);
-          renderToolCounts($('tools'), mon?.data?.toolCounts || {});
-          renderToolRecent($('toolsRecent'), mon?.data?.toolRecent || []);
         } catch(e) {}
 
         try {
@@ -366,42 +340,6 @@
             showToast(msg, 'err');
           }
         }
-      }
-
-      function pickPatchText() {
-        const t = document.getElementById('w-patch');
-        let patch = '';
-        if (t && (t as HTMLTextAreaElement).value) patch = (t as HTMLTextAreaElement).value;
-        if (!patch) patch = window.prompt('Enter apply_patch or unified diff','') || '';
-        return patch;
-      }
-      async function snapStageApplyAfter() {
-        const patch = pickPatchText();
-        if (!patch.trim()) { showToast('No patch provided', 'warn'); return; }
-        const preset = $('snapPreset').value || 'fast';
-        const args = presetToArgs(preset);
-        try {
-          const out = await toolsCall('apply_after_checks', { patch, commands: args.commands, timeoutSec: args.timeoutSec });
-          $('snapOut').textContent = JSON.stringify(out, null, 2);
-          if (!out?.applied) showToast('Apply disabled (set ALLOW_SNAPSHOT_APPLY=1)', 'warn');
-        } catch(e) { showToast(e?.message||String(e),'err'); }
-      }
-      async function snapRevertLast() {
-        try {
-          const res = await getJSON(api('/api/v1/snapshots'));
-          const list = res?.data?.snapshots || [];
-          if (!list.length) { showToast('No snapshots to revert', 'warn'); return; }
-          const sorted = list.slice().sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
-          const id = sorted[0].id;
-          const diffRes = await getJSON(api(`/api/v1/snapshots/${id}/diff`));
-          const patch = diffRes?.data?.diff || '';
-          if (!patch) { showToast('No diff found to revert', 'warn'); return; }
-          const preset = $('snapPreset').value || 'fast';
-          const args = presetToArgs(preset);
-          const out = await toolsCall('apply_after_checks', { patch, reverse: true, commands: args.commands, timeoutSec: args.timeoutSec });
-          $('snapOut').textContent = JSON.stringify(out, null, 2);
-          if (!out?.applied) showToast('Revert disabled (set ALLOW_SNAPSHOT_APPLY=1)', 'warn');
-        } catch(e) { showToast(e?.message||String(e),'err'); }
       }
 
       async function toolsCall(name, args) {
@@ -520,10 +458,6 @@
       $('btnSnapOpen').onclick = snapOpen;
       const btnApplyAfter = document.getElementById('btnSnapApplyAfter');
       if (btnApplyAfter) btnApplyAfter.onclick = snapApplyAfterChecks;
-      const btnStageApplyAfter = document.getElementById('btnSnapStageApplyAfter');
-      if (btnStageApplyAfter) btnStageApplyAfter.onclick = snapStageApplyAfter;
-      const btnRevertLast = document.getElementById('btnSnapRevertLast');
-      if (btnRevertLast) btnRevertLast.onclick = snapRevertLast;
       $('btnLocate').onclick = wfLocate;
       $('btnRename').onclick = wfRename;
       $('btnPatch').onclick = wfPatch;

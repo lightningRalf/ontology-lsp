@@ -217,10 +217,15 @@ export class OverlayStore {
                     { stdio: 'pipe' }
                 );
                 if (applied.status !== 0 && this.which('patch')) {
-                    spawnSync('bash', ['-lc', `patch -p0 < overlay.diff`], { cwd: dir, stdio: 'pipe' });
+                    // Choose -p level based on diff header (a/ b/ prefixes -> -p1)
+                    const diffText = await fsp.readFile(diffFile, 'utf8').catch(() => '');
+                    const pLevel = /\ndiff --git a\//.test('\n' + diffText) ? 1 : 0;
+                    spawnSync('bash', ['-lc', `patch -p${pLevel} < overlay.diff`], { cwd: dir, stdio: 'pipe' });
                 }
             } else if (this.which('patch')) {
-                spawnSync('bash', ['-lc', `patch -p0 < overlay.diff`], { cwd: dir, stdio: 'pipe' });
+                const diffText = await fsp.readFile(diffFile, 'utf8').catch(() => '');
+                const pLevel = /\ndiff --git a\//.test('\n' + diffText) ? 1 : 0;
+                spawnSync('bash', ['-lc', `patch -p${pLevel} < overlay.diff`], { cwd: dir, stdio: 'pipe' });
             }
             await this.logProgress(snapshotId, 'apply:done');
         }
@@ -291,7 +296,10 @@ export class OverlayStore {
         return { ok: true, output: output.join(''), elapsedMs: Date.now() - start };
     }
 
-    async applyToWorkingTree(snapshotId: string, { check = false }: { check?: boolean } = {}): Promise<{
+    async applyToWorkingTree(
+        snapshotId: string,
+        { check = false, reverse = false }: { check?: boolean; reverse?: boolean } = {}
+    ): Promise<{
         ok: boolean;
         output: string;
         elapsedMs: number;
@@ -301,14 +309,21 @@ export class OverlayStore {
         const dir = (await this.ensureMaterialized(snapshotId)) || process.cwd();
         const diffFile = path.join(dir, 'overlay.diff');
         let output = '';
-        const argsGit = ['-lc', `git apply ${check ? '--check ' : ''}--whitespace=nowarn ${JSON.stringify(diffFile)}`];
+        const argsGit = [
+            '-lc',
+            `git apply ${reverse ? '-R ' : ''}${check ? '--check ' : ''}--whitespace=nowarn ${JSON.stringify(diffFile)}`,
+        ];
         const git = spawnSync('bash', argsGit, { stdio: 'pipe', cwd: process.cwd() });
         output += String(git.stdout || '') + String(git.stderr || '');
         if (git.status === 0) {
             return { ok: true, output, elapsedMs: Date.now() - start };
         }
         if (this.which('patch')) {
-            const patchArgs = ['-lc', `${check ? 'patch --dry-run -p0 < ' : 'patch -p0 < '}${JSON.stringify(diffFile)}`];
+            const diffText = await fsp.readFile(diffFile, 'utf8').catch(() => '');
+            const pLevel = /\ndiff --git a\//.test('\n' + diffText) ? 1 : 0;
+            const dry = check ? `--dry-run ` : '';
+            const rev = reverse ? `-R ` : '';
+            const patchArgs = ['-lc', `patch ${dry}${rev}-p${pLevel} < ${JSON.stringify(diffFile)}`];
             const p = spawnSync('bash', patchArgs, { stdio: 'pipe', cwd: process.cwd() });
             output += String(p.stdout || '') + String(p.stderr || '');
             return { ok: p.status === 0, output, elapsedMs: Date.now() - start };

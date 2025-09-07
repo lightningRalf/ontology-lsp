@@ -2938,6 +2938,8 @@ export class CodeAnalyzer {
                 cacheMisses: monDiag?.metrics?.cacheMisses ?? 0,
                 layerBreakdown: monSummary.layerBreakdown ?? {},
                 recentErrors: (this.sharedServices as any).monitoring?.recentErrors || [],
+                toolCounts: (this.sharedServices as any).monitoring?.getToolCounts?.() || {},
+                toolRecent: (this.sharedServices as any).monitoring?.getToolRecent?.() || [],
             };
         } catch {}
 

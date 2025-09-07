@@ -570,6 +570,7 @@ export class MCPAdapter {
         if (!patch) return { content: [{ type: 'text', text: 'patch required' }], isError: true };
         const commands = Array.isArray(args?.commands) ? (args.commands as string[]) : ['bun run build:tsc'];
         const timeoutSec = typeof args?.timeoutSec === 'number' ? args.timeoutSec : 240;
+        const reverse = !!args?.reverse;
         // Ensure/derive snapshot
         const snapRes = await this.handleGetSnapshot({ preferExisting: true });
         const snapTxt = this.safeParseContent(snapRes);
@@ -582,7 +583,7 @@ export class MCPAdapter {
         const checks = await this.handleRunChecks({ snapshot, commands, timeoutSec });
         const chk = this.safeParseContent(checks) || {};
         if (chk?.ok && process.env.ALLOW_SNAPSHOT_APPLY === '1') {
-            const app = await this.handleApplySnapshot({ snapshot, check: false });
+            const app = await this.handleApplySnapshot({ snapshot, check: false, reverse });
             const appOut = this.safeParseContent(app) || {};
             const payload = { ok: !!chk?.ok, snapshot, applied: !!appOut?.ok, output_tail: chk?.output?.slice?.(-4000) || '' };
             return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }], isError: !chk?.ok };
@@ -986,6 +987,7 @@ export class MCPAdapter {
     private async handleApplySnapshot(args: Record<string, any>) {
         const snapshot = String(args?.snapshot || '').trim();
         const check = !!args?.check;
+        const reverse = !!args?.reverse;
         if (!snapshot) {
             return { content: [{ type: 'text', text: 'Missing snapshot' }], isError: true };
         }
@@ -1001,7 +1003,7 @@ export class MCPAdapter {
             };
         }
         try {
-            const res = await overlayStore.applyToWorkingTree(snapshot, { check });
+            const res = await overlayStore.applyToWorkingTree(snapshot, { check, reverse });
             return {
                 content: [
                     {

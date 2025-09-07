@@ -724,6 +724,9 @@ export class HTTPAdapter {
 
                         // Recent errors
                         recentErrors: monitoring.recentErrors || [],
+                        // Tool calls
+                        toolCounts: monitoring.toolCounts || {},
+                        toolRecent: monitoring.toolRecent || [],
 
                         // Learning statistics
                         learning: {

@@ -512,6 +512,7 @@ export class ToolRegistry {
                     snapshot: { type: 'string' },
                     commands: { type: 'array', items: { type: 'string' }, default: ['bun run build:tsc'] },
                     timeoutSec: { type: 'number', default: 240 },
+                    reverse: { type: 'boolean', default: false },
                 },
                 required: ['patch'],
             },
