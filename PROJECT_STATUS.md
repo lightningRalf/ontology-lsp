@@ -559,6 +559,44 @@ Status: adapters/LSP integration tests are green. E2E local run improved reliabi
   - New tests: `tests/patch-invalid-input.test.ts` (invalid patch handling), `tests/layer2-parse-cap.test.ts` (AST cap).
   - Quick validation: `just test` green locally (step+integration); HTTP tool‑first gate tests pass.
 
+## 📅 Latest Updates (2025-09-07)
+
+### Layer 2 AST Cap — Clamp Semantics Finalized
+- Clarified and enforced clamp behavior for `L2_MAX_PARSE_FILES` in Layer 2 (Tree‑sitter):
+  - Numeric values are clamped to [1, 100]. Values ≤ 0 become 1; values > 100 become 100.
+  - Non‑numeric/invalid inputs fall back to the default of 20.
+- Tests:
+  - Added `tests/layer2-parse-cap-boundaries.test.ts` (below‑min, invalid, and above‑max behavior).
+  - Existing cap test `tests/layer2-parse-cap.test.ts` continues to pass.
+- Docs:
+  - CONFIG.md updated to reflect clamp semantics precisely.
+
+### Test Runner Stabilization (Slices + Batches)
+- Slicing and batching improvements aimed at reducing long, silent runs:
+  - `just test-slices` now uses a shell‑safe loop (no `seq` interpolation artifacts); works with positional numeric args only.
+  - Batch runner (`bin/test-progress-batch.sh`):
+    - Optional `BAIL=1` adds `--bail=1` to stop on first failure per batch for fast feedback.
+    - Optional keep‑alive heartbeat prints a line every ~15s while a batch runs; uses line‑buffering when `stdbuf` is available.
+    - Optional `BATCH_HARD_TIMEOUT_SEC` to bound a single bun invocation (uses `timeout` if present).
+  - Slicer (`bin/test-slicer.sh`):
+    - Defaults exclude perf/benchmarks and e2e unless `WITH_PERF=1` / `WITH_E2E=1` is provided.
+  - Recipes:
+    - `test-ci-like` tightened defaults: `BATCH_SIZE=6 TIMEOUT=90000 BAIL=1 L2_MAX_PARSE_FILES=10 ESCALATION_POLICY=never`.
+    - Environment knobs flow through to slicer/batcher.
+
+Known issues and follow‑ups:
+- Some environments still experience long or silent runs. The keep‑alive heartbeat mitigates lack of output; further work is tracked in NEXT_STEPS (“Test Runner Stabilization v2”).
+- `just start` reported a shell syntax error on some hosts due to complex inline command composition. This will be simplified (tracked in NEXT_STEPS under Ports & DevX).
+
+### Monitoring & Warm‑Up
+- Raw monitoring view: `/api/v1/monitoring` now supports `?raw=1` to return the LayerManager’s full performance report for diagnostics.
+- Dev warm‑up probe: when `DEV_AUTO_WARMUP=1` (or `NODE_ENV=development`), the HTTP server triggers a light probe on startup to prime monitoring/learning panels and reduce “cold start” blanks.
+
+Impact:
+- More predictable AST costs in tests via precise cap semantics and defaults.
+- Better test UX with real‑time progress and fail‑fast options; less time lost to hanging or opaque batches.
+- Easier diagnostics for performance via raw monitoring and startup warm‑up.
+
 ### 🛡️ Policy
 - AGENTS.md updated with a concise, mandatory Tool‑First Editing Policy:
   - Stage edits via Ontology‑LSP tools (snapshots + checks), not direct writes.

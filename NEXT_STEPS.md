@@ -18,7 +18,8 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 - New: Introduce `L2_MAX_PARSE_FILES` env knob (default 20; clamp 1–100) to cap Layer 2 AST parsed files per request; reduces variance and stabilizes p95 in constrained environments.
 - Docs: Added to `CONFIG.md`; `tests/README.md` shows example usage alongside `PERF=1`.
 - Validation: Targeted integration + adapter suites green; perf spot‑check with `PERF=1 L2_MAX_PARSE_FILES=10` meets ≤100ms p95 in harness.
-- Next: Calibrate recommended CI defaults (e.g., 10–15) for perf‑gated jobs; monitor metrics and adjust.
+- Update (2025‑09‑07): Clamp semantics finalized and tested. Numeric values clamp to [1,100]; invalid inputs fall back to 20. New boundary tests added.
+- Next: Calibrate recommended CI defaults (e.g., 10–12) for perf‑gated jobs; monitor metrics and adjust.
 - Status (CI): PERF‑gated job now sets `L2_MAX_PARSE_FILES=12` to stabilize p95 on CI runners (scoped to perf step).
 
 ### 0.15 Minimal Viable L1→L5 (Working Paths)
@@ -67,6 +68,8 @@ Developer ergonomics (available):
 Status update (2025‑09‑07):
 - DONE: Per‑tool call counts and a compact recent call list added to monitoring and `/api/v1/monitoring`.
 - UI Tools card renders `toolCounts` and `toolRecent` for quick visibility.
+- NEW: `/api/v1/monitoring?raw=1` returns the raw LayerManager performance report for diagnostics.
+- NEW: Dev warm‑up probe (enabled via `DEV_AUTO_WARMUP=1` or `NODE_ENV=development`) primes monitoring and learning panels at server start.
 
 ### 0.27 Test Slicer & Batch Observability (Now Live)
 - Main test matrix sliced (6) with per‑batch progress and JSONL artifacts; E2E sliced (2) gated.
@@ -208,9 +211,20 @@ Goal: ship a small library of safe, composable workflows and make them discovera
   - DONE: lightweight “Apply After Checks” control (dev‑guarded) with presets (Fast/Typecheck/Build/No‑op) in Snapshots.
   - DONE: “Stage+Apply (dev)” (prompts for patch → stage → checks → apply via `apply_after_checks`).
   - DONE: “Revert Last (dev)” helper (reverse‑apply most recent snapshot overlay.diff).
-- Docs:
-  - DONE: OpenAPI `/openapi.json` extended with named workflow schemas.
-  - Next: short “Tool‑First Editing” reminder and examples in docs/WORKFLOWS.md.
+  - Docs:
+    - DONE: OpenAPI `/openapi.json` extended with named workflow schemas.
+    - Next: short “Tool‑First Editing” reminder and examples in docs/WORKFLOWS.md.
+
+### 0.28 Test Runner Stabilization v2 (New)
+- Tighten CI‑like defaults: `BATCH_SIZE=6 TIMEOUT=90s BAIL=1 L2_MAX_PARSE_FILES=10 ESCALATION_POLICY=never`.
+- Heartbeat output during long batches (a line every ~15s); enable line‑buffering when available.
+- Optional hard timeout per batch via `BATCH_HARD_TIMEOUT_SEC` to bound worst‑case runtime.
+- Exclude `e2e` and `performance/benchmarks` by default in slices; opt‑in via `WITH_E2E=1` / `WITH_PERF=1`.
+- Balance slices using historical timings; isolate “hot files” into a dedicated slow slice (`BATCH_SIZE=3`, `TIMEOUT=45s`).
+- Parallel slices recipe (`test-slices-par`) with port offsets per slice to avoid collisions.
+- Simplify `just start` to remove fragile inline pipelines (extract helpers).
+- Roll up HTTP tests to reuse one server per group (reduce start/stop overhead).
+- Docs: add real‑time output expectations, bail usage, and typical env presets for local vs CI.
 
 ### 1. Execute Production Deployment
 
