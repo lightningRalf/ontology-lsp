@@ -175,6 +175,34 @@ describe("MCPTranslator", () => {
 
 ## 2. Integration Tests (30% Coverage)
 
+### Local Workflow (Sliced + Batched)
+
+For fast local feedback, prefer the Justfile runners which mirror CI behavior with slices and batches.
+
+Examples:
+
+```bash
+# Fast default (auto-sliced + batched)
+just test
+
+# Single slice (K of N)
+just test-sliced 6 2
+
+# All slices sequentially
+just test-slices slices=6
+
+# CI-like run locally (6 slices, steady batch size)
+just test-ci-like
+
+# Tune via env
+SLICES=6 BATCH_SIZE=10 TIMEOUT=180000 BUN_JOBS=1 just test-fast
+```
+
+Notes:
+- `SLICES` controls total slices; `slice` selects which to run.
+- `BATCH_SIZE` files per `bun test` invocation; `BUN_JOBS=1` recommended.
+- `TIMEOUT` per-batch timeout in ms.
+
 ### MCP Server Integration
 
 ```typescript
@@ -266,8 +294,8 @@ To avoid long, silent test runs, use the built-in batch runner and slicer:
   - `BATCH_SIZE=8 TIMEOUT=180000 just test-batch`
 
 - Slice the suite (1-of-N):
-  - `just test-sliced slices=4 slice=1`
-  - Run all slices sequentially: `just test-slices slices=4`
+- `just test-sliced 4 1`
+  - Run all slices sequentially: `just test-slices 4`
 
 CI uses a 6-way matrix for main tests (`tests-sliced`) and a 2-way matrix for E2E (`e2e-sliced`), both with per-batch progress and artifacts. Coverage runs once in a dedicated `coverage` job post-slices. Each slice emits a batch-report.jsonl that is summarized per-slice and then aggregated by `analyze-slices` into the job summary; warnings are produced for batches exceeding a threshold (default WARN_MS=120000 for main, 300000 for E2E).
 

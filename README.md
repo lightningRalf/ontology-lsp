@@ -566,6 +566,35 @@ npm run test:perf
 npm run test:coverage
 ```
 
+#### Local Testing (Sliced + Batched)
+
+Use the Justfile runners for fast, predictable local feedback. By default, `just test` runs the test suite in slices and batches, mirroring our CI approach.
+
+Examples:
+
+```bash
+# Fast default (auto-sliced + batched)
+just test
+
+# Single slice (K of N)
+just test-sliced 6 2
+
+# All slices sequentially
+just test-slices slices=6
+
+# CI-like run locally (6 slices, steady batch size)
+just test-ci-like
+
+# Tune via env vars
+SLICES=6 BATCH_SIZE=10 TIMEOUT=180000 BUN_JOBS=1 just test-fast
+```
+
+Notes:
+- `SLICES` = number of slices (defaults to 4 if not set in some runners).
+- `BATCH_SIZE` = number of files per `bun test` invocation (default 8–10 depending on runner).
+- `TIMEOUT` = per-batch timeout in ms (default 180000).
+- `BUN_JOBS=1` is recommended for stability and lower variance.
+
 ### Debugging
 
 Enable debug logging:
@@ -838,8 +867,8 @@ bun install
 # 3. Start development environment
 just dev
 
-# 4. Run tests to verify setup
-just test-all
+# 4. Run tests to verify setup (fast default)
+just test
 
 # 5. Check code quality
 just check

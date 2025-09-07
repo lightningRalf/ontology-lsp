@@ -56,7 +56,8 @@ for ((i=0; i<TOTAL; i+=BATCH_SIZE)); do
   if [[ ${end} -gt ${TOTAL} ]]; then end=${TOTAL}; fi
   batch=("${FILES[@]:i:end-i}")
 
-  echo "=== BATCH START $(date -Is) :: [${batch_index}] files ${i}-${end}/${TOTAL}"
+  ts=$(date -Is)
+  echo "=== BATCH START ${ts} :: [${batch_index}] files ${i}-${end}/${TOTAL}"
   printf "Files: %s\n" "${batch[*]}"
   START=$(date +%s%3N)
   # Run bun once for the entire batch; do not bail so we capture all failures in the batch
@@ -68,8 +69,7 @@ for ((i=0; i<TOTAL; i+=BATCH_SIZE)); do
   # Persist batch metrics (JSONL)
   FILES_JSON="["
   for f in "${batch[@]}"; do
-    esc=${f//"/\"}
-    FILES_JSON+="\"$esc\",";
+    FILES_JSON="${FILES_JSON}\"${f}\",";
   done
   FILES_JSON="${FILES_JSON%,}]"
   printf '{"batch":%d,"start":%d,"end":%d,"duration_ms":%d,"exit_code":%d,"files":%s}\n' \
@@ -85,5 +85,10 @@ for ((i=0; i<TOTAL; i+=BATCH_SIZE)); do
   echo
 done
 
-echo "Batches summary: ${passes} passed, ${fails} failed, total $((passes+fails))"
-exit $([[ ${fails} -eq 0 ]] && echo 0 || echo 1)
+total=$((passes + fails))
+echo "Batches summary: ${passes} passed, ${fails} failed, total ${total}"
+if [[ ${fails} -eq 0 ]]; then
+  exit 0
+else
+  exit 1
+fi

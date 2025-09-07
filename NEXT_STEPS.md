@@ -50,7 +50,7 @@ Status: `list_symbols` now supports an AST‑backed path behind a feature flag (
 - Gate PRs on dogfood_ci success; include link to artifact/summary for tool‑first validation
 - Optional: document JSON summary shape and add a minimal schema check in CI
 
-Status: CI runs `just dogfood_ci` and uploads `dogfood-summary.json` as an artifact.
+Status: CI runs `just dogfood_ci` and uploads `dogfood-summary.json` as an artifact. Locally, prefer `just test` (sliced + batched) for fast validation and `just test-sliced <N> <K>` for focused slices.
 
 Developer ergonomics (available):
 - Use `just safe-apply <file> -- <commands>` or `git diff | just safe-apply-stdin -- <commands>` to stage diffs safely in a snapshot and run checks.
@@ -64,7 +64,7 @@ Developer ergonomics (available):
 - Main test matrix sliced (6) with per‑batch progress and JSONL artifacts; E2E sliced (2) gated.
 - Dedicated coverage job runs once post‑slices to avoid duplication.
 - Aggregate slice analysis summarizes slowest batches and “hot files” in CI summaries.
-- Local parity via Just recipes (`test-sliced(-analyze)`, `test-slices(-analyze)`, `test-slices-par(-analyze)`).
+- Local parity via Just recipes (default `just test`), targeted `test-sliced(-analyze)`, `test-slices(-analyze)`, and optional `test-slices-par(-analyze)`.
 - Optional slow‑batch gating via repo variables (disabled by default):
   - Main: `WARN_MAX_MAIN`, `FAIL_ON_SLOW_MAIN`; E2E: `WARN_MAX_E2E`, `FAIL_ON_SLOW_E2E`.
   - Thresholds: `WARN_MS=120000` (main), `WARN_MS=300000` (E2E). Configure as needed.
@@ -415,8 +415,10 @@ Done: HTTP `/api/v1/refactor` endpoint and MCP `suggest_refactoring` tool added 
 
 - Read PROJECT_STATUS.md (top sections) to see the current state.
 - Review `test-output.txt` for the latest full-suite logs.
-- Validate the suite:
-  - `bun test --bail=1`
+- Validate the suite (fast default):
+  - `just test`
+  - Single slice: `just test-sliced <N> <K>`
+  - Stop-at-first-failure (single-process): `bun test --bail=1`
   - If a performance benchmark flakes locally, temporarily relax Layer 1 timeout or use the deterministic fixture.
 - Verify Layer 1/CLI
   - `timeout 20s ./ontology-lsp find <Symbol> -n 50 -l 20 --json`
@@ -427,7 +429,9 @@ Done: HTTP `/api/v1/refactor` endpoint and MCP `suggest_refactoring` tool added 
 
 ## 🔧 Useful Commands
 
-- Full suite, stop at first failure: `bun test --bail=1`
+- Local tests (fast): `just test` (sliced + batched)
+- Single slice: `just test-sliced <N> <K>`; all slices: `just test-slices <N>`
+- Stop at first failure: `bun test --bail=1`
 - Focus layer1/error tests: `bun test test/layer1-*.test.ts test/error-handling.test.ts`
 - Generate JUnit report: `bun test --reporter=junit --reporter-outfile=report.xml`
 - Build CLI: `bun run build:cli`

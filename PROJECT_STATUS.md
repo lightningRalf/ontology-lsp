@@ -441,6 +441,7 @@ Status: adapters/LSP integration tests are green. E2E local run improved reliabi
 - UI: open `http://localhost:7000/ui`
 - Live events: `http://localhost:7001/mcp-events`
  - Sync ports into `.env`: `just sync-ports`
+ - Local tests (fast): `just test` (sliced + batched; tune with `SLICES`, `BATCH_SIZE`, `TIMEOUT`)
 
 ---
 
@@ -733,9 +734,11 @@ Notes:
 - JUnit (optional): `bun test --reporter=junit --reporter-outfile=report.xml`
 
 ### 🔁 Quick reproduction
-- Focused: `bun test tests/layer1-*.test.ts tests/error-handling.test.ts`
+- Fast default (local): `just test`
+- Single slice: `just test-sliced <N> <K>` (e.g., `just test-sliced 6 2`)
+- Focused file(s): `bun test tests/layer1-*.test.ts tests/error-handling.test.ts`
 - File-URI tests: `bun test tests/file-uri-resolution.test.ts --bail=1`
-- Full suite stop-at-first-failure: `bun test --bail=1`
+- Stop-at-first-failure (single-process): `bun test --bail=1`
 
 ### ✅ Adapter and URI Stabilization
 - MCP error messages aligned with tests (raw message in `.message`)

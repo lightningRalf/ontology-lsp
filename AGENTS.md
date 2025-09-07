@@ -52,6 +52,8 @@ layer mapping, safety rules, and delivery expectations.
 
 ## Change Workflow
 
+At a glance (local testing quick path): use `just test` for fast, sliced + batched runs. For a single slice use `just test-sliced <N> <K>`, or `just test-ci-like` to mirror CI locally. See “Local Testing (Sliced + Batched)” below.
+
 1) Triage & prepare
 - Reproduce issue locally. Capture exact commands.
 - Read VISION.md, PROJECT_STATUS.md, NEXT_STEPS.md for context.
@@ -70,8 +72,8 @@ layer mapping, safety rules, and delivery expectations.
 
 3) Validate
 - Build: `bun run build:all`.
-- Type‑check: `tsc` (or a core‑only `tsconfig.build.json` once added).
-- Tests (fast path): `bun test --bail=1`.
+- Type‑check: `bun run build:tsc` (or `tsc`).
+- Tests (fast path): `just test` (sliced + batched). For a single slice use `just test-sliced <N> <K>`; for CI‑like locally use `just test-ci-like`. Tune with `SLICES`, `BATCH_SIZE`, `TIMEOUT`, and prefer `BUN_JOBS=1` for stability.
 - Avoid running perf/e2e unless explicitly requested.
 
 4) Commit & docs
@@ -82,9 +84,7 @@ layer mapping, safety rules, and delivery expectations.
 
 @docs/tech-stack-ts.md
 
-<context: folderstructure and filenames>
-Run: eza -T -L 3 --git-ignore .
-</context:folderstructure and filenames>
+Tip: for a quick workspace overview, use `eza -T -L 3 --git-ignore --only-dirs` (or `tree -L 3`).
 
 ## Protocol Adapter Notes
 
@@ -236,3 +236,18 @@ curl -sS -X POST -H "content-type: application/json" -H "Mcp-Session-Id: $MCP_SE
 - `bin/dogfood-explore.sh <symbol> [-f <path>] [--no-conceptual] [--precise] [--json]`
 - `bin/self-apply.sh -f my.diff -- bun run build:all "bun test -q"`
 - `bun run tmp/dogfood-safe-rename.ts`
+
+### Local Testing (Sliced + Batched)
+
+Use the Justfile runners for fast, predictable local feedback that mirrors CI:
+
+- Fast default: `just test`
+- Single slice: `just test-sliced <N> <K>` (e.g., `just test-sliced 6 2`)
+- All slices: `just test-slices <N>` (e.g., `just test-slices 6`)
+- CI‑like locally: `just test-ci-like`
+
+Tunables:
+- `SLICES` (total slices), `BATCH_SIZE` (files per batch), `TIMEOUT` (ms per batch)
+- Recommend `BUN_JOBS=1` for stability and lower variance
+
+See also: TESTING_STRATEGY.md (local workflow details) and README.md (quick examples).

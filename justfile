@@ -14,6 +14,12 @@ default:
     @echo "  just build          - Build all servers (including MCP)"
     @echo "  just clean-build    - Clean and rebuild everything"
     @echo ""
+    @echo "🧪 Tests (sliced & batched):"
+    @echo "  just test                  - Run tests using slices & batches (fast default)"
+    @echo "  just test-fast             - Same as above; set SLICES/BATCH_SIZE/TIMEOUT via env"
+    @echo "  just test-sliced <N> <K>    - Run slice K of N (e.g., 6 2)"
+    @echo "  just test-slices <N>        - Run all N slices sequentially"
+    @echo ""
     @echo "🎯 Server Management:"
     @echo "  just start          - Start all servers"
     @echo "  just stop           - Stop all servers"
@@ -430,9 +436,16 @@ install-extension: build-all package-extension
 # Run all tests including comprehensive integration tests
 test-all: test test-integration-comprehensive test-extension
 
-# Run basic server tests with Bun
+# Run basic tests (now sliced/batched by default for speed)
+# Use TEST_LEGACY=1 to run the legacy single-process recipe
 test:
-    {{bun}} test tests/step*.test.ts tests/integration.test.ts
+    @if [ "${TEST_LEGACY:-}" = "1" ]; then \
+      echo "🧪 Running legacy test recipe (single process)"; \
+      {{bun}} test tests/step*.test.ts tests/integration.test.ts; \
+    else \
+      echo "🧪 Running tests (sliced + batched for speed)"; \
+      just test-fast; \
+    fi
 
 # Run comprehensive integration test suite (NEW UNIFIED ARCHITECTURE)
 test-integration-comprehensive:
@@ -494,7 +507,7 @@ test-batch:
 # Slice the test suite into N parts and run one slice
 test-sliced slices="4" slice="1":
     @echo "🧪 Running test slice {{slice}}/{{slices}} (batched with progress)"
-    @echo "   Override with: just test-sliced slices=<N> slice=<K> [BATCH_SIZE=8 TIMEOUT=180000]"
+    @echo "   Override with: just test-sliced <N> <K> [BATCH_SIZE=8 TIMEOUT=180000]"
     @SLICES={{slices}} SLICE={{slice}} BATCH_SIZE=${BATCH_SIZE:-8} TIMEOUT=${TIMEOUT:-180000} BUN_JOBS=${BUN_JOBS:-1} bin/test-slicer.sh
 
 # Run all slices sequentially (useful locally to get periodic feedback)
@@ -503,6 +516,18 @@ test-slices slices="4":
         echo "================ SLICE $$i/{{slices}} ================"; \
         SLICES={{slices}} SLICE=$$i BATCH_SIZE=${BATCH_SIZE:-8} TIMEOUT=${TIMEOUT:-180000} BUN_JOBS=${BUN_JOBS:-1} bin/test-slicer.sh || exit $$?; \
       done
+
+# CI-like local run: 6 slices sequentially with steadier batch size
+test-ci-like:
+    @echo "🧪 Running CI-like sliced tests (6 slices)"
+    @SLICES=${SLICES:-6}; BATCH_SIZE=${BATCH_SIZE:-10}; TIMEOUT=${TIMEOUT:-180000}; BUN_JOBS=${BUN_JOBS:-1}; just test-slices slices=$$SLICES
+
+# Auto-sliced test runner (detect CPU, clamp slices; sequential for clean output)
+test-fast:
+    @SLICES=${SLICES:-4}; echo "🧪 Running $SLICES slices (batched)"
+    @i=1; while [ $i -le $SLICES ]; do echo "================ SLICE $i/$SLICES ================"; SLICES=$SLICES SLICE=$i BATCH_SIZE=${BATCH_SIZE:-8} TIMEOUT=${TIMEOUT:-180000} BUN_JOBS=${BUN_JOBS:-1} bin/test-slicer.sh || exit $?; i=`expr $i + 1`; done
+
+ 
 
 # Batch + analyze (local)
 test-batch-analyze:
