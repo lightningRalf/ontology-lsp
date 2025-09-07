@@ -561,6 +561,25 @@ Status: adapters/LSP integration tests are green. E2E local run improved reliabi
 
 ## 📅 Latest Updates (2025-09-07)
 
+### L1→L5 Layer Validation (Minimal Viable Working Paths)
+- Created comprehensive validation tests for all 5 layers (`tests/layer-validation.test.ts`)
+- **L1 Fast Search**: 
+  - ✅ `text_search` command working 
+  - ⚠️ Performance: ~1.2s (target: 50ms) - needs optimization
+- **L2 AST Analysis**:
+  - ✅ `ast_query` command working (~900ms)
+  - ⚠️ `symbol-search` having JSON output issues
+- **L3 Planner**:
+  - ⚠️ `plan-rename` and `symbol-map` experiencing timeouts - need performance fixes
+- **L4 Ontology**:
+  - ✅ `explore` command working with definitions and references
+- **L5 Learning**:
+  - ⚠️ `stats` command lacks JSON output support
+- **Action Items**:
+  - Performance optimization needed for L1 and L3
+  - JSON output standardization needed for L5 stats
+  - Timeout issues in symbol-map and plan-rename need investigation
+
 ### Layer 2 AST Cap — Clamp Semantics Finalized ✅
 - Clarified and enforced clamp behavior for `L2_MAX_PARSE_FILES` in Layer 2 (Tree‑sitter):
   - Numeric values are clamped to [1, 100]. Values ≤ 0 become 1; values > 100 become 100.

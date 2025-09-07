@@ -22,13 +22,27 @@ See PROJECT_STATUS.md for achievements and historical context. -->
 - ✅ Documentation updated in `CONFIG.md` and `tests/README.md` 
 - ✅ CI defaults calibrated: PERF‑gated jobs use `L2_MAX_PARSE_FILES=12` for stable p95
 
-### 0.15 Minimal Viable L1→L5 (Working Paths)
-- L1 Fast Search: validate `text_search` tool; cap results; p95≤50ms on fixture
-- L2 AST Analysis: validate `ast_query` and `list_symbols`; p95≤150ms; fail soft if grammars are missing
-- L3 Planner: validate `build_symbol_map` and `plan_rename` preview; include counts in output
-- L4 Ontology: validate `explore_codebase` with `conceptual:true`; toggle via env; metrics visible
-- L5 Learning: validate `pattern_stats`; add a tiny `learn/provide_feedback` round‑trip and assert counters
-- All via `tools/call` or CLI `workflow` with e2e tests; add layer tags to logs
+### 0.15 Minimal Viable L1→L5 (In Progress)
+
+**Status**: Validation tests created, performance issues identified
+
+**Completed**:
+- ✅ Created layer validation test suite (`tests/layer-validation.test.ts`)
+- ✅ L1 `text_search` functional (but slow: ~1.2s vs 50ms target)
+- ✅ L2 `ast_query` functional (~900ms vs 150ms target)
+- ✅ L4 `explore` command working
+
+**Issues Found**:
+- ⚠️ L1 Performance: text_search taking ~1.2s (target: 50ms)
+- ⚠️ L2 Performance: ast_query taking ~900ms (target: 150ms)
+- ⚠️ L3 Timeouts: symbol-map and plan-rename timing out
+- ⚠️ L5 Output: stats command lacks JSON output
+
+**Next Actions**:
+- Optimize L1 Fast Search performance (investigate ripgrep settings)
+- Fix L3 symbol-map and plan-rename timeouts
+- Add JSON output to stats command
+- Add proper performance benchmarks with realistic targets
 
 Status: `list_symbols` now supports an AST‑backed path behind a feature flag (env `LIST_SYMBOLS_AST=1` or `{"ast":true}`), with regex fallback preserved. Targeted HTTP test added.
 
