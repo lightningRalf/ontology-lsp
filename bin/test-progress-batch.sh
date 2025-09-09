@@ -76,13 +76,14 @@ for ((i=0; i<TOTAL; i+=BATCH_SIZE)); do
     PREFIX=(timeout "${BATCH_HARD_TIMEOUT_SEC}s" "${PREFIX[@]}")
   fi
 
-  # Keep-alive heartbeat while tests run
-  (
-    while :; do
+HEARTBEAT_SEC=${HEARTBEAT_SEC:-15}
+# Keep-alive heartbeat while tests run (configurable via HEARTBEAT_SEC)
+(
+  while :; do
       echo "[test-batch ${batch_index}] still running... $(date -Is)" 1>&2
-      sleep 15 || exit 0
-    done
-  ) &
+      sleep "${HEARTBEAT_SEC}" || exit 0
+  done
+) &
   KA_PID=$!
 
   # Execute

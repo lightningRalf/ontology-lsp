@@ -1289,3 +1289,30 @@ Artifacts & Scripts
 
 Policy & Safety
 - Centralized per‑command timeout clamp for snapshot checks (1–600s) in `OverlayStore.runChecks()` to avoid long‑running/hanging steps; adapters remain lean. HTTP already enforced this range; MCP/CLI now match.
+## 📅 Latest Updates (2025-09-09)
+
+### ⏱️ Fast Feedback: Async runner, balanced slices, and hard caps
+- Added heartbeat output to the batch runner (configurable via `HEARTBEAT_SEC`, default 15s) so long test batches emit progress regularly.
+- Introduced hard per-batch timeout (`BATCH_HARD_TIMEOUT_SEC`, default 120s) to prevent indefinite stalls.
+- Implemented history‑aware balanced slicing to spread heavy tests across slices; optional “hot slice” isolates top‑N heavy files.
+- New recipes (Justfile):
+  - `test-ci-like-balanced` — CI‑like run with balanced slices, heartbeat, and hard caps.
+  - `test-quick` — ~2 min high‑signal subset (HTTP/MCP core guards).
+  - `test-smoke` — ≤90s minimal smoke; quick functional sanity.
+  - Async helpers: `test-async` (background run), `test-tail` (live tail), `test-progress` (aggregate), `test-stop-async`.
+
+### 🐞 Surfaced issues during fast runs (actionable)
+- HTTP port collisions in batch runs (`EADDRINUSE` on 7000): multiple HTTP adapter tests default to port 7000, causing clashes when run together. Impact: timeouts and spurious failures.
+  - Mitigation now: runners allow forcing `HTTP_API_PORT` (e.g., 7050) and we recommend smaller `BATCH_SIZE` for HTTP‑heavy sets.
+  - Planned fix (see NEXT_STEPS 0.29): default ephemeral ports for tests and/or per‑slice port offsets.
+
+- Layer 4 SQLite schema bootstrap in tests (`SQLiteError: no such table: concepts`): some test paths initialize L4 with a fresh DB without creating base tables.
+  - Mitigation now: ensure the test server uses a pre‑migrated DB when available.
+  - Planned fix (NEXT_STEPS 0.29): add `ensureSchema()` on L4 init for test/dev; gate via `L4_AUTO_MIGRATE=1`.
+
+- OpenAPI/tools tests occasionally time out under contention (server start races + port conflicts).
+  - Mitigation: bind a fixed non‑default port for these suites (7050) or use ephemeral port.
+  - Planned fix: readiness checks + per‑suite port allocation.
+
+### 📈 Effect
+- With the new knobs, CI‑like local runs provide steady progress and bounded tails; smoke/quick suites finish within ~1–2 minutes on a dev host while still catching regressions (HTTP tools call shape, graph‑expand fallbacks, invalid patch guard, L2 parse caps, MCP init).

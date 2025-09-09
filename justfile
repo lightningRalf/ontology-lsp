@@ -19,6 +19,11 @@ default:
     @echo "  just test-fast             - Same as above; set SLICES/BATCH_SIZE/TIMEOUT via env"
     @echo "  just test-sliced <N> <K>    - Run slice K of N (e.g., 6 2)"
     @echo "  just test-slices <N>        - Run all N slices sequentially"
+    @echo "  just test-ci-like           - Mirror CI locally (6 slices)"
+    @echo "  just test-ci-like-balanced  - CI-like with balanced slices (history-based)"
+    @echo "  just test-quick             - ~2 min smoke suite (fast signal)"
+    @echo "  just test-smoke             - ~60–90s minimal smoke (HTTP/MCP core)"
+    @echo "  just smoke                  - Alias for dogfood_ci (tool-first gate)"
     @echo ""
     @echo "🎯 Server Management:"
     @echo "  just start          - Start all servers"
@@ -528,6 +533,13 @@ test-ci-like:
     @echo "🧪 Running CI-like sliced tests (6 slices)"
     @BAIL=${BAIL:-1} BATCH_SIZE=${BATCH_SIZE:-6} TIMEOUT=${TIMEOUT:-90000} BUN_JOBS=${BUN_JOBS:-1} L2_MAX_PARSE_FILES=${L2_MAX_PARSE_FILES:-10} ESCALATION_POLICY=${ESCALATION_POLICY:-never} just test-slices 6
 
+# CI-like run with balanced slices (uses history when available)
+test-ci-like-balanced:
+    @echo "🧪 Running CI-like (balanced) sliced tests (6 slices)"
+    @BAIL=${BAIL:-1} BATCH_SIZE=${BATCH_SIZE:-6} TIMEOUT=${TIMEOUT:-90000} HEARTBEAT_SEC=${HEARTBEAT_SEC:-30} BATCH_HARD_TIMEOUT_SEC=${BATCH_HARD_TIMEOUT_SEC:-120} BUN_JOBS=${BUN_JOBS:-1} BALANCE_SLICES=1 L2_MAX_PARSE_FILES=${L2_MAX_PARSE_FILES:-10} ESCALATION_POLICY=${ESCALATION_POLICY:-never} just test-slices 6
+
+ 
+
 # Auto-sliced test runner (detect CPU, clamp slices; sequential for clean output)
 test-fast:
     @SLICES=${SLICES:-4}; echo "🧪 Running $SLICES slices (batched)"
@@ -540,6 +552,28 @@ test-batch-analyze:
     @echo "🧪 Running batch + analysis" 
     @BATCH_SIZE=${BATCH_SIZE:-8} TIMEOUT=${TIMEOUT:-180000} BUN_JOBS=${BUN_JOBS:-1} bin/test-progress-batch.sh
     @bun run scripts/analyze-batch-report.ts
+
+# Extremely fast smoke tests (<2 min on dev hw)
+test-quick:
+    @echo "⚡ Quick smoke (~2 min): HTTP/MCP core + guards"
+    @BUN_JOBS=${BUN_JOBS:-1} HEARTBEAT_SEC=${HEARTBEAT_SEC:-30} HTTP_API_PORT=${HTTP_API_PORT:-7050} bun test \
+        ./tests/http-graph-expand.test.ts \
+        ./tests/patch-invalid-input.test.ts \
+        ./tests/layer2-parse-cap-boundaries.test.ts \
+        ./tests/mcp-http-init.test.ts \
+        --timeout ${TIMEOUT:-45000}
+
+# Minimal smoke (≤90s): pure tool-first/API checks
+test-smoke:
+    @echo "🚬 Minimal smoke (≤90s): HTTP/MCP essentials"
+    @BUN_JOBS=${BUN_JOBS:-1} HEARTBEAT_SEC=${HEARTBEAT_SEC:-30} HTTP_API_PORT=${HTTP_API_PORT:-7050} bun test \
+        ./tests/mcp-http-init.test.ts \
+        ./tests/layer2-parse-cap-boundaries.test.ts \
+        --timeout ${TIMEOUT:-30000}
+
+# Alias to the fast dogfood gate
+smoke:
+    @just dogfood_ci
 
 # Slice + analyze (local)
 test-sliced-analyze slices="4" slice="1":
@@ -1966,10 +2000,7 @@ safe-apply file +cmds:
 safe-apply-stdin +cmds:
     @bash -lc 'cat | bin/self-apply.sh -- {{cmds}}'
 
-# CI-like run with balanced slices (uses history when available)
-test-ci-like-balanced:
-    @echo "🧪 Running CI-like (balanced) sliced tests (6 slices)"
-    @BAIL=${BAIL:-1} BATCH_SIZE=${BATCH_SIZE:-6} TIMEOUT=${TIMEOUT:-90000} BUN_JOBS=${BUN_JOBS:-1} BALANCE_SLICES=1 L2_MAX_PARSE_FILES=${L2_MAX_PARSE_FILES:-10} ESCALATION_POLICY=${ESCALATION_POLICY:-never} just test-slices 6
+# (moved above) CI-like run with balanced slices is defined earlier to avoid duplication
 
 # Balanced sequential slices (optional hot slice for top-N heavy files)
 test-slices-balanced slices="6" hot_top="0":
@@ -1979,3 +2010,19 @@ test-slices-balanced slices="6" hot_top="0":
         SLICES="$n" SLICE="$i" BALANCE_SLICES=1 HOT_SLICE_TOP={{hot_top}} BATCH_SIZE=${BATCH_SIZE:-8} TIMEOUT=${TIMEOUT:-180000} BUN_JOBS=${BUN_JOBS:-1} bin/test-slicer.sh || exit $?; \
         i=`expr $i + 1`; \
     done
+test-async:
+    @echo "🚀 Starting async CI-like (balanced) run in background..." 
+    @mkdir -p .test-results
+    @BATCH_SIZE=${BATCH_SIZE:-6} TIMEOUT=${TIMEOUT:-90000} HEARTBEAT_SEC=${HEARTBEAT_SEC:-30} BATCH_HARD_TIMEOUT_SEC=${BATCH_HARD_TIMEOUT_SEC:-120} BUN_JOBS=${BUN_JOBS:-1} BALANCE_SLICES=${BALANCE_SLICES:-1} nohup bash -lc 'just test-ci-like-balanced' > .test-results/async.log 2>&1 & echo $$! > .test-results/async.pid; echo "PID: $(cat .test-results/async.pid)"
+
+test-progress:
+    @echo "📈 Progress (aggregate)"
+    @if [ -f .test-results/batch-report.jsonl ]; then bun run scripts/analyze-batch-report.ts .test-results/batch-report.jsonl; else echo "No batch report yet"; fi
+
+test-tail:
+    @echo "📜 Tailing async log (.test-results/async.log)"
+    @tail -F .test-results/async.log
+
+test-stop-async:
+    @echo "🛑 Stopping async test run..."
+    @if [ -f .test-results/async.pid ]; then kill `cat .test-results/async.pid` 2>/dev/null || true; rm -f .test-results/async.pid; else echo "No async pid"; fi

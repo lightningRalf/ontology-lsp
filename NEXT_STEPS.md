@@ -259,6 +259,32 @@ Goal: ship a small library of safe, composable workflows and make them discovera
 - Roll up HTTP tests to reuse one server per group (reduce start/stop overhead).
 - Docs: add real‑time output expectations, bail usage, and typical env presets for local vs CI.
 
+### 0.29 Test Infra Hardening (Ports + Schemas) (New)
+
+Problems observed during fast/balanced runs:
+- HTTP tests collide on port 7000 when batched → `EADDRINUSE` and timeouts.
+- L4 SQLite sometimes starts on a fresh DB without schema → `no such table: concepts`.
+
+Plan of record:
+- Ports (HTTP adapter):
+  - [ ] Default to ephemeral port (0) in tests when `HTTP_API_PORT` is unset.
+  - [ ] Add per‑slice port offsets in runners: `HTTP_API_PORT_BASE + SLICE` to avoid intra‑slice clashes.
+  - [ ] Provide a `withTestServer` helper that binds a unique port and exposes readiness (health probe) before tests run.
+- L4 schema bootstrap:
+  - [ ] Add `ensureSchema()` to L4 storage init, gated by `L4_AUTO_MIGRATE=1` (safe forward‑only create/alter).
+  - [ ] Use an in‑repo test DB path with cleanup, or `:memory:` plus `ensureSchema()` for speed.
+- OpenAPI/tools reliability:
+  - [ ] Pin ports per suite (e.g., 7050) and add readiness checks to remove flake.
+  - [ ] Time‑bound external calls; keep tests self‑contained.
+- Runner polish:
+  - [ ] Silence missing `test/` folder warnings in slicer (redirect find errors to /dev/null).
+  - [ ] Document `HEARTBEAT_SEC` and `BATCH_HARD_TIMEOUT_SEC` in TESTING_STRATEGY.md.
+
+Acceptance:
+- Balanced CI‑like run completes with no `EADDRINUSE` failures on a clean host.
+- L4 tests pass on clean workspace without manual schema prep.
+- Smoke suite ≤90s; quick suite ≤2 minutes on dev hardware.
+
 ### 1. Execute Production Deployment
 
 **Requirements**: Docker/Kubernetes permissions to complete deployment
