@@ -699,16 +699,65 @@ export class HTTPServer {
                                 depth: body.depth,
                                 limit: body.limit,
                             });
+                            // Record primary-path usage in monitoring counters (minimal)
+                            try {
+                                (this.coreAnalyzer as any)?.sharedServices?.monitoring?.recordToolCall?.(
+                                    'graph_expand_primary'
+                                );
+                            } catch {}
                             return new Response(JSON.stringify({ success: true, data: out }), {
                                 status: 200,
                                 headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
                             });
                         } catch (err) {
-                            // Fallback: never 500 — provide empty neighbors with a note
+                            // Record fallback usage in monitoring counters (minimal)
+                            try {
+                                (this.coreAnalyzer as any)?.sharedServices?.monitoring?.recordToolCall?.(
+                                    'graph_expand_fallback'
+                                );
+                            } catch {}
+                            // Fallback: never 500 — AST-only import/export extraction if possible, else regex; return empty neighbors if none
                             const neighbors: Record<string, any[]> = { imports: [], exports: [], callers: [], callees: [] };
-                            const note = 'fallback: graph expand unavailable; returning empty neighbors';
+                            let note = 'fallback: graph expand unavailable; returning empty neighbors';
+                            let astTried = false;
+                            // Try AST-only extraction for TS/JS if file path is provided
                             try {
                                 if (typeof body.file === 'string') {
+                                    const abs = body.file as string;
+                                    const lower = abs.toLowerCase();
+                                    let language: 'typescript' | 'javascript' | 'python' | null = null;
+                                    if (/\.(ts|tsx)$/.test(lower)) language = 'typescript';
+                                    else if (/\.(js|jsx)$/.test(lower)) language = 'javascript';
+                                    if (language) {
+                                        const { runAstQuery } = await import('../core/ast-query.js');
+                                        const query = `
+                                            (import_statement) @ast.import
+                                            (export_statement) @ast.export
+                                        `;
+                                        const res: any = await runAstQuery({ language, query, paths: [abs], limit: 2000 });
+                                        astTried = true;
+                                        if (Array.isArray(res?.results) && res.results.length > 0) {
+                                            for (const r of res.results) {
+                                                const cap = String(r.capture || '');
+                                                const item = {
+                                                    capture: cap,
+                                                    text: r.snippet || '',
+                                                    start: r.start,
+                                                    end: r.end,
+                                                };
+                                                if (cap.includes('import') && edges.includes('imports')) neighbors.imports.push(item);
+                                                if (cap.includes('export') && edges.includes('exports')) neighbors.exports.push(item);
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch {
+                                // ignore AST fallback errors
+                            }
+
+                            // If AST path didn't yield anything, fall back to simple regex scan of the file
+                            if ((neighbors.imports.length + neighbors.exports.length) === 0 && typeof body.file === 'string') {
+                                try {
                                     const f = Bun.file(body.file);
                                     if (await f.exists()) {
                                         const text = await f.text();
@@ -728,8 +777,13 @@ export class HTTPServer {
                                             }
                                         }
                                     }
-                                }
-                            } catch {}
+                                } catch {}
+                            }
+
+                            // Build note reflecting which fallback path was used
+                            if (astTried) {
+                                note = 'fallback: graph expand unavailable; AST-only imports/exports used (or empty)';
+                            }
                             const data = body.file
                                 ? { file: body.file, neighbors, note }
                                 : { symbol: String(body.symbol || ''), neighbors, note };
