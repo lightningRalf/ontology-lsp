@@ -27,6 +27,7 @@ default:
     @echo "  just dev            - Development mode with auto-reload"
     @echo "  just status         - Check server status"
     @echo "  just health         - Health check for all servers"
+    @echo "  just ensure-env     - Create .env from .env.sample if missing"
     @echo "  just sync-ports     - Adjust .env ports via external registry or local scan"
     @echo ""
     @echo "📊 Monitoring:"
@@ -54,22 +55,21 @@ workspace := env_var_or_default("ONTOLOGY_WORKSPACE", justfile_directory())
 # === SERVER MANAGEMENT (replaces session-start/stop) ===
 
 # Start all servers with port availability checks
-start: stop-quiet
+start: stop-quiet ensure-env
     @echo "🚀 Starting Ontology LSP System..."
     @echo "=================================="
     @mkdir -p .ontology/pids .ontology/logs
     @# Read effective ports from .env (fallback to defaults)
-    @HTTP_PORT=$$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
-    MCP_PORT=$$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7001); \
-    LSP_PORT=$$(grep -E '^LSP_SERVER_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7002); \
+    @HTTP_PORT=$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2-); : "${HTTP_PORT:=7000}"; \
+    MCP_PORT=$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2-); : "${MCP_PORT:=7001}"; \
+    LSP_PORT=$(grep -E '^LSP_SERVER_PORT=' .env 2>/dev/null | cut -d= -f2-); : "${LSP_PORT:=7002}"; \
     echo "Checking port availability..."; \
     just check-ports-available; \
-    echo "Starting LSP Server (port $$LSP_PORT)..."; \
-    LSP_SERVER_PORT=$$LSP_PORT {{bun}} run src/servers/lsp.ts > .ontology/logs/lsp.log 2>&1 & printf '%s\n' $$! > .ontology/pids/lsp.pid; \
-    echo "Starting HTTP API Server (port $$HTTP_PORT)..."; \
-    HTTP_API_PORT=$$HTTP_PORT {{bun}} run src/servers/http.ts > .ontology/logs/http-api.log 2>&1 & printf '%s\n' $$! > .ontology/pids/http-api.pid; \
-    echo "Starting MCP HTTP (Streamable) Server (port $$MCP_PORT)..."; \
-    MCP_HTTP_PORT=$$MCP_PORT {{bun}} run src/servers/mcp-http.ts > .ontology/logs/mcp-http.log 2>&1 & printf '%s\n' $$! > .ontology/pids/mcp-http.pid
+    echo "LSP Server is stdio-only — skipping background start"; \
+    echo "Starting HTTP API Server (port $HTTP_PORT)..."; \
+    HTTP_API_PORT=$HTTP_PORT {{bun}} run src/servers/http.ts > .ontology/logs/http-api.log 2>&1 & printf '%s\n' $! > .ontology/pids/http-api.pid; \
+    echo "Starting MCP HTTP (Streamable) Server (port $MCP_PORT)..."; \
+    MCP_HTTP_PORT=$MCP_PORT {{bun}} run src/servers/mcp-http.ts > .ontology/logs/mcp-http.log 2>&1 & printf '%s\n' $! > .ontology/pids/mcp-http.pid
     @sleep 3
     @just health
     @echo ""
@@ -110,42 +110,46 @@ restart: stop start
 # Check health
 health:
     @echo "🧪 Checking server health..."
-    @HTTP_PORT=$$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
-    MCP_PORT=$$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7001); \
-    echo "(env) HTTP_API_PORT=$$HTTP_PORT MCP_HTTP_PORT=$$MCP_PORT"; \
-    (curl -s --max-time 1 http://localhost:$$HTTP_PORT/health >/dev/null 2>&1 && echo "✅ HTTP API ($$HTTP_PORT): HEALTHY" || echo "❌ HTTP API ($$HTTP_PORT): NOT RESPONDING"); \
-    (curl -s --max-time 1 http://localhost:$$MCP_PORT/health >/dev/null 2>&1 && echo "✅ MCP HTTP ($$MCP_PORT): HEALTHY" || echo "❌ MCP HTTP ($$MCP_PORT): NOT RESPONDING")
+    @HTTP_PORT=$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2-); : "${HTTP_PORT:=7000}"; \
+    MCP_PORT=$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2-); : "${MCP_PORT:=7001}"; \
+    echo "(env) HTTP_API_PORT=$HTTP_PORT MCP_HTTP_PORT=$MCP_PORT"; \
+    (curl -s --max-time 1 http://localhost:$HTTP_PORT/health >/dev/null 2>&1 && echo "✅ HTTP API ($HTTP_PORT): HEALTHY" || echo "❌ HTTP API ($HTTP_PORT): NOT RESPONDING"); \
+    (curl -s --max-time 1 http://localhost:$MCP_PORT/health >/dev/null 2>&1 && echo "✅ MCP HTTP ($MCP_PORT): HEALTHY" || echo "❌ MCP HTTP ($MCP_PORT): NOT RESPONDING")
 
 # Show server status with port information
 status:
     @echo "📊 Server Status"
     @echo "=================="
     @echo ""
-    @HTTP_PORT=$$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
-    MCP_PORT=$$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7001); \
-    LSP_PORT=$$(grep -E '^LSP_SERVER_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7002); \
-    echo "🔧 Ports (env/.env): HTTP=$$HTTP_PORT MCP=$$MCP_PORT LSP=$$LSP_PORT"; \
+    @HTTP_PORT=$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2-); : "${HTTP_PORT:=7000}"; \
+    MCP_PORT=$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2-); : "${MCP_PORT:=7001}"; \
+    echo "🔧 Ports (env/.env): HTTP=$HTTP_PORT MCP=$MCP_PORT LSP=stdio"; \
     echo ""; \
     echo "🔌 Background Services:"; \
-    (curl -s --max-time 1 http://localhost:$$HTTP_PORT/health >/dev/null 2>&1 && echo "  ✅ HTTP API Server: Running on port $$HTTP_PORT" || echo "  ❌ HTTP API Server: Not responding on port $$HTTP_PORT"); \
-    (curl -s --max-time 1 http://localhost:$$MCP_PORT/health >/dev/null 2>&1 && echo "  ✅ MCP HTTP Server: Running on port $$MCP_PORT" || echo "  ❌ MCP HTTP Server: Not responding on port $$MCP_PORT"); \
-    (curl -s --max-time 1 http://localhost:$$LSP_PORT >/dev/null 2>&1 && echo "  ✅ LSP TCP Server: Running on port $$LSP_PORT" || echo "  ❌ LSP TCP Server: Not responding on port $$LSP_PORT"); \
+    (curl -s --max-time 1 http://localhost:$HTTP_PORT/health >/dev/null 2>&1 && echo "  ✅ HTTP API Server: Running on port $HTTP_PORT" || echo "  ❌ HTTP API Server: Not responding on port $HTTP_PORT"); \
+    (curl -s --max-time 1 http://localhost:$MCP_PORT/health >/dev/null 2>&1 && echo "  ✅ MCP HTTP Server: Running on port $MCP_PORT" || echo "  ❌ MCP HTTP Server: Not responding on port $MCP_PORT"); \
+    (test -f .ontology/pids/lsp.pid && kill -0 "$(cat .ontology/pids/lsp.pid 2>/dev/null)" 2>/dev/null && echo "  ✅ LSP STDIO Server: Running (pid $(cat .ontology/pids/lsp.pid))" || echo "  ❌ LSP STDIO Server: Not running"); \
     echo ""; \
     echo "📝 On-Demand Services (stdio):"
     @test -f dist/mcp/mcp.js && echo "  ✅ MCP STDIO Server (dist): Available" || echo "  ❌ MCP STDIO Server (dist): Not found. Run 'bun run build:mcp-stdio'"
     @test -f src/servers/lsp.ts && echo "  ✅ LSP STDIO Server: Available (launches on-demand)" || echo "  ❌ LSP STDIO Server: Not found"
     @echo ""
     @echo "🌐 Port Usage Details:" 
-    @HTTP_PORT=$$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
-    MCP_PORT=$$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7001); \
-    LSP_PORT=$$(grep -E '^LSP_SERVER_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7002); \
-    echo "  Port $$HTTP_PORT:"; (ss -tulnp 2>/dev/null | grep ":$$HTTP_PORT " >/dev/null && echo "   🔴 IN USE" || echo "   🟢 AVAILABLE"); \
-    echo "  Port $$MCP_PORT:"; (ss -tulnp 2>/dev/null | grep ":$$MCP_PORT " >/dev/null && echo "   🔴 IN USE" || echo "   🟢 AVAILABLE"); \
-    echo "  Port $$LSP_PORT:"; (ss -tulnp 2>/dev/null | grep ":$$LSP_PORT " >/dev/null && echo "   🔴 IN USE" || echo "   🟢 AVAILABLE")
+    @HTTP_PORT=$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2-); : "${HTTP_PORT:=7000}"; \
+    MCP_PORT=$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2-); : "${MCP_PORT:=7001}"; \
+    echo "  Port $HTTP_PORT:"; (ss -tulnp 2>/dev/null | grep ":$HTTP_PORT " >/dev/null && echo "   🔴 IN USE" || echo "   🟢 AVAILABLE"); \
+    echo "  Port $MCP_PORT:"; (ss -tulnp 2>/dev/null | grep ":$MCP_PORT " >/dev/null && echo "   🔴 IN USE" || echo "   🟢 AVAILABLE")
 
 # Show logs
 logs:
     @tail -f .ontology/logs/*.log
+
+# Ensure .env exists (non-destructive): copies from .env.sample if missing
+ensure-env:
+    @if [ ! -f .env ]; then \
+        if [ -f .env.sample ]; then cp .env.sample .env && echo "📄 Created .env from .env.sample"; \
+        else echo "⚠️  No .env or .env.sample found"; fi; \
+    else echo "✅ .env present"; fi
 
 # === PORT MANAGEMENT ===
 
@@ -188,29 +192,29 @@ sync-ports:
 
 # Check if required ports are available (reads .env overrides)
 check-ports-available:
-    @HTTP_PORT=$$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
-    MCP_PORT=$$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7001); \
-    LSP_PORT=$$(grep -E '^LSP_SERVER_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7002); \
-    echo "  Checking port $$HTTP_PORT..." && (ss -tulnp 2>/dev/null | grep ":$$HTTP_PORT " >/dev/null && echo "  ❌ Port $$HTTP_PORT is in use" && exit 1 || echo "  ✅ Port $$HTTP_PORT is available"); \
-    echo "  Checking port $$MCP_PORT..." && (ss -tulnp 2>/dev/null | grep ":$$MCP_PORT " >/dev/null && echo "  ❌ Port $$MCP_PORT is in use" && exit 1 || echo "  ✅ Port $$MCP_PORT is available"); \
-    echo "  Checking port $$LSP_PORT..." && (ss -tulnp 2>/dev/null | grep ":$$LSP_PORT " >/dev/null && echo "  ❌ Port $$LSP_PORT is in use" && exit 1 || echo "  ✅ Port $$LSP_PORT is available"); \
+    @HTTP_PORT=$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2-); : "${HTTP_PORT:=7000}"; \
+    MCP_PORT=$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2-); : "${MCP_PORT:=7001}"; \
+    LSP_PORT=$(grep -E '^LSP_SERVER_PORT=' .env 2>/dev/null | cut -d= -f2-); : "${LSP_PORT:=7002}"; \
+    echo "  Checking port $HTTP_PORT..." && (ss -tulnp 2>/dev/null | grep ":$HTTP_PORT " >/dev/null && echo "  ❌ Port $HTTP_PORT is in use" && exit 1 || echo "  ✅ Port $HTTP_PORT is available"); \
+    echo "  Checking port $MCP_PORT..." && (ss -tulnp 2>/dev/null | grep ":$MCP_PORT " >/dev/null && echo "  ❌ Port $MCP_PORT is in use" && exit 1 || echo "  ✅ Port $MCP_PORT is available"); \
+    echo "  Checking port $LSP_PORT..." && (ss -tulnp 2>/dev/null | grep ":$LSP_PORT " >/dev/null && echo "  ❌ Port $LSP_PORT is in use" && exit 1 || echo "  ✅ Port $LSP_PORT is available"); \
     echo "  🎯 All required ports are available"
 
 # Check status of all ports (reads .env overrides)
 check-ports-status:
-    @HTTP_PORT=$$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
-    MCP_PORT=$$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7001); \
-    LSP_PORT=$$(grep -E '^LSP_SERVER_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7002); \
-    echo "  Port $$HTTP_PORT:" && (ss -tulnp 2>/dev/null | grep ":$$HTTP_PORT " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE"); \
-    echo "  Port $$MCP_PORT:" && (ss -tulnp 2>/dev/null | grep ":$$MCP_PORT " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE"); \
-    echo "  Port $$LSP_PORT:" && (ss -tulnp 2>/dev/null | grep ":$$LSP_PORT " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE"); \
+    @HTTP_PORT=$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
+    MCP_PORT=$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7001); \
+    LSP_PORT=$(grep -E '^LSP_SERVER_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7002); \
+    echo "  Port $HTTP_PORT:" && (ss -tulnp 2>/dev/null | grep ":$HTTP_PORT " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE"); \
+    echo "  Port $MCP_PORT:" && (ss -tulnp 2>/dev/null | grep ":$MCP_PORT " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE"); \
+    echo "  Port $LSP_PORT:" && (ss -tulnp 2>/dev/null | grep ":$LSP_PORT " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE"); \
     echo "  Port 8081:" && (ss -tulnp 2>/dev/null | grep ":8081 " >/dev/null && echo " 🔴 IN USE" || echo " 🟢 AVAILABLE")
 
 # Force clean all target ports (use with caution)
 clean-ports:
     @echo "🧹 Force cleaning target ports..."
     @echo "⚠️  This will terminate ALL processes on ports 7000-7002 and 8081"
-    @read -p "Continue? [y/N]: " confirm && [ "$$confirm" = "y" ] || exit 1
+    @read -p "Continue? [y/N]: " confirm && [ "$confirm" = "y" ] || exit 1
     @just clean-ports-force
     @echo "✅ All target ports cleaned"
 
@@ -220,12 +224,12 @@ clean-ports-quiet:
 
 # Force port cleanup implementation  
 clean-ports-force:
-    @HTTP_PORT=$$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
-    MCP_PORT=$$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7001); \
-    LSP_PORT=$$(grep -E '^LSP_SERVER_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7002); \
-    echo "    Cleaning port $$HTTP_PORT..." && (ss -tulnp 2>/dev/null | grep ":$$HTTP_PORT " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true); \
-    echo "    Cleaning port $$MCP_PORT..." && (ss -tulnp 2>/dev/null | grep ":$$MCP_PORT " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true); \
-    echo "    Cleaning port $$LSP_PORT..." && (ss -tulnp 2>/dev/null | grep ":$$LSP_PORT " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true); \
+    @HTTP_PORT=$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
+    MCP_PORT=$(grep -E '^MCP_HTTP_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7001); \
+    LSP_PORT=$(grep -E '^LSP_SERVER_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7002); \
+    echo "    Cleaning port $HTTP_PORT..." && (ss -tulnp 2>/dev/null | grep ":$HTTP_PORT " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true); \
+    echo "    Cleaning port $MCP_PORT..." && (ss -tulnp 2>/dev/null | grep ":$MCP_PORT " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true); \
+    echo "    Cleaning port $LSP_PORT..." && (ss -tulnp 2>/dev/null | grep ":$LSP_PORT " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true); \
     echo "    Cleaning port 8081..." && (ss -tulnp 2>/dev/null | grep ":8081 " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill 2>/dev/null || true); \
     @-pkill -f "src/servers" 2>/dev/null || true
     @-pkill -f "ontology-lsp" 2>/dev/null || true
@@ -235,21 +239,21 @@ clean-ports-force:
 # Get stats from servers
 stats:
     @echo "📊 Server Statistics"
-    @HTTP_PORT=$$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
-    curl -s http://localhost:$$HTTP_PORT/stats | jq . || echo "Server not responding"
+    @HTTP_PORT=$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2-); : "${HTTP_PORT:=7000}"; \
+    curl -s http://localhost:$HTTP_PORT/stats | jq . || echo "Server not responding"
 
 # Learning stats (Layer 5 summary)
 learning-stats:
     @echo "🧠 Learning (L5) Stats"
-    @HTTP_PORT=$$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 7000); \
-    curl -s http://localhost:$$HTTP_PORT/api/v1/learning-stats | jq . || echo "Server not responding"
+    @HTTP_PORT=$(grep -E '^HTTP_API_PORT=' .env 2>/dev/null | cut -d= -f2-); : "${HTTP_PORT:=7000}"; \
+    curl -s http://localhost:$HTTP_PORT/api/v1/learning-stats | jq . || echo "Server not responding"
 
 # === E2E LOCAL RUNNER ===
 
 # Start a dedicated HTTP server on port 7050 for E2E cross‑protocol tests
 start-test-http:
     @echo "🚀 Starting test HTTP server (port 7050)..."
-    @sh -c 'HTTP_API_PORT=7050 ~/.bun/bin/bun run src/servers/http.ts > .e2e-http.log 2>&1 & echo $$! > .e2e-http.pid'
+    @sh -c 'HTTP_API_PORT=7050 ~/.bun/bin/bun run src/servers/http.ts > .e2e-http.log 2>&1 & echo $! > .e2e-http.pid'
     @sh -c 'for x in 1 2 3 4 5 6 7 8 9 10; do if curl -sf http://localhost:7050/health >/dev/null 2>&1; then echo "✅ Test HTTP ready"; exit 0; fi; sleep 1; done; echo "❌ HTTP did not start"; exit 1'
 
 stop-test-http:
@@ -1961,3 +1965,17 @@ safe-apply file +cmds:
 
 safe-apply-stdin +cmds:
     @bash -lc 'cat | bin/self-apply.sh -- {{cmds}}'
+
+# CI-like run with balanced slices (uses history when available)
+test-ci-like-balanced:
+    @echo "🧪 Running CI-like (balanced) sliced tests (6 slices)"
+    @BAIL=${BAIL:-1} BATCH_SIZE=${BATCH_SIZE:-6} TIMEOUT=${TIMEOUT:-90000} BUN_JOBS=${BUN_JOBS:-1} BALANCE_SLICES=1 L2_MAX_PARSE_FILES=${L2_MAX_PARSE_FILES:-10} ESCALATION_POLICY=${ESCALATION_POLICY:-never} just test-slices 6
+
+# Balanced sequential slices (optional hot slice for top-N heavy files)
+test-slices-balanced slices="6" hot_top="0":
+    @n={{slices}}; i=1; \
+    while [ "$i" -le "$n" ]; do \
+        echo "================ BALANCED SLICE $i/$n ================"; \
+        SLICES="$n" SLICE="$i" BALANCE_SLICES=1 HOT_SLICE_TOP={{hot_top}} BATCH_SIZE=${BATCH_SIZE:-8} TIMEOUT=${TIMEOUT:-180000} BUN_JOBS=${BUN_JOBS:-1} bin/test-slicer.sh || exit $?; \
+        i=`expr $i + 1`; \
+    done
