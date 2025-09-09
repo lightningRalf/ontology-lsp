@@ -31,6 +31,12 @@ MAX_FILES=${MAX_FILES:-}
 WITH_PERF=${WITH_PERF:-}
 WITH_E2E=${WITH_E2E:-}
 
+# Balanced slicing knobs (optional)
+BALANCE_SLICES=${BALANCE_SLICES:-}
+HOT_SLICE=${HOT_SLICE:-}
+HOT_SLICE_TOP=${HOT_SLICE_TOP:-0}
+HISTORY_DIRS=${HISTORY_DIRS:-.test-results:slices}
+
 # Collect test files (default excludes perf/benchmarks unless WITH_PERF=1)
 SUITE_DIR=${SUITE_DIR:-}
 if [[ -n "${WITH_PERF}" && "${WITH_PERF}" != "0" ]]; then
@@ -65,16 +71,36 @@ if [[ ${TOTAL} -eq 0 ]]; then
   exit 0
 fi
 
-# Build slice
+# Build slice (optionally balanced using recent history)
 slice_files=()
-index=0
-for f in "${ALL[@]}"; do
-  # Use 0-based modulo on stable index to assign files to slices
-  if (( (index % SLICES) == (SLICE - 1) )); then
-    slice_files+=("$f")
+if [[ -n "${BALANCE_SLICES}" && "${BALANCE_SLICES}" != "0" ]]; then
+  ALL_LIST=".test-results/all-tests.lst"
+  mkdir -p .test-results
+  printf "%s\n" "${ALL[@]}" > "${ALL_LIST}"
+  mapfile -t HLIST < <(tr ':' '\n' <<<"${HISTORY_DIRS}")
+  HARGS=()
+  for d in "${HLIST[@]}"; do
+    [[ -n "$d" ]] && HARGS+=(--history-dir "$d")
+  done
+  if output=$(bun run scripts/build-slice-order.ts --base-list "${ALL_LIST}" --slices "${SLICES}" --slice "${SLICE}" --hot-top "${HOT_SLICE_TOP}" ${HOT_SLICE:+--hot-slice} "${HARGS[@]}" 2>/dev/null); then
+    if [[ -n "$output" ]]; then
+      # shellcheck disable=SC2206
+      slice_files=( $output )
+    fi
   fi
-  index=$((index+1))
-done
+fi
+
+# Fallback: discovery-order round-robin
+if [[ ${#slice_files[@]} -eq 0 ]]; then
+  index=0
+  for f in "${ALL[@]}"; do
+    # Use 0-based modulo on stable index to assign files to slices
+    if (( (index % SLICES) == (SLICE - 1) )); then
+      slice_files+=("$f")
+    fi
+    index=$((index+1))
+  done
+fi
 
 if [[ -n "${MAX_FILES}" ]]; then
   slice_files=("${slice_files[@]:0:${MAX_FILES}}")

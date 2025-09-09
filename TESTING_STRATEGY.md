@@ -198,6 +198,24 @@ just test-ci-like
 SLICES=6 BATCH_SIZE=10 TIMEOUT=180000 BUN_JOBS=1 just test-fast
 ```
 
+### Balanced Slices (Stabilize tail latency)
+
+- Use recent batch history to evenly distribute heavy test files across slices.
+- Knobs (env):
+  - `BALANCE_SLICES=1` enable history-driven ordering.
+  - `HISTORY_DIRS=".test-results:slices"` additional dirs to scan for `batch-report.jsonl`.
+  - `HOT_SLICE_TOP=<N>` optionally isolate the top-N heaviest files into the last slice.
+
+Recipes:
+
+```bash
+# CI-like, balanced (6 slices)
+just test-ci-like-balanced
+
+# Balanced sequential, isolating top-3 heavy files into the last slice
+just test-slices-balanced slices=6 hot_top=3
+```
+
 Notes:
 - `SLICES` controls total slices; `slice` selects which to run.
 - `BATCH_SIZE` files per `bun test` invocation; `BUN_JOBS=1` recommended.
