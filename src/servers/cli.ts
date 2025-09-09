@@ -400,10 +400,11 @@ class CLI {
             .command('stats')
             .description('Show system statistics and health')
             .option('--no-color', 'Disable colored output')
+            .option('-j, --json', 'Output JSON')
             .option('-v, --verbose', 'Verbose output')
             .action(async (options) => {
                 await this.ensureInitialized(options);
-                const result = await this.cliAdapter.handleStats();
+                const result = await this.cliAdapter.handleStats(options);
                 console.log(result);
                 await this.shutdown();
                 process.exit(0);

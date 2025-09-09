@@ -63,10 +63,12 @@ describe('Layer Validation - L1→L5 Working Paths', () => {
   }, 10000);
 
   // L5 Learning
-  test.skip('L5: stats should report pattern statistics', async () => {
-    // Skip - stats doesn't support JSON output yet
-    const { stdout } = await execAsync(`${CLI} stats --no-color`);
-    expect(stdout).toContain('Ontology LSP Statistics');
-    expect(stdout).toContain('Status: Initialized');
+  test('L5: stats should report pattern statistics in JSON', async () => {
+    const { stdout } = await execAsync(`${CLI} stats -j`);
+    const result = JSON.parse(stdout);
+    expect(result).toHaveProperty('status');
+    expect(result.status).toBe('Initialized');
+    expect(result).toHaveProperty('layers');
+    expect(result).toHaveProperty('timestamp');
   }, 10000);
 });

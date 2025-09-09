@@ -661,6 +661,7 @@ export class MCPAdapter {
         const checksOut = this.safeParseContent(checks);
         const ok = !!checksOut?.ok;
         const out = {
+            workflow: 'patch_checks_in_snapshot',
             ok,
             snapshot: snapId,
             stage: staged,
@@ -753,6 +754,7 @@ export class MCPAdapter {
         // Step 3: optionally run checks inside snapshot
         if (!runChecksFlag) {
             const quick = {
+                workflow: 'rename_safely',
                 ok: true,
                 snapshot: snap.id,
                 filesAffected: files.length,
@@ -771,6 +773,7 @@ export class MCPAdapter {
         const checks = await overlayStore.runChecks(snap.id, commands, timeoutSec, { onlyTouched });
         const ok = !!checks.ok;
         const result = {
+            workflow: 'rename_safely',
             ok,
             snapshot: snap.id,
             filesAffected: files.length,
@@ -855,6 +858,7 @@ export class MCPAdapter {
         }
 
         const out = {
+            workflow: 'locate_confirm_definition',
             ok: Array.isArray(chosen?.definitions) && chosen.definitions.length > 0,
             symbol,
             attempts,
@@ -1027,26 +1031,60 @@ export class MCPAdapter {
     private async handleTextSearch(args: Record<string, any>) {
         const query = String(args?.query || '').trim();
         if (!query) return { content: [{ type: 'text', text: 'query required' }], isError: true };
-        const kind = (args?.kind as string) || 'literal';
-        const caseInsensitive = !!args?.caseInsensitive;
-        const maxResults = Math.min(Number(args?.maxResults || 200), 1000);
-        const path = String(args?.path || process.cwd());
-        const asyncGrep = new AsyncEnhancedGrep({ cacheSize: 500, cacheTTL: 30000 });
-        const pattern =
-            kind === 'word' ? `\\b${escapeRegex(query)}\\b` : kind === 'literal' ? escapeRegex(query) : query;
-        const results = await asyncGrep.search({ pattern, path, maxResults, timeout: 2000, caseInsensitive });
-        const normalized = results.map((r) => ({
-            file: r.file,
-            line: r.line ?? 0,
-            column: r.column ?? 0,
-            text: r.text,
-        }));
-        return {
-            content: [
-                { type: 'text', text: JSON.stringify({ count: normalized.length, results: normalized }, null, 2) },
-            ],
-            isError: false,
-        };
+        
+        try {
+            // Ensure analyzer is initialized
+            await (this.coreAnalyzer as any)?.initialize?.();
+            
+            const kind = (args?.kind as string) || 'literal';
+            const caseInsensitive = !!args?.caseInsensitive;
+            const maxResults = Math.min(Number(args?.maxResults || 200), 1000);
+            const path = String(args?.path || process.cwd());
+            
+            // Prepare query based on kind
+            let searchQuery = query;
+            if (kind === 'word') {
+                searchQuery = `\\b${escapeRegex(query)}\\b`;
+            } else if (kind === 'literal') {
+                searchQuery = escapeRegex(query);
+            }
+            
+            // Use the new textSearch method from CodeAnalyzer
+            const result = await this.coreAnalyzer.textSearch(searchQuery, {
+                path,
+                maxResults,
+                caseInsensitive,
+            });
+            
+            return {
+                content: [
+                    { type: 'text', text: JSON.stringify(result, null, 2) },
+                ],
+                isError: false,
+            };
+        } catch (error) {
+            // Fallback to direct AsyncEnhancedGrep if textSearch fails
+            const kind = (args?.kind as string) || 'literal';
+            const caseInsensitive = !!args?.caseInsensitive;
+            const maxResults = Math.min(Number(args?.maxResults || 200), 1000);
+            const path = String(args?.path || process.cwd());
+            const asyncGrep = new AsyncEnhancedGrep({ cacheSize: 500, cacheTTL: 30000 });
+            const pattern =
+                kind === 'word' ? `\\b${escapeRegex(query)}\\b` : kind === 'literal' ? escapeRegex(query) : query;
+            const results = await asyncGrep.search({ pattern, path, maxResults, timeout: 200, caseInsensitive });
+            const normalized = results.map((r) => ({
+                file: r.file,
+                line: r.line ?? 0,
+                column: r.column ?? 0,
+                text: r.text,
+            }));
+            return {
+                content: [
+                    { type: 'text', text: JSON.stringify({ count: normalized.length, results: normalized }, null, 2) },
+                ],
+                isError: false,
+            };
+        }
     }
 
     private async handleSymbolSearch(args: Record<string, any>) {

@@ -355,7 +355,7 @@ export class CLIAdapter {
     }
 
     /**
-     * Text search (ripgrep-backed, bounded)
+     * Text search using Layer 1 Fast Search through CodeAnalyzer
      */
     async handleTextSearch(
         query: string,
@@ -367,23 +367,55 @@ export class CLIAdapter {
             json?: boolean;
         }
     ): Promise<string> {
-        const kind = options.kind || 'literal';
-        const caseInsensitive = !!options.caseInsensitive;
-        const maxResults = Math.min(options.maxResults || this.config.maxResults || 200, 1000);
-        const path = options.path || process.cwd();
-        const asyncGrep = new AsyncEnhancedGrep({ cacheSize: 500, cacheTTL: 30000 });
-        const pattern =
-            kind === 'word' ? `\\b${escapeRegex(query)}\\b` : kind === 'literal' ? escapeRegex(query) : query;
-        const results = await asyncGrep.search({ pattern, path, maxResults, timeout: 2000, caseInsensitive });
-        const normalized = results.map((r) => ({
-            file: r.file,
-            line: r.line ?? 0,
-            column: r.column ?? 0,
-            text: r.text,
-        }));
-        return options.json
-            ? JSON.stringify({ count: normalized.length, results: normalized }, null, 2)
-            : normalized.map((r) => `${r.file}:${r.line}:${r.column}: ${r.text}`).join('\n');
+        try {
+            // Ensure analyzer is initialized
+            await (this.coreAnalyzer as any)?.initialize?.();
+            
+            const kind = options.kind || 'literal';
+            const maxResults = Math.min(options.maxResults || this.config.maxResults || 200, 1000);
+            const path = options.path || process.cwd();
+            
+            // Prepare query based on kind
+            let searchQuery = query;
+            if (kind === 'word') {
+                searchQuery = `\\b${escapeRegex(query)}\\b`;
+            } else if (kind === 'literal') {
+                searchQuery = escapeRegex(query);
+            }
+            
+            // Use the new textSearch method from CodeAnalyzer
+            const result = await this.coreAnalyzer.textSearch(searchQuery, {
+                path,
+                maxResults,
+                caseInsensitive: options.caseInsensitive,
+            });
+            
+            return options.json
+                ? JSON.stringify(result, null, 2)
+                : result.results.map((r) => `${r.file}:${r.line}:${r.column}: ${r.text}`).join('\n');
+        } catch (error) {
+            // Fallback to direct AsyncEnhancedGrep if textSearch fails
+            if (process.env.DEBUG_TEXT_SEARCH === '1') {
+                console.error('[CLI handleTextSearch] Error calling textSearch:', error);
+            }
+            const kind = options.kind || 'literal';
+            const caseInsensitive = !!options.caseInsensitive;
+            const maxResults = Math.min(options.maxResults || this.config.maxResults || 200, 1000);
+            const path = options.path || process.cwd();
+            const asyncGrep = new AsyncEnhancedGrep({ cacheSize: 500, cacheTTL: 30000 });
+            const pattern =
+                kind === 'word' ? `\\b${escapeRegex(query)}\\b` : kind === 'literal' ? escapeRegex(query) : query;
+            const results = await asyncGrep.search({ pattern, path, maxResults, timeout: 200, caseInsensitive });
+            const normalized = results.map((r) => ({
+                file: r.file,
+                line: r.line ?? 0,
+                column: r.column ?? 0,
+                text: r.text,
+            }));
+            return options.json
+                ? JSON.stringify({ count: normalized.length, results: normalized }, null, 2)
+                : normalized.map((r) => `${r.file}:${r.line}:${r.column}: ${r.text}`).join('\n');
+        }
     }
 
     /**
@@ -542,7 +574,7 @@ export class CLIAdapter {
     /**
      * Handle stats command
      */
-    async handleStats(): Promise<string> {
+    async handleStats(options?: { json?: boolean }): Promise<string> {
         try {
             const diagnostics = this.coreAnalyzer.getDiagnostics();
             const l4 = (this.coreAnalyzer as any).getLayer4StorageMetrics?.();
@@ -600,6 +632,21 @@ export class CLIAdapter {
             }
 
             output.push('', `Timestamp: ${new Date(diagnostics.timestamp).toISOString()}`);
+
+            // Return JSON if requested
+            if (options?.json) {
+                const statsData = {
+                    status: diagnostics.initialized ? 'Initialized' : 'Not initialized',
+                    layers: diagnostics.layerManager?.layers || {},
+                    layer1: l1m || null,
+                    layer2: l2m || null,
+                    layer4: l4 || null,
+                    cache: diagnostics.cache || {},
+                    performance: diagnostics.performance || {},
+                    timestamp: diagnostics.timestamp
+                };
+                return JSON.stringify(statsData, null, 2);
+            }
 
             return output.join('\n');
         } catch (error) {

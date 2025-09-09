@@ -2665,6 +2665,140 @@ export class CodeAnalyzer {
     }
 
     /**
+     * Public text search method using Layer 1 Fast Search
+     * Provides general content search with proper layer integration
+     */
+    async textSearch(query: string, options?: {
+        path?: string;
+        maxResults?: number;
+        caseInsensitive?: boolean;
+        fileTypes?: string[];
+    }): Promise<{ count: number; results: Array<{ file: string; line: number; column: number; text: string }> }> {
+        if (!this.initialized) {
+            await this.initialize();
+        }
+
+        // Get Layer 1 for fast search
+        const layer1 = this.layerManager.getLayer('layer1');
+        if (process.env.DEBUG_TEXT_SEARCH === '1') {
+            console.log('[textSearch] Layer 1 available:', !!layer1);
+        }
+        if (!layer1) {
+            // Fallback to direct async search if layer not available
+            if (process.env.DEBUG_TEXT_SEARCH === '1') {
+                console.log('[textSearch] Falling back to AsyncEnhancedGrep (no Layer 1)');
+            }
+            // Fallback: the caller already prepared `query` according to kind (literal|regex|word)
+            // so pass it through without additional escaping to avoid double-boundary patterns.
+            const asyncOptions: AsyncSearchOptions = {
+                pattern: query,
+                path: options?.path || this.config.workspaceRoot,
+                maxResults: options?.maxResults || 200,
+                timeout: 200,
+                caseInsensitive: options?.caseInsensitive,
+                useRegex: /[\\[*+?(){}|]|\\b/.test(query),
+            };
+            const results = await this.asyncSearchTools.search(asyncOptions);
+            return {
+                count: results.length,
+                results: results.map(r => ({
+                    file: r.file,
+                    line: r.line || 0,
+                    column: r.column || 0,
+                    text: r.text,
+                })),
+            };
+        }
+
+        // If the query string contains regex metacharacters (e.g., \b, [, ], (, ), *, +, ?)
+        // prefer the async grep path since Layer 1 identifier search is token-based.
+        const isRegexLike = /[\\[*+?(){}|]|\\b/.test(query);
+        if (isRegexLike) {
+            const asyncOptions: AsyncSearchOptions = {
+                pattern: query,
+                path: options?.path || this.config.workspaceRoot,
+                maxResults: options?.maxResults || 200,
+                timeout: 200,
+                caseInsensitive: options?.caseInsensitive,
+                useRegex: /[\\[*+?(){}|]|\\b/.test(query),
+            };
+            const results = await this.asyncSearchTools.search(asyncOptions);
+            return {
+                count: results.length,
+                results: results.map(r => ({
+                    file: r.file,
+                    line: r.line || 0,
+                    column: r.column || 0,
+                    text: r.text,
+                })),
+            };
+        }
+
+        // Use Layer 1 Fast Search for identifier-like queries
+        const searchQuery: SearchQuery = {
+            identifier: query,
+            searchPath: options?.path || this.config.workspaceRoot,
+            fileTypes: options?.fileTypes,
+            caseSensitive: !options?.caseInsensitive,
+            includeTests: true,
+        };
+
+        try {
+            if (process.env.DEBUG_TEXT_SEARCH === '1') {
+                console.log('[textSearch] Calling Layer 1 with query:', searchQuery);
+            }
+            const matches = await layer1.process(searchQuery);
+            if (process.env.DEBUG_TEXT_SEARCH === '1') {
+                console.log('[textSearch] Layer 1 returned:', {
+                    exact: matches.exact.length,
+                    fuzzy: matches.fuzzy.length,
+                    searchTime: matches.searchTime,
+                });
+            }
+            
+            // Combine all match types
+            const allMatches = [
+                ...matches.exact.map(m => ({ ...m, confidence: 1.0 })),
+                ...matches.fuzzy.map(m => ({ ...m, confidence: 0.8 })),
+            ];
+
+            // Sort by confidence and limit results
+            allMatches.sort((a, b) => b.confidence - a.confidence);
+            const limited = allMatches.slice(0, options?.maxResults || 200);
+
+            return {
+                count: limited.length,
+                results: limited.map(m => ({
+                    file: m.file,
+                    line: m.line,
+                    column: m.column || 0,
+                    text: m.text || '',
+                })),
+            };
+        } catch (error) {
+            // Fallback to async search on error
+            // Fallback: preserve caller-provided pattern semantics (already escaped as needed)
+            const asyncOptions: AsyncSearchOptions = {
+                pattern: query,
+                path: options?.path || this.config.workspaceRoot,
+                maxResults: options?.maxResults || 200,
+                timeout: 200,
+                caseInsensitive: options?.caseInsensitive,
+            };
+        const results = await this.asyncSearchTools.search(asyncOptions);
+            return {
+                count: results.length,
+                results: results.map(r => ({
+                    file: r.file,
+                    line: r.line || 0,
+                    column: r.column || 0,
+                    text: r.text,
+                })),
+            };
+        }
+    }
+
+    /**
      * Helper methods for async search
      */
     private escapeRegex(str: string): string {
