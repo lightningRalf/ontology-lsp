@@ -31,6 +31,8 @@ import {
 } from '../adapters/utils.js';
 import { createCodeAnalyzer } from '../core/index.js';
 import type { CodeAnalyzer } from '../core/unified-analyzer.js';
+import { metricsRegistry, recordLayerLatency, recordToolEnd, recordToolStart } from '../instrumentation/metrics.js';
+import { serve } from 'bun';
 
 export class LSPServer {
     private connection = createConnection(ProposedFeatures.all);
@@ -84,6 +86,38 @@ export class LSPServer {
                 this.connection.client.register(DidChangeConfigurationNotification.type, undefined);
             }
             log('Ontology LSP Server initialized');
+
+            // Start metrics endpoint for LSP on loopback
+            try {
+                const port = Number(process.env.LSP_PROM_PORT || 9467);
+                serve({
+                    hostname: '127.0.0.1',
+                    port,
+                    fetch: async (req) => {
+                        const url = new URL(req.url);
+                        if (url.pathname === '/metrics' && req.method === 'GET') {
+                            const text = metricsRegistry.renderPrometheusText();
+                            return new Response(text, {
+                                status: 200,
+                                headers: { 'Content-Type': 'text/plain; version=0.0.4', 'Cache-Control': 'no-cache' },
+                            });
+                        }
+                        return new Response('Not found', { status: 404 });
+                    },
+                });
+                log(`[LSP] Metrics on http://127.0.0.1:${port}/metrics`);
+            } catch (err) {
+                log('[LSP] Metrics server failed to start:', (err as Error)?.message || String(err));
+            }
+
+            // Bridge layer performance events to metrics histograms
+            try {
+                const ss: any = (this.coreAnalyzer as any).sharedServices;
+                const bus: any = ss?.eventBus;
+                bus?.on?.('layer-manager:performance-recorded', (perf: any) => {
+                    try { recordLayerLatency('lsp', String(perf?.layer || 'unknown'), Number(perf?.duration || 0)); } catch {}
+                });
+            } catch {}
         });
 
         // Document sync
@@ -109,14 +143,32 @@ export class LSPServer {
             if (!this.initialized) {
                 throw new Error('Server not initialized');
             }
-            return await this.lspAdapter.handleDefinition(params);
+            const t0 = Date.now();
+            recordToolStart('lsp');
+            try {
+                const out = await this.lspAdapter.handleDefinition(params);
+                recordToolEnd('lsp', 'definition', Date.now() - t0, true);
+                return out;
+            } catch (e) {
+                try { recordToolEnd('lsp', 'definition', Date.now() - t0, false); } catch {}
+                throw e;
+            }
         });
 
         this.connection.onReferences(async (params) => {
             if (!this.initialized) {
                 throw new Error('Server not initialized');
             }
-            return await this.lspAdapter.handleReferences(params);
+            const t0 = Date.now();
+            recordToolStart('lsp');
+            try {
+                const out = await this.lspAdapter.handleReferences(params);
+                recordToolEnd('lsp', 'references', Date.now() - t0, true);
+                return out;
+            } catch (e) {
+                try { recordToolEnd('lsp', 'references', Date.now() - t0, false); } catch {}
+                throw e;
+            }
         });
 
         this.connection.onPrepareRename(async (params) => {
@@ -130,7 +182,16 @@ export class LSPServer {
             if (!this.initialized) {
                 throw new Error('Server not initialized');
             }
-            return await this.lspAdapter.handleRename(params);
+            const t0 = Date.now();
+            recordToolStart('lsp');
+            try {
+                const out = await this.lspAdapter.handleRename(params);
+                recordToolEnd('lsp', 'rename', Date.now() - t0, true);
+                return out;
+            } catch (e) {
+                try { recordToolEnd('lsp', 'rename', Date.now() - t0, false); } catch {}
+                throw e;
+            }
         });
 
         // Graceful no-op handlers for features we don't implement yet but
@@ -164,6 +225,8 @@ export class LSPServer {
             const uri = params.uri;
             const position = params.position || { line: 0, character: 0 };
             const identifier = params.symbol || this.lspAdapter.extractIdentifierAtPosition(uri, position);
+            const t0 = Date.now();
+            recordToolStart('lsp');
             const req = buildFindReferencesRequest({
                 uri,
                 position,
@@ -173,6 +236,7 @@ export class LSPServer {
                 precise: true,
             } as any);
             const result = await (this.coreAnalyzer as any).findReferencesAsync(req);
+            try { recordToolEnd('lsp', 'preciseReferences', Date.now() - t0, true); } catch {}
             return {
                 locations: result.data.map((r: any) => referenceToLspLocation(r)),
                 count: result.data.length,
@@ -191,6 +255,8 @@ export class LSPServer {
             const uri = params.uri;
             const position = params.position || { line: 0, character: 0 };
             const identifier = params.symbol || this.lspAdapter.extractIdentifierAtPosition(uri, position);
+            const t0 = Date.now();
+            recordToolStart('lsp');
             const req = buildFindDefinitionRequest({
                 uri,
                 position,
@@ -200,6 +266,7 @@ export class LSPServer {
                 precise: true,
             } as any);
             const result = await (this.coreAnalyzer as any).findDefinitionAsync(req);
+            try { recordToolEnd('lsp', 'preciseDefinition', Date.now() - t0, true); } catch {}
             return {
                 locations: result.data.map((d: any) => definitionToLspLocation(d)),
                 count: result.data.length,
@@ -210,7 +277,16 @@ export class LSPServer {
             if (!this.initialized) {
                 return [];
             }
-            return await this.lspAdapter.handleCompletion(params);
+            const t0 = Date.now();
+            recordToolStart('lsp');
+            try {
+                const out = await this.lspAdapter.handleCompletion(params);
+                recordToolEnd('lsp', 'completion', Date.now() - t0, true);
+                return out;
+            } catch (e) {
+                try { recordToolEnd('lsp', 'completion', Date.now() - t0, false); } catch {}
+                return [];
+            }
         });
 
         // Expose workspace/executeCommand for 'ontology.explore'

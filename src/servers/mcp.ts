@@ -21,6 +21,8 @@ import { MCPAdapter } from '../adapters/mcp-adapter.js';
 import { createDefaultCoreConfig } from '../adapters/utils.js';
 import { createCodeAnalyzer } from '../core/index';
 import type { CodeAnalyzer } from '../core/unified-analyzer';
+import { metricsRegistry, recordToolEnd, recordToolStart } from '../instrumentation/metrics.js';
+import { serve } from 'bun';
 
 export class MCPServer {
     private server: Server;
@@ -66,9 +68,16 @@ export class MCPServer {
             const { name, arguments: args } = request.params;
 
             try {
+                const t0 = Date.now();
+                recordToolStart('mcp_stdio');
                 const result = await this.mcpAdapter.handleToolCall(name, args || {});
+                try {
+                    const success = !((result && typeof result === 'object' && 'isError' in result && (result as any).isError) || false);
+                    recordToolEnd('mcp_stdio', String(name || 'unknown'), Date.now() - t0, success);
+                } catch {}
                 return result;
             } catch (error) {
+                try { recordToolEnd('mcp_stdio', String(name || 'unknown'), 0, false); } catch {}
                 console.error(`Tool call failed: ${name}`, error);
                 throw new McpError(
                     ErrorCode.InternalError,
@@ -95,6 +104,29 @@ export class MCPServer {
         this.mcpAdapter = new MCPAdapter(this.coreAnalyzer);
 
         console.error('Ontology MCP Server initialized');
+
+        // Start metrics endpoint on loopback (does not interfere with stdio)
+        try {
+            const port = Number(process.env.MCP_STDIO_PROM_PORT || 9466);
+            serve({
+                hostname: '127.0.0.1',
+                port,
+                fetch: async (req) => {
+                    const url = new URL(req.url);
+                    if (url.pathname === '/metrics' && req.method === 'GET') {
+                        const text = metricsRegistry.renderPrometheusText();
+                        return new Response(text, {
+                            status: 200,
+                            headers: { 'Content-Type': 'text/plain; version=0.0.4', 'Cache-Control': 'no-cache' },
+                        });
+                    }
+                    return new Response('Not found', { status: 404 });
+                },
+            });
+            console.error(`[MCP stdio] Metrics on http://127.0.0.1:${port}/metrics`);
+        } catch (err) {
+            console.error('[MCP stdio] Metrics server failed to start:', (err as Error)?.message || String(err));
+        }
     }
 
     async run(): Promise<void> {

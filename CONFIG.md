@@ -57,8 +57,12 @@ Settings are loaded in this priority order:
   - Numeric values are clamped: values ≤ 0 become 1; values > 100 become 100.
   - Non-numeric/invalid values fall back to the default of 20.
   - CI recommendation: set `L2_MAX_PARSE_FILES=12` for perf-gated CI jobs to stabilize p95 on typical runners (see .github/workflows/ci.yml).
- - `LIST_SYMBOLS_AST` - When set to `1`, `list_symbols` tool uses an AST-backed path (Tree-sitter) for improved coverage; gracefully falls back to a fast regex scanner when grammars are unavailable.
- - Snapshot checks timeout clamp: all tools that run commands inside snapshots (e.g., `run_checks`, `patch_checks_in_snapshot`, `rename_safely`) accept `timeoutSec` but are centrally clamped to 1–600 seconds per command. The HTTP adapter already enforces this; core now applies the same cap for MCP/CLI parity.
+- `LIST_SYMBOLS_AST` - When set to `1`, `list_symbols` tool uses an AST-backed path (Tree-sitter) for improved coverage; gracefully falls back to a fast regex scanner when grammars are unavailable.
+- Snapshot checks timeout clamp: all tools that run commands inside snapshots (e.g., `run_checks`, `patch_checks_in_snapshot`, `rename_safely`) accept `timeoutSec` but are centrally clamped to 1–600 seconds per command. The HTTP adapter already enforces this; core now applies the same cap for MCP/CLI parity.
+
+### Metrics (Prometheus) Ports
+- `MCP_STDIO_PROM_PORT` — MCP stdio metrics HTTP endpoint (default: 9466, bind 127.0.0.1)
+- `LSP_PROM_PORT` — LSP metrics HTTP endpoint (default: 9467, bind 127.0.0.1)
 
 ### Circuit Breaker
 - `CIRCUIT_BREAKER_THRESHOLD` - Failures before opening circuit (default: 5)
