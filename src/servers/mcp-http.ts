@@ -37,6 +37,7 @@ import { overlayStore } from '../core/overlay-store.js';
 import { registerCommonPrompts, registerCommonResources } from './mcp-shared.js';
 import { ToolExecutor } from '../core/tools/executor.js';
 import type { CodeAnalyzer } from '../core/unified-analyzer';
+import { metricsRegistry, recordToolEnd, recordToolStart } from '../instrumentation/metrics.js';
 
 type SessionRecord = {
     server: Server;
@@ -58,6 +59,13 @@ app.use(
         allowedHeaders: ['Content-Type', 'mcp-session-id'],
     })
 );
+
+// Prometheus metrics endpoint for MCP HTTP adapter
+app.get('/metrics', (_req, res) => {
+    const text = metricsRegistry.renderPrometheusText();
+    res.setHeader('Content-Type', 'text/plain; version=0.0.4');
+    res.status(200).send(text);
+});
 
 // In-memory session map
 const sessions: Record<string, SessionRecord> = {};
@@ -85,9 +93,17 @@ async function createMcpServer(desiredSid?: string): Promise<SessionRecord> {
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { name, arguments: args } = request.params;
         try {
+            const t0 = Date.now();
             const sid = transport.sessionId || 'unknown';
             mcpEvents.emit('toolCall', { sessionId: sid, name, args, ts: Date.now() });
-            return await executor.execute(adapter, name, (args || {}) as Record<string, any>);
+            recordToolStart('mcp_http');
+            const out = await executor.execute(adapter, name, (args || {}) as Record<string, any>);
+            try {
+                // success if adapter didn't set isError=true
+                const success = !((out && typeof out === 'object' && 'isError' in out && (out as any).isError) || false);
+                recordToolEnd('mcp_http', String(name || 'unknown'), Date.now() - t0, success);
+            } catch {}
+            return out;
         } catch (error) {
             const sid = transport.sessionId || 'unknown';
             mcpEvents.emit('toolError', {
@@ -96,6 +112,7 @@ async function createMcpServer(desiredSid?: string): Promise<SessionRecord> {
                 error: error instanceof Error ? error.message : String(error),
                 ts: Date.now(),
             });
+            try { recordToolEnd('mcp_http', String(name || 'unknown'), 0, false); } catch {}
             if (isCoreError(error) || error instanceof McpError) {
                 throw toMcpError(error);
             }

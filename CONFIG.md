@@ -189,6 +189,35 @@ LOG_LEVEL=debug bun run start
 4. **Monitor circuit breaker** - Adjust thresholds based on network conditions
 5. **Tune cache settings** - Balance freshness vs performance
 
+## Observability: Metrics (Prometheus)
+
+The HTTP and MCP HTTP servers expose a Prometheus-compatible `/metrics` endpoint with low-cardinality counters and histograms.
+
+- Endpoints:
+  - HTTP API: `http://<host>:<HTTP_API_PORT>/metrics` (default port 7000)
+  - MCP HTTP: `http://<host>:<MCP_HTTP_PORT>/metrics` (default port 7001)
+
+- Metrics emitted:
+  - `tool_calls_total{adapter,tool,result}` — total tool calls by adapter and tool with `result=success|error`
+  - `tool_duration_ms{adapter,tool}` — histogram of tool durations (ms)
+  - `layer_latency_ms{adapter,layer}` — histogram of per-layer latencies (ms)
+  - `inflight_requests{adapter}` — gauge of in-flight requests per adapter
+
+- Example Prometheus scrape config:
+```yaml
+scrape_configs:
+  - job_name: 'ontology-http'
+    static_configs:
+      - targets: ['localhost:7000']
+  - job_name: 'ontology-mcp-http'
+    static_configs:
+      - targets: ['localhost:7001']
+```
+
+Notes:
+- Label sets are bounded to prevent cardinality explosions.
+- The LSP and CLI adapters can be instrumented similarly in future phases (CLI via Pushgateway).
+
 ## Layer 4 StoragePort (Ontology) Configuration
 
 Layer 4 persists concepts and relations through a pluggable StoragePort. Select the backend via config or environment.

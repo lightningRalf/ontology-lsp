@@ -112,7 +112,8 @@ curl -sS 'http://localhost:7000/api/v1/pipelines/dev_example_1' | jq .
 
 ## Snapshot Resources
 - Diff: `GET /api/v1/snapshots/{id}/diff` → `{ success, data: { id, diff } }`
-- Status: `GET /api/v1/snapshots/{id}/status`
+- Status: `GET /api/v1/snapshots/{id}/status` → includes `lastApply` summary
+- Progress: `GET /api/v1/snapshots/{id}/progress` → progress.log text (when DOGFOOD_PROGRESS=1)
 - UI: `/ui` → Snapshots panel with client‑side diff highlighting
 - CLI: `just snap_diff_cli <SNAP_ID>` uses `delta` when available
 
@@ -127,3 +128,46 @@ curl -sS 'http://localhost:7000/api/v1/pipelines/dev_example_1' | jq .
 - Prefer HTTP tools in CI; for local dev, MCP stdio via `./mcp-wrapper.sh` is convenient (ensure clean stdout).
 - `FAST_STDIO_CHECKS=touched` keeps snapshot checks fast (typecheck touched TS files).
 - Use `just safe-apply <file> -- <commands>` or pipe via `just safe-apply-stdin` to stage patches safely inside snapshots.
+
+## Unified Diff Guidance (recommended)
+
+For edits intended to be applied (apply_after_checks / apply_snapshot), prefer git-style unified diffs:
+
+- Modify existing file
+  ```diff
+  diff --git a/src/file.ts b/src/file.ts
+  --- a/src/file.ts
+  +++ b/src/file.ts
+  @@ -10,2 +10,3 @@
+   export function fn() {
+  +  // added line
+     return 1;
+  }
+  ```
+
+- Add new file
+  ```diff
+  diff --git a/new/file.ts b/new/file.ts
+  --- /dev/null
+  +++ b/new/file.ts
+  @@ -0,0 +1,2 @@
+  +// new file content
+  +export const X = 1;
+  ```
+
+Notes
+- Parent directories must exist in the working tree for new files; create them first (e.g., `mkdir -p tests/temp`).
+- The server accepts `apply_patch` format (`*** Begin Patch` … `*** End Patch`) and auto-converts it to unified for staging. For application, unified diff yields more predictable results across environments.
+- Applying to working tree is guarded by `ALLOW_SNAPSHOT_APPLY=1`. Without it, workflows only stage and run checks in snapshots.
+- Reverting: use `apply_snapshot` with `{ reverse: true }` and the same snapshot id.
+
+## Apply after checks
+
+- Purpose: Stage patch → run checks → optionally apply to working tree when allowed.
+- HTTP/MCP tool: `apply_after_checks` with arguments `{ patch, commands?: string[], timeoutSec?: number }`.
+- Guard: Requires `ALLOW_SNAPSHOT_APPLY=1` to write to working tree.
+- Typical flow:
+  1) `get_snapshot` (optional convenience)
+  2) `propose_patch` (stage)
+  3) `run_checks` (typecheck/build/tests)
+  4) `apply_snapshot` (dev only; guard enforced)

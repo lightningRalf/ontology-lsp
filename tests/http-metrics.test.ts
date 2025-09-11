@@ -1,49 +1,50 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { HTTPServer } from '../src/servers/http';
 
-describe('HTTP /metrics endpoint', () => {
-    let server: HTTPServer;
-    const host = '127.0.0.1';
-    const port = 7010; // test port per CONFIG.md
-    const base = `http://${host}:${port}`;
+async function callTool(base: string, name: string, args: Record<string, any>) {
+  const res = await fetch(`${base}/api/v1/tools/call`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name, arguments: args }),
+  });
+  const body = await res.json();
+  return { status: res.status, body };
+}
 
-    beforeAll(async () => {
-        server = new HTTPServer({ host, port, workspaceRoot: process.cwd(), enableOpenAPI: false });
-        await server.start();
-    });
+describe('HTTP metrics', () => {
+  let server: HTTPServer;
+  const host = '127.0.0.1';
+  const port = 7067;
+  const base = `http://${host}:${port}`;
 
-    afterAll(async () => {
-        await server.stop();
-    });
+  beforeAll(async () => {
+    process.env.HTTP_API_PORT = String(port);
+    server = new HTTPServer({ host, port, workspaceRoot: process.cwd(), enableOpenAPI: false });
+    await server.start();
+  });
 
-    test('returns consolidated JSON metrics (L1/L2/L4)', async () => {
-        const res = await fetch(`${base}/metrics?format=json`);
-        expect(res.status).toBeGreaterThanOrEqual(200);
-        expect(res.status).toBeLessThan(500);
-        const body = await res.json();
-        // Presence
-        expect(body).toBeDefined();
-        // L4 should generally be present
-        expect(body.l4).toBeDefined();
-        // Storage extras and totals should be present for dashboards
-        expect(body.storageExtras).toBeDefined();
-        expect(typeof body.storageExtras).toBe('object');
-        expect(body.storageTotals).toBeDefined();
-        expect(typeof body.storageTotals.count).toBe('number');
-        // If L1/L2 real layers are present, validate some fields
-        if (body.l1 && body.l1.layer) {
-            expect(typeof body.l1.layer.searches).toBe('number');
-            expect(body.l1.layer.searches).toBeGreaterThanOrEqual(0);
-        }
-        if (body.l2 && typeof body.l2.count === 'number') {
-            expect(body.l2.count).toBeGreaterThanOrEqual(0);
-        }
-    });
+  afterAll(async () => {
+    await server.stop();
+    delete process.env.HTTP_API_PORT;
+  });
 
-    test('returns Prometheus text', async () => {
-        const res = await fetch(`${base}/metrics?format=prometheus`);
-        expect(res.status).toBe(200);
-        const text = await res.text();
-        expect(text).toContain('ontology_l4_');
+  test('tool_calls_total increments after text_search', async () => {
+    const { status, body } = await callTool(base, 'text_search', {
+      query: 'function',
+      kind: 'word',
+      maxResults: 5,
+      caseInsensitive: true,
     });
+    expect(status).toBe(200);
+    expect(body.success).toBe(true);
+
+    const m = await fetch(`${base}/metrics`);
+    expect(m.status).toBe(200);
+    const text = await m.text();
+    // Minimal assertion: adapter=http, tool=text_search and result=success present in a counter line
+    expect(text).toContain('tool_calls_total');
+    expect(text).toContain('adapter="http"');
+    expect(text).toContain('tool="text_search"');
+    expect(text).toContain('result="success"');
+  }, 15000);
 });

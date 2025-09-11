@@ -20,6 +20,7 @@ import { createCodeAnalyzer } from '../core/index';
 import type { CodeAnalyzer } from '../core/unified-analyzer';
 import type { FastSearchLayer } from '../layers/layer1-fast-search.js';
 import type { SearchQuery } from '../types/core.js';
+import { metricsRegistry, recordLayerLatency, recordToolEnd, recordToolStart } from '../instrumentation/metrics.js';
 
 interface HTTPServerConfig {
     port?: number;
@@ -114,6 +115,15 @@ export class HTTPServer {
                     // if (url.pathname.includes('/stream/') && request.method === 'POST') {
                     //   return await this.handleSSEStream(request, url.pathname);
                     // }
+
+                    // Prometheus metrics endpoint (adapter: http)
+                    if (url.pathname === '/metrics' && request.method === 'GET') {
+                        const text = metricsRegistry.renderPrometheusText();
+                        return new Response(text, {
+                            status: 200,
+                            headers: { 'Content-Type': 'text/plain; version=0.0.4', 'Cache-Control': 'no-cache' },
+                        });
+                    }
 
                     // Small built-in metrics endpoint for Layer 4 storage
                     if (url.pathname === '/metrics/l4' && request.method === 'GET') {
@@ -293,6 +303,8 @@ export class HTTPServer {
 
                             const mcpAdapter = new MCPAdapter(this.coreAnalyzer);
                             const executor = new ToolExecutor();
+                            const t0 = Date.now();
+                            recordToolStart('http');
                             const mcpResult: any = await executor.execute(mcpAdapter as any, name, args);
                             // Record tool call in monitoring (if enabled)
                             try {
@@ -334,6 +346,8 @@ export class HTTPServer {
                             };
 
                             const normalized = unwrap(mcpResult);
+                            const success = !(normalized && typeof normalized === 'object' && normalized.ok === false);
+                            recordToolEnd('http', name, Date.now() - t0, success);
                             const isError = !!(normalized && typeof normalized === 'object' && normalized.ok === false);
                             return new Response(
                                 JSON.stringify({ success: !isError, result: isError ? undefined : normalized, error: isError ? normalized.error : undefined }),
@@ -346,6 +360,7 @@ export class HTTPServer {
                                 }
                             );
                         } catch (err: any) {
+                            try { recordToolEnd('http', 'unknown', 0, false); } catch {}
                             const message = err?.message || String(err || 'tool call failed');
                             const status = isCoreError(err)
                                 ? err.code === 'InvalidParams'
@@ -692,6 +707,7 @@ export class HTTPServer {
                         const edges: string[] = Array.isArray(body.edges) && body.edges.length ? body.edges : ['imports', 'exports'];
                         try {
                             const { expandNeighbors } = await import('../core/code-graph.js');
+                            const t0 = Date.now();
                             const out = await expandNeighbors({
                                 file: body.file,
                                 symbol: body.symbol,
@@ -705,6 +721,9 @@ export class HTTPServer {
                                     'graph_expand_primary'
                                 );
                             } catch {}
+                            try {
+                                recordToolEnd('http', 'graph_expand_primary', Date.now() - t0, true);
+                            } catch {}
                             return new Response(JSON.stringify({ success: true, data: out }), {
                                 status: 200,
                                 headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
@@ -715,6 +734,9 @@ export class HTTPServer {
                                 (this.coreAnalyzer as any)?.sharedServices?.monitoring?.recordToolCall?.(
                                     'graph_expand_fallback'
                                 );
+                            } catch {}
+                            try {
+                                recordToolEnd('http', 'graph_expand_fallback', 0, true);
                             } catch {}
                             // Fallback: never 500 — AST-only import/export extraction if possible, else regex; return empty neighbors if none
                             const neighbors: Record<string, any[]> = { imports: [], exports: [], callers: [], callees: [] };
@@ -797,9 +819,14 @@ export class HTTPServer {
                     // Snapshots - list
                     if (url.pathname === '/api/v1/snapshots' && request.method === 'GET') {
                         const { overlayStore } = await import('../core/overlay-store.js');
-                        const snaps = overlayStore
-                            .list()
-                            .map((s) => ({ id: s.id, createdAt: s.createdAt, diffCount: s.diffs.length }));
+                        const snaps = overlayStore.list().map((s: any) => ({
+                            id: s.id,
+                            createdAt: s.createdAt,
+                            diffCount: s.diffs.length,
+                            lastApply: s.lastApply
+                                ? { ok: !!s.lastApply.ok, elapsedMs: s.lastApply.elapsedMs, at: s.lastApply.at }
+                                : null,
+                        }));
                         return new Response(JSON.stringify({ success: true, data: snaps }), {
                             status: 200,
                             headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
@@ -846,6 +873,74 @@ export class HTTPServer {
                                 JSON.stringify({ success: false, error: 'Failed to read snapshot diff' }),
                                 { status: 500, headers: { 'Content-Type': 'application/json' } }
                             );
+                        }
+                    }
+
+                    // Snapshots - status (exposes lastApply and touched files)
+                    if (
+                        url.pathname.startsWith('/api/v1/snapshots/') &&
+                        url.pathname.endsWith('/status') &&
+                        request.method === 'GET'
+                    ) {
+                        try {
+                            const m = url.pathname.match(/^\/api\/v1\/snapshots\/([^/]+)\/status$/);
+                            const id = m && m[1];
+                            if (!id)
+                                return new Response(JSON.stringify({ success: false, error: 'Invalid snapshot id' }), {
+                                    status: 400,
+                                    headers: { 'Content-Type': 'application/json' },
+                                });
+                            const { overlayStore } = await import('../core/overlay-store.js');
+                            const status = (overlayStore as any).getStatus?.(id);
+                            if (!status)
+                                return new Response(JSON.stringify({ success: false, error: 'Snapshot not found' }), {
+                                    status: 404,
+                                    headers: { 'Content-Type': 'application/json' },
+                                });
+                            return new Response(JSON.stringify({ success: true, data: status }), {
+                                status: 200,
+                                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                            });
+                        } catch (err) {
+                            return new Response(JSON.stringify({ success: false, error: 'Failed to read snapshot status' }), {
+                                status: 500,
+                                headers: { 'Content-Type': 'application/json' },
+                            });
+                        }
+                    }
+
+                    // Snapshots - progress (tail)
+                    if (
+                        url.pathname.startsWith('/api/v1/snapshots/') &&
+                        url.pathname.endsWith('/progress') &&
+                        request.method === 'GET'
+                    ) {
+                        try {
+                            const m = url.pathname.match(/^\/api\/v1\/snapshots\/([^/]+)\/progress$/);
+                            const id = m && m[1];
+                            if (!id)
+                                return new Response(JSON.stringify({ success: false, error: 'Invalid snapshot id' }), {
+                                    status: 400,
+                                    headers: { 'Content-Type': 'application/json' },
+                                });
+                            const snapsRoot = '.ontology/snapshots';
+                            const file = Bun.file(`${snapsRoot}/${id}/progress.log`);
+                            if (!(await file.exists())) {
+                                return new Response(JSON.stringify({ success: true, data: { id, progress: '' } }), {
+                                    status: 200,
+                                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                                });
+                            }
+                            const text = await file.text();
+                            return new Response(JSON.stringify({ success: true, data: { id, progress: text } }), {
+                                status: 200,
+                                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                            });
+                        } catch (err) {
+                            return new Response(JSON.stringify({ success: false, error: 'Failed to read snapshot progress' }), {
+                                status: 500,
+                                headers: { 'Content-Type': 'application/json' },
+                            });
                         }
                     }
 
@@ -955,6 +1050,15 @@ export class HTTPServer {
                 };
                 this.httpAdapter.handleRequest(httpRequest2).catch(() => {});
             }
+        } catch {}
+
+        // Subscribe to layer performance to record layer latency histograms
+        try {
+            const ss: any = (this.coreAnalyzer as any).sharedServices;
+            const bus: any = ss?.eventBus;
+            bus?.on?.('layer-manager:performance-recorded', (perf: any) => {
+                try { recordLayerLatency('http', String(perf?.layer || 'unknown'), Number(perf?.duration || 0)); } catch {}
+            });
         } catch {}
     }
 
@@ -1243,7 +1347,6 @@ export async function createHTTPServer(config?: HTTPServerConfig): Promise<HTTPS
     httpServer = new HTTPServer(config);
     return httpServer;
 }
-
 // Start server if run directly
 if (import.meta.main) {
     const server = new HTTPServer();

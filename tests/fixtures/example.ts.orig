@@ -4,6 +4,7 @@
 
 export class TestClass {
     // unified apply_after_checks test
+    // unified apply_after_checks test
 // overlay unified add
     private value: number = 0;
 

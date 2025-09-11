@@ -11,6 +11,7 @@ Links
 
 - Core: unified `CodeAnalyzer` + `LayerManager` orchestrate L1–L5; adapters remain thin.
 - Adapters: HTTP, MCP (HTTP/stdio), CLI, and LSP integrate with the unified core and shared mappers.
+- Observability: HTTP and MCP HTTP export Prometheus-compatible `/metrics` with bounded counters/histograms; layer latencies recorded via event bridge.
 - Learning: pattern detection, feedback loop, pipelines (dev) surfaced via HTTP and UI; stats available.
 - Dogfooding: `just dogfood_ci` runs explore → safe‑rename → patch+checks and uploads a summary artifact.
 - Monitoring (in‑process): layer timings and tool counts available; unified metrics plan (below) replaces bespoke rollups.
@@ -18,6 +19,7 @@ Links
 ## Recent Highlights
 
 - Unified metrics (decision): adopt OpenTelemetry + Prometheus across ALL adapters (HTTP, MCP HTTP, MCP stdio, CLI, LSP). Counters + histograms with bounded labels; exporters per adapter; CLI via Pushgateway.
+- Prometheus endpoints: Shipped first slice — HTTP and MCP HTTP expose `/metrics`; record `tool_calls_total`, `tool_duration_ms`, `layer_latency_ms`, and `inflight_requests`. Tests added for HTTP.
 - Graph Expand hardened: never 500; returns `{ neighbors }` with AST‑only and regex fallbacks; counters for primary/fallback.
 - Test‑runner stabilization: balanced slices, heartbeat, hard caps; quick/smoke suites for fast signal.
 - Dogfooding CI: HTTP tools gate with compact JSON summary.
@@ -33,7 +35,7 @@ Links
 ## Next Steps (Pointers)
 
 - See `NEXT_STEPS.md` — especially:
-  - 0.7 Unified Metrics via OpenTelemetry + Prometheus (all adapters, always on)
+  - 0.7 Unified Metrics via OpenTelemetry + Prometheus (HTTP + MCP HTTP done; LSP, MCP stdio, CLI Pushgateway next)
   - 0.6 MCP/HTTP Workflows GA (discoverability + docs)
   - 0.28 Test Runner Stabilization v2
 
@@ -51,6 +53,12 @@ Exporter defaults:
 Why this path:
 - Standardized dashboards without bespoke DB plumbing; adapters remain thin.
 - Bounded labels → predictable Prom storage; portable to OTLP/Collector later.
+
+Progress (2025‑09‑11):
+- HTTP: `/metrics` shipped; tools and graph-expand instrumented; layer latency histograms recorded; test coverage added.
+- MCP HTTP: `/metrics` shipped; tool calls instrumented.
+- Docs: CONFIG.md updated with scrape examples.
+- Remaining: LSP exporter, MCP stdio exporter, CLI Pushgateway, error counters expansion, OpenAPI/docs polish.
 
 ## Changelog
 

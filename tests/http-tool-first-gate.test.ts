@@ -33,12 +33,15 @@ describe('Tool-First Gate (HTTP tools/call)', () => {
   const fixtureFile = path.join(process.cwd(), 'tests', 'fixtures', 'example.ts');
 
   beforeAll(async () => {
+    // Ensure env override doesn't force default port
+    process.env.HTTP_API_PORT = String(port);
     server = new HTTPServer({ host, port, workspaceRoot: process.cwd(), enableOpenAPI: false });
     await server.start();
   });
 
   afterAll(async () => {
     await server.stop();
+    delete process.env.HTTP_API_PORT;
   });
 
   test('locate_confirm_definition returns ≥1 definition', async () => {

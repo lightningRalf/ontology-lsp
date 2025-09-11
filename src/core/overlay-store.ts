@@ -9,6 +9,13 @@ type Snapshot = {
     createdAt: number;
     diffs: string[];
     touchedFiles?: Set<string>;
+    lastApply?: {
+        ok: boolean;
+        elapsedMs: number;
+        outputTail: string;
+        args: { check: boolean; reverse: boolean };
+        at: number;
+    };
 };
 
 export class OverlayStore {
@@ -243,6 +250,40 @@ export class OverlayStore {
         // Materialize snapshot into .ontology/snapshots/<id>
         const cwd = (await this.ensureMaterialized(snapshotId)) || process.cwd();
         const output: string[] = [];
+        
+        // If running under partial materialization, ensure essential directories exist
+        // for common commands like build/test which require source files or local scripts.
+        try {
+            const preferPartial = process.env.SNAPSHOT_PARTIAL === '1';
+            const needsBuild = (commands || []).some((c) => /\b(build(:|\b)|bun\s+build|bun\s+run\s+build)/.test(c));
+            const needsTest = (commands || []).some((c) => /\b(test(\b|:)|bun\s+test)/.test(c));
+            const needsScripts = (commands || []).some((c) => /\bbun\s+run\s+|npm\s+run\s+|pnpm\s+run\s+/.test(c));
+            if (preferPartial && (needsBuild || needsTest || needsScripts)) {
+                const envBase = process.env.WORKSPACE_ROOT || process.env.ONTOLOGY_WORKSPACE || '';
+                const base = envBase ? path.resolve(envBase) : path.resolve('.');
+                const ensureDirs = ['src', 'scripts'];
+                for (const d of ensureDirs) {
+                    const needThis = d === 'src' ? (needsBuild || needsTest) : needsScripts;
+                    if (!needThis) continue;
+                    const srcDir = path.join(base, d);
+                    const dstDir = path.join(cwd, d);
+                    const missing = (() => { try { return !fs.existsSync(dstDir); } catch { return true; } })();
+                    if (missing && fs.existsSync(srcDir)) {
+                        await this.logProgress(snapshotId, `materialize:ensure-${d}`);
+                        if (this.which('rsync')) {
+                            spawnSync('bash', ['-lc', `rsync -a ${JSON.stringify(srcDir)}/ ${JSON.stringify(dstDir)}/`], { stdio: 'pipe' });
+                        } else if (this.which('tar')) {
+                            const cmd = `tar -C ${JSON.stringify(srcDir)} -cf - . | tar -C ${JSON.stringify(dstDir)} -xf -`;
+                            spawnSync('bash', ['-lc', cmd], { stdio: 'pipe' });
+                        } else {
+                            spawnSync('bash', ['-lc', `mkdir -p ${JSON.stringify(dstDir)} && cp -a ${JSON.stringify(srcDir)}/. ${JSON.stringify(dstDir)}/`], { stdio: 'pipe' });
+                        }
+                    }
+                }
+            }
+        } catch {
+            // best-effort; continue even if ensure-src fails
+        }
         // Build command list
         let cmdList = commands && commands.length ? [...commands] : ['bun run typecheck', 'bun run build'];
         const onlyTouched = !!opts.onlyTouched || (process.env.FAST_STDIO_CHECKS || '').toLowerCase() === 'touched';
@@ -309,14 +350,48 @@ export class OverlayStore {
         const dir = (await this.ensureMaterialized(snapshotId)) || process.cwd();
         const diffFile = path.join(dir, 'overlay.diff');
         let output = '';
+        // Best-effort: ensure parent directories exist for files referenced in diff
+        try {
+            const diffText = await fsp.readFile(diffFile, 'utf8');
+            const ensureDirs = new Set<string>();
+            for (const line of diffText.split(/\r?\n/)) {
+                let m = line.match(/^\+\+\+\s+b\/(.+)$/);
+                if (m && m[1]) {
+                    ensureDirs.add(path.dirname(m[1].trim()));
+                }
+                m = line.match(/^\*\*\*\s+Add File:\s+(.+)$/);
+                if (m && m[1]) {
+                    ensureDirs.add(path.dirname(m[1].trim()));
+                }
+            }
+            for (const rel of ensureDirs) {
+                if (!rel || rel === '.' || rel === '/') continue;
+                const abs = path.resolve(process.cwd(), rel);
+                try { await fsp.mkdir(abs, { recursive: true }); } catch {}
+            }
+        } catch {
+            // ignore ensure-dir errors
+        }
         const argsGit = [
             '-lc',
             `git apply ${reverse ? '-R ' : ''}${check ? '--check ' : ''}--whitespace=nowarn ${JSON.stringify(diffFile)}`,
         ];
         const git = spawnSync('bash', argsGit, { stdio: 'pipe', cwd: process.cwd() });
         output += String(git.stdout || '') + String(git.stderr || '');
+        const elapsed = Date.now() - start;
         if (git.status === 0) {
-            return { ok: true, output, elapsedMs: Date.now() - start };
+            // record status
+            try {
+                const snap = this.ensureSnapshot(snapshotId);
+                snap.lastApply = {
+                    ok: true,
+                    elapsedMs: elapsed,
+                    outputTail: output.slice(-4000),
+                    args: { check, reverse },
+                    at: Date.now(),
+                };
+            } catch {}
+            return { ok: true, output, elapsedMs: elapsed };
         }
         if (this.which('patch')) {
             const diffText = await fsp.readFile(diffFile, 'utf8').catch(() => '');
@@ -326,9 +401,43 @@ export class OverlayStore {
             const patchArgs = ['-lc', `patch ${dry}${rev}-p${pLevel} < ${JSON.stringify(diffFile)}`];
             const p = spawnSync('bash', patchArgs, { stdio: 'pipe', cwd: process.cwd() });
             output += String(p.stdout || '') + String(p.stderr || '');
-            return { ok: p.status === 0, output, elapsedMs: Date.now() - start };
+            const ok = p.status === 0;
+            try {
+                const snap = this.ensureSnapshot(snapshotId);
+                snap.lastApply = {
+                    ok,
+                    elapsedMs: Date.now() - start,
+                    outputTail: output.slice(-4000),
+                    args: { check, reverse },
+                    at: Date.now(),
+                };
+            } catch {}
+            return { ok, output, elapsedMs: Date.now() - start };
         }
+        try {
+            const snap = this.ensureSnapshot(snapshotId);
+            snap.lastApply = {
+                ok: false,
+                elapsedMs: Date.now() - start,
+                outputTail: output.slice(-4000),
+                args: { check, reverse },
+                at: Date.now(),
+            };
+        } catch {}
         return { ok: false, output, elapsedMs: Date.now() - start };
+    }
+
+    getStatus(snapshotId: string): any {
+        this.assertValidId(snapshotId);
+        const s = this.ensureSnapshot(snapshotId);
+        const touched = Array.from(s.touchedFiles || []);
+        return {
+            id: s.id,
+            createdAt: s.createdAt,
+            diffsCount: s.diffs.length,
+            touchedFiles: touched,
+            lastApply: s.lastApply || null,
+        };
     }
 }
 
