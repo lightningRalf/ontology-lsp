@@ -47,6 +47,11 @@ Settings are loaded in this priority order:
   - Path to SQLite DB file (applies to Layers 3/4/5 when set)
 - `ONTOLOGY_PG_URL` / `DATABASE_URL` / `PG_URL`
   - Postgres connection string (only required if using `postgres` adapter)
+- `L4_AUTO_MIGRATE` - Enable automatic schema creation and migration (default: `1`)
+  - When set to `1` (default): Schema is auto-created in the constructor, eliminating "no such table" errors
+  - When set to `0`: Schema is only created when `initialize()` is explicitly called
+  - Safe for dev/test: Uses forward-only, idempotent CREATE TABLE IF NOT EXISTS and ALTER TABLE ADD COLUMN
+  - Note: The `ensureSchema()` method can be called multiple times safely (idempotent)
 
 ### Performance Settings
 - `LSP_TIMEOUT` - Request timeout in milliseconds (default: 5000)

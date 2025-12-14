@@ -74,21 +74,49 @@ export class OntologyStorage implements StoragePort {
     private missingEvolution = 0;
     // Guard for schema drift in local dev DBs
     private supportsEvolutionStates = true;
+    // Track whether schema has been created (idempotent guard)
+    private schemaInitialized = false;
 
     constructor(private dbPath: string) {
-        // Ensure directory exists
-        const dir = path.dirname(dbPath);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
+        // Ensure directory exists (skip for :memory:)
+        if (dbPath !== ':memory:') {
+            const dir = path.dirname(dbPath);
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
         }
 
         this.db = new Database(dbPath);
         this.db.exec('PRAGMA journal_mode = WAL');
+
+        // Auto-create schema in dev/test mode (L4_AUTO_MIGRATE=1 is default)
+        const autoMigrate = (process.env.L4_AUTO_MIGRATE ?? '1') !== '0';
+        if (autoMigrate) {
+            this.ensureSchema();
+        }
+    }
+
+    /**
+     * Ensure the database schema exists (idempotent).
+     * Called automatically in constructor when L4_AUTO_MIGRATE=1 (default).
+     * Safe to call multiple times.
+     */
+    ensureSchema(): void {
+        if (this.schemaInitialized) return;
+        try {
+            this.createTables();
+            this.createIndices();
+            this.schemaInitialized = true;
+        } catch (e) {
+            // Log but don't throw - allow graceful degradation
+            console.warn('[L4] Failed to ensure schema:', e);
+        }
     }
 
     async initialize(): Promise<void> {
-        this.createTables();
-        this.createIndices();
+        // Ensure schema exists (idempotent - may already be done in constructor)
+        this.ensureSchema();
+        // Run additional initialization steps
         this.cleanupMalformedRepresentations();
         this.ensureSchemaCompatibility();
     }

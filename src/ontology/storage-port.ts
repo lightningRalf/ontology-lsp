@@ -7,6 +7,14 @@ export interface StoragePort {
     initialize(): Promise<void>;
     close(): Promise<void>;
 
+    /**
+     * Ensure the database schema exists (idempotent).
+     * Called automatically in SQLite adapter constructor when L4_AUTO_MIGRATE=1.
+     * Safe to call multiple times - no-op if schema already exists.
+     * Optional: adapters that don't need schema setup can omit this.
+     */
+    ensureSchema?(): void;
+
     // Core CRUD
     saveConcept(concept: Concept): Promise<void>;
     updateConcept(concept: Concept): Promise<void>;

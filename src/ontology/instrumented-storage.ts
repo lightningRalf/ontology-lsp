@@ -122,6 +122,12 @@ export class InstrumentedStoragePort implements StoragePort {
     }
 
     // Lifecycle
+    ensureSchema(): void {
+        // Pass through to inner - synchronous, no timing needed (called at construction)
+        if (this.inner.ensureSchema) {
+            this.inner.ensureSchema();
+        }
+    }
     async initialize(): Promise<void> {
         return this.timed('initialize', () => this.inner.initialize());
     }

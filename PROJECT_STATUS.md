@@ -18,6 +18,7 @@ Links
 
 ## Recent Highlights
 
+- **L4 schema auto-migrate**: Schema is now auto-created in `OntologyStorage` constructor when `L4_AUTO_MIGRATE=1` (default). Eliminates "no such table: concepts" errors in tests. Idempotent `ensureSchema()` method added; works with `:memory:` and file-based DBs.
 - Unified metrics (decision): adopt OpenTelemetry + Prometheus across ALL adapters (HTTP, MCP HTTP, MCP stdio, CLI, LSP). Counters + histograms with bounded labels; exporters per adapter; CLI via Pushgateway.
 - Prometheus endpoints: Shipped first slice — HTTP and MCP HTTP expose `/metrics`; record `tool_calls_total`, `tool_duration_ms`, `layer_latency_ms`, and `inflight_requests`. Tests added for HTTP.
 - Graph Expand hardened: never 500; returns `{ neighbors }` with AST‑only and regex fallbacks; counters for primary/fallback.
@@ -30,7 +31,6 @@ Links
 - Pipelines persistence/UI: minor polish; token gating for write endpoints in HTTP adapter.
 - Perf tests flake on constrained hosts; CI guards via `L2_MAX_PARSE_FILES` and capped suites.
 - Test port collisions in parallel runs; move to ephemeral/offset ports per slice.
-- L4 schema bootstrap in tests: ensure minimal auto‑migrate in dev/test modes.
 
 ## Next Steps (Pointers)
 
@@ -38,6 +38,7 @@ Links
   - 0.7 Unified Metrics via OpenTelemetry + Prometheus (HTTP + MCP HTTP done; LSP, MCP stdio, CLI Pushgateway next)
   - 0.6 MCP/HTTP Workflows GA (discoverability + docs)
   - 0.28 Test Runner Stabilization v2
+  - 0.29 Test Infra Hardening — L4 schema bootstrap **DONE**; port collisions fix pending
 
 ## Unified Metrics — OTEL + Prometheus (Plan Snapshot)
 
