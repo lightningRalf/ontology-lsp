@@ -13,6 +13,9 @@ process.env.STDIO_MODE = 'true';
  * - Output presentation
  *
  * All analysis work is delegated to the CLI adapter and core analyzer.
+ *
+ * Metrics: When PUSHGATEWAY_URL is set, the CLI records tool call metrics
+ * and pushes them to the Prometheus Pushgateway on exit.
  */
 
 import { spawnSync } from 'child_process';
@@ -21,6 +24,12 @@ import * as fs from 'fs';
 // Note: defer heavy imports (tree-sitter, analyzer, adapter) to runtime.
 // This keeps `--help` and `init` working even if native deps are unavailable.
 import * as path from 'path';
+import {
+    recordToolStart,
+    recordToolEnd,
+    pushToGateway,
+    getPushgatewayUrl,
+} from '../instrumentation/metrics.js';
 
 class CLI {
     private program: Command;
@@ -32,9 +41,44 @@ class CLI {
     private fmtDef?: (d: any) => string;
     private fmtRef?: (r: any) => string;
 
+    // Metrics tracking for CLI commands
+    private currentCommand: string | null = null;
+    private commandStartTime: number = 0;
+    private commandSuccess: boolean = true;
+
     constructor() {
         this.program = new Command();
         this.setupCommands();
+    }
+
+    /**
+     * Start tracking a CLI command for metrics.
+     * Call this at the beginning of each command action.
+     */
+    private startCommandMetrics(commandName: string): void {
+        this.currentCommand = commandName;
+        this.commandStartTime = Date.now();
+        this.commandSuccess = true;
+        recordToolStart('cli');
+    }
+
+    /**
+     * Mark the current command as failed for metrics purposes.
+     */
+    private markCommandFailed(): void {
+        this.commandSuccess = false;
+    }
+
+    /**
+     * End metrics tracking for the current command.
+     * Called automatically in shutdown().
+     */
+    private endCommandMetrics(): void {
+        if (this.currentCommand) {
+            const duration = Date.now() - this.commandStartTime;
+            recordToolEnd('cli', this.currentCommand, duration, this.commandSuccess);
+            this.currentCommand = null;
+        }
     }
 
     private setupCommands(): void {
@@ -56,36 +100,42 @@ class CLI {
             .option('--no-color', 'Disable colored output')
             .option('-v, --verbose', 'Verbose output with performance info')
             .action(async (identifier, options) => {
-                await this.ensureInitialized(options);
-                const result = await this.cliAdapter.handleFind(identifier, {
-                    file: options.file,
-                    maxResults: parseInt(options.maxResults),
-                    limit: parseInt(options.limit),
-                    summary: !!options.summary,
-                    precise: !!options.precise,
-                    astOnly: !!options.astOnly,
-                    json: !!options.json,
-                    verbose: !!options.verbose,
-                });
-                if (typeof result === 'string' || options.json) {
-                    console.log(result);
-                } else if (Array.isArray(result)) {
-                    const items = result as any[];
-                    if (options.summary) {
-                        const header = this.formatHeader(`Found ${items.length} definitions (showing ${items.length})`);
-                        const top = items[0]
-                            ? `Top: ${this.fmtDef ? this.fmtDef(items[0]) : JSON.stringify(items[0])}`
-                            : 'Top: (none)';
-                        console.log([header, top].join('\n'));
+                this.startCommandMetrics('find');
+                try {
+                    await this.ensureInitialized(options);
+                    const result = await this.cliAdapter.handleFind(identifier, {
+                        file: options.file,
+                        maxResults: parseInt(options.maxResults),
+                        limit: parseInt(options.limit),
+                        summary: !!options.summary,
+                        precise: !!options.precise,
+                        astOnly: !!options.astOnly,
+                        json: !!options.json,
+                        verbose: !!options.verbose,
+                    });
+                    if (typeof result === 'string' || options.json) {
+                        console.log(result);
+                    } else if (Array.isArray(result)) {
+                        const items = result as any[];
+                        if (options.summary) {
+                            const header = this.formatHeader(`Found ${items.length} definitions (showing ${items.length})`);
+                            const top = items[0]
+                                ? `Top: ${this.fmtDef ? this.fmtDef(items[0]) : JSON.stringify(items[0])}`
+                                : 'Top: (none)';
+                            console.log([header, top].join('\n'));
+                        } else {
+                            const lines: string[] = [
+                                this.formatHeader(`Found ${items.length} definitions (showing ${items.length})`),
+                            ];
+                            for (const d of items) lines.push(`  ${this.fmtDef ? this.fmtDef(d) : JSON.stringify(d)}`);
+                            console.log(lines.join('\n'));
+                        }
                     } else {
-                        const lines: string[] = [
-                            this.formatHeader(`Found ${items.length} definitions (showing ${items.length})`),
-                        ];
-                        for (const d of items) lines.push(`  ${this.fmtDef ? this.fmtDef(d) : JSON.stringify(d)}`);
-                        console.log(lines.join('\n'));
+                        console.log(result);
                     }
-                } else {
-                    console.log(result);
+                } catch (e) {
+                    this.markCommandFailed();
+                    throw e;
                 }
                 await this.shutdown();
                 process.exit(0);
@@ -107,37 +157,43 @@ class CLI {
             .option('--no-color', 'Disable colored output')
             .option('-v, --verbose', 'Verbose output with performance info')
             .action(async (identifier, options) => {
-                await this.ensureInitialized(options);
-                const result = await this.cliAdapter.handleReferences(identifier, {
-                    file: options.file,
-                    includeDeclaration: options.includeDeclaration,
-                    maxResults: parseInt(options.maxResults),
-                    limit: parseInt(options.limit),
-                    summary: !!options.summary,
-                    precise: !!options.precise,
-                    astOnly: !!options.astOnly,
-                    json: !!options.json,
-                    verbose: !!options.verbose,
-                });
-                if (typeof result === 'string' || options.json) {
-                    console.log(result);
-                } else if (Array.isArray(result)) {
-                    const items = result as any[];
-                    if (options.summary) {
-                        const header = this.formatHeader(`Found ${items.length} references (showing ${items.length})`);
-                        const top = items[0]
-                            ? `Top: ${this.fmtRef ? this.fmtRef(items[0]) : JSON.stringify(items[0])}`
-                            : 'Top: (none)';
-                        console.log([header, top].join('\n'));
+                this.startCommandMetrics('references');
+                try {
+                    await this.ensureInitialized(options);
+                    const result = await this.cliAdapter.handleReferences(identifier, {
+                        file: options.file,
+                        includeDeclaration: options.includeDeclaration,
+                        maxResults: parseInt(options.maxResults),
+                        limit: parseInt(options.limit),
+                        summary: !!options.summary,
+                        precise: !!options.precise,
+                        astOnly: !!options.astOnly,
+                        json: !!options.json,
+                        verbose: !!options.verbose,
+                    });
+                    if (typeof result === 'string' || options.json) {
+                        console.log(result);
+                    } else if (Array.isArray(result)) {
+                        const items = result as any[];
+                        if (options.summary) {
+                            const header = this.formatHeader(`Found ${items.length} references (showing ${items.length})`);
+                            const top = items[0]
+                                ? `Top: ${this.fmtRef ? this.fmtRef(items[0]) : JSON.stringify(items[0])}`
+                                : 'Top: (none)';
+                            console.log([header, top].join('\n'));
+                        } else {
+                            const lines: string[] = [
+                                this.formatHeader(`Found ${items.length} references (showing ${items.length})`),
+                            ];
+                            for (const r of items) lines.push(`  ${this.fmtRef ? this.fmtRef(r) : JSON.stringify(r)}`);
+                            console.log(lines.join('\n'));
+                        }
                     } else {
-                        const lines: string[] = [
-                            this.formatHeader(`Found ${items.length} references (showing ${items.length})`),
-                        ];
-                        for (const r of items) lines.push(`  ${this.fmtRef ? this.fmtRef(r) : JSON.stringify(r)}`);
-                        console.log(lines.join('\n'));
+                        console.log(result);
                     }
-                } else {
-                    console.log(result);
+                } catch (e) {
+                    this.markCommandFailed();
+                    throw e;
                 }
                 await this.shutdown();
                 process.exit(0);
@@ -228,15 +284,21 @@ class CLI {
             .option('-n, --max-results <count>', 'Limit results (<=1000)', '200')
             .option('-j, --json', 'JSON output')
             .action(async (query, options) => {
-                await this.ensureInitialized(options);
-                const out = await this.cliAdapter.handleTextSearch(query, {
-                    kind: options.kind,
-                    caseInsensitive: !!options.ignoreCase,
-                    path: options.path,
-                    maxResults: parseInt(options.maxResults),
-                    json: !!options.json,
-                });
-                console.log(out);
+                this.startCommandMetrics('text_search');
+                try {
+                    await this.ensureInitialized(options);
+                    const out = await this.cliAdapter.handleTextSearch(query, {
+                        kind: options.kind,
+                        caseInsensitive: !!options.ignoreCase,
+                        path: options.path,
+                        maxResults: parseInt(options.maxResults),
+                        json: !!options.json,
+                    });
+                    console.log(out);
+                } catch (e) {
+                    this.markCommandFailed();
+                    throw e;
+                }
                 await this.shutdown();
                 process.exit(0);
             });
@@ -403,9 +465,15 @@ class CLI {
             .option('-j, --json', 'Output JSON')
             .option('-v, --verbose', 'Verbose output')
             .action(async (options) => {
-                await this.ensureInitialized(options);
-                const result = await this.cliAdapter.handleStats(options);
-                console.log(result);
+                this.startCommandMetrics('stats');
+                try {
+                    await this.ensureInitialized(options);
+                    const result = await this.cliAdapter.handleStats(options);
+                    console.log(result);
+                } catch (e) {
+                    this.markCommandFailed();
+                    throw e;
+                }
                 await this.shutdown();
                 process.exit(0);
             });
@@ -425,27 +493,33 @@ class CLI {
             .option('-j, --json', 'Output JSON')
             .option('--no-color', 'Disable colored output')
             .action(async (identifier, options) => {
-                await this.ensureInitialized(options);
-                let output = await this.cliAdapter.handleExplore(identifier, {
-                    file: options.file,
-                    maxResults: parseInt(options.maxResults),
-                    includeDeclaration: !!options.includeDeclaration,
-                    limit: parseInt(options.limit),
-                    summary: !!options.summary,
-                    precise: !!options.precise,
-                    conceptual: !!options.conceptual,
-                    json: !!options.json,
-                    verbose: !!options.verbose,
-                });
-                if (options.tree && !options.json) {
-                    const target = options.file ? options.file : this.workspaceRoot;
-                    const depth = parseInt(options.treeDepth) || 2;
-                    const tree = this.renderTree(target, depth);
-                    if (tree) {
-                        output += `\n\n` + tree;
+                this.startCommandMetrics('explore');
+                try {
+                    await this.ensureInitialized(options);
+                    let output = await this.cliAdapter.handleExplore(identifier, {
+                        file: options.file,
+                        maxResults: parseInt(options.maxResults),
+                        includeDeclaration: !!options.includeDeclaration,
+                        limit: parseInt(options.limit),
+                        summary: !!options.summary,
+                        precise: !!options.precise,
+                        conceptual: !!options.conceptual,
+                        json: !!options.json,
+                        verbose: !!options.verbose,
+                    });
+                    if (options.tree && !options.json) {
+                        const target = options.file ? options.file : this.workspaceRoot;
+                        const depth = parseInt(options.treeDepth) || 2;
+                        const tree = this.renderTree(target, depth);
+                        if (tree) {
+                            output += `\n\n` + tree;
+                        }
                     }
+                    console.log(output);
+                } catch (e) {
+                    this.markCommandFailed();
+                    throw e;
                 }
-                console.log(output);
                 await this.shutdown();
                 process.exit(0);
             });
@@ -467,8 +541,9 @@ class CLI {
             .option('-F, --args-file <path>', 'Path to a JSON file with arguments')
             .option('-j, --json', 'Print raw JSON response where applicable')
             .action(async (name, options) => {
-                await this.ensureInitialized(options);
+                this.startCommandMetrics(`workflow_${String(name).replace(/[^a-zA-Z0-9_]/g, '_')}`);
                 try {
+                    await this.ensureInitialized(options);
                     const [{ MCPAdapter }, { ToolExecutor }] = await Promise.all([
                         import('../adapters/mcp-adapter.js'),
                         import('../core/tools/executor.js'),
@@ -489,6 +564,7 @@ class CLI {
                     await this.shutdown();
                     process.exit(0);
                 } catch (e) {
+                    this.markCommandFailed();
                     console.error(`Workflow failed: ${e instanceof Error ? e.message : String(e)}`);
                     await this.shutdown();
                     process.exit(1);
@@ -845,6 +921,26 @@ build/
     }
 
     async shutdown(): Promise<void> {
+        // End command metrics tracking
+        this.endCommandMetrics();
+
+        // Push metrics to Pushgateway if configured
+        const pushgatewayUrl = getPushgatewayUrl();
+        if (pushgatewayUrl) {
+            try {
+                const result = await pushToGateway(pushgatewayUrl, 'ontology_cli');
+                if (!result.success && process.env.CLI_METRICS_DEBUG) {
+                    console.error(`[metrics] Failed to push to Pushgateway: ${result.error}`);
+                }
+            } catch (e) {
+                // Don't fail CLI exit on metrics push failure
+                if (process.env.CLI_METRICS_DEBUG) {
+                    console.error(`[metrics] Pushgateway error: ${e instanceof Error ? e.message : String(e)}`);
+                }
+            }
+        }
+
+        // Dispose core analyzer
         if (this.coreAnalyzer) {
             await this.coreAnalyzer.dispose();
         }

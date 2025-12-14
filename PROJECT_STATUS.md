@@ -58,8 +58,11 @@ Why this path:
 Progress (2025‑09‑11):
 - HTTP: `/metrics` shipped; tools and graph-expand instrumented; layer latency histograms recorded; test coverage added.
 - MCP HTTP: `/metrics` shipped; tool calls instrumented.
-- Docs: CONFIG.md updated with scrape examples.
-- Remaining: LSP exporter, MCP stdio exporter, CLI Pushgateway, error counters expansion, OpenAPI/docs polish.
+- MCP stdio: `/metrics` on loopback port 9466; tool calls instrumented.
+- LSP: `/metrics` on loopback port 9467; LSP methods instrumented; layer latencies recorded.
+- **CLI Pushgateway**: Metrics pushed to Prometheus Pushgateway on exit when `PUSHGATEWAY_URL` is set. Records `tool_calls_total` and `tool_duration_ms` for key commands (find, references, explore, text_search, stats, workflow).
+- Docs: CONFIG.md updated with scrape examples and CLI Pushgateway configuration.
+- Remaining: error counters expansion, OpenAPI/docs polish.
 
 ## Changelog
 

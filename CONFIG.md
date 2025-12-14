@@ -69,6 +69,15 @@ Settings are loaded in this priority order:
 - `MCP_STDIO_PROM_PORT` — MCP stdio metrics HTTP endpoint (default: 9466, bind 127.0.0.1)
 - `LSP_PROM_PORT` — LSP metrics HTTP endpoint (default: 9467, bind 127.0.0.1)
 
+### CLI Metrics (Pushgateway)
+- `PUSHGATEWAY_URL` — Prometheus Pushgateway URL for CLI metrics (e.g., `http://localhost:9091`)
+  - When set, CLI commands record metrics and push them to the Pushgateway on exit
+  - Alternative: `PROMETHEUS_PUSHGATEWAY_URL` (fallback if `PUSHGATEWAY_URL` is not set)
+  - Job name: `ontology_cli`
+  - Metrics pushed: `tool_calls_total`, `tool_duration_ms` (histogram)
+  - Push occurs on CLI shutdown (success or failure)
+- `CLI_METRICS_DEBUG` — Set to `1` to enable debug logging for CLI metrics push failures
+
 ### Circuit Breaker
 - `CIRCUIT_BREAKER_THRESHOLD` - Failures before opening circuit (default: 5)
 - `CIRCUIT_BREAKER_RESET_TIMEOUT` - Reset timeout in milliseconds (default: 30000)

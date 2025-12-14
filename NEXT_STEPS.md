@@ -278,22 +278,24 @@ Adapter coverage (default ON for all):
 - CLI: pushes to Prometheus Pushgateway (always on). Requires `PUSHGATEWAY_URL` (e.g., `http://nas:9091`).
 
 Implementation (phased, small diffs):
-- [x] Add `src/instrumentation/metrics.ts` (helpers: recordToolStart/End, recordError, recordLayerLatency)
+- [x] Add `src/instrumentation/metrics.ts` (helpers: recordToolStart/End, recordError, recordLayerLatency, pushToGateway)
 - [x] Wire HTTP server: wrap `/api/v1/tools/call` and `/api/v1/graph-expand`; subscribe to `layer-manager:performance-recorded` and expose `/metrics`
 - [x] Wire MCP HTTP: wrap tool calls and expose `/metrics`
-- [ ] Wire MCP stdio: exporter bound to `127.0.0.1:9466` (no stdio noise)
-- [ ] Wire LSP: instrument custom methods (buildSymbolMap, planRename) and definition/references if applicable
-- [ ] Wire CLI: record counters/histograms around each command; on exit push to Pushgateway (job=ontology_cli)
-- [ ] Add `.env.sample` keys: `MCP_STDIO_PROM_PORT`, `LSP_PROM_PORT`, `PUSHGATEWAY_URL`
-- [x] Add Prometheus scrape config snippet to CONFIG.md; document Pushgateway next
-- [x] Add minimal tests: tool call metrics on HTTP; graph‑expand primary/fallback presence
+- [x] Wire MCP stdio: exporter bound to `127.0.0.1:9466` (no stdio noise)
+- [x] Wire LSP: instrument LSP methods (definition/references/rename/completion) and expose `/metrics` on port 9467
+- [x] Wire CLI: record counters/histograms around key commands (find, references, explore, text_search, stats, workflow); on exit push to Pushgateway (job=ontology_cli)
+- [x] Add `.env.sample` keys: `MCP_STDIO_PROM_PORT`, `LSP_PROM_PORT`, `PUSHGATEWAY_URL`
+- [x] Add Prometheus scrape config snippet to CONFIG.md; document Pushgateway
+- [x] Add minimal tests: tool call metrics on HTTP; graph‑expand primary/fallback; CLI pushgateway tests
 
 Acceptance criteria:
-- HTTP and MCP HTTP export metrics by default; no stdio/log pollution (DONE for HTTP/MCP HTTP)
-- `/metrics` shows counters/histograms with bounded labels; Prometheus scrapes without errors (DONE for HTTP/MCP HTTP)
-- Graph‑expand increments primary/fallback paths as applicable (HTTP covered by tests)
-- LSP and MCP stdio exporters available without stdio noise
-- CLI pushes at end of execution when `PUSHGATEWAY_URL` is set (no failures block CLI exit)
+- [x] HTTP and MCP HTTP export metrics by default; no stdio/log pollution
+- [x] `/metrics` shows counters/histograms with bounded labels; Prometheus scrapes without errors
+- [x] Graph‑expand increments primary/fallback paths as applicable (HTTP covered by tests)
+- [x] LSP and MCP stdio exporters available without stdio noise (ports 9467 and 9466 respectively)
+- [x] CLI pushes at end of execution when `PUSHGATEWAY_URL` is set (no failures block CLI exit)
+
+**0.7 Unified Metrics: COMPLETE** - All adapters (HTTP, MCP HTTP, MCP stdio, LSP, CLI) now emit Prometheus-compatible metrics.
 
 Second‑to‑Sixth order effects (considerations):
 - Second: unified telemetry across processes → simpler SLOs and triage
