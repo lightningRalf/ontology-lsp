@@ -111,3 +111,7 @@ test-output.txt
 *.db
 *.db-wal
 *.db-shm
+
+# Test temp files
+tests/fixtures/temp-*
+*.orig

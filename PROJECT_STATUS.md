@@ -18,6 +18,16 @@ Links
 
 ## Recent Highlights
 
+- **Text Search Routing Verified (2025-09-07)**: NEXT_STEPS task 0.16 investigation revealed text_search already properly routes through Layer 1 Fast Search. No implementation needed - system working correctly. Key findings:
+  - `CodeAnalyzer.textSearch()` exists at `src/core/unified-analyzer.ts:2698`
+  - MCP adapter correctly calls `this.coreAnalyzer.textSearch()` (line 1097)
+  - CLI adapter correctly calls `this.coreAnalyzer.textSearch()` (line 399)
+  - Layer 1 integration active with caching and BloomFilter optimization
+  - Performance exceeds targets: avg 65ms, p95 87ms, cached 0ms (target: <200ms)
+  - Fallback to AsyncEnhancedGrep only for regex patterns (by design)
+  - Test suite: `tests/text-search-performance.test.ts` (8/8 passing)
+  - Architecture: Adapters → CodeAnalyzer → Layer 1 Fast Search with proper budgets
+  - Documentation: `TEXT_SEARCH_ROUTING_ANALYSIS.md` and `TEXT_SEARCH_IMPLEMENTATION_SUMMARY.md`
 - **L4 schema auto-migrate**: Schema is now auto-created in `OntologyStorage` constructor when `L4_AUTO_MIGRATE=1` (default). Eliminates "no such table: concepts" errors in tests. Idempotent `ensureSchema()` method added; works with `:memory:` and file-based DBs.
 - Unified metrics (decision): adopt OpenTelemetry + Prometheus across ALL adapters (HTTP, MCP HTTP, MCP stdio, CLI, LSP). Counters + histograms with bounded labels; exporters per adapter; CLI via Pushgateway.
 - Prometheus endpoints: Shipped first slice — HTTP and MCP HTTP expose `/metrics`; record `tool_calls_total`, `tool_duration_ms`, `layer_latency_ms`, and `inflight_requests`. Tests added for HTTP.
@@ -30,15 +40,15 @@ Links
 - Graph expand callers/callees remain best‑effort; imports/exports robust. Plan AST‑only caller coverage for TS/JS under budgets.
 - Pipelines persistence/UI: minor polish; token gating for write endpoints in HTTP adapter.
 - Perf tests flake on constrained hosts; CI guards via `L2_MAX_PARSE_FILES` and capped suites.
-- Test port collisions in parallel runs; move to ephemeral/offset ports per slice.
+- ~~Test port collisions in parallel runs~~ **FIXED** — config port now takes priority over env; tests use unique temp files.
 
 ## Next Steps (Pointers)
 
 - See `NEXT_STEPS.md` — especially:
-  - 0.7 Unified Metrics via OpenTelemetry + Prometheus (HTTP + MCP HTTP done; LSP, MCP stdio, CLI Pushgateway next)
+  - 0.7 Unified Metrics via OpenTelemetry + Prometheus — **COMPLETE**
   - 0.6 MCP/HTTP Workflows GA (discoverability + docs)
   - 0.28 Test Runner Stabilization v2
-  - 0.29 Test Infra Hardening — L4 schema bootstrap **DONE**; port collisions fix pending
+  - 0.29 Test Infra Hardening — **COMPLETE** (L4 schema bootstrap, port collisions fix, test fixture isolation)
 
 ## Unified Metrics — OTEL + Prometheus (Plan Snapshot)
 
