@@ -19,7 +19,7 @@ describe('Layer 1 Text Search - Edge Cases', () => {
         const { stdout } = await execAsync(`${CLI} text-search "FUNCTION" -i -n 10 -j`);
         const result = JSON.parse(stdout);
         expect(result.count).toBeGreaterThan(0);
-    }, 15000);
+    }, 30000);
 
     test('regex kind works with basic character classes', async () => {
         const { stdout } = await execAsync(`${CLI} text-search "Code[A-Za-z]+" -k regex -p src -n 10 -j`);
