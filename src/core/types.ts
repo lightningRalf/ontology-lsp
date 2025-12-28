@@ -25,8 +25,12 @@ export interface LayerPerformance {
 }
 
 // Core result types (protocol-agnostic)
+export type ResultSource = 'exact' | 'fuzzy' | 'conceptual' | 'pattern';
+
 export interface Definition {
     identifier: string;
+    /** Best-effort extracted token name (may differ from requested identifier). */
+    name?: string;
     uri: string;
     range: {
         start: { line: number; character: number };
@@ -34,26 +38,33 @@ export interface Definition {
     };
     kind: DefinitionKind;
     confidence: number;
-    source: 'exact' | 'fuzzy' | 'conceptual' | 'pattern';
+    source: ResultSource;
+    /** Producing layer hint (e.g. layer1, layer2, async-layer1). */
+    layer?: string;
+    /** Set when validated or refined by AST (Layer 2). */
+    astValidated?: boolean;
     context?: string;
     metadata?: Record<string, any>;
 }
 
-export enum DefinitionKind {
-    Function = 'function',
-    Variable = 'variable',
-    Class = 'class',
-    Interface = 'interface',
-    Method = 'method',
-    Property = 'property',
-    Type = 'type',
-    Module = 'module',
-    Import = 'import',
-    Export = 'export',
-}
+export const DefinitionKind = {
+    Function: 'function',
+    Variable: 'variable',
+    Class: 'class',
+    Interface: 'interface',
+    Method: 'method',
+    Property: 'property',
+    Type: 'type',
+    Module: 'module',
+    Import: 'import',
+    Export: 'export',
+} as const;
+export type DefinitionKind = (typeof DefinitionKind)[keyof typeof DefinitionKind];
 
 export interface Reference {
     identifier: string;
+    /** Best-effort extracted token name (may differ from requested identifier). */
+    name?: string;
     uri: string;
     range: {
         start: { line: number; character: number };
@@ -61,18 +72,23 @@ export interface Reference {
     };
     kind: ReferenceKind;
     confidence: number;
+    source?: ResultSource;
+    layer?: string;
+    astValidated?: boolean;
     isDeclaration?: boolean;
     context?: string;
+    metadata?: Record<string, any>;
 }
 
-export enum ReferenceKind {
-    Usage = 'usage',
-    Definition = 'definition',
-    Import = 'import',
-    Export = 'export',
-    Call = 'call',
-    Assignment = 'assignment',
-}
+export const ReferenceKind = {
+    Usage: 'usage',
+    Definition: 'definition',
+    Import: 'import',
+    Export: 'export',
+    Call: 'call',
+    Assignment: 'assignment',
+} as const;
+export type ReferenceKind = (typeof ReferenceKind)[keyof typeof ReferenceKind];
 
 export interface Completion {
     label: string;
@@ -84,36 +100,39 @@ export interface Completion {
     sortText?: string;
     filterText?: string;
     patternId?: string;
+    source?: ResultSource;
+    layer?: string;
 }
 
-export enum CompletionKind {
-    Text = 'text',
-    Method = 'method',
-    Function = 'function',
-    Constructor = 'constructor',
-    Field = 'field',
-    Variable = 'variable',
-    Class = 'class',
-    Interface = 'interface',
-    Module = 'module',
-    Property = 'property',
-    Unit = 'unit',
-    Value = 'value',
-    Enum = 'enum',
-    Keyword = 'keyword',
-    Snippet = 'snippet',
-    Color = 'color',
-    File = 'file',
-    Reference = 'reference',
-    Folder = 'folder',
-    EnumMember = 'enumMember',
-    Constant = 'constant',
-    Struct = 'struct',
-    Event = 'event',
-    Operator = 'operator',
-    TypeParameter = 'typeParameter',
-    Pattern = 'pattern',
-}
+export const CompletionKind = {
+    Text: 'text',
+    Method: 'method',
+    Function: 'function',
+    Constructor: 'constructor',
+    Field: 'field',
+    Variable: 'variable',
+    Class: 'class',
+    Interface: 'interface',
+    Module: 'module',
+    Property: 'property',
+    Unit: 'unit',
+    Value: 'value',
+    Enum: 'enum',
+    Keyword: 'keyword',
+    Snippet: 'snippet',
+    Color: 'color',
+    File: 'file',
+    Reference: 'reference',
+    Folder: 'folder',
+    EnumMember: 'enumMember',
+    Constant: 'constant',
+    Struct: 'struct',
+    Event: 'event',
+    Operator: 'operator',
+    TypeParameter: 'typeParameter',
+    Pattern: 'pattern',
+} as const;
+export type CompletionKind = (typeof CompletionKind)[keyof typeof CompletionKind];
 
 export interface WorkspaceEdit {
     changes: Record<string, TextEdit[]>;
@@ -317,6 +336,13 @@ export interface CoreConfig {
     performance: PerformanceConfig;
     cache: CacheConfig;
     monitoring: MonitoringConfig;
+    /** Absolute path to workspace root (used for "file://workspace" resolution). */
+    workspaceRoot?: string;
+    /** Optional shared DB config used by learning/pattern subsystems. */
+    database?: {
+        path: string;
+        maxConnections: number;
+    };
 }
 
 export interface LayerConfigs {
@@ -384,6 +410,8 @@ export interface Layer5Config {
 
 export interface PerformanceConfig {
     targetLatency?: number; // 100ms
+    /** Back-compat alias (legacy name used in a few call sites). */
+    targetResponseTime?: number;
     maxConcurrentRequests?: number;
     requestTimeout?: number;
     circuitBreakerThreshold?: number;
@@ -405,6 +433,11 @@ export interface PerformanceConfig {
         };
         layer3?: {
             budgetMs?: number;
+        };
+    };
+    tools?: {
+        fileDiscovery?: {
+            prefer?: 'auto' | 'rg' | 'node';
         };
     };
 }
@@ -470,7 +503,7 @@ export class InvalidRequestError extends CoreError {
 export interface RequestMetadata {
     id: string;
     startTime: number;
-    source: 'lsp' | 'mcp' | 'http' | 'cli';
+    source: 'lsp' | 'mcp' | 'http' | 'cli' | 'unified';
     userId?: string;
     sessionId?: string;
     clientVersion?: string;

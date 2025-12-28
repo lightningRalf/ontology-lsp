@@ -3,7 +3,10 @@ declare module 'bun:sqlite' {
     export class Database {
         constructor(path: string);
         exec(sql: string): void;
+        query<T = any>(sql: string): Statement<T>;
         prepare<T = any>(sql: string): Statement<T>;
+        transaction<T>(fn: () => T): () => T;
+        backup(path: string): Promise<void>;
         close(): void;
     }
 

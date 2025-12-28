@@ -91,6 +91,8 @@ export interface EnhancedMatches {
 export interface Concept {
     id: string;
     canonicalName: string;
+    /** Optional high-level semantic category (best-effort). */
+    type?: string;
     representations: Map<string, SymbolRepresentation>;
     relations: Map<string, Relation>;
     signature: ConceptSignature;
@@ -163,13 +165,17 @@ export interface ConceptMetadata {
 // Pattern types
 export interface Pattern {
     id: string;
+    name?: string;
+    description?: string;
     from: TokenPattern[];
     to: TokenPattern[];
     confidence: number;
     occurrences: number;
     examples: Example[];
+    createdAt?: Date;
     lastApplied: Date;
     category: PatternCategory;
+    metadata?: Record<string, any>;
 }
 
 export interface TokenPattern {
@@ -182,6 +188,7 @@ export interface TokenPattern {
 }
 
 export enum PatternCategory {
+    General = 'general',
     Rename = 'rename',
     Refactor = 'refactor',
     Convention = 'convention',
@@ -245,6 +252,10 @@ export interface ASTNode {
 }
 
 export interface NodeMetadata {
+    conceptId?: string;
+    conceptName?: string;
+    conceptConfidence?: number;
+    semanticType?: string;
     functionName?: string;
     className?: string;
     parameters?: string[];
