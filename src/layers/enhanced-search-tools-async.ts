@@ -1,6 +1,6 @@
 /**
  * Async, streaming implementation of Enhanced Search Tools
- * 
+ *
  * This implementation fixes the fundamental performance issues by:
  * 1. Using async execution (non-blocking)
  * 2. Streaming results as they arrive
@@ -60,11 +60,11 @@ export interface AsyncSearchOptions {
 export interface FileListOptions {
     includes?: string[]; // filename globs (ripgrep -g), e.g., **/*Foo*.ts
     excludes?: string[]; // directories or globs to exclude (ripgrep -g !...)
-    path?: string;       // root directory
-    maxDepth?: number;   // ripgrep --max-depth
-    timeout?: number;    // milliseconds
+    path?: string; // root directory
+    maxDepth?: number; // ripgrep --max-depth
+    timeout?: number; // milliseconds
     includeHidden?: boolean; // ripgrep --hidden
-    maxFiles?: number;   // cap number of files returned
+    maxFiles?: number; // cap number of files returned
 }
 
 /**
@@ -95,14 +95,14 @@ class RipgrepProcessPool {
     async execute(command: string, args: string[]): Promise<ChildProcess> {
         // Wait if at max capacity
         while (this.activeProcesses >= this.maxProcesses) {
-            await new Promise<void>(resolve => {
+            await new Promise<void>((resolve) => {
                 this.queue.push(resolve);
             });
         }
 
         this.activeProcesses++;
         const process = spawn(command, args, {
-            stdio: ['ignore', 'pipe', 'pipe']
+            stdio: ['ignore', 'pipe', 'pipe'],
         });
 
         process.on('exit', () => {
@@ -128,7 +128,7 @@ class RipgrepProcessPool {
     }
 
     destroy() {
-        this.pool.forEach(p => p.kill());
+        this.pool.forEach((p) => p.kill());
         this.pool = [];
         this.queue = [];
     }
@@ -153,38 +153,37 @@ class SmartSearchCache {
             pattern: options.pattern,
             path: options.path,
             caseInsensitive: options.caseInsensitive,
-            fileType: options.fileType
+            fileType: options.fileType,
         });
     }
 
     get(options: AsyncSearchOptions): StreamingGrepResult[] | null {
         const key = this.getCacheKey(options);
         const cached = this.cache.get(key);
-        
+
         if (!cached) return null;
-        
+
         // Check if expired
         if (Date.now() - cached.timestamp > this.ttl) {
             this.cache.delete(key);
             return null;
         }
-        
+
         // Check if any watched files changed
-        if (cached.watchedFiles.some(f => this.hasFileChanged(f, cached.timestamp))) {
+        if (cached.watchedFiles.some((f) => this.hasFileChanged(f, cached.timestamp))) {
             this.invalidate(key);
             return null;
         }
-        
+
         return cached.results;
     }
 
     set(options: AsyncSearchOptions, results: StreamingGrepResult[]) {
         const key = this.getCacheKey(options);
-        
+
         // Evict old entries if at capacity - ensure we have room for new entry
         while (this.cache.size >= this.maxSize) {
-            const oldest = Array.from(this.cache.entries())
-                .sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
+            const oldest = Array.from(this.cache.entries()).sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
             if (oldest) {
                 this.invalidate(oldest[0]);
             } else {
@@ -193,12 +192,12 @@ class SmartSearchCache {
         }
 
         // Extract unique files from results for watching
-        const files = [...new Set(results.map(r => r.file))];
-        
+        const files = [...new Set(results.map((r) => r.file))];
+
         this.cache.set(key, {
             results,
             timestamp: Date.now(),
-            watchedFiles: files
+            watchedFiles: files,
         });
 
         // Set up file watchers for invalidation
@@ -208,8 +207,8 @@ class SmartSearchCache {
     private watchFiles(cacheKey: string, files: string[]) {
         // Only watch a subset to avoid too many watchers
         const filesToWatch = files.slice(0, 10);
-        
-        filesToWatch.forEach(file => {
+
+        filesToWatch.forEach((file) => {
             if (!this.watchers.has(file)) {
                 try {
                     const watcher = fsSync.watch(file, (eventType) => {
@@ -241,7 +240,7 @@ class SmartSearchCache {
         const cached = this.cache.get(key);
         if (cached) {
             // Clean up watchers
-            cached.watchedFiles.forEach(file => {
+            cached.watchedFiles.forEach((file) => {
                 const watcher = this.watchers.get(file);
                 if (watcher) {
                     watcher.close();
@@ -254,7 +253,7 @@ class SmartSearchCache {
 
     clear() {
         // Clean up all watchers
-        this.watchers.forEach(w => {
+        this.watchers.forEach((w) => {
             if (w && typeof w.close === 'function') {
                 w.close();
             }
@@ -297,7 +296,7 @@ export class AsyncEnhancedGrep {
             cacheTTL: 60000,
             defaultTimeout: defTimeout, // Default timeout (overridable via env)
             fileDiscoveryPrefer: 'auto',
-            ...config
+            ...config,
         };
 
         try {
@@ -331,10 +330,10 @@ export class AsyncEnhancedGrep {
 
         // Execute search
         const results = await this.executeSearch(options);
-        
+
         // Cache results
         this.cache.set(options, results);
-        
+
         return results;
     }
 
@@ -388,7 +387,9 @@ export class AsyncEnhancedGrep {
         let timeout: NodeJS.Timeout | null = null;
         if (options.timeout && options.timeout > 0) {
             timeout = setTimeout(() => {
-                try { proc.kill('SIGTERM'); } catch {}
+                try {
+                    proc.kill('SIGTERM');
+                } catch {}
             }, options.timeout);
         }
 
@@ -400,7 +401,9 @@ export class AsyncEnhancedGrep {
                 }
                 // Cap results if requested
                 if (options.maxFiles && files.length >= options.maxFiles) {
-                    try { proc.kill('SIGTERM'); } catch {}
+                    try {
+                        proc.kill('SIGTERM');
+                    } catch {}
                 }
             });
             proc.on('close', () => {
@@ -455,45 +458,45 @@ export class AsyncEnhancedGrep {
                     // Emit cached results with proper timing delays to simulate streaming
                     let delay = 0;
                     const timeouts: NodeJS.Timeout[] = [];
-                    
+
                     for (let i = 0; i < cached.length; i++) {
                         if (cancelled) break;
-                        
+
                         const result = cached[i];
                         const timeout = setTimeout(() => {
                             if (!cancelled) {
                                 emitter.emit('data', result);
                                 matchesFound++;
-                                
+
                                 // Emit progress
                                 if (matchesFound % 10 === 0) {
                                     emitter.emit('progress', {
                                         filesSearched,
                                         matchesFound,
-                                        elapsedMs: Date.now() - startTime
+                                        elapsedMs: Date.now() - startTime,
                                     });
                                 }
-                                
+
                                 // Emit end after last result
                                 if (i === cached.length - 1) {
                                     emitter.emit('end');
                                 }
                             }
                         }, delay);
-                        
+
                         timeouts.push(timeout);
-                        
+
                         // Increment delay for next result (1-5ms per result)
                         delay += Math.random() * 4 + 1;
                     }
-                    
+
                     // Clear timeouts if cancelled
                     const originalCancel = emitter.cancel;
                     emitter.cancel = () => {
                         timeouts.forEach(clearTimeout);
                         originalCancel();
                     };
-                    
+
                     // If no results, emit end immediately
                     if (cached.length === 0) {
                         emitter.emit('end');
@@ -515,7 +518,9 @@ export class AsyncEnhancedGrep {
                 if (options.timeout) {
                     timeout = setTimeout(() => {
                         if (process) {
-                            try { process.kill('SIGTERM'); } catch {}
+                            try {
+                                process.kill('SIGTERM');
+                            } catch {}
                             // Graceful end with partial results on timeout
                             rl.close();
                             emitter.emit('end');
@@ -526,7 +531,7 @@ export class AsyncEnhancedGrep {
                 // Stream results line by line
                 const rl = createInterface({
                     input: process.stdout!,
-                    crlfDelay: Infinity
+                    crlfDelay: Infinity,
                 });
                 readline = rl;
 
@@ -561,7 +566,7 @@ export class AsyncEnhancedGrep {
                             emitter.emit('progress', {
                                 filesSearched,
                                 matchesFound,
-                                elapsedMs: Date.now() - startTime
+                                elapsedMs: Date.now() - startTime,
                             });
                         }
                     }
@@ -569,7 +574,7 @@ export class AsyncEnhancedGrep {
 
                 rl.on('close', () => {
                     if (timeout) clearTimeout(timeout);
-                    
+
                     // Cache results if not cancelled
                     if (!cancelled && results.length > 0) {
                         this.cache.set(options, results);
@@ -579,7 +584,7 @@ export class AsyncEnhancedGrep {
                     emitter.emit('progress', {
                         filesSearched,
                         matchesFound,
-                        elapsedMs: Date.now() - startTime
+                        elapsedMs: Date.now() - startTime,
                     });
 
                     emitter.emit('end');
@@ -589,16 +594,18 @@ export class AsyncEnhancedGrep {
                 process.stderr?.on('data', (data) => {
                     // Ignore non-critical ripgrep warnings and common error patterns
                     const errorText = data.toString().trim();
-                    if (!errorText || 
-                        errorText.includes('No such file') || 
+                    if (
+                        !errorText ||
+                        errorText.includes('No such file') ||
                         errorText.includes('Permission denied') ||
                         errorText.includes('Is a directory') ||
                         errorText.includes('(os error 2)') ||
-                        errorText.includes('No files were searched')) {
+                        errorText.includes('No files were searched')
+                    ) {
                         // These are expected errors that should result in empty results, not failures
                         return;
                     }
-                    
+
                     // Only emit errors for truly unexpected issues
                     if (errorText.includes('ripgrep') || errorText.includes('regex')) {
                         emitter.emit('error', new Error(errorText));
@@ -607,18 +614,20 @@ export class AsyncEnhancedGrep {
 
                 process.on('error', (err) => {
                     if (timeout) clearTimeout(timeout);
-                    
+
                     // Check if this is a common path/command error that should result in empty results
                     const errorMessage = err.message.toLowerCase();
-                    if (errorMessage.includes('enoent') || 
+                    if (
+                        errorMessage.includes('enoent') ||
                         errorMessage.includes('no such file') ||
                         errorMessage.includes('spawn rg') ||
-                        errorMessage.includes('(os error 2)')) {
+                        errorMessage.includes('(os error 2)')
+                    ) {
                         // Path doesn't exist or ripgrep not found - return empty results gracefully
                         emitter.emit('end');
                         return;
                     }
-                    
+
                     // Otherwise, it's a real error
                     emitter.emit('error', err);
                     emitter.emit('end');
@@ -629,7 +638,6 @@ export class AsyncEnhancedGrep {
                     if (timeout) clearTimeout(timeout);
                     emitter.emit('end');
                 });
-
             } catch (error) {
                 emitter.emit('error', error as Error);
                 emitter.emit('end');
@@ -676,26 +684,25 @@ export class AsyncEnhancedGrep {
      * Parallel search across multiple directories
      */
     async searchParallel(
-        patterns: string[], 
-        directories: string[], 
+        patterns: string[],
+        directories: string[],
         options?: Omit<AsyncSearchOptions, 'pattern' | 'path'>
     ): Promise<Map<string, StreamingGrepResult[]>> {
         const results = new Map<string, StreamingGrepResult[]>();
-        
+
         // Create all search promises
         const searches = [];
         for (const pattern of patterns) {
             for (const dir of directories) {
                 searches.push(
-                    this.search({ ...options, pattern, path: dir })
-                        .then(res => ({ pattern, dir, results: res }))
+                    this.search({ ...options, pattern, path: dir }).then((res) => ({ pattern, dir, results: res }))
                 );
             }
         }
 
         // Execute in parallel with concurrency control
         const completed = await Promise.allSettled(searches);
-        
+
         // Organize results
         for (const result of completed) {
             if (result.status === 'fulfilled') {
@@ -737,11 +744,18 @@ export class AsyncEnhancedGrep {
         const promise = (async () => {
             proc = await this.processPool.execute('rg', args);
             if (options.timeout && options.timeout > 0) {
-                timeout = setTimeout(() => { try { proc?.kill('SIGTERM'); } catch {} }, options.timeout);
+                timeout = setTimeout(() => {
+                    try {
+                        proc?.kill('SIGTERM');
+                    } catch {}
+                }, options.timeout);
             }
             return new Promise<string[]>((resolve) => {
                 resolveFn = (v: string[]) => {
-                    if (!settled) { settled = true; resolve(v); }
+                    if (!settled) {
+                        settled = true;
+                        resolve(v);
+                    }
                 };
                 proc!.stdout?.on('data', (data: Buffer) => {
                     const lines = data.toString('utf8').split(/\r?\n/).filter(Boolean);
@@ -749,12 +763,15 @@ export class AsyncEnhancedGrep {
                         files.push(line);
                     }
                     if (options.maxFiles && files.length >= options.maxFiles) {
-                        try { proc?.kill('SIGTERM'); } catch {}
+                        try {
+                            proc?.kill('SIGTERM');
+                        } catch {}
                     }
                 });
                 proc!.on('close', () => {
                     if (timeout) clearTimeout(timeout);
-                    const out = options.maxFiles && files.length > options.maxFiles ? files.slice(0, options.maxFiles) : files;
+                    const out =
+                        options.maxFiles && files.length > options.maxFiles ? files.slice(0, options.maxFiles) : files;
                     resolveFn(out);
                 });
                 proc!.on('error', () => {
@@ -765,7 +782,9 @@ export class AsyncEnhancedGrep {
         })();
 
         const cancel = () => {
-            try { proc?.kill('SIGTERM'); } catch {}
+            try {
+                proc?.kill('SIGTERM');
+            } catch {}
             if (timeout) clearTimeout(timeout);
             // Resolve immediately with partial results on cancel
             const out = options.maxFiles && files.length > options.maxFiles ? files.slice(0, options.maxFiles) : files;
@@ -801,15 +820,25 @@ export class AsyncEnhancedGrep {
         const proc = await this.processPool.execute('fd', args);
         let timeout: NodeJS.Timeout | null = null;
         if (options.timeout && options.timeout > 0) {
-            timeout = setTimeout(() => { try { proc.kill('SIGTERM'); } catch {} }, options.timeout);
+            timeout = setTimeout(() => {
+                try {
+                    proc.kill('SIGTERM');
+                } catch {}
+            }, options.timeout);
         }
         return new Promise<string[]>((resolve) => {
             proc.stdout?.on('data', (data: Buffer) => {
                 const lines = data.toString('utf8').split(/\r?\n/).filter(Boolean);
                 for (const line of lines) files.push(line);
             });
-            proc.on('close', () => { if (timeout) clearTimeout(timeout); resolve(files); });
-            proc.on('error', () => { if (timeout) clearTimeout(timeout); resolve([]); });
+            proc.on('close', () => {
+                if (timeout) clearTimeout(timeout);
+                resolve(files);
+            });
+            proc.on('error', () => {
+                if (timeout) clearTimeout(timeout);
+                resolve([]);
+            });
         });
     }
 
@@ -832,20 +861,45 @@ export class AsyncEnhancedGrep {
         const promise = (async () => {
             proc = await this.processPool.execute('fd', args);
             if (options.timeout && options.timeout > 0) {
-                timeout = setTimeout(() => { try { proc?.kill('SIGTERM'); } catch {} }, options.timeout);
+                timeout = setTimeout(() => {
+                    try {
+                        proc?.kill('SIGTERM');
+                    } catch {}
+                }, options.timeout);
             }
             return new Promise<string[]>((resolve) => {
-                resolveFn = (v: string[]) => { if (!settled) { settled = true; resolve(v); } };
+                resolveFn = (v: string[]) => {
+                    if (!settled) {
+                        settled = true;
+                        resolve(v);
+                    }
+                };
                 proc!.stdout?.on('data', (data: Buffer) => {
                     const lines = data.toString('utf8').split(/\r?\n/).filter(Boolean);
                     for (const line of lines) files.push(line);
-                    if (options.maxFiles && files.length >= options.maxFiles) { try { proc?.kill('SIGTERM'); } catch {} }
+                    if (options.maxFiles && files.length >= options.maxFiles) {
+                        try {
+                            proc?.kill('SIGTERM');
+                        } catch {}
+                    }
                 });
-                proc!.on('close', () => { if (timeout) clearTimeout(timeout); resolveFn(files); });
-                proc!.on('error', () => { if (timeout) clearTimeout(timeout); resolveFn([]); });
+                proc!.on('close', () => {
+                    if (timeout) clearTimeout(timeout);
+                    resolveFn(files);
+                });
+                proc!.on('error', () => {
+                    if (timeout) clearTimeout(timeout);
+                    resolveFn([]);
+                });
             });
         })();
-        const cancel = () => { try { proc?.kill('SIGTERM'); } catch {} if (timeout) clearTimeout(timeout); resolveFn(files); };
+        const cancel = () => {
+            try {
+                proc?.kill('SIGTERM');
+            } catch {}
+            if (timeout) clearTimeout(timeout);
+            resolveFn(files);
+        };
         return { promise, cancel };
     }
 
@@ -856,17 +910,24 @@ export class AsyncEnhancedGrep {
         const args: string[] = [];
 
         // Performance optimizations (flags before pattern)
-        args.push('--no-heading');        // No file headers
-        args.push('--line-number');       // Include line numbers
-        args.push('--column');            // Include column numbers for precise ranges
+        args.push('--no-heading'); // No file headers
+        args.push('--line-number'); // Include line numbers
+        args.push('--column'); // Include column numbers for precise ranges
         // Respect .gitignore for performance; do not disable parent ignores
-        
+
         // Smart exclusions (configured, not hardcoded)
         const defaultExcludes = [
-            'node_modules', 'dist', '.git', 'coverage', 
-            'build', 'out', 'target', '.next', '.nuxt'
+            'node_modules',
+            'dist',
+            '.git',
+            'coverage',
+            'build',
+            'out',
+            'target',
+            '.next',
+            '.nuxt',
         ];
-        
+
         const excludes = options.excludePaths || defaultExcludes;
         for (const exclude of excludes) {
             // If the exclude contains glob chars or a dot, treat as raw pattern; otherwise as directory
@@ -880,16 +941,16 @@ export class AsyncEnhancedGrep {
 
         // Search depth limit
         args.push('--max-depth', '10');
-        
+
         // File type filtering
         if (options.fileType) {
             const typeMap: Record<string, string> = {
-                'javascript': 'js',
-                'typescript': 'ts',
-                'python': 'py',
-                'java': 'java',
-                'go': 'go',
-                'rust': 'rust'
+                javascript: 'js',
+                typescript: 'ts',
+                python: 'py',
+                java: 'java',
+                go: 'go',
+                rust: 'rust',
             };
             args.push('--type', typeMap[options.fileType] || options.fileType);
         }
@@ -940,7 +1001,7 @@ export class AsyncEnhancedGrep {
             column: isNaN(Number(columnNum)) ? undefined : columnNum,
             text,
             match: options.pattern,
-            confidence: 1.0
+            confidence: 1.0,
         };
     }
 
@@ -958,7 +1019,9 @@ export class AsyncEnhancedGrep {
                     if (!settled) {
                         settled = true;
                         reject(new Error(`Operation timeout after ${options.timeout}ms`));
-                        try { stream.cancel(); } catch {}
+                        try {
+                            stream.cancel();
+                        } catch {}
                     }
                 }, options.timeout);
             }
@@ -970,10 +1033,12 @@ export class AsyncEnhancedGrep {
             stream.on('error', (error) => {
                 // For path-related errors, return empty results instead of rejecting
                 const errorMessage = error.message.toLowerCase();
-                if (errorMessage.includes('enoent') || 
+                if (
+                    errorMessage.includes('enoent') ||
                     errorMessage.includes('no such file') ||
                     errorMessage.includes('(os error 2)') ||
-                    errorMessage.includes('permission denied')) {
+                    errorMessage.includes('permission denied')
+                ) {
                     if (!settled) {
                         settled = true;
                         if (timer) clearTimeout(timer);
@@ -981,7 +1046,7 @@ export class AsyncEnhancedGrep {
                     }
                     return;
                 }
-                
+
                 if (!settled) {
                     settled = true;
                     if (timer) clearTimeout(timer);
@@ -1010,7 +1075,13 @@ export class AsyncEnhancedGrep {
     /**
      * Runtime info for metrics/diagnostics
      */
-    getRuntimeInfo(): { maxProcesses: number; defaultTimeout: number; cacheSize: number; cacheTTL: number; fileDiscoveryPrefer: string } {
+    getRuntimeInfo(): {
+        maxProcesses: number;
+        defaultTimeout: number;
+        cacheSize: number;
+        cacheTTL: number;
+        fileDiscoveryPrefer: string;
+    } {
         return {
             maxProcesses: this.config.maxProcesses,
             defaultTimeout: this.config.defaultTimeout,
@@ -1025,10 +1096,10 @@ export class AsyncEnhancedGrep {
  * Backward-compatible wrapper for sync API
  */
 export class EnhancedGrepCompat {
-    private async: AsyncEnhancedGrep;
+    private asyncGrep: AsyncEnhancedGrep;
 
     constructor(config?: any) {
-        this.async = new AsyncEnhancedGrep(config);
+        this.asyncGrep = new AsyncEnhancedGrep(config);
     }
 
     /**
@@ -1038,11 +1109,11 @@ export class EnhancedGrepCompat {
         // This is a hack for backward compatibility
         // In real implementation, we'd need to use worker threads or fibers
         const { execSync } = require('child_process');
-        
+
         // For now, fall back to old implementation for sync API
         // But mark it as deprecated
         console.warn('Sync search API is deprecated. Please use searchAsync()');
-        
+
         // ... existing sync implementation
         return [];
     }
@@ -1051,14 +1122,14 @@ export class EnhancedGrepCompat {
      * New async API
      */
     async searchAsync(params: AsyncSearchOptions): Promise<StreamingGrepResult[]> {
-        return this.async.search(params);
+        return this.asyncGrep.search(params);
     }
 
     /**
      * New streaming API
      */
     searchStream(params: AsyncSearchOptions): SearchStream {
-        return this.async.searchStream(params);
+        return this.asyncGrep.searchStream(params);
     }
 }
 
