@@ -135,7 +135,8 @@ function loadLanguageParser(language: string): any {
                 return null;
         }
     } catch (e) {
-        console.warn(`Failed to load ${language} parser:`, e.message);
+        const msg = e instanceof Error ? e.message : String(e);
+        console.warn(`Failed to load ${language} parser:`, msg);
         return null;
     }
 }

@@ -158,7 +158,7 @@ const LS = async (params: ClaudeLSParams): Promise<ClaudeLSResult> => {
         return result.entries.map((entry) => ({
             name: entry.name,
             path: entry.path,
-            type: entry.type,
+            type: entry.type === 'unknown' ? 'file' : entry.type,
             size: entry.size,
             modified: entry.modified,
         }));
@@ -545,7 +545,7 @@ export class FastSearchLayer implements Layer<SearchQuery, EnhancedMatches> {
 
         try {
             const { s, results } = await Promise.any([...searchPromises, budgetPromise]);
-            const converted: Match[] = results.map((r) => {
+            const converted: Match[] = results.map((r: any) => {
                 const categorization = this.categorizeMatch(r.text, query.identifier);
                 return {
                     file: r.file,
@@ -779,6 +779,25 @@ export class FastSearchLayer implements Layer<SearchQuery, EnhancedMatches> {
             }
             seen.add(key);
             return true;
+        });
+    }
+
+    private sortMatchesByPriority(matches: Match[]): Match[] {
+        const rank: Record<string, number> = {
+            'likely-definition': 0,
+            'likely-import': 1,
+            'likely-usage': 2,
+            unknown: 3,
+        };
+        const score = (m: Match) => rank[m.category || 'unknown'] ?? 3;
+        return [...matches].sort((a, b) => {
+            const ra = score(a);
+            const rb = score(b);
+            if (ra !== rb) return ra - rb;
+            const ca = a.categoryConfidence ?? 0;
+            const cb = b.categoryConfidence ?? 0;
+            if (ca !== cb) return cb - ca;
+            return (b.confidence ?? 0) - (a.confidence ?? 0);
         });
     }
 

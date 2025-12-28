@@ -125,7 +125,7 @@ export interface EnhancedToolsConfig {
 }
 
 // Performance monitoring
-interface PerformanceMetrics {
+export interface PerformanceMetrics {
     searchCount: number;
     totalTime: number;
     averageTime: number;
@@ -226,6 +226,7 @@ class SmartCacheAdapter<T> implements LegacySearchCache<T> {
 export class EnhancedGrep {
     public cache: LegacySearchCache<EnhancedGrepResult[]>;
     public smartCache?: SmartCache<EnhancedGrepResult[]>;
+    private config: EnhancedToolsConfig;
     private metrics: PerformanceMetrics = {
         searchCount: 0,
         totalTime: 0,
@@ -487,7 +488,7 @@ export class EnhancedGrep {
         const files = await this.getFilesToSearch(searchPath, params);
 
         // Search files concurrently with limit
-        const chunks = this.chunkArray(files, this.config.maxConcurrentFiles);
+        const chunks = this.chunkArray(files, this.config.maxConcurrentFiles ?? 10);
 
         for (const chunk of chunks) {
             const chunkResults = await Promise.allSettled(chunk.map((file) => this.searchFile(file, params)));
