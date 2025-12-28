@@ -115,7 +115,9 @@ export class LSPServer {
                 const ss: any = (this.coreAnalyzer as any).sharedServices;
                 const bus: any = ss?.eventBus;
                 bus?.on?.('layer-manager:performance-recorded', (perf: any) => {
-                    try { recordLayerLatency('lsp', String(perf?.layer || 'unknown'), Number(perf?.duration || 0)); } catch {}
+                    try {
+                        recordLayerLatency('lsp', String(perf?.layer || 'unknown'), Number(perf?.duration || 0));
+                    } catch {}
                 });
             } catch {}
         });
@@ -150,7 +152,9 @@ export class LSPServer {
                 recordToolEnd('lsp', 'definition', Date.now() - t0, true);
                 return out;
             } catch (e) {
-                try { recordToolEnd('lsp', 'definition', Date.now() - t0, false); } catch {}
+                try {
+                    recordToolEnd('lsp', 'definition', Date.now() - t0, false);
+                } catch {}
                 throw e;
             }
         });
@@ -166,7 +170,9 @@ export class LSPServer {
                 recordToolEnd('lsp', 'references', Date.now() - t0, true);
                 return out;
             } catch (e) {
-                try { recordToolEnd('lsp', 'references', Date.now() - t0, false); } catch {}
+                try {
+                    recordToolEnd('lsp', 'references', Date.now() - t0, false);
+                } catch {}
                 throw e;
             }
         });
@@ -189,7 +195,9 @@ export class LSPServer {
                 recordToolEnd('lsp', 'rename', Date.now() - t0, true);
                 return out;
             } catch (e) {
-                try { recordToolEnd('lsp', 'rename', Date.now() - t0, false); } catch {}
+                try {
+                    recordToolEnd('lsp', 'rename', Date.now() - t0, false);
+                } catch {}
                 throw e;
             }
         });
@@ -236,7 +244,9 @@ export class LSPServer {
                 precise: true,
             } as any);
             const result = await (this.coreAnalyzer as any).findReferencesAsync(req);
-            try { recordToolEnd('lsp', 'preciseReferences', Date.now() - t0, true); } catch {}
+            try {
+                recordToolEnd('lsp', 'preciseReferences', Date.now() - t0, true);
+            } catch {}
             return {
                 locations: result.data.map((r: any) => referenceToLspLocation(r)),
                 count: result.data.length,
@@ -266,7 +276,9 @@ export class LSPServer {
                 precise: true,
             } as any);
             const result = await (this.coreAnalyzer as any).findDefinitionAsync(req);
-            try { recordToolEnd('lsp', 'preciseDefinition', Date.now() - t0, true); } catch {}
+            try {
+                recordToolEnd('lsp', 'preciseDefinition', Date.now() - t0, true);
+            } catch {}
             return {
                 locations: result.data.map((d: any) => definitionToLspLocation(d)),
                 count: result.data.length,
@@ -284,7 +296,9 @@ export class LSPServer {
                 recordToolEnd('lsp', 'completion', Date.now() - t0, true);
                 return out;
             } catch (e) {
-                try { recordToolEnd('lsp', 'completion', Date.now() - t0, false); } catch {}
+                try {
+                    recordToolEnd('lsp', 'completion', Date.now() - t0, false);
+                } catch {}
                 return [];
             }
         });
@@ -301,7 +315,9 @@ export class LSPServer {
                 }
                 const arg = (params.arguments && params.arguments[0]) || {};
                 if (!arg || typeof arg !== 'object' || typeof arg.identifier !== 'string' || !arg.identifier.trim()) {
-                    throw new Error('Invalid arguments: expected { identifier: string, uri?, includeDeclaration?, maxResults? }');
+                    throw new Error(
+                        'Invalid arguments: expected { identifier: string, uri?, includeDeclaration?, maxResults? }'
+                    );
                 }
                 const result = await (this.coreAnalyzer as any).exploreCodebase({
                     uri: arg.uri || arg.file || (this.coreAnalyzer as any)?.config?.workspaceRoot || 'file://workspace',

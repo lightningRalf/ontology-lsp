@@ -117,7 +117,7 @@ describe('LSP Server Integration Tests', () => {
             method: 'workspace/executeCommand',
             params: {
                 command: 'ontology.explore',
-                arguments: [ { identifier: 'HTTPServer', uri: 'file:///test/file.ts', maxResults: 5 } ],
+                arguments: [{ identifier: 'HTTPServer', uri: 'file:///test/file.ts', maxResults: 5 }],
             },
         };
 

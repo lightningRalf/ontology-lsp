@@ -493,13 +493,18 @@ export class LearningOrchestrator {
             };
             try {
                 const db = (this.sharedServices as any).database;
-                await db.execute(
-                    `UPDATE pipeline_runs SET finished_at = ?, status = ?, metrics = ? WHERE id = ?`,
-                    [finishedAt, status, JSON.stringify(metrics), runId]
-                );
+                await db.execute(`UPDATE pipeline_runs SET finished_at = ?, status = ?, metrics = ? WHERE id = ?`, [
+                    finishedAt,
+                    status,
+                    JSON.stringify(metrics),
+                    runId,
+                ]);
             } catch (e) {
                 if (!process.env.SILENT_MODE && !process.env.STDIO_MODE) {
-                    console.warn('runPipeline: failed to update finish row:', e instanceof Error ? e.message : String(e));
+                    console.warn(
+                        'runPipeline: failed to update finish row:',
+                        e instanceof Error ? e.message : String(e)
+                    );
                 }
             }
             return { ok: true, runId };
@@ -519,14 +524,19 @@ export class LearningOrchestrator {
     /**
      * List recent runs for a pipeline (defaults to 10)
      */
-    async listPipelineRuns(pipelineId: string, limit: number = 10): Promise<Array<{
-        id: string;
-        pipeline_id: string;
-        started_at: number;
-        finished_at?: number | null;
-        status: string;
-        metrics?: any;
-    }>> {
+    async listPipelineRuns(
+        pipelineId: string,
+        limit: number = 10
+    ): Promise<
+        Array<{
+            id: string;
+            pipeline_id: string;
+            started_at: number;
+            finished_at?: number | null;
+            status: string;
+            metrics?: any;
+        }>
+    > {
         try {
             const db = (this.sharedServices as any).database;
             const rows = await db.query<any>(
@@ -543,7 +553,13 @@ export class LearningOrchestrator {
                 started_at: Number(r.started_at),
                 finished_at: r.finished_at != null ? Number(r.finished_at) : null,
                 status: String(r.status || 'unknown'),
-                metrics: (() => { try { return JSON.parse(r.metrics || '{}'); } catch { return {}; } })(),
+                metrics: (() => {
+                    try {
+                        return JSON.parse(r.metrics || '{}');
+                    } catch {
+                        return {};
+                    }
+                })(),
             }));
         } catch (e) {
             if (!process.env.SILENT_MODE && !process.env.STDIO_MODE) {
@@ -691,7 +707,9 @@ export class LearningOrchestrator {
         performance: any;
     }> {
         if (!this.initialized) {
-            try { await this.initialize(); } catch {}
+            try {
+                await this.initialize();
+            } catch {}
         }
 
         const stats = {
@@ -1325,13 +1343,13 @@ export class LearningOrchestrator {
     private async savePipelineStats(pipeline: LearningPipeline): Promise<void> {
         try {
             const db = (this.sharedServices as any).database;
-            await db.execute(
-                `UPDATE pipelines SET updated_at = strftime('%s','now') WHERE id = ?`,
-                [pipeline.id]
-            );
+            await db.execute(`UPDATE pipelines SET updated_at = strftime('%s','now') WHERE id = ?`, [pipeline.id]);
         } catch (e) {
             if (!process.env.SILENT_MODE && !process.env.STDIO_MODE) {
-                console.error(`Pipeline stats update failed (${pipeline.id}):`, e instanceof Error ? e.message : String(e));
+                console.error(
+                    `Pipeline stats update failed (${pipeline.id}):`,
+                    e instanceof Error ? e.message : String(e)
+                );
             }
         }
     }
@@ -1339,11 +1357,17 @@ export class LearningOrchestrator {
     private async loadPipelinesFromDatabase(): Promise<void> {
         try {
             const db = (this.sharedServices as any).database;
-            const rows = await db.query<any>(`SELECT id, name, description, components, trigger, schedule, enabled FROM pipelines`);
+            const rows = await db.query<any>(
+                `SELECT id, name, description, components, trigger, schedule, enabled FROM pipelines`
+            );
             for (const row of rows) {
                 if (this.pipelines.has(row.id)) continue;
                 let comps: any[] = [];
-                try { comps = JSON.parse(row.components || '[]'); } catch { comps = []; }
+                try {
+                    comps = JSON.parse(row.components || '[]');
+                } catch {
+                    comps = [];
+                }
                 const pipeline: LearningPipeline = {
                     id: row.id,
                     name: row.name,

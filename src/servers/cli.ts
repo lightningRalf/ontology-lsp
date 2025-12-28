@@ -24,12 +24,7 @@ import * as fs from 'fs';
 // Note: defer heavy imports (tree-sitter, analyzer, adapter) to runtime.
 // This keeps `--help` and `init` working even if native deps are unavailable.
 import * as path from 'path';
-import {
-    recordToolStart,
-    recordToolEnd,
-    pushToGateway,
-    getPushgatewayUrl,
-} from '../instrumentation/metrics.js';
+import { recordToolStart, recordToolEnd, pushToGateway, getPushgatewayUrl } from '../instrumentation/metrics.js';
 
 class CLI {
     private program: Command;
@@ -118,7 +113,9 @@ class CLI {
                     } else if (Array.isArray(result)) {
                         const items = result as any[];
                         if (options.summary) {
-                            const header = this.formatHeader(`Found ${items.length} definitions (showing ${items.length})`);
+                            const header = this.formatHeader(
+                                `Found ${items.length} definitions (showing ${items.length})`
+                            );
                             const top = items[0]
                                 ? `Top: ${this.fmtDef ? this.fmtDef(items[0]) : JSON.stringify(items[0])}`
                                 : 'Top: (none)';
@@ -176,7 +173,9 @@ class CLI {
                     } else if (Array.isArray(result)) {
                         const items = result as any[];
                         if (options.summary) {
-                            const header = this.formatHeader(`Found ${items.length} references (showing ${items.length})`);
+                            const header = this.formatHeader(
+                                `Found ${items.length} references (showing ${items.length})`
+                            );
                             const top = items[0]
                                 ? `Top: ${this.fmtRef ? this.fmtRef(items[0]) : JSON.stringify(items[0])}`
                                 : 'Top: (none)';
@@ -591,7 +590,11 @@ class CLI {
                     newName: String(newName),
                     file: options.file ? String(options.file) : undefined,
                     runChecks: options.checks !== false,
-                    commands: Array.isArray(options.cmd) ? options.cmd : options.cmd ? [options.cmd] : ['bun run build:tsc'],
+                    commands: Array.isArray(options.cmd)
+                        ? options.cmd
+                        : options.cmd
+                          ? [options.cmd]
+                          : ['bun run build:tsc'],
                     timeoutSec: parseInt(String(options.timeout) || '240', 10),
                 };
                 const mcp = new MCPAdapter(this.coreAnalyzer);
@@ -628,7 +631,11 @@ class CLI {
                 const args: Record<string, any> = {
                     patch,
                     snapshot: options.snapshot ? String(options.snapshot) : undefined,
-                    commands: Array.isArray(options.cmd) ? options.cmd : options.cmd ? [options.cmd] : ['bun run build:tsc'],
+                    commands: Array.isArray(options.cmd)
+                        ? options.cmd
+                        : options.cmd
+                          ? [options.cmd]
+                          : ['bun run build:tsc'],
                     timeoutSec: parseInt(String(options.timeout) || '240', 10),
                     onlyTouched: !!options.onlyTouched,
                 };

@@ -117,11 +117,11 @@ class Layer3Adapter extends LayerAdapter {
         this.storage = storage;
         // Check for env flag to control lazy initialization
         this.lazyInit = process.env.EAGER_L4_INIT !== '1';
-        
+
         if (process.env.DEBUG_LAYER_INIT === '1') {
             console.log(`[Layer4] Lazy init: ${this.lazyInit}`);
         }
-        
+
         if (!this.lazyInit) {
             // Eager initialization (old behavior)
             this.ontology = new OntologyEngine(storage);
@@ -138,7 +138,7 @@ class Layer3Adapter extends LayerAdapter {
 
     private async ensureInitialized(): Promise<void> {
         if (this.ontology) return;
-        
+
         // Use a promise to prevent multiple initializations
         if (!this.initPromise) {
             this.initPromise = (async () => {
@@ -146,7 +146,7 @@ class Layer3Adapter extends LayerAdapter {
                 await this.ontology.initialize?.();
             })();
         }
-        
+
         await this.initPromise;
     }
 
@@ -368,12 +368,15 @@ export class AnalyzerFactory {
 
         // Pass null initially if using lazy init for Layer 4
         // Layer 2 can work without ontology engine
-        const layer2 = new Layer2Adapter({
-            enabled: fullConfig.layers.layer2.enabled,
-            timeout: fullConfig.layers.layer2.timeout,
-            languages: fullConfig.layers.layer2.languages,
-            maxFileSize: fullConfig.layers.layer2.maxFileSize.toString(),
-        }, process.env.EAGER_L4_INIT === '1' ? layer4Ont.getOntologyEngine() : undefined);
+        const layer2 = new Layer2Adapter(
+            {
+                enabled: fullConfig.layers.layer2.enabled,
+                timeout: fullConfig.layers.layer2.timeout,
+                languages: fullConfig.layers.layer2.languages,
+                maxFileSize: fullConfig.layers.layer2.maxFileSize.toString(),
+            },
+            process.env.EAGER_L4_INIT === '1' ? layer4Ont.getOntologyEngine() : undefined
+        );
 
         const layer5Pat = new Layer4Adapter(ontologyDbPath, {
             learningThreshold: (fullConfig.layers as any).layer5?.learningThreshold ?? 3,

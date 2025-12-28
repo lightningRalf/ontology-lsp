@@ -72,12 +72,17 @@ export class MCPServer {
                 recordToolStart('mcp_stdio');
                 const result = await this.mcpAdapter.handleToolCall(name, args || {});
                 try {
-                    const success = !((result && typeof result === 'object' && 'isError' in result && (result as any).isError) || false);
+                    const success = !(
+                        (result && typeof result === 'object' && 'isError' in result && (result as any).isError) ||
+                        false
+                    );
                     recordToolEnd('mcp_stdio', String(name || 'unknown'), Date.now() - t0, success);
                 } catch {}
                 return result;
             } catch (error) {
-                try { recordToolEnd('mcp_stdio', String(name || 'unknown'), 0, false); } catch {}
+                try {
+                    recordToolEnd('mcp_stdio', String(name || 'unknown'), 0, false);
+                } catch {}
                 console.error(`Tool call failed: ${name}`, error);
                 throw new McpError(
                     ErrorCode.InternalError,

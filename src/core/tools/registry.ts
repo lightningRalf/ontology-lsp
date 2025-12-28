@@ -31,20 +31,24 @@ export class ToolRegistry {
             title: 'Workflow: Safe Rename (Snapshot + Checks)',
             description:
                 'Plan a rename, stage a unified diff into a snapshot, run checks, and return status with next actions.',
-      category: 'workflow',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          oldName: { type: 'string', description: 'Original symbol name' },
-          newName: { type: 'string', description: 'New symbol name' },
-          file: { type: 'string', description: 'Optional context file URI' },
-          commands: { type: 'array', items: { type: 'string' }, default: ['bun run build:tsc'] },
-          timeoutSec: { type: 'number', default: 240, description: 'Per-command timeout (seconds, 1–600; clamped centrally)' },
-          runChecks: { type: 'boolean', default: true },
+            category: 'workflow',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    oldName: { type: 'string', description: 'Original symbol name' },
+                    newName: { type: 'string', description: 'New symbol name' },
+                    file: { type: 'string', description: 'Optional context file URI' },
+                    commands: { type: 'array', items: { type: 'string' }, default: ['bun run build:tsc'] },
+                    timeoutSec: {
+                        type: 'number',
+                        default: 240,
+                        description: 'Per-command timeout (seconds, 1–600; clamped centrally)',
+                    },
+                    runChecks: { type: 'boolean', default: true },
+                },
+                required: ['oldName', 'newName'],
+            },
         },
-        required: ['oldName', 'newName'],
-      },
-    },
         {
             name: 'workflow_explore_symbol',
             title: 'Workflow: Explore Symbol Impact',
@@ -75,8 +79,16 @@ export class ToolRegistry {
                     patch: { type: 'string', description: 'Unified diff (git format) to stage' },
                     snapshot: { type: 'string', description: 'Optional snapshot id; if absent a snapshot is created' },
                     commands: { type: 'array', items: { type: 'string' }, default: ['bun run build:tsc'] },
-                    onlyTouched: { type: 'boolean', description: 'Restrict checks to touched files when possible', default: false },
-                    timeoutSec: { type: 'number', default: 240, description: 'Per-command timeout (seconds, 1–600; clamped centrally)' },
+                    onlyTouched: {
+                        type: 'boolean',
+                        description: 'Restrict checks to touched files when possible',
+                        default: false,
+                    },
+                    timeoutSec: {
+                        type: 'number',
+                        default: 240,
+                        description: 'Per-command timeout (seconds, 1–600; clamped centrally)',
+                    },
                 },
                 required: ['patch'],
             },
@@ -154,8 +166,16 @@ export class ToolRegistry {
                 properties: {
                     snapshot: { type: 'string' },
                     commands: { type: 'array', items: { type: 'string' } },
-                    onlyTouched: { type: 'boolean', description: 'Restrict checks to touched files when possible', default: false },
-                    timeoutSec: { type: 'number', default: 120, description: 'Per-command timeout (seconds, 1–600; clamped centrally)' },
+                    onlyTouched: {
+                        type: 'boolean',
+                        description: 'Restrict checks to touched files when possible',
+                        default: false,
+                    },
+                    timeoutSec: {
+                        type: 'number',
+                        default: 120,
+                        description: 'Per-command timeout (seconds, 1–600; clamped centrally)',
+                    },
                 },
                 required: ['snapshot'],
             },
@@ -427,7 +447,11 @@ export class ToolRegistry {
                     newName: { type: 'string' },
                     file: { type: 'string' },
                     commands: { type: 'array', items: { type: 'string' }, default: ['bun run build:tsc'] },
-                    timeoutSec: { type: 'number', default: 240, description: 'Per-command timeout (seconds, 1–600; clamped centrally)' },
+                    timeoutSec: {
+                        type: 'number',
+                        default: 240,
+                        description: 'Per-command timeout (seconds, 1–600; clamped centrally)',
+                    },
                     runChecks: { type: 'boolean', default: true },
                 },
                 required: ['oldName', 'newName'],
@@ -463,7 +487,11 @@ export class ToolRegistry {
                     patch: { type: 'string' },
                     snapshot: { type: 'string' },
                     commands: { type: 'array', items: { type: 'string' }, default: ['bun run build:tsc'] },
-                    timeoutSec: { type: 'number', default: 240, description: 'Per-command timeout (seconds, 1–600; clamped centrally)' },
+                    timeoutSec: {
+                        type: 'number',
+                        default: 240,
+                        description: 'Per-command timeout (seconds, 1–600; clamped centrally)',
+                    },
                 },
                 required: ['patch'],
             },
@@ -526,14 +554,22 @@ export class ToolRegistry {
             inputSchema: {
                 type: 'object',
                 properties: {
-                    intent: { type: 'string', enum: ['rename', 'patch', 'explore', 'locate', 'apply'], description: 'Preferred action; optional if args imply intent' },
+                    intent: {
+                        type: 'string',
+                        enum: ['rename', 'patch', 'explore', 'locate', 'apply'],
+                        description: 'Preferred action; optional if args imply intent',
+                    },
                     // Rename
                     oldName: { type: 'string' },
                     newName: { type: 'string' },
                     file: { type: 'string' },
                     // Patch
                     patch: { type: 'string' },
-                    applyIfOk: { type: 'boolean', default: false, description: 'If checks pass and apply is allowed, apply snapshot' },
+                    applyIfOk: {
+                        type: 'boolean',
+                        default: false,
+                        description: 'If checks pass and apply is allowed, apply snapshot',
+                    },
                     commands: { type: 'array', items: { type: 'string' }, description: 'Optional commands for checks' },
                     timeoutSec: { type: 'number', default: 240 },
                     // Explore/Locate

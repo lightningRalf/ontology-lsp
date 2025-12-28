@@ -131,8 +131,12 @@ export class OntologyStorage implements StoragePort {
             const missingFrom = !evoCols.has('from_state');
             const missingTo = !evoCols.has('to_state');
             if (auto && (missingFrom || missingTo)) {
-                try { if (missingFrom) this.db.exec(`ALTER TABLE evolution_history ADD COLUMN from_state TEXT`); } catch {}
-                try { if (missingTo) this.db.exec(`ALTER TABLE evolution_history ADD COLUMN to_state TEXT`); } catch {}
+                try {
+                    if (missingFrom) this.db.exec(`ALTER TABLE evolution_history ADD COLUMN from_state TEXT`);
+                } catch {}
+                try {
+                    if (missingTo) this.db.exec(`ALTER TABLE evolution_history ADD COLUMN to_state TEXT`);
+                } catch {}
             }
         } catch {}
         try {
@@ -140,7 +144,9 @@ export class OntologyStorage implements StoragePort {
             const conInfo = this.db.query(`PRAGMA table_info(concepts)`).all() as Array<{ name: string }>;
             const conCols = new Set(conInfo.map((r) => (r as any).name));
             if (auto && !conCols.has('signature_fingerprint')) {
-                try { this.db.exec(`ALTER TABLE concepts ADD COLUMN signature_fingerprint TEXT`); } catch {}
+                try {
+                    this.db.exec(`ALTER TABLE concepts ADD COLUMN signature_fingerprint TEXT`);
+                } catch {}
             }
         } catch {}
         // Final detection for guards

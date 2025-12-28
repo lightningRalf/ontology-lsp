@@ -177,7 +177,9 @@ export class OverlayStore {
                         const dst = path.join(dir, rel);
                         await fsp.mkdir(path.dirname(dst), { recursive: true }).catch(() => {});
                         if (fs.existsSync(src) && fs.statSync(src).isFile()) {
-                            spawnSync('bash', ['-lc', `cp -a ${JSON.stringify(src)} ${JSON.stringify(dst)}`], { stdio: 'pipe' });
+                            spawnSync('bash', ['-lc', `cp -a ${JSON.stringify(src)} ${JSON.stringify(dst)}`], {
+                                stdio: 'pipe',
+                            });
                         }
                     } catch {}
                 }
@@ -204,7 +206,9 @@ export class OverlayStore {
                         const src = path.join(base, ent.name);
                         const dest = path.join(dir, ent.name);
                         try {
-                            spawnSync('bash', ['-lc', `cp -a ${JSON.stringify(src)} ${JSON.stringify(dest)}`], { stdio: 'pipe' });
+                            spawnSync('bash', ['-lc', `cp -a ${JSON.stringify(src)} ${JSON.stringify(dest)}`], {
+                                stdio: 'pipe',
+                            });
                         } catch {}
                     }
                 }
@@ -250,7 +254,7 @@ export class OverlayStore {
         // Materialize snapshot into .ontology/snapshots/<id>
         const cwd = (await this.ensureMaterialized(snapshotId)) || process.cwd();
         const output: string[] = [];
-        
+
         // If running under partial materialization, ensure essential directories exist
         // for common commands like build/test which require source files or local scripts.
         try {
@@ -263,20 +267,37 @@ export class OverlayStore {
                 const base = envBase ? path.resolve(envBase) : path.resolve('.');
                 const ensureDirs = ['src', 'scripts'];
                 for (const d of ensureDirs) {
-                    const needThis = d === 'src' ? (needsBuild || needsTest) : needsScripts;
+                    const needThis = d === 'src' ? needsBuild || needsTest : needsScripts;
                     if (!needThis) continue;
                     const srcDir = path.join(base, d);
                     const dstDir = path.join(cwd, d);
-                    const missing = (() => { try { return !fs.existsSync(dstDir); } catch { return true; } })();
+                    const missing = (() => {
+                        try {
+                            return !fs.existsSync(dstDir);
+                        } catch {
+                            return true;
+                        }
+                    })();
                     if (missing && fs.existsSync(srcDir)) {
                         await this.logProgress(snapshotId, `materialize:ensure-${d}`);
                         if (this.which('rsync')) {
-                            spawnSync('bash', ['-lc', `rsync -a ${JSON.stringify(srcDir)}/ ${JSON.stringify(dstDir)}/`], { stdio: 'pipe' });
+                            spawnSync(
+                                'bash',
+                                ['-lc', `rsync -a ${JSON.stringify(srcDir)}/ ${JSON.stringify(dstDir)}/`],
+                                { stdio: 'pipe' }
+                            );
                         } else if (this.which('tar')) {
                             const cmd = `tar -C ${JSON.stringify(srcDir)} -cf - . | tar -C ${JSON.stringify(dstDir)} -xf -`;
                             spawnSync('bash', ['-lc', cmd], { stdio: 'pipe' });
                         } else {
-                            spawnSync('bash', ['-lc', `mkdir -p ${JSON.stringify(dstDir)} && cp -a ${JSON.stringify(srcDir)}/. ${JSON.stringify(dstDir)}/`], { stdio: 'pipe' });
+                            spawnSync(
+                                'bash',
+                                [
+                                    '-lc',
+                                    `mkdir -p ${JSON.stringify(dstDir)} && cp -a ${JSON.stringify(srcDir)}/. ${JSON.stringify(dstDir)}/`,
+                                ],
+                                { stdio: 'pipe' }
+                            );
                         }
                     }
                 }
@@ -293,8 +314,10 @@ export class OverlayStore {
             const tsFiles = touched.filter((f) => /\.(ts|tsx)$/.test(f));
             if (onlyTouched && touched.length > 0 && tsFiles.length > 0 && this.which('bunx')) {
                 // Prefer a quick typecheck against touched TS files
-                const limited = tsFiles.slice(0, 50) // cap to avoid overly long cmdlines
-                    .map((f) => JSON.stringify(f)).join(' ');
+                const limited = tsFiles
+                    .slice(0, 50) // cap to avoid overly long cmdlines
+                    .map((f) => JSON.stringify(f))
+                    .join(' ');
                 const quick = `bunx tsc --noEmit --pretty false ${limited}`;
                 // Prepend quick check if no explicit commands were provided
                 if (!(commands && commands.length)) {
@@ -367,7 +390,9 @@ export class OverlayStore {
             for (const rel of ensureDirs) {
                 if (!rel || rel === '.' || rel === '/') continue;
                 const abs = path.resolve(process.cwd(), rel);
-                try { await fsp.mkdir(abs, { recursive: true }); } catch {}
+                try {
+                    await fsp.mkdir(abs, { recursive: true });
+                } catch {}
             }
         } catch {
             // ignore ensure-dir errors

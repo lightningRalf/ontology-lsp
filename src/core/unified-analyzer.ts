@@ -80,8 +80,15 @@ export class CodeAnalyzer {
         };
         (this.config as any).cache = (this.config as any).cache || { enabled: true };
         (this.config as any).database = (this.config as any).database || { path: ':memory:', maxConnections: 5 };
-        (this.config as any).performance = (this.config as any).performance || { targetResponseTime: 100, maxConcurrentRequests: 10 };
-        (this.config as any).monitoring = (this.config as any).monitoring || { enabled: false, metricsInterval: 60000, logLevel: 'error' };
+        (this.config as any).performance = (this.config as any).performance || {
+            targetResponseTime: 100,
+            maxConcurrentRequests: 10,
+        };
+        (this.config as any).monitoring = (this.config as any).monitoring || {
+            enabled: false,
+            metricsInterval: 60000,
+            logLevel: 'error',
+        };
         const noOpBus: EventBus = {
             emit: () => {},
             on: () => {},
@@ -112,20 +119,20 @@ export class CodeAnalyzer {
         }
 
         const startTime = Date.now();
-        
+
         if (process.env.DEBUG_LAYER_INIT === '1') {
             console.log('[CodeAnalyzer] Starting initialization...');
         }
 
         await this.layerManager.initialize();
-        
+
         if (process.env.DEBUG_LAYER_INIT === '1') {
             console.log(`[CodeAnalyzer] LayerManager initialized in ${Date.now() - startTime}ms`);
         }
-        
+
         const sharedStart = Date.now();
         await this.sharedServices.initialize();
-        
+
         if (process.env.DEBUG_LAYER_INIT === '1') {
             console.log(`[CodeAnalyzer] SharedServices initialized in ${Date.now() - sharedStart}ms`);
         }
@@ -141,7 +148,7 @@ export class CodeAnalyzer {
             },
         });
         await this.learningOrchestrator.initialize();
-        
+
         if (process.env.DEBUG_LAYER_INIT === '1') {
             console.log(`[CodeAnalyzer] LearningOrchestrator initialized in ${Date.now() - learningStart}ms`);
             console.log(`[CodeAnalyzer] Total initialization time: ${Date.now() - startTime}ms`);
@@ -180,7 +187,9 @@ export class CodeAnalyzer {
      */
     async getStats(): Promise<Record<string, any>> {
         if (!this.initialized) {
-            try { await this.initialize(); } catch {}
+            try {
+                await this.initialize();
+            } catch {}
         }
         // Shared services stats (cache/db/monitoring)
         const services = await this.sharedServices.getStats().catch(() => ({
@@ -264,7 +273,9 @@ export class CodeAnalyzer {
      */
     async findDefinitionAsync(request: FindDefinitionRequest): Promise<FindDefinitionResult> {
         if (!this.initialized) {
-            try { await this.initialize(); } catch {}
+            try {
+                await this.initialize();
+            } catch {}
         }
         this.validateRequest(request);
 
@@ -618,21 +629,22 @@ export class CodeAnalyzer {
                 ? ['1', 'true', 'on', 'yes'].includes(envFlag)
                     ? true
                     : ['0', 'false', 'off', 'no'].includes(envFlag)
-                        ? false
-                        : undefined
+                      ? false
+                      : undefined
                 : undefined;
             const reqObj: any = request as any;
             const reqOverride =
                 typeof reqObj?.conceptual === 'boolean'
                     ? (reqObj.conceptual as boolean)
                     : typeof reqObj?.augmentConcepts === 'boolean'
-                        ? (reqObj.augmentConcepts as boolean)
-                        : undefined;
+                      ? (reqObj.augmentConcepts as boolean)
+                      : undefined;
             const cfgDefault = (this.config as any)?.layers?.layer4?.augmentExplore ?? false;
             const augment = (envOverride ?? reqOverride ?? cfgDefault) === true;
             if (augment && (this.config as any)?.layers?.layer4?.enabled) {
                 const layer4: any = (this as any).layerManager?.getLayer('layer4');
-                const engine = layer4 && typeof layer4.getOntologyEngine === 'function' ? layer4.getOntologyEngine() : null;
+                const engine =
+                    layer4 && typeof layer4.getOntologyEngine === 'function' ? layer4.getOntologyEngine() : null;
                 if (engine && typeof engine.ensureInitialized === 'function') {
                     await engine.ensureInitialized();
                     const concept = await engine.findConceptStrict(request.identifier);
@@ -653,7 +665,11 @@ export class CodeAnalyzer {
                             });
                         }
                         // Merge with definitions, keeping dedup simple by (uri,line,col)
-                        const seen = new Set(result.definitions.map((d: any) => `${d.uri}:${d.range.start.line}:${d.range.start.character}`));
+                        const seen = new Set(
+                            result.definitions.map(
+                                (d: any) => `${d.uri}:${d.range.start.line}:${d.range.start.character}`
+                            )
+                        );
                         for (const d of conceptualDefs) {
                             const key = `${d.uri}:${d.range.start.line}:${d.range.start.character}`;
                             if (!seen.has(key)) {
@@ -694,7 +710,9 @@ export class CodeAnalyzer {
      */
     async findReferencesAsync(request: FindReferencesRequest): Promise<FindReferencesResult> {
         if (!this.initialized) {
-            try { await this.initialize(); } catch {}
+            try {
+                await this.initialize();
+            } catch {}
         }
         this.validateRequest(request);
 
@@ -2175,7 +2193,13 @@ export class CodeAnalyzer {
                 const lines = fileLineCache.get(filePath)!;
                 lineText = lines[n.range.start.line] || '';
             } catch {}
-            exports.push({ uri: this.pathToFileUri(filePath), range: n.range, kind: 'export', name, text: lineText.trim() });
+            exports.push({
+                uri: this.pathToFileUri(filePath),
+                range: n.range,
+                kind: 'export',
+                name,
+                text: lineText.trim(),
+            });
         }
 
         // Imports: use relationships with location to read the single line and verify
@@ -2193,7 +2217,10 @@ export class CodeAnalyzer {
                 if (col >= 0) {
                     imports.push({
                         uri: this.pathToFileUri(filePath),
-                        range: { start: { line: lineIdx, character: col }, end: { line: lineIdx, character: col + identifier.length } },
+                        range: {
+                            start: { line: lineIdx, character: col },
+                            end: { line: lineIdx, character: col + identifier.length },
+                        },
                         kind: 'import',
                         text: line.trim(),
                     });
@@ -2668,12 +2695,15 @@ export class CodeAnalyzer {
      * Public text search method using Layer 1 Fast Search
      * Provides general content search with proper layer integration
      */
-    async textSearch(query: string, options?: {
-        path?: string;
-        maxResults?: number;
-        caseInsensitive?: boolean;
-        fileTypes?: string[];
-    }): Promise<{ count: number; results: Array<{ file: string; line: number; column: number; text: string }> }> {
+    async textSearch(
+        query: string,
+        options?: {
+            path?: string;
+            maxResults?: number;
+            caseInsensitive?: boolean;
+            fileTypes?: string[];
+        }
+    ): Promise<{ count: number; results: Array<{ file: string; line: number; column: number; text: string }> }> {
         if (!this.initialized) {
             await this.initialize();
         }
@@ -2701,7 +2731,7 @@ export class CodeAnalyzer {
             const results = await this.asyncSearchTools.search(asyncOptions);
             return {
                 count: results.length,
-                results: results.map(r => ({
+                results: results.map((r) => ({
                     file: r.file,
                     line: r.line || 0,
                     column: r.column || 0,
@@ -2725,7 +2755,7 @@ export class CodeAnalyzer {
             const results = await this.asyncSearchTools.search(asyncOptions);
             return {
                 count: results.length,
-                results: results.map(r => ({
+                results: results.map((r) => ({
                     file: r.file,
                     line: r.line || 0,
                     column: r.column || 0,
@@ -2755,11 +2785,11 @@ export class CodeAnalyzer {
                     searchTime: matches.searchTime,
                 });
             }
-            
+
             // Combine all match types
             const allMatches = [
-                ...matches.exact.map(m => ({ ...m, confidence: 1.0 })),
-                ...matches.fuzzy.map(m => ({ ...m, confidence: 0.8 })),
+                ...matches.exact.map((m) => ({ ...m, confidence: 1.0 })),
+                ...matches.fuzzy.map((m) => ({ ...m, confidence: 0.8 })),
             ];
 
             // Sort by confidence and limit results
@@ -2768,7 +2798,7 @@ export class CodeAnalyzer {
 
             return {
                 count: limited.length,
-                results: limited.map(m => ({
+                results: limited.map((m) => ({
                     file: m.file,
                     line: m.line,
                     column: m.column || 0,
@@ -2785,10 +2815,10 @@ export class CodeAnalyzer {
                 timeout: 200,
                 caseInsensitive: options?.caseInsensitive,
             };
-        const results = await this.asyncSearchTools.search(asyncOptions);
+            const results = await this.asyncSearchTools.search(asyncOptions);
             return {
                 count: results.length,
-                results: results.map(r => ({
+                results: results.map((r) => ({
                     file: r.file,
                     line: r.line || 0,
                     column: r.column || 0,

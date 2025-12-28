@@ -1,5 +1,5 @@
 class TestClass {
-  constructor() {
-    this.name = "test";
-  }
+    constructor() {
+        this.name = 'test';
+    }
 }

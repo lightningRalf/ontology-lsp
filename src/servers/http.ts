@@ -143,7 +143,8 @@ export class HTTPServer {
                         const l2m = typeof l2?.getMetrics === 'function' ? l2.getMetrics() : null;
                         const l4 = (this.coreAnalyzer as any).getLayer4StorageMetrics?.();
                         const lmAll = typeof lm?.getAllMetrics === 'function' ? lm.getAllMetrics() : null;
-                        const lmPerf = typeof lm?.getPerformanceReport === 'function' ? lm.getPerformanceReport() : null;
+                        const lmPerf =
+                            typeof lm?.getPerformanceReport === 'function' ? lm.getPerformanceReport() : null;
 
                         if (fmt !== 'prometheus') {
                             // JSON variant for dashboards: include L4 storage extras for richer panels
@@ -287,7 +288,9 @@ export class HTTPServer {
                             const body: any = raw ? JSON.parse(raw) : {};
                             const name = String(body?.name || '').trim();
                             const args =
-                                body?.arguments && typeof body.arguments === 'object' ? (body.arguments as Record<string, any>) : {};
+                                body?.arguments && typeof body.arguments === 'object'
+                                    ? (body.arguments as Record<string, any>)
+                                    : {};
                             if (!name) {
                                 return new Response(
                                     JSON.stringify({ success: false, error: { message: 'Missing tool name' } }),
@@ -350,7 +353,11 @@ export class HTTPServer {
                             recordToolEnd('http', name, Date.now() - t0, success);
                             const isError = !!(normalized && typeof normalized === 'object' && normalized.ok === false);
                             return new Response(
-                                JSON.stringify({ success: !isError, result: isError ? undefined : normalized, error: isError ? normalized.error : undefined }),
+                                JSON.stringify({
+                                    success: !isError,
+                                    result: isError ? undefined : normalized,
+                                    error: isError ? normalized.error : undefined,
+                                }),
                                 {
                                     status: isError ? 400 : 200,
                                     headers: {
@@ -360,14 +367,16 @@ export class HTTPServer {
                                 }
                             );
                         } catch (err: any) {
-                            try { recordToolEnd('http', 'unknown', 0, false); } catch {}
+                            try {
+                                recordToolEnd('http', 'unknown', 0, false);
+                            } catch {}
                             const message = err?.message || String(err || 'tool call failed');
                             const status = isCoreError(err)
                                 ? err.code === 'InvalidParams'
                                     ? 400
                                     : err.code === 'UnknownTool'
-                                        ? 404
-                                        : 500
+                                      ? 404
+                                      : 500
                                 : 500;
                             return new Response(JSON.stringify({ success: false, error: { message } }), {
                                 status,
@@ -395,9 +404,23 @@ export class HTTPServer {
                             const mcpAdapter = new MCPAdapter(this.coreAnalyzer);
                             const executor = new ToolExecutor();
                             // Kick off the pipeline run
-                            const runRes = await executor.execute(mcpAdapter as any, 'run_pipeline', { id: pipelineId });
-                            const txt = (() => { try { return runRes?.content?.[0]?.text ?? ''; } catch { return ''; } })();
-                            const runJson = (() => { try { return JSON.parse(txt); } catch { return {}; } })();
+                            const runRes = await executor.execute(mcpAdapter as any, 'run_pipeline', {
+                                id: pipelineId,
+                            });
+                            const txt = (() => {
+                                try {
+                                    return runRes?.content?.[0]?.text ?? '';
+                                } catch {
+                                    return '';
+                                }
+                            })();
+                            const runJson = (() => {
+                                try {
+                                    return JSON.parse(txt);
+                                } catch {
+                                    return {};
+                                }
+                            })();
                             const runId = String(runJson?.runId || '').trim();
                             if (!runId) {
                                 return new Response(JSON.stringify({ error: 'failed to start pipeline' }), {
@@ -409,18 +432,36 @@ export class HTTPServer {
                             const stream = new ReadableStream<Uint8Array>({
                                 start: async (controller) => {
                                     const begun = { event: 'started', pipelineId, runId, t: Date.now() };
-                                    try { controller.enqueue(encoder.encode(JSON.stringify(begun) + '\n')); } catch {}
+                                    try {
+                                        controller.enqueue(encoder.encode(JSON.stringify(begun) + '\n'));
+                                    } catch {}
                                     const t0 = Date.now();
                                     let lastStatus = '';
                                     // Poll for status using list_pipeline_runs (filter by runId)
                                     while (true) {
                                         try {
-                                            const listRes = await executor.execute(mcpAdapter as any, 'list_pipeline_runs', {
-                                                id: pipelineId,
-                                                limit: 10,
-                                            });
-                                            const ltxt = (() => { try { return listRes?.content?.[0]?.text ?? ''; } catch { return ''; } })();
-                                            const ljson = (() => { try { return JSON.parse(ltxt); } catch { return { runs: [] }; } })();
+                                            const listRes = await executor.execute(
+                                                mcpAdapter as any,
+                                                'list_pipeline_runs',
+                                                {
+                                                    id: pipelineId,
+                                                    limit: 10,
+                                                }
+                                            );
+                                            const ltxt = (() => {
+                                                try {
+                                                    return listRes?.content?.[0]?.text ?? '';
+                                                } catch {
+                                                    return '';
+                                                }
+                                            })();
+                                            const ljson = (() => {
+                                                try {
+                                                    return JSON.parse(ltxt);
+                                                } catch {
+                                                    return { runs: [] };
+                                                }
+                                            })();
                                             const runs = Array.isArray(ljson?.runs) ? ljson.runs : [];
                                             const row = runs.find((r: any) => String(r?.id) === runId);
                                             if (row) {
@@ -428,21 +469,38 @@ export class HTTPServer {
                                                 const finished = row?.finished_at != null;
                                                 if (status !== lastStatus) {
                                                     lastStatus = status;
-                                                    const ev = { event: 'status', runId, status, finished, metrics: row?.metrics ?? {}, t: Date.now() };
-                                                    try { controller.enqueue(encoder.encode(JSON.stringify(ev) + '\n')); } catch {}
+                                                    const ev = {
+                                                        event: 'status',
+                                                        runId,
+                                                        status,
+                                                        finished,
+                                                        metrics: row?.metrics ?? {},
+                                                        t: Date.now(),
+                                                    };
+                                                    try {
+                                                        controller.enqueue(encoder.encode(JSON.stringify(ev) + '\n'));
+                                                    } catch {}
                                                 }
                                                 if (finished) {
                                                     const ev = { event: 'finished', runId, status, t: Date.now() };
-                                                    try { controller.enqueue(encoder.encode(JSON.stringify(ev) + '\n')); } catch {}
-                                                    try { controller.close(); } catch {}
+                                                    try {
+                                                        controller.enqueue(encoder.encode(JSON.stringify(ev) + '\n'));
+                                                    } catch {}
+                                                    try {
+                                                        controller.close();
+                                                    } catch {}
                                                     break;
                                                 }
                                             }
                                         } catch {}
                                         if (Date.now() - t0 > timeoutSec * 1000) {
                                             const ev = { event: 'timeout', runId, t: Date.now() };
-                                            try { controller.enqueue(encoder.encode(JSON.stringify(ev) + '\n')); } catch {}
-                                            try { controller.close(); } catch {}
+                                            try {
+                                                controller.enqueue(encoder.encode(JSON.stringify(ev) + '\n'));
+                                            } catch {}
+                                            try {
+                                                controller.close();
+                                            } catch {}
                                             break;
                                         }
                                         await new Promise((r) => setTimeout(r, pollMs));
@@ -480,9 +538,23 @@ export class HTTPServer {
                             }
                             const mcpAdapter = new MCPAdapter(this.coreAnalyzer);
                             const executor = new ToolExecutor();
-                            const runRes = await executor.execute(mcpAdapter as any, 'run_pipeline', { id: pipelineId });
-                            const txt = (() => { try { return (runRes as any)?.content?.[0]?.text ?? ''; } catch { return ''; } })();
-                            const json = (() => { try { return JSON.parse(txt); } catch { return { ok: false, runId: '', reason: 'parse_error' }; } })();
+                            const runRes = await executor.execute(mcpAdapter as any, 'run_pipeline', {
+                                id: pipelineId,
+                            });
+                            const txt = (() => {
+                                try {
+                                    return (runRes as any)?.content?.[0]?.text ?? '';
+                                } catch {
+                                    return '';
+                                }
+                            })();
+                            const json = (() => {
+                                try {
+                                    return JSON.parse(txt);
+                                } catch {
+                                    return { ok: false, runId: '', reason: 'parse_error' };
+                                }
+                            })();
                             return new Response(JSON.stringify({ success: true, data: json }), {
                                 status: 200,
                                 headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
@@ -501,10 +573,16 @@ export class HTTPServer {
                             const pipelineId = String(url.searchParams.get('id') || '').trim();
                             const runId = String(url.searchParams.get('runId') || '').trim();
                             if (!pipelineId || !runId) {
-                                return new Response(JSON.stringify({ success: false, error: 'id and runId required' }), {
-                                    status: 400,
-                                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-                                });
+                                return new Response(
+                                    JSON.stringify({ success: false, error: 'id and runId required' }),
+                                    {
+                                        status: 400,
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'Access-Control-Allow-Origin': '*',
+                                        },
+                                    }
+                                );
                             }
 
                             const mcpAdapter = new MCPAdapter(this.coreAnalyzer);
@@ -513,8 +591,20 @@ export class HTTPServer {
                                 id: pipelineId,
                                 limit: 25,
                             });
-                            const ltxt = (() => { try { return (listRes as any)?.content?.[0]?.text ?? ''; } catch { return ''; } })();
-                            const ljson = (() => { try { return JSON.parse(ltxt); } catch { return { runs: [] as any[] }; } })();
+                            const ltxt = (() => {
+                                try {
+                                    return (listRes as any)?.content?.[0]?.text ?? '';
+                                } catch {
+                                    return '';
+                                }
+                            })();
+                            const ljson = (() => {
+                                try {
+                                    return JSON.parse(ltxt);
+                                } catch {
+                                    return { runs: [] as any[] };
+                                }
+                            })();
                             const runs = Array.isArray((ljson as any)?.runs) ? (ljson as any).runs : [];
                             const row = runs.find((r: any) => String(r?.id) === runId) || null;
 
@@ -545,16 +635,27 @@ export class HTTPServer {
                             }
                             const mcpAdapter = new MCPAdapter(this.coreAnalyzer);
                             const executor = new ToolExecutor();
-                            const res = await executor.execute(mcpAdapter as any, 'pipeline_status', { id: pipelineId });
-                            const txt = (() => { try { return (res as any)?.content?.[0]?.text ?? ''; } catch { return ''; } })();
-                            const json = (() => { try { return JSON.parse(txt); } catch { return { ok: false, reason: 'parse_error' }; } })();
-                            return new Response(
-                                JSON.stringify({ success: true, data: json }),
-                                {
-                                    status: 200,
-                                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                            const res = await executor.execute(mcpAdapter as any, 'pipeline_status', {
+                                id: pipelineId,
+                            });
+                            const txt = (() => {
+                                try {
+                                    return (res as any)?.content?.[0]?.text ?? '';
+                                } catch {
+                                    return '';
                                 }
-                            );
+                            })();
+                            const json = (() => {
+                                try {
+                                    return JSON.parse(txt);
+                                } catch {
+                                    return { ok: false, reason: 'parse_error' };
+                                }
+                            })();
+                            return new Response(JSON.stringify({ success: true, data: json }), {
+                                status: 200,
+                                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                            });
                         } catch (err) {
                             return new Response(JSON.stringify({ success: false, error: 'status failed' }), {
                                 status: 500,
@@ -576,16 +677,28 @@ export class HTTPServer {
                             }
                             const mcpAdapter = new MCPAdapter(this.coreAnalyzer);
                             const executor = new ToolExecutor();
-                            const res = await executor.execute(mcpAdapter as any, 'list_pipeline_runs', { id: pipelineId, limit });
-                            const txt = (() => { try { return (res as any)?.content?.[0]?.text ?? ''; } catch { return ''; } })();
-                            const json = (() => { try { return JSON.parse(txt); } catch { return { runs: [] }; } })();
-                            return new Response(
-                                JSON.stringify({ success: true, data: json }),
-                                {
-                                    status: 200,
-                                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                            const res = await executor.execute(mcpAdapter as any, 'list_pipeline_runs', {
+                                id: pipelineId,
+                                limit,
+                            });
+                            const txt = (() => {
+                                try {
+                                    return (res as any)?.content?.[0]?.text ?? '';
+                                } catch {
+                                    return '';
                                 }
-                            );
+                            })();
+                            const json = (() => {
+                                try {
+                                    return JSON.parse(txt);
+                                } catch {
+                                    return { runs: [] };
+                                }
+                            })();
+                            return new Response(JSON.stringify({ success: true, data: json }), {
+                                status: 200,
+                                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                            });
                         } catch (err) {
                             return new Response(JSON.stringify({ success: false, error: 'runs failed' }), {
                                 status: 500,
@@ -600,8 +713,20 @@ export class HTTPServer {
                             const mcpAdapter = new MCPAdapter(this.coreAnalyzer);
                             const executor = new ToolExecutor();
                             const res = await executor.execute(mcpAdapter as any, 'list_pipelines', {});
-                            const txt = (() => { try { return (res as any)?.content?.[0]?.text ?? ''; } catch { return ''; } })();
-                            const json = (() => { try { return JSON.parse(txt); } catch { return { pipelines: [] }; } })();
+                            const txt = (() => {
+                                try {
+                                    return (res as any)?.content?.[0]?.text ?? '';
+                                } catch {
+                                    return '';
+                                }
+                            })();
+                            const json = (() => {
+                                try {
+                                    return JSON.parse(txt);
+                                } catch {
+                                    return { pipelines: [] };
+                                }
+                            })();
                             return new Response(JSON.stringify({ success: true, data: json }), {
                                 status: 200,
                                 headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
@@ -643,10 +768,13 @@ export class HTTPServer {
 
                             const lo = (this.coreAnalyzer as any)?.learningOrchestrator;
                             if (!lo || typeof lo.registerPipeline !== 'function') {
-                                return new Response(JSON.stringify({ success: false, error: 'learning orchestrator unavailable' }), {
-                                    status: 500,
-                                    headers: { 'Content-Type': 'application/json' },
-                                });
+                                return new Response(
+                                    JSON.stringify({ success: false, error: 'learning orchestrator unavailable' }),
+                                    {
+                                        status: 500,
+                                        headers: { 'Content-Type': 'application/json' },
+                                    }
+                                );
                             }
 
                             const payload = {
@@ -685,9 +813,23 @@ export class HTTPServer {
                             }
                             const mcpAdapter = new MCPAdapter(this.coreAnalyzer);
                             const executor = new ToolExecutor();
-                            const res = await executor.execute(mcpAdapter as any, 'pipeline_status', { id: pipelineId });
-                            const txt = (() => { try { return (res as any)?.content?.[0]?.text ?? ''; } catch { return ''; } })();
-                            const json = (() => { try { return JSON.parse(txt); } catch { return { ok: false, reason: 'parse_error' }; } })();
+                            const res = await executor.execute(mcpAdapter as any, 'pipeline_status', {
+                                id: pipelineId,
+                            });
+                            const txt = (() => {
+                                try {
+                                    return (res as any)?.content?.[0]?.text ?? '';
+                                } catch {
+                                    return '';
+                                }
+                            })();
+                            const json = (() => {
+                                try {
+                                    return JSON.parse(txt);
+                                } catch {
+                                    return { ok: false, reason: 'parse_error' };
+                                }
+                            })();
                             return new Response(JSON.stringify({ success: true, data: json }), {
                                 status: 200,
                                 headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
@@ -704,7 +846,8 @@ export class HTTPServer {
                     if (url.pathname === '/api/v1/graph-expand' && request.method === 'POST') {
                         const raw = await this.getRequestBody(request);
                         const body: any = raw ? JSON.parse(raw) : {};
-                        const edges: string[] = Array.isArray(body.edges) && body.edges.length ? body.edges : ['imports', 'exports'];
+                        const edges: string[] =
+                            Array.isArray(body.edges) && body.edges.length ? body.edges : ['imports', 'exports'];
                         try {
                             const { expandNeighbors } = await import('../core/code-graph.js');
                             const t0 = Date.now();
@@ -739,7 +882,12 @@ export class HTTPServer {
                                 recordToolEnd('http', 'graph_expand_fallback', 0, true);
                             } catch {}
                             // Fallback: never 500 — AST-only import/export extraction if possible, else regex; return empty neighbors if none
-                            const neighbors: Record<string, any[]> = { imports: [], exports: [], callers: [], callees: [] };
+                            const neighbors: Record<string, any[]> = {
+                                imports: [],
+                                exports: [],
+                                callers: [],
+                                callees: [],
+                            };
                             let note = 'fallback: graph expand unavailable; returning empty neighbors';
                             let astTried = false;
                             // Try AST-only extraction for TS/JS if file path is provided
@@ -756,7 +904,12 @@ export class HTTPServer {
                                             (import_statement) @ast.import
                                             (export_statement) @ast.export
                                         `;
-                                        const res: any = await runAstQuery({ language, query, paths: [abs], limit: 2000 });
+                                        const res: any = await runAstQuery({
+                                            language,
+                                            query,
+                                            paths: [abs],
+                                            limit: 2000,
+                                        });
                                         astTried = true;
                                         if (Array.isArray(res?.results) && res.results.length > 0) {
                                             for (const r of res.results) {
@@ -767,8 +920,10 @@ export class HTTPServer {
                                                     start: r.start,
                                                     end: r.end,
                                                 };
-                                                if (cap.includes('import') && edges.includes('imports')) neighbors.imports.push(item);
-                                                if (cap.includes('export') && edges.includes('exports')) neighbors.exports.push(item);
+                                                if (cap.includes('import') && edges.includes('imports'))
+                                                    neighbors.imports.push(item);
+                                                if (cap.includes('export') && edges.includes('exports'))
+                                                    neighbors.exports.push(item);
                                             }
                                         }
                                     }
@@ -778,7 +933,10 @@ export class HTTPServer {
                             }
 
                             // If AST path didn't yield anything, fall back to simple regex scan of the file
-                            if ((neighbors.imports.length + neighbors.exports.length) === 0 && typeof body.file === 'string') {
+                            if (
+                                neighbors.imports.length + neighbors.exports.length === 0 &&
+                                typeof body.file === 'string'
+                            ) {
                                 try {
                                     const f = Bun.file(body.file);
                                     if (await f.exists()) {
@@ -788,14 +946,26 @@ export class HTTPServer {
                                             const impRe = /^(\s*)(import\s+[^;]+;?)/;
                                             for (let i = 0; i < lines.length; i++) {
                                                 const m = impRe.exec(lines[i]);
-                                                if (m) neighbors.imports.push({ capture: 'fallback.import', text: m[2], start: { line: i, column: 0 }, end: { line: i, column: lines[i].length } });
+                                                if (m)
+                                                    neighbors.imports.push({
+                                                        capture: 'fallback.import',
+                                                        text: m[2],
+                                                        start: { line: i, column: 0 },
+                                                        end: { line: i, column: lines[i].length },
+                                                    });
                                             }
                                         }
                                         if (edges.includes('exports')) {
                                             const expRe = /^(\s*)(export\s+[^;{]+|export\s+\{[^}]*\})/;
                                             for (let i = 0; i < lines.length; i++) {
                                                 const m = expRe.exec(lines[i]);
-                                                if (m) neighbors.exports.push({ capture: 'fallback.export', text: m[2], start: { line: i, column: 0 }, end: { line: i, column: lines[i].length } });
+                                                if (m)
+                                                    neighbors.exports.push({
+                                                        capture: 'fallback.export',
+                                                        text: m[2],
+                                                        start: { line: i, column: 0 },
+                                                        end: { line: i, column: lines[i].length },
+                                                    });
                                             }
                                         }
                                     }
@@ -902,10 +1072,13 @@ export class HTTPServer {
                                 headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
                             });
                         } catch (err) {
-                            return new Response(JSON.stringify({ success: false, error: 'Failed to read snapshot status' }), {
-                                status: 500,
-                                headers: { 'Content-Type': 'application/json' },
-                            });
+                            return new Response(
+                                JSON.stringify({ success: false, error: 'Failed to read snapshot status' }),
+                                {
+                                    status: 500,
+                                    headers: { 'Content-Type': 'application/json' },
+                                }
+                            );
                         }
                     }
 
@@ -937,10 +1110,13 @@ export class HTTPServer {
                                 headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
                             });
                         } catch (err) {
-                            return new Response(JSON.stringify({ success: false, error: 'Failed to read snapshot progress' }), {
-                                status: 500,
-                                headers: { 'Content-Type': 'application/json' },
-                            });
+                            return new Response(
+                                JSON.stringify({ success: false, error: 'Failed to read snapshot progress' }),
+                                {
+                                    status: 500,
+                                    headers: { 'Content-Type': 'application/json' },
+                                }
+                            );
                         }
                     }
 
@@ -1057,7 +1233,9 @@ export class HTTPServer {
             const ss: any = (this.coreAnalyzer as any).sharedServices;
             const bus: any = ss?.eventBus;
             bus?.on?.('layer-manager:performance-recorded', (perf: any) => {
-                try { recordLayerLatency('http', String(perf?.layer || 'unknown'), Number(perf?.duration || 0)); } catch {}
+                try {
+                    recordLayerLatency('http', String(perf?.layer || 'unknown'), Number(perf?.duration || 0));
+                } catch {}
             });
         } catch {}
     }
@@ -1270,12 +1448,12 @@ export class HTTPServer {
 
         // Use regular definition search for now - could be enhanced with streaming later
         try {
-                const result = await (this.coreAnalyzer as any).findDefinitionAsync({
-                    uri: file || 'file://unknown',
-                    position: { line: 0, character: 0 },
-                    identifier,
-                    maxResults,
-                });
+            const result = await (this.coreAnalyzer as any).findDefinitionAsync({
+                uri: file || 'file://unknown',
+                position: { line: 0, character: 0 },
+                identifier,
+                maxResults,
+            });
 
             // Stream the results one by one to simulate streaming
             for (let i = 0; i < result.data.length; i++) {

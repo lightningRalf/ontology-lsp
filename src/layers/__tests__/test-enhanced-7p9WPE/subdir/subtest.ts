@@ -1,1 +1,1 @@
-const subTest = "subdirectory test";
+const subTest = 'subdirectory test';

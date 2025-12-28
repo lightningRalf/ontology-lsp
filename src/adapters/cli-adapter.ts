@@ -61,7 +61,9 @@ export class CLIAdapter {
         file: string,
         input: { line?: number; character?: number; symbol?: string } = {}
     ): Promise<any[]> {
-        try { await (this.coreAnalyzer as any)?.initialize?.(); } catch {}
+        try {
+            await (this.coreAnalyzer as any)?.initialize?.();
+        } catch {}
         const uri = normalizeUri(file || 'file://workspace');
         const symbol = input.symbol || this.extractWordFromFile(uri, input.line ?? 0, input.character ?? 0) || 'symbol';
         const request = buildFindDefinitionRequest({
@@ -80,7 +82,9 @@ export class CLIAdapter {
      * Convenience: for E2E validator – direct references lookup
      */
     async findReferences(file: string, symbol: string): Promise<any[]> {
-        try { await (this.coreAnalyzer as any)?.initialize?.(); } catch {}
+        try {
+            await (this.coreAnalyzer as any)?.initialize?.();
+        } catch {}
         const uri = normalizeUri(file || 'file://workspace');
         const request = buildFindReferencesRequest({
             uri,
@@ -97,8 +101,14 @@ export class CLIAdapter {
     /**
      * Convenience: for E2E validator – perform rename (preview)
      */
-    async rename(file: string, position: { line: number; character: number }, newName: string): Promise<Record<string, any>> {
-        try { await (this.coreAnalyzer as any)?.initialize?.(); } catch {}
+    async rename(
+        file: string,
+        position: { line: number; character: number },
+        newName: string
+    ): Promise<Record<string, any>> {
+        try {
+            await (this.coreAnalyzer as any)?.initialize?.();
+        } catch {}
         const uri = normalizeUri(file || 'file://workspace');
         const identifier = this.extractWordFromFile(uri, position.line, position.character) || 'symbol';
         const request = buildRenameRequest({ uri, position, identifier, newName, dryRun: true });
@@ -123,7 +133,9 @@ export class CLIAdapter {
                 if (idx >= start && idx <= end) return m[0];
             }
             return null;
-        } catch { return null; }
+        } catch {
+            return null;
+        }
     }
 
     /**
@@ -370,11 +382,11 @@ export class CLIAdapter {
         try {
             // Ensure analyzer is initialized
             await (this.coreAnalyzer as any)?.initialize?.();
-            
+
             const kind = options.kind || 'literal';
             const maxResults = Math.min(options.maxResults || this.config.maxResults || 200, 1000);
             const path = options.path || process.cwd();
-            
+
             // Prepare query based on kind
             let searchQuery = query;
             if (kind === 'word') {
@@ -382,14 +394,14 @@ export class CLIAdapter {
             } else if (kind === 'literal') {
                 searchQuery = escapeRegex(query);
             }
-            
+
             // Use the new textSearch method from CodeAnalyzer
             const result = await this.coreAnalyzer.textSearch(searchQuery, {
                 path,
                 maxResults,
                 caseInsensitive: options.caseInsensitive,
             });
-            
+
             return options.json
                 ? JSON.stringify(result, null, 2)
                 : result.results.map((r) => `${r.file}:${r.line}:${r.column}: ${r.text}`).join('\n');
@@ -643,7 +655,7 @@ export class CLIAdapter {
                     layer4: l4 || null,
                     cache: diagnostics.cache || {},
                     performance: diagnostics.performance || {},
-                    timestamp: diagnostics.timestamp
+                    timestamp: diagnostics.timestamp,
                 };
                 return JSON.stringify(statsData, null, 2);
             }

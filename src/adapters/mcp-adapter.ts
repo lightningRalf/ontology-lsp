@@ -133,7 +133,9 @@ export class MCPAdapter {
     private async pickOntologySeedFile(symbol: string): Promise<string | undefined> {
         const engine = this.getOntologyEngine();
         if (!engine) return undefined;
-        try { await engine.ensureInitialized?.(); } catch {}
+        try {
+            await engine.ensureInitialized?.();
+        } catch {}
         try {
             // Prefer non-strict to allow inference/creation when missing
             const concept = await (engine.findConcept?.(symbol) ?? engine.findConceptStrict?.(symbol));
@@ -143,10 +145,15 @@ export class MCPAdapter {
             for (const [_, rep] of concept.representations) {
                 const uri = (rep as any)?.location?.uri as string | undefined;
                 const occ = (rep as any)?.occurrences ?? 0;
-                if (uri && occ >= bestCount) { bestCount = occ; bestUri = uri; }
+                if (uri && occ >= bestCount) {
+                    bestCount = occ;
+                    bestUri = uri;
+                }
             }
             return bestUri;
-        } catch { return undefined; }
+        } catch {
+            return undefined;
+        }
     }
 
     /**
@@ -166,7 +173,9 @@ export class MCPAdapter {
                 });
 
                 // Validate tool name early and return structured error (do not throw)
-                const validTools = ToolRegistry.list().map((t) => t.name).concat(['suggest_refactoring']);
+                const validTools = ToolRegistry.list()
+                    .map((t) => t.name)
+                    .concat(['suggest_refactoring']);
                 if (!validTools.includes(name)) {
                     const msg = `Unknown tool: ${name}. Valid tools: ${validTools.join(', ')}`;
                     // Return MCP-style error payload expected by tests without throwing
@@ -175,7 +184,9 @@ export class MCPAdapter {
 
                 const startTime = Date.now();
                 // Ensure analyzer is ready before routing any core requests
-                try { await (this.coreAnalyzer as any)?.initialize?.(); } catch {}
+                try {
+                    await (this.coreAnalyzer as any)?.initialize?.();
+                } catch {}
                 let result: any;
 
                 switch (name) {
@@ -217,10 +228,10 @@ export class MCPAdapter {
                         return this.handleGetSnapshot(arguments_);
                     case 'propose_patch':
                         return this.handleProposePatch(arguments_);
-                case 'run_checks':
-                    return this.handleRunChecks(arguments_);
-                case 'apply_snapshot':
-                    return this.handleApplySnapshot(arguments_);
+                    case 'run_checks':
+                        return this.handleRunChecks(arguments_);
+                    case 'apply_snapshot':
+                        return this.handleApplySnapshot(arguments_);
                     case 'text_search':
                         return this.handleTextSearch(arguments_);
                     case 'symbol_search':
@@ -251,7 +262,10 @@ export class MCPAdapter {
                         result = await this.handleGenerateTests(arguments_, context);
                         break;
                     case 'suggest_refactoring':
-                        result = { content: [{ type: 'text', text: JSON.stringify({ suggestions: [] }) }], isError: false };
+                        result = {
+                            content: [{ type: 'text', text: JSON.stringify({ suggestions: [] }) }],
+                            isError: false,
+                        };
                         break;
                     case 'explore_codebase':
                         result = await this.handleExploreCodebase(arguments_, context);
@@ -264,7 +278,11 @@ export class MCPAdapter {
                         const s = JSON.stringify(result);
                         return typeof s === 'string' ? s : '';
                     } catch {
-                        try { return String(result ?? ''); } catch { return ''; }
+                        try {
+                            return String(result ?? '');
+                        } catch {
+                            return '';
+                        }
                     }
                 })();
                 adapterLogger.logPerformance(`tool_${name}`, duration, true, {
@@ -391,7 +409,10 @@ export class MCPAdapter {
                     // AST path failed or grammars missing — fall back to regex below
                     if (process.env.DEBUG && !process.env.SILENT_MODE) {
                         // eslint-disable-next-line no-console
-                        console.error('list_symbols AST path failed; falling back to regex:', e instanceof Error ? e.message : e);
+                        console.error(
+                            'list_symbols AST path failed; falling back to regex:',
+                            e instanceof Error ? e.message : e
+                        );
                     }
                 }
             }
@@ -410,7 +431,10 @@ export class MCPAdapter {
                     if (m) push(m[1], 'const', i, Math.max(0, l.indexOf(m[1])));
                     m = /\bexport\s+\{\s*([^}]+)\}/.exec(l);
                     if (m) {
-                        const names = m[1].split(',').map((s) => s.trim()).filter(Boolean);
+                        const names = m[1]
+                            .split(',')
+                            .map((s) => s.trim())
+                            .filter(Boolean);
                         for (const n of names) push(n.split(/\s+as\s+/i)[0], 'export', i, Math.max(0, l.indexOf(n)));
                     }
                 }
@@ -429,7 +453,9 @@ export class MCPAdapter {
         try {
             const lo = (this.coreAnalyzer as any)?.learningOrchestrator;
             return lo || null;
-        } catch { return null; }
+        } catch {
+            return null;
+        }
     }
 
     private async handleListPipelines() {
@@ -437,7 +463,11 @@ export class MCPAdapter {
         if (!lo) return { content: [{ type: 'text', text: 'learning orchestrator unavailable' }], isError: true };
         try {
             const items = Array.from((lo as any).pipelines?.values?.() || []).map((p: any) => ({
-                id: p.id, name: p.name, trigger: p.trigger, schedule: p.schedule || null, enabled: !!p.enabled,
+                id: p.id,
+                name: p.name,
+                trigger: p.trigger,
+                schedule: p.schedule || null,
+                enabled: !!p.enabled,
             }));
             return { content: [{ type: 'text', text: JSON.stringify({ pipelines: items }, null, 2) }], isError: false };
         } catch (e) {
@@ -452,7 +482,11 @@ export class MCPAdapter {
         if (!lo) return { content: [{ type: 'text', text: 'learning orchestrator unavailable' }], isError: true };
         try {
             const p = (lo as any).pipelines?.get?.(id);
-            if (!p) return { content: [{ type: 'text', text: JSON.stringify({ ok: false, reason: 'not_found' }) }], isError: false };
+            if (!p)
+                return {
+                    content: [{ type: 'text', text: JSON.stringify({ ok: false, reason: 'not_found' }) }],
+                    isError: false,
+                };
             const status = {
                 id: p.id,
                 name: p.name,
@@ -503,9 +537,12 @@ export class MCPAdapter {
     }
 
     private async handleExecuteIntent(args: Record<string, any>) {
-        const intentRaw = String(args?.intent || '').trim().toLowerCase();
+        const intentRaw = String(args?.intent || '')
+            .trim()
+            .toLowerCase();
         const hasPatch = typeof args?.patch === 'string' && args.patch.trim().length > 0;
-        const hasRename = typeof args?.oldName === 'string' && typeof args?.newName === 'string' && args.oldName && args.newName;
+        const hasRename =
+            typeof args?.oldName === 'string' && typeof args?.newName === 'string' && args.oldName && args.newName;
         const hasSymbol = typeof args?.symbol === 'string' && args.symbol.trim().length > 0;
 
         const prefer = intentRaw as 'rename' | 'patch' | 'explore' | 'locate' | 'apply' | '';
@@ -539,7 +576,11 @@ export class MCPAdapter {
             invoked = 'apply_snapshot';
             result = await this.handleApplySnapshot(args);
         } else {
-            const payload = { invoked: 'none', ok: false, message: 'Insufficient arguments; provide patch, oldName+newName, or symbol' };
+            const payload = {
+                invoked: 'none',
+                ok: false,
+                message: 'Insufficient arguments; provide patch, oldName+newName, or symbol',
+            };
             return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }], isError: true };
         }
 
@@ -585,7 +626,12 @@ export class MCPAdapter {
         if (chk?.ok && process.env.ALLOW_SNAPSHOT_APPLY === '1') {
             const app = await this.handleApplySnapshot({ snapshot, check: false, reverse });
             const appOut = this.safeParseContent(app) || {};
-            const payload = { ok: !!chk?.ok, snapshot, applied: !!appOut?.ok, output_tail: chk?.output?.slice?.(-4000) || '' };
+            const payload = {
+                ok: !!chk?.ok,
+                snapshot,
+                applied: !!appOut?.ok,
+                output_tail: chk?.output?.slice?.(-4000) || '',
+            };
             return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }], isError: !chk?.ok };
         }
         const payload = { ok: !!chk?.ok, snapshot, applied: false, output_tail: chk?.output?.slice?.(-4000) || '' };
@@ -759,17 +805,15 @@ export class MCPAdapter {
                 snapshot: snap.id,
                 filesAffected: files.length,
                 totalEdits: files.reduce((acc, f) => acc + (Array.isArray(changes[f]) ? changes[f].length : 0), 0),
-                next_actions: [
-                    'Run checks when ready',
-                    'Open snapshot diff: snapshot://' + snap.id + '/overlay.diff',
-                ],
+                next_actions: ['Run checks when ready', 'Open snapshot diff: snapshot://' + snap.id + '/overlay.diff'],
             };
             return { content: [{ type: 'text', text: JSON.stringify(quick, null, 2) }], isError: false };
         }
 
         // Step 3: run checks inside snapshot
         const onlyTouchedEnv = (process.env.FAST_STDIO_CHECKS || '').toLowerCase() === 'touched';
-        const onlyTouched = typeof (args as any)?.onlyTouched === 'boolean' ? !!(args as any).onlyTouched : onlyTouchedEnv;
+        const onlyTouched =
+            typeof (args as any)?.onlyTouched === 'boolean' ? !!(args as any).onlyTouched : onlyTouchedEnv;
         const checks = await overlayStore.runChecks(snap.id, commands, timeoutSec, { onlyTouched });
         const ok = !!checks.ok;
         const result = {
@@ -1031,16 +1075,16 @@ export class MCPAdapter {
     private async handleTextSearch(args: Record<string, any>) {
         const query = String(args?.query || '').trim();
         if (!query) return { content: [{ type: 'text', text: 'query required' }], isError: true };
-        
+
         try {
             // Ensure analyzer is initialized
             await (this.coreAnalyzer as any)?.initialize?.();
-            
+
             const kind = (args?.kind as string) || 'literal';
             const caseInsensitive = !!args?.caseInsensitive;
             const maxResults = Math.min(Number(args?.maxResults || 200), 1000);
             const path = String(args?.path || process.cwd());
-            
+
             // Prepare query based on kind
             let searchQuery = query;
             if (kind === 'word') {
@@ -1048,18 +1092,16 @@ export class MCPAdapter {
             } else if (kind === 'literal') {
                 searchQuery = escapeRegex(query);
             }
-            
+
             // Use the new textSearch method from CodeAnalyzer
             const result = await this.coreAnalyzer.textSearch(searchQuery, {
                 path,
                 maxResults,
                 caseInsensitive,
             });
-            
+
             return {
-                content: [
-                    { type: 'text', text: JSON.stringify(result, null, 2) },
-                ],
+                content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
                 isError: false,
             };
         } catch (error) {
@@ -1146,7 +1188,14 @@ export class MCPAdapter {
                     );
                 } catch {}
             }
-            const out = await expandNeighbors({ file, symbol, edges, depth: args?.depth, limit: args?.limit, seedFiles });
+            const out = await expandNeighbors({
+                file,
+                symbol,
+                edges,
+                depth: args?.depth,
+                limit: args?.limit,
+                seedFiles,
+            });
             return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: false };
         } catch {
             const neighbors: Record<string, any[]> = { imports: [], exports: [], callers: [], callees: [] };
@@ -1182,7 +1231,10 @@ export class MCPAdapter {
         if (!symbol && uri) {
             try {
                 const fsPath = uri.startsWith('file://') ? uri.substring(7) : uri;
-                const exists = await fs.stat(fsPath).then(() => true).catch(() => false);
+                const exists = await fs
+                    .stat(fsPath)
+                    .then(() => true)
+                    .catch(() => false);
                 if (exists) {
                     const text = await fs.readFile(fsPath, 'utf8');
                     const derived = this.wordAt(text, position);
@@ -1195,7 +1247,9 @@ export class MCPAdapter {
         }
 
         // Ensure core is initialized for E2E/local flows
-        try { await (this.coreAnalyzer as any)?.initialize?.(); } catch {}
+        try {
+            await (this.coreAnalyzer as any)?.initialize?.();
+        } catch {}
 
         if (!uri) {
             // Use workspace-wide search to find the symbol
@@ -1542,16 +1596,37 @@ export class MCPAdapter {
     private async handleFindReferences(args: Record<string, any>, context: ErrorContext) {
         // Parity: tolerate empty symbol by returning empty references (not error)
         if (typeof args?.symbol === 'string' && args.symbol.trim().length === 0) {
-            return { content: [{ type: 'text', text: JSON.stringify({ references: [], performance: { total: 0 }, requestId: 'none', count: 0 }, null, 2) }], isError: false };
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify(
+                            { references: [], performance: { total: 0 }, requestId: 'none', count: 0 },
+                            null,
+                            2
+                        ),
+                    },
+                ],
+                isError: false,
+            };
         }
         this.validateArgs(args, ['symbol'], context);
-        try { await (this.coreAnalyzer as any)?.initialize?.(); } catch {}
+        try {
+            await (this.coreAnalyzer as any)?.initialize?.();
+        } catch {}
 
         // For MCP, we don't have exact position; require a file context for cross-protocol consistency
         if (!args.file && !args.uri) {
             return {
                 content: [
-                    { type: 'text', text: JSON.stringify({ references: [], performance: { total: 0 }, requestId: 'none', count: 0 }, null, 2) },
+                    {
+                        type: 'text',
+                        text: JSON.stringify(
+                            { references: [], performance: { total: 0 }, requestId: 'none', count: 0 },
+                            null,
+                            2
+                        ),
+                    },
                 ],
                 isError: false,
             };

@@ -59,7 +59,7 @@ export class OntologyEngine extends EventEmitter {
         // Don't initialize immediately - wait for explicit initialization
         // This avoids the 567ms loadAllConcepts on startup
         this.initPromise = null;
-        
+
         if (process.env.DEBUG_LAYER_INIT === '1') {
             console.log('[OntologyEngine] Created without initialization');
         }
@@ -115,7 +115,7 @@ export class OntologyEngine extends EventEmitter {
 
     async findConcept(identifier: string, options?: { inferIfMissing?: boolean }): Promise<Concept | null> {
         await this.ensureInitialized();
-        
+
         // 1. Direct lookup by representation
         const directMatch = await this.findByRepresentation(identifier);
         if (directMatch) return directMatch;

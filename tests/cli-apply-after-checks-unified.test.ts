@@ -6,54 +6,57 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
 function parseJsonMaybe(s: string): any {
-  try { return JSON.parse(s); } catch { return {}; }
+    try {
+        return JSON.parse(s);
+    } catch {
+        return {};
+    }
 }
 
 describe('CLIAdapter propose_patch + run_checks + apply (unified diff)', () => {
-  let cli: CLIAdapter;
-  const targetRel = 'tests/fixtures/example.ts';
-  const targetAbs = path.join(process.cwd(), targetRel);
-  const marker = '// cli unified apply_after_checks test';
+    let cli: CLIAdapter;
+    const targetRel = 'tests/fixtures/example.ts';
+    const targetAbs = path.join(process.cwd(), targetRel);
+    const marker = '// cli unified apply_after_checks test';
 
-  beforeAll(async () => {
-    const analyzer = await createCodeAnalyzer({ workspaceRoot: process.cwd() });
-    await (analyzer as any).initialize?.();
-    cli = new CLIAdapter(analyzer);
-    process.env.ALLOW_SNAPSHOT_APPLY = '1';
-  });
+    beforeAll(async () => {
+        const analyzer = await createCodeAnalyzer({ workspaceRoot: process.cwd() });
+        await (analyzer as any).initialize?.();
+        cli = new CLIAdapter(analyzer);
+        process.env.ALLOW_SNAPSHOT_APPLY = '1';
+    });
 
-  afterAll(async () => {
-    delete process.env.ALLOW_SNAPSHOT_APPLY;
-  });
+    afterAll(async () => {
+        delete process.env.ALLOW_SNAPSHOT_APPLY;
+    });
 
-  test('stages unified diff, runs checks and applies to working tree', async () => {
-    const before = await fs.readFile(targetAbs, 'utf8');
-    const patch = `diff --git a/${targetRel} b/${targetRel}\n--- a/${targetRel}\n+++ b/${targetRel}\n@@ -5,2 +5,3 @@\n export class TestClass {\n+${marker}\n     private value: number = 0;\n`;
+    test('stages unified diff, runs checks and applies to working tree', async () => {
+        const before = await fs.readFile(targetAbs, 'utf8');
+        const patch = `diff --git a/${targetRel} b/${targetRel}\n--- a/${targetRel}\n+++ b/${targetRel}\n@@ -5,2 +5,3 @@\n export class TestClass {\n+${marker}\n     private value: number = 0;\n`;
 
-    // Stage via CLI adapter
-    const staged = await cli.handleProposePatch(patch, { json: true, runChecks: false });
-    const stagedOut = parseJsonMaybe(String(staged));
-    const snapId = String(stagedOut?.snapshot || '');
-    expect(stagedOut.accepted).toBe(true);
-    expect(snapId.length).toBeGreaterThan(0);
+        // Stage via CLI adapter
+        const staged = await cli.handleProposePatch(patch, { json: true, runChecks: false });
+        const stagedOut = parseJsonMaybe(String(staged));
+        const snapId = String(stagedOut?.snapshot || '');
+        expect(stagedOut.accepted).toBe(true);
+        expect(snapId.length).toBeGreaterThan(0);
 
-    // Run trivial checks
-    const chkStr = await cli.handleRunChecks({ snapshot: snapId, commands: ['true'], json: true });
-    const chk = parseJsonMaybe(String(chkStr));
-    expect(chk.ok).toBe(true);
+        // Run trivial checks
+        const chkStr = await cli.handleRunChecks({ snapshot: snapId, commands: ['true'], json: true });
+        const chk = parseJsonMaybe(String(chkStr));
+        expect(chk.ok).toBe(true);
 
-    // Apply to working tree using overlay store (CLI has no apply tool)
-    const app = await overlayStore.applyToWorkingTree(snapId, { check: false, reverse: false });
-    expect(app.ok).toBe(true);
-    const afterApply = await fs.readFile(targetAbs, 'utf8');
-    expect(afterApply).toContain(marker);
-    expect(afterApply).not.toEqual(before);
+        // Apply to working tree using overlay store (CLI has no apply tool)
+        const app = await overlayStore.applyToWorkingTree(snapId, { check: false, reverse: false });
+        expect(app.ok).toBe(true);
+        const afterApply = await fs.readFile(targetAbs, 'utf8');
+        expect(afterApply).toContain(marker);
+        expect(afterApply).not.toEqual(before);
 
-    // Revert for cleanliness
-    const rev = await overlayStore.applyToWorkingTree(snapId, { check: false, reverse: true });
-    expect(rev.ok).toBe(true);
-    const afterRevert = await fs.readFile(targetAbs, 'utf8');
-    expect(afterRevert).toEqual(before);
-  }, 30000);
+        // Revert for cleanliness
+        const rev = await overlayStore.applyToWorkingTree(snapId, { check: false, reverse: true });
+        expect(rev.ok).toBe(true);
+        const afterRevert = await fs.readFile(targetAbs, 'utf8');
+        expect(afterRevert).toEqual(before);
+    }, 30000);
 });
-

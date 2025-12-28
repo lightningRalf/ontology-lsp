@@ -1,2 +1,2 @@
-import { testFunction } from "./test1.ts";
+import { testFunction } from './test1.ts';
 testFunction();

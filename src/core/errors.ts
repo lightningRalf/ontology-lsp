@@ -6,17 +6,18 @@
 export type CoreErrorCode = 'UnknownTool' | 'InvalidParams' | 'Internal';
 
 export class CoreError extends Error {
-  code: CoreErrorCode;
-  data?: any;
-  constructor(code: CoreErrorCode, message: string, data?: any) {
-    super(message);
-    this.code = code;
-    this.data = data;
-    this.name = 'CoreError';
-  }
+    code: CoreErrorCode;
+    data?: any;
+    constructor(code: CoreErrorCode, message: string, data?: any) {
+        super(message);
+        this.code = code;
+        this.data = data;
+        this.name = 'CoreError';
+    }
 }
 
 export function isCoreError(err: unknown): err is CoreError {
-  return !!err && typeof err === 'object' && (err as any).name === 'CoreError' && typeof (err as any).code === 'string';
+    return (
+        !!err && typeof err === 'object' && (err as any).name === 'CoreError' && typeof (err as any).code === 'string'
+    );
 }
-

@@ -273,7 +273,14 @@ export class HTTPAdapter {
             const hasContext = !!(body.file || body.uri);
             const ident = typeof body.identifier === 'string' ? body.identifier.trim() : '';
             if (!hasContext || ident.length === 0) {
-                const empty = JSON.stringify({ success: true, data: [], performance: {}, requestId: undefined, timestamp: Date.now(), cacheHit: false });
+                const empty = JSON.stringify({
+                    success: true,
+                    data: [],
+                    performance: {},
+                    requestId: undefined,
+                    timestamp: Date.now(),
+                    cacheHit: false,
+                });
                 return { status: 200, headers: { 'X-Cache': 'SKIP' }, body: empty };
             }
 
@@ -836,39 +843,39 @@ export class HTTPAdapter {
                 description: 'REST API for ontology-enhanced language server functionality',
             },
             servers: [{ url: 'http://localhost:7000' }],
-                components: {
-                    schemas: {
-                        PipelineStatus: {
-                            type: 'object',
-                            properties: {
-                                id: { type: 'string' },
-                                name: { type: 'string' },
-                                trigger: { type: 'string' },
-                                schedule: { type: 'string', nullable: true },
-                                enabled: { type: 'boolean' },
-                                stats: {
-                                    type: 'object',
-                                    properties: {
-                                        runsCompleted: { type: 'integer' },
-                                        runsSuccessful: { type: 'integer' },
-                                        averageRuntimeMs: { type: 'number' },
-                                        lastError: { type: 'string' },
-                                    },
+            components: {
+                schemas: {
+                    PipelineStatus: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'string' },
+                            name: { type: 'string' },
+                            trigger: { type: 'string' },
+                            schedule: { type: 'string', nullable: true },
+                            enabled: { type: 'boolean' },
+                            stats: {
+                                type: 'object',
+                                properties: {
+                                    runsCompleted: { type: 'integer' },
+                                    runsSuccessful: { type: 'integer' },
+                                    averageRuntimeMs: { type: 'number' },
+                                    lastError: { type: 'string' },
                                 },
                             },
                         },
-                        PipelineRun: {
-                            type: 'object',
-                            properties: {
-                                id: { type: 'string' },
-                                pipeline_id: { type: 'string' },
-                                started_at: { type: 'integer' },
-                                finished_at: { type: 'integer', nullable: true },
-                                status: { type: 'string' },
-                                metrics: { type: 'object' },
-                            },
-                            required: ['id', 'pipeline_id', 'started_at', 'status'],
+                    },
+                    PipelineRun: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'string' },
+                            pipeline_id: { type: 'string' },
+                            started_at: { type: 'integer' },
+                            finished_at: { type: 'integer', nullable: true },
+                            status: { type: 'string' },
+                            metrics: { type: 'object' },
                         },
+                        required: ['id', 'pipeline_id', 'started_at', 'status'],
+                    },
                     LocateConfirmDefinitionResult: {
                         type: 'object',
                         properties: {
@@ -930,7 +937,10 @@ export class HTTPAdapter {
                         type: 'object',
                         properties: {
                             success: { type: 'boolean' },
-                            result: { description: 'Normalized tool result (parsed JSON for workflows)', additionalProperties: true },
+                            result: {
+                                description: 'Normalized tool result (parsed JSON for workflows)',
+                                additionalProperties: true,
+                            },
                             error: {
                                 type: 'object',
                                 properties: { message: { type: 'string' } },
@@ -1196,7 +1206,10 @@ export class HTTPAdapter {
                                                         definitions: [
                                                             {
                                                                 uri: 'file:///workspace/tests/fixtures/example.ts',
-                                                                range: { start: { line: 4, character: 7 }, end: { line: 4, character: 16 } },
+                                                                range: {
+                                                                    start: { line: 4, character: 7 },
+                                                                    end: { line: 4, character: 16 },
+                                                                },
                                                                 kind: 'class',
                                                                 confidence: 0.95,
                                                             },
@@ -1232,7 +1245,11 @@ export class HTTPAdapter {
                                                         ok: true,
                                                         snapshot: '<snapshot-id>',
                                                         stage: { accepted: true, diffCount: 1 },
-                                                        checks: { ok: true, elapsedMs: 640, outputTail: '...last lines of checks...' },
+                                                        checks: {
+                                                            ok: true,
+                                                            elapsedMs: 640,
+                                                            outputTail: '...last lines of checks...',
+                                                        },
                                                     },
                                                 },
                                             },
@@ -1242,7 +1259,9 @@ export class HTTPAdapter {
                             },
                             '400': {
                                 description: 'Bad Request',
-                                content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+                                content: {
+                                    'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } },
+                                },
                             },
                         },
                     },
@@ -1264,7 +1283,10 @@ export class HTTPAdapter {
                                             includeDeclaration: { type: 'boolean' },
                                             maxResults: { type: 'integer' },
                                             precise: { type: 'boolean' },
-                                            conceptual: { type: 'boolean', description: 'Include Layer 4 conceptual hints if available' },
+                                            conceptual: {
+                                                type: 'boolean',
+                                                description: 'Include Layer 4 conceptual hints if available',
+                                            },
                                         },
                                     },
                                 },
@@ -1286,8 +1308,14 @@ export class HTTPAdapter {
                                                             properties: {
                                                                 symbol: { type: 'string' },
                                                                 contextUri: { type: 'string' },
-                                                                definitions: { type: 'array', items: { $ref: '#/components/schemas/Definition' } },
-                                                                references: { type: 'array', items: { $ref: '#/components/schemas/Reference' } },
+                                                                definitions: {
+                                                                    type: 'array',
+                                                                    items: { $ref: '#/components/schemas/Definition' },
+                                                                },
+                                                                references: {
+                                                                    type: 'array',
+                                                                    items: { $ref: '#/components/schemas/Reference' },
+                                                                },
                                                                 performance: { type: 'object' },
                                                                 diagnostics: { type: 'object' },
                                                                 timestamp: { type: 'number' },
@@ -1461,9 +1489,7 @@ export class HTTPAdapter {
                 [api('/pipelines/status')]: {
                     get: {
                         summary: 'Get pipeline status',
-                        parameters: [
-                            { name: 'id', in: 'query', required: true, schema: { type: 'string' } },
-                        ],
+                        parameters: [{ name: 'id', in: 'query', required: true, schema: { type: 'string' } }],
                         responses: {
                             '200': {
                                 description: 'OK',
@@ -1472,7 +1498,12 @@ export class HTTPAdapter {
                                         schema: {
                                             allOf: [
                                                 { $ref: '#/components/schemas/ApiResponse' },
-                                                { type: 'object', properties: { data: { $ref: '#/components/schemas/PipelineStatus' } } },
+                                                {
+                                                    type: 'object',
+                                                    properties: {
+                                                        data: { $ref: '#/components/schemas/PipelineStatus' },
+                                                    },
+                                                },
                                             ],
                                         },
                                     },
@@ -1487,7 +1518,12 @@ export class HTTPAdapter {
                         summary: 'List recent pipeline runs',
                         parameters: [
                             { name: 'id', in: 'query', required: true, schema: { type: 'string' } },
-                            { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100 } },
+                            {
+                                name: 'limit',
+                                in: 'query',
+                                required: false,
+                                schema: { type: 'integer', minimum: 1, maximum: 100 },
+                            },
                         ],
                         responses: {
                             '200': {
@@ -1502,7 +1538,12 @@ export class HTTPAdapter {
                                                     properties: {
                                                         data: {
                                                             type: 'object',
-                                                            properties: { runs: { type: 'array', items: { $ref: '#/components/schemas/PipelineRun' } } },
+                                                            properties: {
+                                                                runs: {
+                                                                    type: 'array',
+                                                                    items: { $ref: '#/components/schemas/PipelineRun' },
+                                                                },
+                                                            },
                                                         },
                                                     },
                                                 },
@@ -1538,7 +1579,12 @@ export class HTTPAdapter {
                                                             properties: {
                                                                 pipelineId: { type: 'string' },
                                                                 runId: { type: 'string' },
-                                                                run: { oneOf: [ { $ref: '#/components/schemas/PipelineRun' }, { type: 'null' } ] },
+                                                                run: {
+                                                                    oneOf: [
+                                                                        { $ref: '#/components/schemas/PipelineRun' },
+                                                                        { type: 'null' },
+                                                                    ],
+                                                                },
                                                             },
                                                         },
                                                     },
@@ -1557,7 +1603,11 @@ export class HTTPAdapter {
                             required: true,
                             content: {
                                 'application/json': {
-                                    schema: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+                                    schema: {
+                                        type: 'object',
+                                        required: ['id'],
+                                        properties: { id: { type: 'string' } },
+                                    },
                                 },
                             },
                         },
@@ -1571,7 +1621,15 @@ export class HTTPAdapter {
                                                 { $ref: '#/components/schemas/ApiResponse' },
                                                 {
                                                     type: 'object',
-                                                    properties: { data: { type: 'object', properties: { ok: { type: 'boolean' }, runId: { type: 'string' } } } },
+                                                    properties: {
+                                                        data: {
+                                                            type: 'object',
+                                                            properties: {
+                                                                ok: { type: 'boolean' },
+                                                                runId: { type: 'string' },
+                                                            },
+                                                        },
+                                                    },
                                                 },
                                             ],
                                         },
@@ -1607,10 +1665,13 @@ export class HTTPAdapter {
                                                                             id: { type: 'string' },
                                                                             name: { type: 'string' },
                                                                             trigger: { type: 'string' },
-                                                                            schedule: { type: 'string', nullable: true },
+                                                                            schedule: {
+                                                                                type: 'string',
+                                                                                nullable: true,
+                                                                            },
                                                                             enabled: { type: 'boolean' },
                                                                         },
-                                                                        required: ['id','name','trigger','enabled'],
+                                                                        required: ['id', 'name', 'trigger', 'enabled'],
                                                                     },
                                                                 },
                                                             },
@@ -1639,9 +1700,20 @@ export class HTTPAdapter {
                                             description: { type: 'string' },
                                             components: {
                                                 type: 'array',
-                                                items: { type: 'string', enum: ['pattern_learning','feedback_loop','evolution_tracking','team_knowledge'] },
+                                                items: {
+                                                    type: 'string',
+                                                    enum: [
+                                                        'pattern_learning',
+                                                        'feedback_loop',
+                                                        'evolution_tracking',
+                                                        'team_knowledge',
+                                                    ],
+                                                },
                                             },
-                                            trigger: { type: 'string', enum: ['manual','automatic','scheduled','event_driven'] },
+                                            trigger: {
+                                                type: 'string',
+                                                enum: ['manual', 'automatic', 'scheduled', 'event_driven'],
+                                            },
                                             schedule: { type: 'string' },
                                             eventTriggers: { type: 'array', items: { type: 'string' } },
                                             enabled: { type: 'boolean' },
@@ -1658,7 +1730,15 @@ export class HTTPAdapter {
                                         schema: {
                                             allOf: [
                                                 { $ref: '#/components/schemas/ApiResponse' },
-                                                { type: 'object', properties: { data: { type: 'object', properties: { id: { type: 'string' } } } } },
+                                                {
+                                                    type: 'object',
+                                                    properties: {
+                                                        data: {
+                                                            type: 'object',
+                                                            properties: { id: { type: 'string' } },
+                                                        },
+                                                    },
+                                                },
                                             ],
                                         },
                                     },
@@ -1671,7 +1751,7 @@ export class HTTPAdapter {
                 [api('/pipelines/{id}')]: {
                     get: {
                         summary: 'Get pipeline by id (status/detail)',
-                        parameters: [ { name: 'id', in: 'path', required: true, schema: { type: 'string' } } ],
+                        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
                         responses: {
                             '200': {
                                 description: 'OK',
@@ -1680,7 +1760,12 @@ export class HTTPAdapter {
                                         schema: {
                                             allOf: [
                                                 { $ref: '#/components/schemas/ApiResponse' },
-                                                { type: 'object', properties: { data: { $ref: '#/components/schemas/PipelineStatus' } } },
+                                                {
+                                                    type: 'object',
+                                                    properties: {
+                                                        data: { $ref: '#/components/schemas/PipelineStatus' },
+                                                    },
+                                                },
                                             ],
                                         },
                                     },

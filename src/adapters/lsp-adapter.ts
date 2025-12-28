@@ -93,10 +93,11 @@ export class LSPAdapter {
     async findDefinition(
         file: string,
         input: { line?: number; character?: number; symbol?: string } = {}
-    ): Promise<Location[]>
-    {
+    ): Promise<Location[]> {
         // Ensure core is initialized for E2E convenience
-        try { await (this.coreAnalyzer as any)?.initialize?.(); } catch {}
+        try {
+            await (this.coreAnalyzer as any)?.initialize?.();
+        } catch {}
         const uri = normalizeUri(file || 'file://workspace');
         const pos = normalizePosition({ line: input.line ?? 0, character: input.character ?? 0 } as any);
         const identifier = input.symbol || this.extractIdentifierAtPosition(uri, pos);
@@ -116,7 +117,9 @@ export class LSPAdapter {
      * Convenience: find references for E2E validator
      */
     async findReferences(file: string, symbol: string): Promise<Location[]> {
-        try { await (this.coreAnalyzer as any)?.initialize?.(); } catch {}
+        try {
+            await (this.coreAnalyzer as any)?.initialize?.();
+        } catch {}
         const uri = normalizeUri(file || 'file://workspace');
         const request = buildFindReferencesRequest({
             uri,
@@ -134,10 +137,18 @@ export class LSPAdapter {
      * Convenience: rename symbol for E2E validator
      */
     async rename(file: string, position: { line: number; character: number }, newName: string): Promise<WorkspaceEdit> {
-        try { await (this.coreAnalyzer as any)?.initialize?.(); } catch {}
+        try {
+            await (this.coreAnalyzer as any)?.initialize?.();
+        } catch {}
         const uri = normalizeUri(file || 'file://workspace');
         const identifier = this.extractIdentifierAtPosition(uri, position);
-        const request = buildRenameRequest({ uri, position: normalizePosition(position as any), identifier, newName, dryRun: true });
+        const request = buildRenameRequest({
+            uri,
+            position: normalizePosition(position as any),
+            identifier,
+            newName,
+            dryRun: true,
+        });
         const result = await (this.coreAnalyzer as any).rename(request);
         return workspaceEditToLsp(result.data);
     }

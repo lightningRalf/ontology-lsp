@@ -100,7 +100,10 @@ async function createMcpServer(desiredSid?: string): Promise<SessionRecord> {
             const out = await executor.execute(adapter, name, (args || {}) as Record<string, any>);
             try {
                 // success if adapter didn't set isError=true
-                const success = !((out && typeof out === 'object' && 'isError' in out && (out as any).isError) || false);
+                const success = !(
+                    (out && typeof out === 'object' && 'isError' in out && (out as any).isError) ||
+                    false
+                );
                 recordToolEnd('mcp_http', String(name || 'unknown'), Date.now() - t0, success);
             } catch {}
             return out;
@@ -112,7 +115,9 @@ async function createMcpServer(desiredSid?: string): Promise<SessionRecord> {
                 error: error instanceof Error ? error.message : String(error),
                 ts: Date.now(),
             });
-            try { recordToolEnd('mcp_http', String(name || 'unknown'), 0, false); } catch {}
+            try {
+                recordToolEnd('mcp_http', String(name || 'unknown'), 0, false);
+            } catch {}
             if (isCoreError(error) || error instanceof McpError) {
                 throw toMcpError(error);
             }
@@ -162,21 +167,25 @@ app.post('/mcp', async (req, res) => {
         let record: SessionRecord | undefined;
         if (sessionId && sessions[sessionId]) {
             record = sessions[sessionId];
-        } else if (
-            !sessionId && (isInitializeRequest(req.body) || (req.body && req.body.method === 'initialize'))
-        ) {
+        } else if (!sessionId && (isInitializeRequest(req.body) || (req.body && req.body.method === 'initialize'))) {
             try {
                 const preSid = randomUUID();
                 record = await createMcpServer(preSid);
                 // Expose session id on first initialize response for client convenience
-                try { res.setHeader('Mcp-Session-Id', preSid); } catch {}
+                try {
+                    res.setHeader('Mcp-Session-Id', preSid);
+                } catch {}
             } catch (e) {
                 // Log detailed error to help diagnose 500s on initialize
                 // eslint-disable-next-line no-console
                 console.error('[MCP HTTP] createMcpServer failed:', e);
                 res.status(500).json({
                     jsonrpc: '2.0',
-                    error: { code: -32603, message: 'Initialization failed', data: String(e instanceof Error ? e.message : e) },
+                    error: {
+                        code: -32603,
+                        message: 'Initialization failed',
+                        data: String(e instanceof Error ? e.message : e),
+                    },
                     id: req.body?.id ?? null,
                 });
                 return;
@@ -185,7 +194,9 @@ app.post('/mcp', async (req, res) => {
             // When session is initialized, store it
             transport.onsessioninitialized = (sid: string) => {
                 sessions[sid] = record!;
-                try { res.setHeader('Mcp-Session-Id', sid); } catch {}
+                try {
+                    res.setHeader('Mcp-Session-Id', sid);
+                } catch {}
             };
             transport.onclose = () => {
                 if (transport.sessionId) delete sessions[transport.sessionId];
@@ -199,7 +210,12 @@ app.post('/mcp', async (req, res) => {
             if (needJson || needSse) {
                 try {
                     const merged = [
-                        ...(accepts ? accepts.split(',').map((s) => s.trim()).filter(Boolean) : []),
+                        ...(accepts
+                            ? accepts
+                                  .split(',')
+                                  .map((s) => s.trim())
+                                  .filter(Boolean)
+                            : []),
                         ...(needJson ? ['application/json'] : []),
                         ...(needSse ? ['text/event-stream'] : []),
                     ]
@@ -229,7 +245,11 @@ app.post('/mcp', async (req, res) => {
             if (!res.headersSent) {
                 res.status(500).json({
                     jsonrpc: '2.0',
-                    error: { code: -32603, message: 'Internal server error', data: String(e instanceof Error ? e.message : e) },
+                    error: {
+                        code: -32603,
+                        message: 'Internal server error',
+                        data: String(e instanceof Error ? e.message : e),
+                    },
                     id: req.body?.id ?? null,
                 });
             }
@@ -249,7 +269,11 @@ app.post('/mcp', async (req, res) => {
         if (!res.headersSent) {
             res.status(500).json({
                 jsonrpc: '2.0',
-                error: { code: -32603, message: 'Internal server error', data: String(error instanceof Error ? error.message : error) },
+                error: {
+                    code: -32603,
+                    message: 'Internal server error',
+                    data: String(error instanceof Error ? error.message : error),
+                },
                 id: req.body?.id ?? null,
             });
         }

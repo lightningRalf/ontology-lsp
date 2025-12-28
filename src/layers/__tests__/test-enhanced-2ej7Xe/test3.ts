@@ -1,2 +1,2 @@
-export const testConstant = "test value";
+export const testConstant = 'test value';
 export default testConstant;
