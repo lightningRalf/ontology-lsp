@@ -1094,7 +1094,7 @@ export class MCPAdapter {
             }
 
             // Use the new textSearch method from CodeAnalyzer
-            const result = await this.coreAnalyzer.textSearch(searchQuery, {
+            const result = await (this.coreAnalyzer as any).textSearch(searchQuery, {
                 path,
                 maxResults,
                 caseInsensitive,

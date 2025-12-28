@@ -4,6 +4,7 @@
  */
 
 import { EventEmitter } from 'events';
+import * as fs from 'node:fs/promises';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -42,6 +43,7 @@ import {
     type RequestMetadata,
     type WorkspaceEdit,
 } from './types.js';
+import type { SearchQuery } from '../types/core.js';
 
 /**
  * The unified code analyzer that orchestrates all 5 layers
@@ -157,7 +159,7 @@ export class CodeAnalyzer {
         this.initialized = true;
 
         // Start cache warming in background (don't await to avoid blocking initialization)
-        this.warmCacheForWorkspace(this.config.workspaceRoot).catch((error) => {
+        this.warmCacheForWorkspace(this.config.workspaceRoot ?? process.cwd()).catch((error) => {
             console.debug('Background cache warming failed:', error);
         });
 
@@ -351,7 +353,7 @@ export class CodeAnalyzer {
                             pattern: fuzzyPattern,
                             path: searchDir,
                             maxResults: request.maxResults ?? 50,
-                            timeout: Math.min(asyncOptions.timeout + 500, 5000),
+                            timeout: Math.min((asyncOptions.timeout ?? 0) + 500, 5000),
                             caseInsensitive: true,
                             useRegex: true,
                             fileType: this.getFileTypeFromUri(request.uri) || 'typescript',
@@ -383,6 +385,7 @@ export class CodeAnalyzer {
                 seenDef.add(key);
                 const confL1 = this.scoreL1(result.text || '', result.file, request.identifier);
                 definitions.push({
+                    identifier: request.identifier,
                     uri,
                     range: {
                         start: { line: (result.line || 1) - 1, character: exp.start },
@@ -799,6 +802,7 @@ export class CodeAnalyzer {
                 const exp = this.expandToken(result.text || '', col, request.identifier);
                 const confL1 = this.scoreL1(result.text || '', result.file, request.identifier);
                 references.push({
+                    identifier: request.identifier,
                     uri: this.pathToFileUri(result.file),
                     range: {
                         start: { line: (result.line || 1) - 1, character: exp.start },
@@ -1185,7 +1189,6 @@ export class CodeAnalyzer {
                 },
             ],
             systemHealth: {
-                overall: 'healthy',
                 status: 'healthy',
                 metrics: {
                     totalLearningEvents: 42,
@@ -1552,7 +1555,7 @@ export class CodeAnalyzer {
             };
 
             // Execute layer 1 search
-            const result = await layer.process(searchQuery);
+            const result = await (layer.process as any)(searchQuery);
 
             // Convert ClaudeToolsLayer result to Definition[]
             const definitions: Definition[] = [];
@@ -1561,6 +1564,7 @@ export class CodeAnalyzer {
             if (result.exact) {
                 for (const match of result.exact) {
                     definitions.push({
+                        identifier: request.identifier,
                         uri: this.pathToFileUri(match.file),
                         range: {
                             start: { line: match.line - 1, character: match.column },
@@ -1579,6 +1583,7 @@ export class CodeAnalyzer {
             if (result.fuzzy) {
                 for (const match of result.fuzzy) {
                     definitions.push({
+                        identifier: request.identifier,
                         uri: this.pathToFileUri(match.file),
                         range: {
                             start: { line: match.line - 1, character: match.column },
@@ -1633,7 +1638,7 @@ export class CodeAnalyzer {
             }
 
             // Execute tree-sitter analysis
-            const result = await layer.process(enhancedMatches);
+            const result = await (layer.process as any)(enhancedMatches);
 
             // Convert TreeSitter result to Definition[] and validate strictly by symbol name
             const definitions: Definition[] = [];
@@ -1660,6 +1665,7 @@ export class CodeAnalyzer {
                         candidateNames.size > 1
                     );
                     definitions.push({
+                        identifier: request.identifier,
                         uri: this.pathToFileUri(this.extractFilePathFromNodeId(node.id)),
                         range: node.range,
                         kind: this.inferDefinitionKindFromNodeType(node.type),
@@ -1715,7 +1721,7 @@ export class CodeAnalyzer {
             };
 
             // Execute layer 1 search
-            const result = await layer.process(searchQuery);
+            const result = await (layer.process as any)(searchQuery);
 
             // Convert ClaudeToolsLayer result to Reference[]
             const references: Reference[] = [];
@@ -1724,12 +1730,13 @@ export class CodeAnalyzer {
             if (result.exact) {
                 for (const match of result.exact) {
                     references.push({
+                        identifier: request.identifier,
                         uri: this.pathToFileUri(match.file),
                         range: {
                             start: { line: match.line - 1, character: match.column },
                             end: { line: match.line - 1, character: match.column + match.length },
                         },
-                        kind: 'usage' as ReferenceKind,
+                        kind: 'usage',
                         name: request.identifier,
                         source: 'exact' as const,
                         confidence: match.confidence,
@@ -1742,12 +1749,13 @@ export class CodeAnalyzer {
             if (result.fuzzy) {
                 for (const match of result.fuzzy) {
                     references.push({
+                        identifier: request.identifier,
                         uri: this.pathToFileUri(match.file),
                         range: {
                             start: { line: match.line - 1, character: match.column },
                             end: { line: match.line - 1, character: match.column + match.length },
                         },
-                        kind: 'usage' as ReferenceKind,
+                        kind: 'usage',
                         name: request.identifier,
                         source: 'fuzzy' as const,
                         confidence: match.confidence,
@@ -1800,7 +1808,7 @@ export class CodeAnalyzer {
                 searchTime: 0,
             } as any;
 
-            const result = await layer.process(enhancedMatches);
+            const result = await (layer.process as any)(enhancedMatches);
             const nodes = result?.nodes || [];
 
             // 1) Validate existing refs by matching to identifier nodes on the same line/near column
@@ -1840,6 +1848,7 @@ export class CodeAnalyzer {
                 const filePath = this.extractFilePathFromNodeId(n.id);
                 const score = this.scoreAstReference(nName, request.identifier, n, filePath, n.range.start.character);
                 astDerived.push({
+                    identifier: request.identifier,
                     uri: this.pathToFileUri(this.extractFilePathFromNodeId(n.id)),
                     range: n.range,
                     kind: 'call',
@@ -1988,7 +1997,7 @@ export class CodeAnalyzer {
 
                 const learningData = {
                     rename: {
-                        oldName: request.identifier,
+                        oldName: request.oldName,
                         newName: request.newName,
                         context: {
                             file: request.uri,
@@ -2078,7 +2087,6 @@ export class CodeAnalyzer {
                     nodir: true,
                 } as any);
                 const limited = candidates.slice(0, 200);
-                const fs = await import('node:fs/promises');
                 const word = new RegExp(`\\b${this.escapeRegex(id)}\\b`);
                 for (const rel of limited) {
                     try {
@@ -2204,7 +2212,6 @@ export class CodeAnalyzer {
 
         // Imports: use relationships with location to read the single line and verify
         const rels = (result?.relationships || []) as any[];
-        const fs = await import('node:fs/promises');
         for (const r of rels) {
             if (r.type !== 'imports' || !r.location) continue;
             const [filePath, lineStr] = String(r.location).split(':');
@@ -2767,7 +2774,7 @@ export class CodeAnalyzer {
         // Use Layer 1 Fast Search for identifier-like queries
         const searchQuery: SearchQuery = {
             identifier: query,
-            searchPath: options?.path || this.config.workspaceRoot,
+            searchPath: options?.path || this.config.workspaceRoot || process.cwd(),
             fileTypes: options?.fileTypes,
             caseSensitive: !options?.caseInsensitive,
             includeTests: true,
@@ -2777,7 +2784,7 @@ export class CodeAnalyzer {
             if (process.env.DEBUG_TEXT_SEARCH === '1') {
                 console.log('[textSearch] Calling Layer 1 with query:', searchQuery);
             }
-            const matches = await layer1.process(searchQuery);
+            const matches = await (layer1.process as any)(searchQuery);
             if (process.env.DEBUG_TEXT_SEARCH === '1') {
                 console.log('[textSearch] Layer 1 returned:', {
                     exact: matches.exact.length,
@@ -2788,8 +2795,8 @@ export class CodeAnalyzer {
 
             // Combine all match types
             const allMatches = [
-                ...matches.exact.map((m) => ({ ...m, confidence: 1.0 })),
-                ...matches.fuzzy.map((m) => ({ ...m, confidence: 0.8 })),
+                ...matches.exact.map((m: any) => ({ ...m, confidence: 1.0 })),
+                ...matches.fuzzy.map((m: any) => ({ ...m, confidence: 0.8 })),
             ];
 
             // Sort by confidence and limit results
@@ -2925,8 +2932,8 @@ export class CodeAnalyzer {
     private inferReferenceKind(text: string): ReferenceKind {
         if (text.includes('(')) return 'call';
         if (text.includes('import') || text.includes('from')) return 'import';
-        if (text.includes('=')) return 'write';
-        return 'read';
+        if (text.includes('=')) return 'assignment';
+        return 'usage';
     }
 
     // === Confidence scoring helpers ===

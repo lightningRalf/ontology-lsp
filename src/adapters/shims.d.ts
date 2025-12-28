@@ -4,6 +4,10 @@ declare module '../core/unified-analyzer.js' {
     }
 }
 
+declare module '../core/analyzer-factory.js' {
+    export const AnalyzerFactory: any;
+}
+
 declare module '../core/tools/registry.js' {
     export const ToolRegistry: any;
 }

@@ -131,7 +131,7 @@ class Layer3Adapter extends LayerAdapter {
     async initialize(): Promise<void> {
         if (!this.lazyInit && this.ontology) {
             // If eager init, initialize the ontology engine now
-            await this.ontology.initialize?.();
+            await this.ontology.ensureInitialized();
         }
         // If lazy init, do nothing - will initialize on first use
     }
@@ -143,7 +143,7 @@ class Layer3Adapter extends LayerAdapter {
         if (!this.initPromise) {
             this.initPromise = (async () => {
                 this.ontology = new OntologyEngine(this.storage);
-                await this.ontology.initialize?.();
+                await this.ontology.ensureInitialized();
             })();
         }
 
