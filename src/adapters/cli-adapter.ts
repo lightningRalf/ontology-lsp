@@ -11,11 +11,11 @@
  * All actual analysis work is delegated to the unified core analyzer.
  */
 
+import * as fs from 'node:fs';
 import leven from 'leven';
 import { overlayStore } from '../core/overlay-store.js';
 import type { CodeAnalyzer } from '../core/unified-analyzer.js';
 import { AsyncEnhancedGrep } from '../layers/enhanced-search-tools-async.js';
-import * as fs from 'node:fs';
 import {
     buildFindDefinitionRequest,
     buildFindReferencesRequest,
@@ -225,12 +225,37 @@ export class CLIAdapter {
         }
     ): Promise<any> {
         try {
-            // For consistency across protocols, require a file context for references
-            if (!options.file) {
-                return [];
+            // Parity + UX: when identifier is empty
+            if (!identifier || !String(identifier).trim()) {
+                if (options.file) return [];
+                return 'References search failed: identifier required';
             }
+
+            // When no file context provided, first locate the symbol via definitions
+            // to get seed files for a more targeted references search
+            let contextUri = options.file ? normalizeUri(options.file) : 'file://workspace';
+            if (!options.file) {
+                try {
+                    const defRequest = buildFindDefinitionRequest({
+                        uri: 'file://workspace',
+                        position: createPosition(0, 0),
+                        identifier,
+                        maxResults: 10,
+                        includeDeclaration: true,
+                        precise: false,
+                    });
+                    const defResult = await (this.coreAnalyzer as any).findDefinitionAsync(defRequest);
+                    // Use first definition file as context for references search
+                    if (defResult?.data?.[0]?.uri) {
+                        contextUri = defResult.data[0].uri;
+                    }
+                } catch {
+                    // Fallback to workspace search
+                }
+            }
+
             const request = buildFindReferencesRequest({
-                uri: normalizeUri(options.file || 'file://workspace'),
+                uri: contextUri,
                 position: createPosition(0, 0),
                 identifier,
                 maxResults: options.maxResults || this.config.maxResults,
