@@ -6,13 +6,13 @@
  * - Pushgateway push function works correctly
  * - Environment variable configuration is respected
  */
-import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import {
-    metricsRegistry,
-    recordToolStart,
-    recordToolEnd,
-    pushToGateway,
     getPushgatewayUrl,
+    metricsRegistry,
+    pushToGateway,
+    recordToolEnd,
+    recordToolStart,
     shouldPushMetrics,
 } from '../src/instrumentation/metrics';
 

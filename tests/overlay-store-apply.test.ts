@@ -1,7 +1,7 @@
-import { describe, expect, test, beforeAll, afterAll } from 'bun:test';
-import { overlayStore } from '../src/core/overlay-store.js';
-import * as path from 'node:path';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import { overlayStore } from '../src/core/overlay-store.js';
 
 describe('OverlayStore applyToWorkingTree with unified diff', () => {
     const targetRel = 'tests/fixtures/example.ts';

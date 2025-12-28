@@ -1,5 +1,5 @@
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { CoreError, isCoreError } from '../core/errors.js';
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 export function toMcpError(err: unknown): McpError {
     if (isCoreError(err)) {

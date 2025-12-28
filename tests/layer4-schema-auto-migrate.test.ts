@@ -5,11 +5,11 @@
  * in the constructor when L4_AUTO_MIGRATE=1 (default), eliminating
  * "no such table: concepts" errors in tests.
  */
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { OntologyStorage } from '../src/ontology/storage';
-import { OntologyEngine } from '../src/ontology/ontology-engine';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import * as fs from 'fs';
 import * as path from 'path';
+import { OntologyEngine } from '../src/ontology/ontology-engine';
+import { OntologyStorage } from '../src/ontology/storage';
 
 const TMP_DIR = '/tmp/l4-schema-test';
 const TMP_DB = path.join(TMP_DIR, 'test.db');

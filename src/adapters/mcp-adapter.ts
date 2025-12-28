@@ -13,8 +13,8 @@
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { overlayStore } from '../core/overlay-store.js';
 import { CoreError } from '../core/errors.js';
+import { overlayStore } from '../core/overlay-store.js';
 import { ToolRegistry } from '../core/tools/registry.js';
 import { DefinitionKind } from '../core/types.js';
 import { createValidationError, type ErrorContext, withMcpErrorHandling } from '../core/utils/error-handler.js';
@@ -968,7 +968,7 @@ export class MCPAdapter {
             while (i < lines.length && !isFileHeader(lines[i]) && !/^\*\*\*\s+End Patch$/i.test(lines[i])) {
                 const l = lines[i];
                 // Accept hunk markers and diff lines; ignore apply_patch footers
-                if (/^@@/.test(l) || /^[ +\-]/.test(l)) {
+                if (/^@@/.test(l) || /^[ +-]/.test(l)) {
                     chunk.push(l);
                 }
                 i++;

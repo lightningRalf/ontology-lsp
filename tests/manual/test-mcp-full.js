@@ -7,11 +7,12 @@ console.log('Testing full MCP stdio protocol...\n');
 
 // Start MCP server
 import path from 'path';
+
 const server = spawn('bun', ['run', path.resolve(process.cwd(), 'dist/mcp/mcp.js')], {
     stdio: ['pipe', 'pipe', 'pipe'],
 });
 
-let responses = [];
+const responses = [];
 
 // Capture server responses
 server.stdout.on('data', (data) => {

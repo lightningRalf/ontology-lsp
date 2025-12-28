@@ -11,6 +11,7 @@
  * All actual analysis work is delegated to the unified core analyzer.
  */
 
+import * as fs from 'node:fs';
 import type {
     CompletionItem,
     CompletionParams,
@@ -24,7 +25,6 @@ import type {
     WorkspaceEdit,
 } from 'vscode-languageserver';
 import { ResponseError, TextDocumentSyncKind } from 'vscode-languageserver';
-import * as fs from 'node:fs';
 
 // Minimal core analyzer surface required by the LSP adapter
 type CoreAnalyzer = {

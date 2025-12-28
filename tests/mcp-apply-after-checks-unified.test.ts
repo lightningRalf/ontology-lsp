@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { createCodeAnalyzer } from '../src/core/index.js';
-import { MCPAdapter } from '../src/adapters/mcp-adapter.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { MCPAdapter } from '../src/adapters/mcp-adapter.js';
+import { createCodeAnalyzer } from '../src/core/index.js';
 
 function unwrap(result: any): any {
     try {

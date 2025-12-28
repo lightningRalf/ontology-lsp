@@ -4,8 +4,8 @@
  */
 
 import { spawn } from 'node:child_process';
-import { createInterface } from 'node:readline';
 import { resolve } from 'node:path';
+import { createInterface } from 'node:readline';
 
 // Spawn the MCP server (use bun from PATH and repo-relative server path)
 const serverPath = resolve(process.cwd(), 'src/servers/mcp.ts');

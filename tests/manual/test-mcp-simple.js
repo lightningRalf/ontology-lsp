@@ -16,7 +16,7 @@ const server = spawn('bun', ['dist/mcp-fast/mcp-fast.js'], {
 });
 
 let messageId = 1;
-let responses = [];
+const responses = [];
 
 function sendMessage(method, params = {}) {
     const message = {

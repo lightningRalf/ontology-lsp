@@ -38,7 +38,7 @@ describe('Layer 4: DB cleanup of malformed entries', () => {
 
         // 3) Re-initialize engine; storage.initialize should clean
         const engine = new OntologyEngine(new OntologyStorage(DB));
-        await new Promise((r) => setTimeout(r, 30));
+        await engine.ensureInitialized(); // Trigger the actual initialization
 
         // 4) Verify DB has no invalid representations remaining
         const db2 = new Database(DB);

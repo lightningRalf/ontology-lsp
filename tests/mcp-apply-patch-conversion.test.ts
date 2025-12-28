@@ -1,10 +1,10 @@
 import { expect, test } from 'bun:test';
-import { createDefaultCoreConfig } from '../src/adapters/utils';
-import { createCodeAnalyzer } from '../src/core/index';
-import { MCPAdapter } from '../src/adapters/mcp-adapter';
-import { overlayStore } from '../src/core/overlay-store';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { MCPAdapter } from '../src/adapters/mcp-adapter';
+import { createDefaultCoreConfig } from '../src/adapters/utils';
+import { createCodeAnalyzer } from '../src/core/index';
+import { overlayStore } from '../src/core/overlay-store';
 
 async function parseContent(res: any): Promise<any> {
     try {

@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 

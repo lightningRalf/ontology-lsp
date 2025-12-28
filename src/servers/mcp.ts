@@ -16,13 +16,12 @@ process.env.STDIO_MODE = 'true';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
-
+import { serve } from 'bun';
 import { MCPAdapter } from '../adapters/mcp-adapter.js';
 import { createDefaultCoreConfig } from '../adapters/utils.js';
 import { createCodeAnalyzer } from '../core/index';
 import type { CodeAnalyzer } from '../core/unified-analyzer';
 import { metricsRegistry, recordToolEnd, recordToolStart } from '../instrumentation/metrics.js';
-import { serve } from 'bun';
 
 export class MCPServer {
     private server: Server;

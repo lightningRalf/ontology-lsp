@@ -10,8 +10,8 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { completable } from '@modelcontextprotocol/sdk/server/completable.js';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {
     CallToolRequestSchema,
@@ -23,21 +23,21 @@ import {
     McpError,
     ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { z } from 'zod';
 import cors from 'cors';
 import { EventEmitter } from 'events';
 import express from 'express';
-import { MCPAdapter } from '../adapters/mcp-adapter.js';
-import { isCoreError } from '../core/errors.js';
+import { z } from 'zod';
 import { toMcpError } from '../adapters/error-mapper.js';
+import { MCPAdapter } from '../adapters/mcp-adapter.js';
 import { createDefaultCoreConfig } from '../adapters/utils.js';
 import { getEnvironmentConfig } from '../core/config/server-config.js';
+import { isCoreError } from '../core/errors.js';
 import { createCodeAnalyzer } from '../core/index';
 import { overlayStore } from '../core/overlay-store.js';
-import { registerCommonPrompts, registerCommonResources } from './mcp-shared.js';
 import { ToolExecutor } from '../core/tools/executor.js';
 import type { CodeAnalyzer } from '../core/unified-analyzer';
 import { metricsRegistry, recordToolEnd, recordToolStart } from '../instrumentation/metrics.js';
+import { registerCommonPrompts, registerCommonResources } from './mcp-shared.js';
 
 type SessionRecord = {
     server: Server;

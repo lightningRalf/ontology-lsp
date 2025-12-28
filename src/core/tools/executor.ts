@@ -1,5 +1,5 @@
-import { ToolRegistry, type ToolSpec } from './registry.js';
 import { CoreError } from '../errors.js';
+import { ToolRegistry, type ToolSpec } from './registry.js';
 
 export interface ToolAdapter {
     // Minimal surface the executor needs

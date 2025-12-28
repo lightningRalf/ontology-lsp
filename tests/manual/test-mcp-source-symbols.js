@@ -5,8 +5,8 @@
  */
 
 import { spawn } from 'node:child_process';
-import { createInterface } from 'node:readline';
 import path from 'node:path';
+import { createInterface } from 'node:readline';
 
 class MCPClient {
     constructor(command, args = []) {

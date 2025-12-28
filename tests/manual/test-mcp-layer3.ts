@@ -4,11 +4,11 @@
  * Test MCP find_definition functionality with Layer 3 ontology implementation
  */
 
-// First, let's add some test data to the database and then test MCP
-import { DatabaseService, DatabaseConfig } from './src/core/services/database-service.js';
-import { EventBusService } from './src/core/services/event-bus-service.js';
-import * as path from 'path';
 import * as fs from 'fs';
+import * as path from 'path';
+// First, let's add some test data to the database and then test MCP
+import { type DatabaseConfig, DatabaseService } from './src/core/services/database-service.js';
+import { EventBusService } from './src/core/services/event-bus-service.js';
 
 async function testMCPLayer3() {
     console.log('🔧 Setting up test database with concepts...');

@@ -44,7 +44,7 @@ const testMessages = [
 
 let messageIndex = 0;
 let receivedResponses = 0;
-let expectedResponses = 2; // initialize + tools/list (notification has no response)
+const expectedResponses = 2; // initialize + tools/list (notification has no response)
 
 function sendNextMessage() {
     if (messageIndex >= testMessages.length) {

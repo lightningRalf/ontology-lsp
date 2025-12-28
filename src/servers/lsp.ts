@@ -9,6 +9,7 @@
  * All analysis work is delegated to the LSP adapter and core analyzer.
  */
 
+import { serve } from 'bun';
 import type { Location } from 'vscode-languageserver/node';
 import {
     createConnection,
@@ -32,7 +33,6 @@ import {
 import { createCodeAnalyzer } from '../core/index.js';
 import type { CodeAnalyzer } from '../core/unified-analyzer.js';
 import { metricsRegistry, recordLayerLatency, recordToolEnd, recordToolStart } from '../instrumentation/metrics.js';
-import { serve } from 'bun';
 
 export class LSPServer {
     private connection = createConnection(ProposedFeatures.all);

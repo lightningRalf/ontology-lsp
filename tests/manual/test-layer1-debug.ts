@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import { ClaudeToolsLayer } from './src/layers/claude-tools.js';
 import { createDefaultCoreConfig } from './src/adapters/utils.js';
+import { ClaudeToolsLayer } from './src/layers/claude-tools.js';
 
 async function testLayer1() {
     console.log('🔍 Debugging Layer 1 search for AsyncEnhancedGrep class definition');

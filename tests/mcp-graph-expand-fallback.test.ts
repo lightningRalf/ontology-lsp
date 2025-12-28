@@ -1,8 +1,8 @@
-import { describe, test, beforeAll, afterAll, expect } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { MCPAdapter } from '../src/adapters/mcp-adapter.js';
-import { CodeAnalyzer } from '../src/core/unified-analyzer.js';
 import { LayerManager } from '../src/core/layer-manager.js';
 import { SharedServices } from '../src/core/services/index.js';
+import { CodeAnalyzer } from '../src/core/unified-analyzer.js';
 import { createTestConfig } from './test-helpers';
 
 async function parse(res: any) {

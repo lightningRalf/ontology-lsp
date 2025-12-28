@@ -23,7 +23,7 @@ import {
     type CoreConfig,
     CoreError,
     type Definition,
-    DefinitionKind,
+    type DefinitionKind,
     type EventBus,
     type ExploreRequest,
     type ExploreResult,
@@ -607,7 +607,7 @@ export class CodeAnalyzer {
             Promise.resolve(this.getDiagnostics()),
         ]);
 
-        let result: ExploreResult = {
+        const result: ExploreResult = {
             symbol: request.identifier,
             contextUri: ctxUri,
             definitions: defs.status === 'fulfilled' ? defs.value.data : [],

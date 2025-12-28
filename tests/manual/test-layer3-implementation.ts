@@ -5,13 +5,13 @@
  * This will populate the database with test concepts and then test if Layer 3 can find them
  */
 
-import { CodeAnalyzer } from './src/core/unified-analyzer.js';
-import { LayerManager } from './src/core/layer-manager.js';
-import { SharedServices } from './src/core/services/shared-services.js';
-import { EventBusService } from './src/core/services/event-bus-service.js';
-import { CoreConfig, FindDefinitionRequest } from './src/core/types.js';
-import * as path from 'node:path';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { LayerManager } from './src/core/layer-manager.js';
+import { EventBusService } from './src/core/services/event-bus-service.js';
+import { SharedServices } from './src/core/services/shared-services.js';
+import type { CoreConfig, FindDefinitionRequest } from './src/core/types.js';
+import { CodeAnalyzer } from './src/core/unified-analyzer.js';
 
 async function testLayer3Implementation() {
     const testDbPath = path.join(process.cwd(), '.test-ontology', 'test-layer3.db');

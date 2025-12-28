@@ -11,9 +11,9 @@
  * - Diagnostic mode with full communication logging
  */
 
-import { spawn, type ChildProcess } from 'node:child_process';
-import { createInterface, type Interface } from 'node:readline';
+import { type ChildProcess, spawn } from 'node:child_process';
 import * as path from 'node:path';
+import { createInterface, type Interface } from 'node:readline';
 
 interface MCPRequest {
     jsonrpc: string;

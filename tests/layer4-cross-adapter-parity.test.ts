@@ -22,7 +22,7 @@ const rep = (name: string): SymbolRepresentation => ({
     test('export from SQLite and import into Postgres; compare k-hop at depths 1 and 2', async () => {
         // Build in SQLite (in-memory)
         const sqlite = new OntologyEngine(new OntologyStorage(':memory:'));
-        await new Promise((r) => setTimeout(r, 20));
+        await sqlite.ensureInitialized();
 
         const suffix = String(Date.now());
         const A: Concept = {
@@ -99,7 +99,7 @@ const rep = (name: string): SymbolRepresentation => ({
 describe('Layer 4: Cross-adapter parity (SQLite → TripleStore)', () => {
     test('export from SQLite and import into TripleStore; compare k-hop at depths 1 and 2', async () => {
         const sqlite = new OntologyEngine(new OntologyStorage(':memory:'));
-        await new Promise((r) => setTimeout(r, 20));
+        await sqlite.ensureInitialized();
 
         const suffix = String(Date.now());
         const A = {
@@ -149,7 +149,7 @@ describe('Layer 4: Cross-adapter parity (SQLite → TripleStore)', () => {
             .sort();
 
         const tstore = new OntologyEngine(new TripleStoreStorageAdapter());
-        await new Promise((r) => setTimeout(r, 20));
+        await tstore.ensureInitialized();
         for (const c of exported) {
             await tstore.importConcept(c);
         }

@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 
-import { CodeAnalyzer } from './src/core/unified-analyzer.js';
-import { createCodeAnalyzer } from './src/core/index.js';
 import { createDefaultCoreConfig } from './src/adapters/utils.js';
+import { createCodeAnalyzer } from './src/core/index.js';
+import type { CodeAnalyzer } from './src/core/unified-analyzer.js';
 
 async function compareMcpVsLayer1() {
     console.log('🔬 Comparing MCP path vs direct Layer 1 search for AsyncEnhancedGrep');

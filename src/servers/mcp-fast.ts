@@ -12,13 +12,13 @@ process.env.STDIO_MODE = 'true';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
-import { isCoreError } from '../core/errors.js';
 import { toMcpError } from '../adapters/error-mapper.js';
+import { isCoreError } from '../core/errors.js';
 import { ToolExecutor } from '../core/tools/executor.js';
-import { registerCommonPrompts, registerCommonResources } from './mcp-shared.js';
 // IMPORTANT: Avoid importing heavy core modules at top-level.
 // Use type-only import to prevent runtime side effects.
 import type { CodeAnalyzer } from '../core/unified-analyzer';
+import { registerCommonPrompts, registerCommonResources } from './mcp-shared.js';
 
 export class FastMCPServer {
     private server: Server;

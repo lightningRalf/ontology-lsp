@@ -5,12 +5,12 @@
  * Tests the actual implementation without mocking
  */
 
-import { FeedbackLoopSystem } from './src/learning/feedback-loop.js';
-import { SharedServices } from './src/core/services/index.js';
-import { EventBusService } from './src/core/services/event-bus-service.js';
-import { PatternLearner } from './src/patterns/pattern-learner.js';
-import path from 'path';
 import fs from 'fs';
+import path from 'path';
+import { EventBusService } from './src/core/services/event-bus-service.js';
+import { SharedServices } from './src/core/services/index.js';
+import { FeedbackLoopSystem } from './src/learning/feedback-loop.js';
+import { PatternLearner } from './src/patterns/pattern-learner.js';
 
 // Test database paths
 const TEST_DB_PATH = path.join(process.cwd(), 'test-feedback-integration.db');

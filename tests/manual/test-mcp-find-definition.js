@@ -6,9 +6,9 @@
  */
 
 import { spawn } from 'child_process';
+import path from 'path';
+import path from 'path';
 import { createInterface } from 'readline';
-import path from 'path';
-import path from 'path';
 
 class MCPStdioClient {
     constructor(command, args = []) {
