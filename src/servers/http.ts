@@ -12,15 +12,15 @@
 import { serve } from 'bun';
 import { HTTPAdapter, type HTTPRequest } from '../adapters/http-adapter.js';
 import { MCPAdapter } from '../adapters/mcp-adapter.js';
-import { ToolExecutor } from '../core/tools/executor.js';
-import { isCoreError } from '../core/errors.js';
 import { createDefaultCoreConfig, definitionToApiResponse } from '../adapters/utils.js';
 import { getEnvironmentConfig, type ServerConfig } from '../core/config/server-config.js';
+import { isCoreError } from '../core/errors.js';
 import { createCodeAnalyzer } from '../core/index';
+import { ToolExecutor } from '../core/tools/executor.js';
 import type { CodeAnalyzer } from '../core/unified-analyzer';
+import { metricsRegistry, recordLayerLatency, recordToolEnd, recordToolStart } from '../instrumentation/metrics.js';
 import type { FastSearchLayer } from '../layers/layer1-fast-search.js';
 import type { SearchQuery } from '../types/core.js';
-import { metricsRegistry, recordLayerLatency, recordToolEnd, recordToolStart } from '../instrumentation/metrics.js';
 
 interface HTTPServerConfig {
     port?: number;
@@ -81,8 +81,8 @@ export class HTTPServer {
             await this.initialize();
         }
 
-        // Determine port: use HTTP_API_PORT env, else configured default (7000)
-        const listenPort = Number(process.env.HTTP_API_PORT || this.config.port || 7000);
+        // Determine port: prefer config port if explicitly set, else HTTP_API_PORT env, else 7000
+        const listenPort = Number(this.config.port || process.env.HTTP_API_PORT || 7000);
 
         this.server = serve({
             hostname: this.config.host,
@@ -116,15 +116,6 @@ export class HTTPServer {
                     //   return await this.handleSSEStream(request, url.pathname);
                     // }
 
-                    // Prometheus metrics endpoint (adapter: http)
-                    if (url.pathname === '/metrics' && request.method === 'GET') {
-                        const text = metricsRegistry.renderPrometheusText();
-                        return new Response(text, {
-                            status: 200,
-                            headers: { 'Content-Type': 'text/plain; version=0.0.4', 'Cache-Control': 'no-cache' },
-                        });
-                    }
-
                     // Small built-in metrics endpoint for Layer 4 storage
                     if (url.pathname === '/metrics/l4' && request.method === 'GET') {
                         const metrics = (this.coreAnalyzer as any).getLayer4StorageMetrics?.();
@@ -134,6 +125,7 @@ export class HTTPServer {
                         });
                     }
 
+                    // Unified /metrics endpoint - supports format=json|prometheus (default)
                     if (url.pathname === '/metrics' && request.method === 'GET') {
                         const fmt = (url.searchParams.get('format') || 'prometheus').toLowerCase();
                         const lm: any = (this.coreAnalyzer as any).layerManager;
@@ -234,6 +226,11 @@ export class HTTPServer {
                                     text += `ontology_l4_operation_duration_ms{op="${op}",quantile="p99"} ${Math.round((s as any).p99)}\n`;
                                 }
                             }
+                        }
+                        // Include core metrics registry output
+                        const coreMetrics = metricsRegistry.renderPrometheusText();
+                        if (coreMetrics) {
+                            text = coreMetrics + '\n' + text;
                         }
                         if (!text.endsWith('\n')) text += '\n';
                         return new Response(text, {
