@@ -27,7 +27,7 @@ export interface FeedbackEvent {
         timeToDecision?: number; // milliseconds from suggestion to decision
         keystrokes?: number; // if user modified the suggestion
         alternativesShown?: number;
-        source: 'vscode' | 'claude' | 'cli' | 'web';
+        source: 'vscode' | 'claude' | 'cli' | 'web' | 'unknown';
     };
 }
 
@@ -193,14 +193,14 @@ export class FeedbackLoopSystem {
     /**
      * Validate and sanitize feedback data to handle corrupted input
      */
-    private validateAndSanitizeFeedback(feedback: any): FeedbackEvent {
+    private validateAndSanitizeFeedback(feedback: any): Omit<FeedbackEvent, 'id'> {
         // Handle null/undefined original feedback
         if (!feedback) {
             throw new CoreError('Feedback cannot be null or undefined', 'INVALID_FEEDBACK');
         }
 
         // Provide defaults for required fields if missing/corrupted
-        const sanitized: any = {
+        const sanitized: Omit<FeedbackEvent, 'id'> = {
             suggestionId: feedback.suggestionId || `fallback-${Date.now()}`,
             type: this.validateFeedbackType(feedback.type) ? feedback.type : 'accept',
             originalSuggestion: feedback.originalSuggestion || 'unknown',

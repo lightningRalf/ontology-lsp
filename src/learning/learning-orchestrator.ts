@@ -424,7 +424,21 @@ export class LearningOrchestrator {
                         case 'team_knowledge':
                             if (this.teamKnowledge) {
                                 const teamInsights = await this.teamKnowledge.generateTeamInsights();
-                                result.insights!.push(...teamInsights);
+                                const convertedInsights: LearningInsight[] = teamInsights.map((ti) => ({
+                                    type:
+                                        ti.type === 'pattern_trend'
+                                            ? 'new_trend'
+                                            : ti.type === 'collaboration_opportunity'
+                                              ? 'user_preference'
+                                              : 'pattern_weakness',
+                                    description: ti.description,
+                                    confidence: ti.confidence,
+                                    actionable: ti.actionable,
+                                    suggestedAction: ti.recommendedAction,
+                                    evidence: ti.evidence.map((e) => String(e)),
+                                    discoveredAt: ti.discoveredAt,
+                                }));
+                                result.insights!.push(...convertedInsights);
                             }
                             break;
                     }
@@ -539,7 +553,7 @@ export class LearningOrchestrator {
     > {
         try {
             const db = (this.sharedServices as any).database;
-            const rows = await db.query<any>(
+            const rows: any[] = await db.query(
                 `SELECT id, pipeline_id, started_at, finished_at, status, metrics
                  FROM pipeline_runs
                  WHERE pipeline_id = ?
@@ -712,7 +726,7 @@ export class LearningOrchestrator {
             } catch {}
         }
 
-        const stats = {
+        const stats: any = {
             totalFeedbackEvents: 0,
             totalEvolutionEvents: 0,
             patternsLearned: 0,
@@ -1357,7 +1371,7 @@ export class LearningOrchestrator {
     private async loadPipelinesFromDatabase(): Promise<void> {
         try {
             const db = (this.sharedServices as any).database;
-            const rows = await db.query<any>(
+            const rows: any[] = await db.query(
                 `SELECT id, name, description, components, trigger, schedule, enabled FROM pipelines`
             );
             for (const row of rows) {
@@ -1439,7 +1453,7 @@ export class LearningOrchestrator {
         teamInsights: any;
         crossSystemCorrelations: any;
     }> {
-        const insights = {
+        const insights: any = {
             feedbackInsights: null,
             evolutionInsights: null,
             teamInsights: null,

@@ -734,6 +734,7 @@ export class PatternLearner extends EventEmitter {
         totalCandidates: number;
         averageConfidence: number;
         topPatterns: Array<{ id: string; occurrences: number; confidence: number }>;
+        metrics: { missingExampleContextTimestamp: number };
     }> {
         const patterns = Array.from(this.patterns.values());
         const activePatterns = patterns.filter((p) => p.confidence >= this.confidenceThreshold);

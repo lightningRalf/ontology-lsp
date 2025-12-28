@@ -643,7 +643,7 @@ export class TeamKnowledgeSystem {
         importerId: string,
         source: string
     ): Promise<{ imported: number; skipped: number; errors: string[] }> {
-        const result = { imported: 0, skipped: 0, errors: [] };
+        const result: { imported: number; skipped: number; errors: string[] } = { imported: 0, skipped: 0, errors: [] };
 
         try {
             for (const patternData of patterns) {
@@ -1622,8 +1622,10 @@ export class TeamKnowledgeSystem {
                 category: 'architectural' as PatternCategory,
                 examples: [],
                 confidence: knowledgeItem.confidence || 0.5,
-                usage_frequency: 0,
-                last_updated: Date.now(),
+                from: [],
+                to: [],
+                occurrences: 0,
+                lastApplied: new Date(),
                 metadata: {
                     tags: knowledgeItem.tags || [],
                     author: knowledgeItem.author,
@@ -1681,8 +1683,10 @@ export class TeamKnowledgeSystem {
                     category: 'architectural' as PatternCategory,
                     examples: [],
                     confidence: pattern.confidence || 0.5,
-                    usage_frequency: 0,
-                    last_updated: Date.now(),
+                    from: [],
+                    to: [],
+                    occurrences: 0,
+                    lastApplied: new Date(),
                     metadata: { context: pattern.context },
                 },
                 contributor: 'system',
@@ -1702,7 +1706,7 @@ export class TeamKnowledgeSystem {
                 metrics: {
                     usageCount: 0,
                     successRate: 0,
-                    averageImpact: 0,
+                    averageConfidence: 0,
                     lastUsed: new Date(),
                 },
             };
@@ -1730,17 +1734,14 @@ export class TeamKnowledgeSystem {
             const validation: PatternValidation = {
                 validatorId: memberId,
                 validatedAt: new Date(),
-                approved: vote === 'approve',
-                confidence: vote === 'approve' ? 0.8 : 0.2,
                 feedback: comment || '',
-                expertise: 0.7,
-                status: vote === 'approve' ? 'approved' : 'rejected',
-                score: vote === 'approve' ? 0.8 : 0.2,
+                status: vote,
+                score: vote === 'approve' ? 4 : 1,
                 criteria: {
-                    correctness: vote === 'approve' ? 0.8 : 0.2,
-                    usefulness: vote === 'approve' ? 0.8 : 0.2,
-                    clarity: vote === 'approve' ? 0.8 : 0.2,
-                    completeness: vote === 'approve' ? 0.8 : 0.2,
+                    correctness: vote === 'approve' ? 4 : 1,
+                    usefulness: vote === 'approve' ? 4 : 1,
+                    clarity: vote === 'approve' ? 4 : 1,
+                    completeness: vote === 'approve' ? 4 : 1,
                 },
             };
 
@@ -1761,8 +1762,8 @@ export class TeamKnowledgeSystem {
                 return { status: 'not_found', votes: [] };
             }
 
-            const approvals = sharedPattern.validations.filter((v) => v.approved).length;
-            const rejections = sharedPattern.validations.filter((v) => !v.approved).length;
+            const approvals = sharedPattern.validations.filter((v) => v.status === 'approve').length;
+            const rejections = sharedPattern.validations.filter((v) => v.status === 'reject').length;
 
             let status = 'pending';
             if (approvals > rejections && approvals >= 2) {
@@ -1775,7 +1776,7 @@ export class TeamKnowledgeSystem {
                 status,
                 votes: sharedPattern.validations.map((v) => ({
                     memberId: v.validatorId,
-                    vote: v.approved ? 'approve' : 'reject',
+                    vote: v.status,
                     comment: v.feedback,
                 })),
             };

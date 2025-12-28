@@ -22,7 +22,8 @@ export interface EvolutionEvent {
         | 'import_added'
         | 'import_removed'
         | 'dependency_added'
-        | 'dependency_removed';
+        | 'dependency_removed'
+        | 'refactoring';
     timestamp: Date;
     file: string;
     before?: {
@@ -42,6 +43,7 @@ export interface EvolutionEvent {
         author?: string;
         branch?: string;
         message?: string;
+        refactoringType?: string;
     };
     impact: {
         filesAffected: number;
