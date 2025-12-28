@@ -79,6 +79,11 @@ export class OverlayStore {
         return Array.from(this.snapshots.values()).sort((a, b) => b.createdAt - a.createdAt);
     }
 
+    /** Clear all in-memory snapshots. Useful for test isolation. */
+    clearAll(): void {
+        this.snapshots.clear();
+    }
+
     async cleanup(maxKeep = 10, maxAgeMs = 3 * 24 * 60 * 60 * 1000): Promise<void> {
         const snaps = this.list();
         const now = Date.now();
@@ -122,7 +127,6 @@ export class OverlayStore {
             if (m) {
                 files.add(m[1].trim());
                 files.add(m[2].trim());
-                continue;
             }
         }
         // Filter obvious non-files

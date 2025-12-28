@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { createCodeAnalyzer } from '../src/core/index.js';
-import { CLIAdapter } from '../src/adapters/cli-adapter.js';
-import { overlayStore } from '../src/core/overlay-store.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { CLIAdapter } from '../src/adapters/cli-adapter.js';
+import { createCodeAnalyzer } from '../src/core/index.js';
+import { overlayStore } from '../src/core/overlay-store.js';
 
 function parseJsonMaybe(s: string): any {
     try {
@@ -15,11 +15,29 @@ function parseJsonMaybe(s: string): any {
 
 describe('CLIAdapter propose_patch + run_checks + apply (unified diff)', () => {
     let cli: CLIAdapter;
-    const targetRel = 'tests/fixtures/example.ts';
+    // Use a unique temp file to avoid conflicts with parallel tests
+    const testId = `cli-unified-${Date.now()}`;
+    const targetRel = `tests/fixtures/temp-${testId}.ts`;
     const targetAbs = path.join(process.cwd(), targetRel);
     const marker = '// cli unified apply_after_checks test';
 
     beforeAll(async () => {
+        // Clear overlay store to ensure test isolation
+        overlayStore.clearAll();
+        // Create a clean temp file for this test
+        const templateContent = `/**
+ * Temp fixture for cli-apply-after-checks-unified test
+ */
+
+export class TestClass {
+    private value: number = 0;
+
+    constructor(initialValue?: number) {
+        this.value = initialValue ?? 0;
+    }
+}
+`;
+        await fs.writeFile(targetAbs, templateContent, 'utf8');
         const analyzer = await createCodeAnalyzer({ workspaceRoot: process.cwd() });
         await (analyzer as any).initialize?.();
         cli = new CLIAdapter(analyzer);
@@ -27,12 +45,16 @@ describe('CLIAdapter propose_patch + run_checks + apply (unified diff)', () => {
     });
 
     afterAll(async () => {
+        // Clean up temp file
+        try {
+            await fs.unlink(targetAbs);
+        } catch {}
         delete process.env.ALLOW_SNAPSHOT_APPLY;
     });
 
     test('stages unified diff, runs checks and applies to working tree', async () => {
         const before = await fs.readFile(targetAbs, 'utf8');
-        const patch = `diff --git a/${targetRel} b/${targetRel}\n--- a/${targetRel}\n+++ b/${targetRel}\n@@ -5,2 +5,3 @@\n export class TestClass {\n+${marker}\n     private value: number = 0;\n`;
+        const patch = `diff --git a/${targetRel} b/${targetRel}\n--- a/${targetRel}\n+++ b/${targetRel}\n@@ -5,2 +5,3 @@\n export class TestClass {\n+    ${marker}\n     private value: number = 0;\n`;
 
         // Stage via CLI adapter
         const staged = await cli.handleProposePatch(patch, { json: true, runChecks: false });

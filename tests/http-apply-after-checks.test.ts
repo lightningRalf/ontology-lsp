@@ -1,4 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import { overlayStore } from '../src/core/overlay-store';
 import { HTTPServer } from '../src/servers/http';
 
 async function callTool(base: string, name: string, args: Record<string, any>) {
@@ -28,8 +31,28 @@ describe('apply_after_checks (guarded apply)', () => {
     const host = '127.0.0.1';
     const port = 7019;
     const base = `http://${host}:${port}`;
+    // Use a unique temp file to avoid conflicts with parallel tests
+    const testId = `http-guarded-${Date.now()}`;
+    const tempFilePath = path.join(process.cwd(), `tests/fixtures/temp-${testId}.ts`);
+    const tempFileRel = `tests/fixtures/temp-${testId}.ts`;
 
     beforeAll(async () => {
+        // Clear overlay store to ensure test isolation
+        overlayStore.clearAll();
+        // Create a clean temp file for this test
+        const templateContent = `/**
+ * Temp fixture for http-apply-after-checks test
+ */
+
+export class TestClass {
+    private value: number = 0;
+
+    constructor(initialValue?: number) {
+        this.value = initialValue ?? 0;
+    }
+}
+`;
+        await fs.writeFile(tempFilePath, templateContent, 'utf8');
         process.env.HTTP_API_PORT = String(port);
         process.env.SNAPSHOT_PARTIAL = '1';
         process.env.ALLOW_SNAPSHOT_APPLY = '1';
@@ -38,6 +61,10 @@ describe('apply_after_checks (guarded apply)', () => {
     });
 
     afterAll(async () => {
+        // Clean up temp file
+        try {
+            await fs.unlink(tempFilePath);
+        } catch {}
         await server.stop();
         delete process.env.HTTP_API_PORT;
         delete process.env.SNAPSHOT_PARTIAL;
@@ -46,7 +73,7 @@ describe('apply_after_checks (guarded apply)', () => {
 
     test('stages patch, runs checks, attempts apply (structured result)', async () => {
         // Using apply_patch format patch: apply may or may not succeed depending on patch engine support.
-        const patch = `*** Begin Patch\n*** Update File: tests/fixtures/example.ts\n@@\n export class TestClass {\n-    private value: number = 0;\n+    // apply_after_checks noop\n+    private value: number = 0;\n*** End Patch\n`;
+        const patch = `*** Begin Patch\n*** Update File: ${tempFileRel}\n@@\n export class TestClass {\n-    private value: number = 0;\n+    // apply_after_checks noop\n+    private value: number = 0;\n*** End Patch\n`;
 
         const res = await callTool(base, 'apply_after_checks', {
             patch,
